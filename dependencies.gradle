@@ -35,19 +35,77 @@
  */
 dependencies {
     elytraModpackVersion {
-        setGtnhVersion("2.9.0-beta-1")
-        attachManifestVersionToJar(true)
+        // 在这配置的gtnh版本 用于自动拉取依赖版本
+        gtnhVersion = "2.9.0-beta-2"
+        // 是否不缓存拉取的依赖清单文件
+        manifestNoCache = false
+        // 是否自动为输出的jar添加 `gtnhVersion` 后缀
+        attachManifestVersionToJar = false
     }
+    implementation("com.github.GTNewHorizons:GT5-Unofficial:5.09.54.27:dev")
+    implementation("com.github.GTNewHorizons:NewHorizonsCoreMod:2.9.10:dev")
+    implementation(gtnhDev("Mobs-Info"))
+    implementation(gtnhDev("Infernal-Mobs"))
+    implementation(gtnhDev("Galaxy-Space-GTNH"))
+    implementation(gtnhDev("SGCraft"))
+    implementation(gtnhDev("twilightforest"))
+    implementation(gtnhDev("Avaritia"))
+    runtimeOnlyNonPublishable(gtnhDev("Avaritiaddons"))
+    runtimeOnlyNonPublishable(gtnhDev("neiaddons"))
+    implementation(gtnhDev("Binnie"))
+    implementation(gtnhDev("BloodMagic"))
+    implementation(gtnhDev("Botania"))
+    implementation(gtnhDev("Draconic-Evolution"))
+    implementation(gtnhDev("EnderIO"))
+    implementation(gtnhDev("Eternal-Singularity"))
+
+    implementation(gtnhDev("NotEnoughItems"))
+    implementation(gtnhDev("supersolarpanels"))
+    implementation(rfg.deobf('curse.maven:advsolar-362768:2885953'))
+    implementation ("net.industrial-craft:industrialcraft-2:2.2.828-experimental:dev")
+
+    implementation(deobfCurse('witchery-69673:2234410'))
+    implementation(gtnhDev("WitcheryExtras"))
+
+    //runtime
+    runtimeOnlyNonPublishable(gtnhDev("OpenComputers"))
+    runtimeOnlyNonPublishable(gtnhDev("ThaumicEnergistics"))
+    runtimeOnlyNonPublishable(gtnhDev("Universal-Singularities"))
+    runtimeOnlyNonPublishable(rfg.deobf("curse.maven:BiomesOPlenty-220318:2499612"))
+    runtimeOnlyNonPublishable(gtnhDev("ForestryMC"))
+    runtimeOnlyNonPublishable(gtnhDev("MagicBees"))
+    runtimeOnlyNonPublishable("thaumcraft:Thaumcraft:1.7.10-4.2.3.5:dev")
+    runtimeOnlyNonPublishable("com.github.GTNewHorizons:Chisel:2.17.5-GTNH:dev")
+    runtimeOnlyNonPublishable(gtnhDev("BetterP2P"))
+    runtimeOnlyNonPublishable(gtnhDev("StructureLib"))
+    runtimeOnlyNonPublishable(gtnhDev("BlockRenderer6343")) { transitive = false }
+    //extra mods
+    runtimeOnlyNonPublishable("com.github.GTNewHorizons:worldedit-gtnh:v0.0.8:dev")
+
+    annotationProcessor('com.google.auto.value:auto-value:1.10.1')
+    implementation('com.google.auto.value:auto-value-annotations:1.10.1')
+
+
+    // jvmDowngrader
+    compileOnly("javax.xml.bind:jaxb-api:2.3.1")
+    compileOnly("org.jetbrains:annotations:26.0.1")
+    compileOnly("org.projectlombok:lombok:1.18.46") { transitive = false }
+    annotationProcessor("org.projectlombok:lombok:1.18.46")
+
     configurations.configureEach {
         exclude group: 'com.github.GTNewHorizons', module: 'Baubles'
     }
+
+    configurations.all {
+        resolutionStrategy {
+            force "com.github.GTNewHorizons:GTNHLib:0.11.14"
+        }
+    }
+
 }
 
 
-String gtnhdev(String name) {
-    project.elytraModpackVersion.gtnhdev(name)
-}
-
-String v(String name) {
-    project.elytraModpackVersion[name]
+@SuppressWarnings('GrMethodMayBeStatic')
+String gtnhDev(String name, String classifier = "dev") {
+    return elytraModpackVersion.gtnh(name, classifier)
 }

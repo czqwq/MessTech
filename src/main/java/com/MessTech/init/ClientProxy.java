@@ -1,4 +1,4 @@
-package com.megatech.init;
+package com.MessTech.init;
 
 public class ClientProxy extends CommonProxy {
 

@@ -3,10 +3,10 @@
 	"modList": [{
 		"modid": "${modId}",
 		"name": "${modName}",
-		"description": "An community mod for GTNH.",
+		"description": "A community mod for GTNH.",
 		"version": "${modVersion}",
 		"mcversion": "${minecraftVersion}",
-		"url": "https://github.com/czqwq/MegaTech",
+		"url": "https://github.com/czqwq/MessTech",
 		"updateUrl": "",
 		"authorList": ["czqwq"],
 		"credits": "",

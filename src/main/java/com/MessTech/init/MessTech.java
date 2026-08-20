@@ -1,6 +1,5 @@
-package com.megatech.init;
+package com.MessTech.init;
 
-import com.megatech.init.Tags;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -11,13 +10,18 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
-@Mod(modid = MegaTech.MODID, version = Tags.VERSION, name = "MegaTech", acceptedMinecraftVersions = "[1.7.10]")
-public class MegaTech {
+@Mod(
+    modid = MessTech.MODID,
+    version = com.MessTech.init.Tags.VERSION,
+    name = "MessTech",
+    acceptedMinecraftVersions = "[1.7.10]",
+    dependencies = "required-after:gregtech; required-after:tectech; required-after:structurelib")
+public class MessTech {
 
-    public static final String MODID = "MegaTech";
+    public static final String MODID = "MessTech";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
-    @SidedProxy(clientSide = "com.megatech.init.ClientProxy", serverSide = "com.megatech.init.CommonProxy")
+    @SidedProxy(clientSide = "com.MessTech.init.ClientProxy", serverSide = "com.MessTech.init.CommonProxy")
     public static CommonProxy proxy;
 
     @Mod.EventHandler
