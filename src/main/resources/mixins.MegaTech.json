@@ -4,7 +4,7 @@
   "mixinextras": {
     "minVersion": "0.5.0"
   },
-  "package": "com.czqwq.MessTech.mixin",
+  "package": "com.MessTech.mixin",
   "refmap": "mixins.MessTech.refmap.json",
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
