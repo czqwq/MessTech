@@ -1,0 +1,22 @@
+# --- MTDTPF 结构提示 ---
+misc.structure_tooltip.reactor_coil=反应堆线圈方块 (A)
+misc.structure_tooltip.fusion_machine_casing=聚变机械方块 (B)
+
+# --- MTDTPF 结构错误 ---
+structure.error.tier_mismatch=反应堆线圈方块等级 (%1$s) 与 聚变机械方块等级 (%2$s) 不匹配!
+
+# --- MTDTPF 状态 ---
+machine.dtpf.perfectoverclock=超频状态
+machine.dtpf.perfectoverclock.on=无损超频喵
+machine.dtpf.perfectoverclock.off=有损超频,zako~
+machine.dtpf.machinelevel=机器等级
+machine.dtpf.runtime=运行时间
+
+# --- MTDTPF tooltip ---
+machine.dtpf.tooltip.runtime=持续运行3600s后获得满效率
+machine.dtpf.tooltip.runtime.ramp=未满3600s: 无耗电/时长减免
+machine.dtpf.tooltip.runtime.maxparallel=最大并行: (1+机器等级-配方等级)×64
+machine.dtpf.tooltip.runtime.maxeff=满效率: 耗电|配方时长减半
+
+# --- MTDTPF 机器名
+machine.dtpf.name=超维度等离子聚变堆

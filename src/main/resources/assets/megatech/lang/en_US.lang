@@ -1,0 +1,22 @@
+# --- MTDTPF structure tooltips ---
+misc.structure_tooltip.reactor_coil=Reactor Coil Block (A)
+misc.structure_tooltip.fusion_machine_casing=Fusion Machine Casing (B)
+
+# --- MTDTPF structure errors ---
+structure.error.tier_mismatch=Reactor coil tier (%1$s) does not match the fusion machine casing tier (%2$s)!
+
+# --- MTDTPF state ---
+machine.dtpf.perfectoverclock=Perfect Overclock
+machine.dtpf.perfectoverclock.on=Enabled
+machine.dtpf.perfectoverclock.off=Disabled
+machine.dtpf.machinelevel=Machine Level
+machine.dtpf.runtime=Runtime
+
+# --- MTDTPF tooltip ---
+machine.dtpf.tooltip.runtime=Full efficiency after 3600s of continuous running
+machine.dtpf.tooltip.runtime.ramp=Below 3600s: no EU/duration reduction
+machine.dtpf.tooltip.runtime.maxparallel=Max parallel: (1+machine tier-recipe tier)×64
+machine.dtpf.tooltip.runtime.maxeff=At full efficiency: EU|duration halved
+
+# --- MTDTPF 机器名 ---
+machine.dtpf.name=Dimensionally Transcendent Plasma Fusion Computer
