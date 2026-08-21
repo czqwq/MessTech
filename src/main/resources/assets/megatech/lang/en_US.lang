@@ -8,15 +8,23 @@ structure.error.tier_mismatch=Reactor coil tier (%1$s) does not match the fusion
 # --- MTDTPF state ---
 machine.dtpf.perfectoverclock=Perfect Overclock
 machine.dtpf.perfectoverclock.on=Enabled
+machine.dtpf.perfectoverclock.on.spec=Enabled~Nya
 machine.dtpf.perfectoverclock.off=Disabled
 machine.dtpf.machinelevel=Machine Level
 machine.dtpf.runtime=Runtime
+machine.dtpf.wireless=Wireless Mode
+machine.dtpf.wireless.tooltip.0=Draw power directly from the wireless network
+machine.dtpf.wireless.tooltip.1=Requires Astral Array Fabricator and MK-V machine tier
+machine.dtpf.wireless.tooltip.2=Right-click to set wireless parallel (max 2147483647)
+machine.dtpf.wireless.parallel=Wireless Parallel
 
 # --- MTDTPF tooltip ---
 machine.dtpf.tooltip.runtime=Full efficiency after 3600s of continuous running
 machine.dtpf.tooltip.runtime.ramp=Below 3600s: no EU/duration reduction
 machine.dtpf.tooltip.runtime.maxparallel=Max parallel: (1+machine tier-recipe tier)×64
 machine.dtpf.tooltip.runtime.maxeff=At full efficiency: EU|duration halved
+machine.dtpf.tooltip.wireless.parallel=Wireless mode: selectable parallel (up to 2147483647)
+machine.dtpf.tooltip.wireless.discount=Wireless mode: fixed 0.75 EU/duration discount, runtime ramp disabled
 
-# --- MTDTPF 机器名 ---
+# --- MTDTPF Machine Name ---
 machine.dtpf.name=Dimensionally Transcendent Plasma Fusion Computer

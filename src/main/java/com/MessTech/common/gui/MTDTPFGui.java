@@ -2,7 +2,6 @@ package com.MessTech.common.gui;
 
 import static net.minecraft.util.StatCollector.translateToLocal;
 
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 
 import com.MessTech.common.machine.MTDTPF;
@@ -19,16 +18,14 @@ import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 
-import gregtech.api.enums.ItemList;
 import gregtech.api.modularui2.GTGuiTextures;
 import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 
 /**
- * DTPF (Plasma Forge) style GUI, ported from
- * {@code gregtech.common.gui.modularui.multiblock.MTEPlasmaForgeGui}.
+ * DTPF (Plasma Forge) style GUI with a wireless-mode toggle button.
  * <p>
- * Only the UI / button plumbing is ported so far: the convergence toggle and the catalyst-type
- * selector panel. The machine does not implement convergence / catalyst behaviour yet.
+ * Left-click toggles wireless mode; right-click opens the wireless parallel selector.
+ * The parallel selector is the same pattern as {@code MTETranscendentPlasmaMixerGui}.
  */
 public class MTDTPFGui extends MTEMultiBlockBaseGui<MTDTPF> {
 
@@ -39,86 +36,82 @@ public class MTDTPFGui extends MTEMultiBlockBaseGui<MTDTPF> {
     @Override
     protected void registerSyncValues(PanelSyncManager syncManager) {
         super.registerSyncValues(syncManager);
-        BooleanSyncValue convergenceSyncer = new BooleanSyncValue(
-            multiblock::getConvergenceStatus,
-            multiblock::setConvergenceStatus).allowC2S();
-        syncManager.syncValue("convergence", convergenceSyncer);
-        IntSyncValue catalystTypeSyncer = new IntSyncValue(
-            multiblock::getCatalystTypeForRecipesWithoutCatalyst,
-            multiblock::setCatalystTypeForRecipesWithoutCatalyst).allowC2S();
-        syncManager.syncValue("catalystType", catalystTypeSyncer);
+        syncManager.syncValue("wirelessFunc", new BooleanSyncValue(multiblock::isWirelessModeAvailable));
+        syncManager.syncValue(
+            "wireless",
+            new BooleanSyncValue(multiblock::isWirelessModeEnabled, multiblock::setEnableWireless).allowC2S());
+        syncManager.syncValue(
+            "wirelessParallel",
+            new IntSyncValue(multiblock::getWirelessParallel, multiblock::setWirelessParallel).allowC2S());
     }
 
     @Override
     protected Flow createButtonColumn(ModularPanel panel, PanelSyncManager syncManager) {
-        return super.createButtonColumn(panel, syncManager).child(createConvergenceButton(syncManager, panel));
+        return super.createButtonColumn(panel, syncManager).child(createWirelessButton(syncManager, panel));
     }
 
-    protected IWidget createConvergenceButton(PanelSyncManager syncManager, ModularPanel parent) {
-        IPanelHandler catalystSelectPanel = syncManager
-            .syncedPanel("catalystPanel", true, (p_syncManager, syncHandler) -> openCatalystPanel(syncManager, parent));
+    protected IWidget createWirelessButton(PanelSyncManager syncManager, ModularPanel parent) {
+        IPanelHandler parallelSelectPanel = syncManager.syncedPanel(
+            "wirelessParallelPanel",
+            true,
+            (p_syncManager, syncHandler) -> openParallelSelectPanel(syncManager, parent));
 
-        BooleanSyncValue convergenceSyncer = syncManager.findSyncHandler("convergence", BooleanSyncValue.class);
+        BooleanSyncValue wirelessFuncSyncer = syncManager.findSyncHandler("wirelessFunc", BooleanSyncValue.class);
+        BooleanSyncValue wirelessSyncer = syncManager.findSyncHandler("wireless", BooleanSyncValue.class);
         return new ButtonWidget<>().marginBottom(2)
             .tooltip(
-                t -> t.addLine(translateToLocal("GT5U.DTPF.convergencebutton"))
-                    .addLine(EnumChatFormatting.GRAY + translateToLocal("GT5U.DTPF.convergencebuttontooltip.0"))
-                    .addLine(EnumChatFormatting.GRAY + translateToLocal("GT5U.DTPF.convergencebuttontooltip.1")))
+                t -> t.addLine(translateToLocal("machine.dtpf.wireless"))
+                    .addLine(EnumChatFormatting.GRAY + translateToLocal("machine.dtpf.wireless.tooltip.0"))
+                    .addLine(EnumChatFormatting.GRAY + translateToLocal("machine.dtpf.wireless.tooltip.1"))
+                    .addLine(EnumChatFormatting.GRAY + translateToLocal("machine.dtpf.wireless.tooltip.2")))
             .overlay(new DynamicDrawable(() -> {
-                boolean convergenceActive = convergenceSyncer.getBoolValue();
-                if (convergenceActive) {
+                if (wirelessFuncSyncer.getBoolValue() && wirelessSyncer.getBoolValue()) {
                     return GTGuiTextures.TT_SAFE_VOID_ON;
                 }
                 return GTGuiTextures.TT_SAFE_VOID_OFF;
             }))
             .onMousePressed(mouseButton -> {
-                if (mouseButton == 1) { // right click, open ui
-                    if (!catalystSelectPanel.isPanelOpen()) {
-                        catalystSelectPanel.openPanel();
+                if (mouseButton == 1) { // right click: open wireless parallel selector
+                    if (!parallelSelectPanel.isPanelOpen()) {
+                        parallelSelectPanel.openPanel();
                     } else {
-                        catalystSelectPanel.closePanel();
+                        parallelSelectPanel.closePanel();
                     }
-                } else if (mouseButton == 0) { // left click, toggle convergence value
-                    ItemStack controllerStack = multiblock.getControllerSlot();
-                    if (controllerStack == null) return false;
-                    if (!controllerStack.isItemEqual(ItemList.Transdimensional_Alignment_Matrix.get(1))) return false;
-
-                    convergenceSyncer.setBoolValue(!convergenceSyncer.getBoolValue());
+                } else if (mouseButton == 0 && wirelessFuncSyncer.getBoolValue()) { // left click: toggle wireless
+                    wirelessSyncer.setBoolValue(!wirelessSyncer.getBoolValue());
                 }
-
                 return true;
             });
     }
 
-    private static final int WIDTH = 60;
-    private static final int HEIGHT = 52;
+    private static final int WIDTH = 120;
+    private static final int HEIGHT = 50;
     private static final int PADDING_SIDES = 4;
 
-    private ModularPanel openCatalystPanel(PanelSyncManager syncManager, ModularPanel parent) {
-        ModularPanel returnPanel = new ModularPanel("catalystPanel").size(WIDTH, HEIGHT)
+    private ModularPanel openParallelSelectPanel(PanelSyncManager syncManager, ModularPanel parent) {
+        ModularPanel returnPanel = new ModularPanel("wirelessParallelPanel").size(WIDTH, HEIGHT)
             .relative(parent)
             .leftRel(1)
-            .topRel(0.9f);
-        IntSyncValue catalystSyncer = syncManager.findSyncHandler("catalystType", IntSyncValue.class);
+            .topRel(0.8f);
+
+        IntSyncValue parallelSyncer = syncManager.findSyncHandler("wirelessParallel", IntSyncValue.class);
         Flow holdingColumn = Flow.column()
             .full()
             .paddingTop(4);
         holdingColumn.child(
-            IKey.lang("GT5U.DTPF.catalysttier")
-                .alignment(Alignment.Center)
+            IKey.lang("machine.dtpf.wireless.parallel")
                 .asWidget()
-                .marginBottom(2));
+                .marginBottom(4));
         holdingColumn.child(
             new TextFieldWidget().formatAsInteger(true)
-                .numbersInt(1, 5)
+                .numbersInt(1, Integer.MAX_VALUE)
                 .setTextAlignment(Alignment.CENTER)
                 .defaultNumber(1)
-                .value(catalystSyncer)
+                .value(parallelSyncer)
                 .size(WIDTH - PADDING_SIDES * 2, 18));
 
         returnPanel.child(holdingColumn);
 
         return returnPanel;
     }
-
 }

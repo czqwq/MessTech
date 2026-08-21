@@ -4,8 +4,10 @@ import static com.gtnewhorizon.structurelib.structure.StructureUtility.ofBlock;
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.ofBlocksTiered;
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
 import static gregtech.api.enums.GTValues.VN;
+import static gregtech.common.misc.WirelessNetworkManager.getUserEU;
 import static net.minecraft.util.StatCollector.translateToLocal;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -45,11 +47,13 @@ import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.ICasingTextureProvider;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.logic.ProcessingLogic;
+import gregtech.api.metatileentity.GregTechTileClientEvents;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.RecipeMaps;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.render.TextureFactory;
+import gregtech.api.structure.error.ErrorType;
 import gregtech.api.structure.error.StructureError;
 import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.structure.error.TranslatableText;
@@ -57,12 +61,15 @@ import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.MultiblockTooltipBuilder;
+import gregtech.api.util.OverclockCalculator;
+import gregtech.api.util.ParallelHelper;
 import gtPlusPlus.core.block.ModBlocks;
 import gtPlusPlus.xmod.gregtech.common.blocks.textures.TexturesGtBlock;
 import lombok.Getter;
 import lombok.Setter;
 import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
+import tectech.thing.CustomItemList;
 
 public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConstructable, ICasingTextureProvider {
 
@@ -72,6 +79,22 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
 
     public MTDTPF(String aName) {
         super(aName);
+    }
+
+    /**
+     * 控制器槽位是否放入星阵
+     * 控制器槽是同步的库存槽,客户端永远最新,GUI 按钮以此作为门槛
+     */
+    public void detecttier() {
+        this.EnableWirelessFunc = hasAAF() && isTierAtLeast(5);
+        if (!EnableWirelessFunc) {
+            this.EnableWireless = false;
+        }
+    }
+
+    public boolean hasAAF() {
+        ItemStack aGuiStack = this.getControllerSlot();
+        return aGuiStack != null && GTUtility.areStacksEqual(aGuiStack, CustomItemList.astralArrayFabricator.get(1));
     }
 
     // region Structure piece offsets (structure_string is transposed; controller '~' ends up at x=16, y=29, z=16)
@@ -227,6 +250,33 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
     private int fusionMachineTier = LevelTier.INVALID_TIER;
     @Getter
     private LevelTier levelTier = LevelTier.INVALID;
+    /** Client-synced tier used for the controller's side texture; INVALID is rendered as MKI (1). */
+    private int renderTier = 1;
+    @Getter
+    @Setter
+    private boolean EnableWirelessFunc = false;
+    @Getter
+    private boolean EnableWireless = false;
+    @Getter
+    private int wirelessParallel = 1;
+
+    @Override
+    public boolean isWirelessModeAvailable() {
+        return EnableWirelessFunc;
+    }
+
+    @Override
+    public boolean isWirelessModeEnabled() {
+        return EnableWireless;
+    }
+
+    public void setEnableWireless(boolean value) {
+        this.EnableWireless = value && EnableWirelessFunc && areEnergyHatchesEmpty();
+    }
+
+    public void setWirelessParallel(int value) {
+        this.wirelessParallel = Math.max(1, value);
+    }
 
     /** Structure tier as a plain int (1..5), or -1 ({@link LevelTier#INVALID_TIER}) if not formed / mismatched. */
     public int getStructureTier() {
@@ -304,6 +354,8 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
     public void saveNBTData(NBTTagCompound aNBT) {
         aNBT.setInteger("catalystType", catalystTypeForRecipesWithoutCatalyst);
         aNBT.setBoolean("convergence", convergence);
+        aNBT.setBoolean("enableWireless", EnableWireless);
+        aNBT.setInteger("wirelessParallel", wirelessParallel);
         aNBT.setLong("eRunningTime", running_time);
         super.saveNBTData(aNBT);
     }
@@ -312,6 +364,8 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
     public void loadNBTData(NBTTagCompound aNBT) {
         if (aNBT.hasKey("catalystType")) catalystTypeForRecipesWithoutCatalyst = aNBT.getInteger("catalystType");
         convergence = aNBT.getBoolean("convergence");
+        if (aNBT.hasKey("enableWireless")) EnableWireless = aNBT.getBoolean("enableWireless");
+        if (aNBT.hasKey("wirelessParallel")) wirelessParallel = Math.max(1, aNBT.getInteger("wirelessParallel"));
         if (aNBT.hasKey("eRunningTime")) running_time = aNBT.getLong("eRunningTime");
         super.loadNBTData(aNBT);
     }
@@ -330,18 +384,24 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
 
     @Override
     protected float getEuModifier() {
-        // EU/t bonus only kicks in after 3600s: 1.0 (no reduction) until then, 0.5 at/after full runtime.
+        // Wireless mode: fixed 0.75 EU discount, independent of the 3600s runtime ramp.
+        if (isEnableWireless()) return 0.75F;
+        // Wired mode: EU/t bonus only kicks in after 3600s: 1.0 (no reduction) until then, 0.5 at/after full runtime.
         return getRuntimeProgress() >= 1.0 ? 0.5F : 1.0F;
     }
 
     @Override
     protected float getSpeedBonus() {
-        // durationModifier: 1.0 = normal time; only at 3600s does it become 0.5 (half recipe time).
+        // Wireless mode: fixed 0.75 duration modifier, independent of the 3600s runtime ramp.
+        if (isEnableWireless()) return 0.75F;
+        // Wired mode: durationModifier: 1.0 = normal time; only at 3600s does it become 0.5 (half recipe time).
         return getRuntimeProgress() >= 1.0 ? 0.5F : 1.0F;
     }
 
     @Override
     public int getMaxParallelRecipes() {
+        // Wireless mode uses the player-selected parallel cap (like the Transcendent Plasma Mixer).
+        if (isEnableWireless()) return Math.max(1, wirelessParallel);
         // Upper-bound fallback for the GUI / before a recipe is selected.
         // The actual parallel is set per recipe in validateRecipe:
         // maxParallel = (1 + machineTier - recipeTier) * 64, min 1.
@@ -542,7 +602,13 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
     @Override
     public String[] getInfoData() {
         List<String> infoData = new ArrayList<>();
-        if (isTierAtLeast(5)) {
+        if (getLevelTier() == LevelTier.TIER5) {
+            infoData.add(
+                translateToLocal("machine.dtpf.perfectoverclock") + ": "
+                    + EnumChatFormatting.YELLOW
+                    + translateToLocal("machine.dtpf.perfectoverclock.on.spec")
+                    + EnumChatFormatting.RESET);
+        } else if (getLevelTier() == LevelTier.TIER4) {
             infoData.add(
                 translateToLocal("machine.dtpf.perfectoverclock") + ": "
                     + EnumChatFormatting.YELLOW
@@ -573,8 +639,36 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
             public CheckRecipeResult process() {
                 setEuModifier(getEuModifier());
                 setSpeedBonus(getSpeedBonus());
-                setOverclock(isEnablePerfectOverclock() ? 4 : 2, 4);
+                setOverclock(isEnablePerfectOverclock() ? 4 : 2, isTierAtLeast(4) ? 2 : 4);
+                // level 5->4 speed 2 power
+                // level 4->2 speed 2 power
+                // level 1-3->2 speed 4 power
                 return super.process();
+            }
+
+            @NotNull
+            @Override
+            protected ParallelHelper createParallelHelper(@NotNull GTRecipe recipe) {
+                ParallelHelper helper = super.createParallelHelper(recipe);
+                if (isEnableWireless()) {
+                    // Wireless power is consumed directly from the network in onRecipeStart,
+                    // so do not let ParallelHelper consume inputs before that check.
+                    helper.setConsumption(false);
+                }
+                return helper;
+            }
+
+            @NotNull
+            @Override
+            protected OverclockCalculator createOverclockCalculator(@NotNull GTRecipe recipe) {
+                // Wireless mode follows MTETranscendentPlasmaMixer's no-overclock behaviour, but keeps
+                // MTDTPF's runtime efficiency modifiers so the wireless cost matches what is actually paid.
+                if (isEnableWireless()) {
+                    return OverclockCalculator.ofNoOverclock(recipe)
+                        .setEUtDiscount(getEuModifier())
+                        .setDurationModifier(getSpeedBonus());
+                }
+                return super.createOverclockCalculator(recipe);
             }
 
             @NotNull
@@ -585,19 +679,81 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
                     return CheckRecipeResultRegistry.insufficientPower(recipe.mEUt);
                 }
 
-                // Parallel = (1 + machine tier - recipe tier) * 64, min 1.
-                // Recipe tier is the GT voltage tier mapped to MKI..MKV scale (LuV=1, ZPM=2, ... UEV=5).
-                int recipeTier = Math.max(1, GTUtility.getTier(recipe.mEUt) - 5);
-                maxParallel = Math.max(1, (1 + current.tier - recipeTier) * 64);
+                if (isEnableWireless()) {
+                    // Wireless mode uses the player-selected parallel cap (like the Transcendent Plasma Mixer).
+                    maxParallel = Math.max(1, wirelessParallel);
+                } else {
+                    // Parallel = (1 + machine tier - recipe tier) * 64, min 1.
+                    // Recipe tier is the GT voltage tier mapped to MKI..MKV scale (LuV=1, ZPM=2, ... UEV=5).
+                    int recipeTier = Math.max(1, GTUtility.getTier(recipe.mEUt) - 5);
+                    maxParallel = Math.max(1, (1 + current.tier - recipeTier) * 64);
+                }
 
                 // Same restriction as the Fusion Computer, but without the startup-energy system:
                 // a tier can only do recipes of its own voltage tier and below.
                 if (recipe.mEUt > GTValues.V[current.voltageTier]) {
                     return CheckRecipeResultRegistry.insufficientPower(recipe.mEUt);
                 }
+
+                // Wireless mode: mimic MTETranscendentPlasmaMixer and cap the parallel to what the
+                // global wireless balance can actually pay for. This check happens before any input is consumed.
+                long wirelessEUt = recipe.mEUt;
+                int wirelessDuration = recipe.mDuration;
+                if (isEnableWireless()) {
+                    wirelessEUt = (long) Math.ceil(recipe.mEUt * getEuModifier());
+                    wirelessDuration = (int) Math.ceil(recipe.mDuration * getSpeedBonus());
+                    BigInteger recipeEU = BigInteger.valueOf(wirelessEUt)
+                        .multiply(BigInteger.valueOf(wirelessDuration));
+                    if (ownerUUID == null || getUserEU(ownerUUID).compareTo(recipeEU) < 0) {
+                        return CheckRecipeResultRegistry.insufficientStartupPower(recipeEU);
+                    }
+                    maxParallel = getUserEU(ownerUUID).divide(recipeEU)
+                        .min(BigInteger.valueOf(maxParallel))
+                        .intValue();
+                }
+
+                // Wireless mode: final shared safety check before input consumption.
+                CheckRecipeResult wirelessResult = checkWirelessPower(wirelessEUt, wirelessDuration, maxParallel);
+                if (!wirelessResult.wasSuccessful()) {
+                    return wirelessResult;
+                }
                 return CheckRecipeResultRegistry.SUCCESSFUL;
             }
+
+            @NotNull
+            @Override
+            protected CheckRecipeResult onRecipeStart(@NotNull GTRecipe recipe) {
+                if (isEnableWireless()) {
+                    CheckRecipeResult wirelessResult = startWirelessRecipe(
+                        recipe,
+                        calculatedParallels,
+                        calculatedEut,
+                        duration,
+                        inputFluids,
+                        inputItems);
+                    if (!wirelessResult.wasSuccessful()) {
+                        return wirelessResult;
+                    }
+                    // Power was already deducted from the wireless network in one lump; don't also drain hatches.
+                    overwriteCalculatedEut(0);
+                }
+                return super.onRecipeStart(recipe);
+            }
         }.setMaxParallelSupplier(this::getLimitedMaxParallel);
+    }
+
+    @Override
+    protected void setProcessingLogicPower(ProcessingLogic logic) {
+        if (isEnableWireless()) {
+            // Wireless mode pulls directly from the global wireless network, so the machine has no
+            // energy-hatch voltage limit to respect (same idea as MTETranscendentPlasmaMixer).
+            logic.setAvailableVoltage(Long.MAX_VALUE);
+            logic.setAvailableAmperage(1);
+            logic.setAmperageOC(false);
+            logic.setUnlimitedTierSkips();
+        } else {
+            super.setProcessingLogicPower(logic);
+        }
     }
 
     @Override
@@ -609,6 +765,8 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
             .addInfo(EnumChatFormatting.GRAY + translateToLocal("machine.dtpf.tooltip.runtime.ramp"))
             .addInfo(EnumChatFormatting.GOLD + translateToLocal("machine.dtpf.tooltip.runtime.maxparallel"))
             .addInfo(EnumChatFormatting.AQUA + translateToLocal("machine.dtpf.tooltip.runtime.maxeff"))
+            .addInfo(EnumChatFormatting.LIGHT_PURPLE + translateToLocal("machine.dtpf.tooltip.wireless.parallel"))
+            .addInfo(EnumChatFormatting.LIGHT_PURPLE + translateToLocal("machine.dtpf.tooltip.wireless.discount"))
             .addStructureInfo("")
             .toolTipFinisher();
         return tt;
@@ -617,17 +775,30 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
     @NotNull
     @Override
     public CheckRecipeResult checkProcessing() {
+        detecttier();
         CheckRecipeResult result = super.checkProcessing();
-        if (result.wasSuccessful()) {
+        if (result.wasSuccessful() && !isEnableWireless()) {
             running_time += mMaxProgresstime;
         }
         return result;
     }
 
     @Override
+    public void onPreTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
+        super.onPreTick(aBaseMetaTileEntity, aTick);
+        if (aBaseMetaTileEntity.isServerSide()) {
+            if (ownerUUID == null) {
+                initWirelessNetwork(aBaseMetaTileEntity);
+            }
+            // do not add dectecttier here,it causes large lag in server thread
+            // detecttier();
+        }
+    }
+
+    @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         super.onPostTick(aBaseMetaTileEntity, aTick);
-        if (aBaseMetaTileEntity.isServerSide() && mMaxProgresstime == 0) {
+        if (aBaseMetaTileEntity.isServerSide() && mMaxProgresstime == 0 && !isEnableWireless()) {
             running_time = Math.max(0, running_time - EFFICIENCY_DECAY_RATE);
         }
     }
@@ -658,6 +829,8 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
         setFusionCoilTier(LevelTier.INVALID_TIER);
         setFusionMachineTier(LevelTier.INVALID_TIER);
         levelTier = LevelTier.INVALID;
+        renderTier = 1; // INVALID is rendered as MKI
+        aBaseMetaTileEntity.sendBlockEvent(GregTechTileClientEvents.CHANGE_CUSTOM_DATA, getUpdateData());
 
         if (!checkPiece(STRUCTURE_PIECE_MAIN, HORIZONTAL_OFFSET, VERTICAL_OFFSET, DEPTH_OFFSET, errors)) return;
 
@@ -675,11 +848,28 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
         }
 
         levelTier = coilLevel; // coilLevel == machineLevel
+        renderTier = coilLevel.tier;
+        detecttier();
+        aBaseMetaTileEntity.sendBlockEvent(GregTechTileClientEvents.CHANGE_CUSTOM_DATA, getUpdateData());
 
         // D compartments: input/output bus & hatch, and energy hatch requirements.
+        // In wireless mode the machine draws directly from the global wireless network, so normal
+        // energy hatches are forbidden (and are not used).
         checkHasAnyInput(errors);
         checkHasAnyOutput(errors);
-        checkHasAnyEnergy(errors);
+        if (EnableWireless) {
+            if (!areEnergyHatchesEmpty()) {
+                errors.add(
+                    StructureErrors.hatchCount(
+                        ErrorType.TOO_MANY,
+                        HatchElement.Energy,
+                        mEnergyHatches.size() + mExoticEnergyHatches.size(),
+                        0));
+                return;
+            }
+        } else {
+            checkHasAnyEnergy(errors);
+        }
     }
 
     @Override
@@ -713,9 +903,24 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
         return succeed;
     }
 
+    @Override
+    public byte getUpdateData() {
+        // Send the render tier (1..5) to the client; INVALID is sent as 1 (MKI).
+        return (byte) renderTier;
+    }
+
+    @Override
+    public void receiveClientEvent(byte aEventID, byte aValue) {
+        super.receiveClientEvent(aEventID, aValue);
+        if (aEventID == GregTechTileClientEvents.CHANGE_CUSTOM_DATA && aValue >= 1 && aValue <= 5) {
+            renderTier = aValue;
+        }
+    }
+
     /**
-     * Front face (side == facing) uses the Large Fusion Computer Mk-V style, other faces use the
-     * Plasma Forge (DTPF) casing material.
+     * Front face (side == facing) uses the Large Fusion Computer Mk-V style; other faces use the
+     * fusion machine casing texture matching the current machine tier (INVALID falls back to MKI),
+     * similar to how MTEPreciseAssembler varies its side texture by casing tier.
      */
     @Override
     public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity, ForgeDirection side, ForgeDirection facing,
@@ -727,8 +932,14 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
                 .extFacing()
                 .build(), getTextureOverlay() };
         }
-        // Other faces: DTPF (Plasma Forge) casing material.
-        return new ITexture[] { getCasingTexture() };
+        // Other faces: tier-dependent fusion machine casing (INVALID -> MKI).
+        // Use TextureFactory.of(block, meta) directly so the side uses the actual block icon;
+        // this avoids missing casing-texture entries for GT++/higher-tier casings.
+        LevelTier textureTier = LevelTier.fromTier(renderTier);
+        if (!textureTier.isValid()) {
+            textureTier = LevelTier.TIER1;
+        }
+        return new ITexture[] { TextureFactory.of(textureTier.machineBlock, textureTier.machineMeta) };
     }
 
     @Override

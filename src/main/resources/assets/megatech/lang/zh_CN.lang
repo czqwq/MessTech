@@ -7,16 +7,24 @@ structure.error.tier_mismatch=反应堆线圈方块等级 (%1$s) 与 聚变机�
 
 # --- MTDTPF 状态 ---
 machine.dtpf.perfectoverclock=超频状态
-machine.dtpf.perfectoverclock.on=无损超频喵
+machine.dtpf.perfectoverclock.on=无损超频
+machine.dtpf.perfectoverclock.on.spec=无损超频喵
 machine.dtpf.perfectoverclock.off=有损超频,zako~
 machine.dtpf.machinelevel=机器等级
 machine.dtpf.runtime=运行时间
+machine.dtpf.wireless=无线模式
+machine.dtpf.wireless.tooltip.0=直接从无线电网取电
+machine.dtpf.wireless.tooltip.1=需要星阵且机器结构等级达到MK-V
+machine.dtpf.wireless.tooltip.2=右键设置无线并行数(最大2147483647)
+machine.dtpf.wireless.parallel=无线并行
 
 # --- MTDTPF tooltip ---
 machine.dtpf.tooltip.runtime=持续运行3600s后获得满效率
 machine.dtpf.tooltip.runtime.ramp=未满3600s: 无耗电/时长减免
 machine.dtpf.tooltip.runtime.maxparallel=最大并行: (1+机器等级-配方等级)×64
 machine.dtpf.tooltip.runtime.maxeff=满效率: 耗电|配方时长减半
+machine.dtpf.tooltip.wireless.parallel=无线模式: 可自定义并行数(最大2147483647)
+machine.dtpf.tooltip.wireless.discount=无线模式: 固定耗电/时长七五折,运行时间增益禁用
 
 # --- MTDTPF 机器名
 machine.dtpf.name=超维度等离子聚变堆

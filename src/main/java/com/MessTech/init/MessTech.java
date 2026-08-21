@@ -3,11 +3,15 @@ package com.MessTech.init;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.MessTech.common.recipe.GTRecipes;
+
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLLoadCompleteEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
+import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 
 @Mod(
@@ -20,6 +24,7 @@ public class MessTech {
 
     public static final String MODID = "MessTech";
     public static final Logger LOG = LogManager.getLogger(MODID);
+    public static final Logger MT_LOG = LogManager.getLogger(MODID);
 
     @SidedProxy(clientSide = "com.MessTech.init.ClientProxy", serverSide = "com.MessTech.init.CommonProxy")
     public static CommonProxy proxy;
@@ -47,5 +52,15 @@ public class MessTech {
     // register server commands in this event handler (Remove if not needed)
     public void serverStarting(FMLServerStartingEvent event) {
         proxy.serverStarting(event);
+    }
+
+    @Mod.EventHandler
+    public void completeInit(FMLLoadCompleteEvent event) {
+        GTRecipes.loadRecipes();
+    }
+
+    @Mod.EventHandler
+    public void serverStarted(FMLServerStartedEvent event) {
+        proxy.serverStarted(event);
     }
 }

@@ -4,12 +4,17 @@ import static com.MessTech.common.util.Utils.filterValidMTEs;
 import static gregtech.GTMod.GT;
 import static gregtech.api.enums.GTValues.VN;
 import static gregtech.api.metatileentity.BaseTileEntity.TOOLTIP_DELAY;
+import static gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap;
+import static gregtech.common.misc.WirelessNetworkManager.getUserEU;
+import static gregtech.common.misc.WirelessNetworkManager.processInitialSettings;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.annotation.Nonnull;
 
@@ -58,6 +63,7 @@ import gregtech.api.metatileentity.implementations.MTEHatchMultiInput;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.threads.RunnableSound;
+import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTUtility;
 import gregtech.client.GTSoundLoop;
 import gregtech.common.tileentities.machines.IDualInputHatch;
@@ -89,6 +95,81 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         mSolderingTool = true;
         mWrench = true;
     }
+
+    // region Wireless network support (shared by MessTech multiblocks)
+    protected UUID ownerUUID;
+
+    /** Whether the wireless feature is currently available (e.g. AAF + max tier). */
+    public boolean isWirelessModeAvailable() {
+        return false;
+    }
+
+    /** Whether the player has activated wireless mode through the GUI. */
+    public boolean isWirelessModeEnabled() {
+        return false;
+    }
+
+    protected boolean isWirelessModeActive() {
+        return isWirelessModeAvailable() && isWirelessModeEnabled();
+    }
+
+    public boolean areEnergyHatchesEmpty() {
+        return mEnergyHatches.isEmpty() && mExoticEnergyHatches.isEmpty();
+    }
+
+    protected void initWirelessNetwork(IGregTechTileEntity aBaseMetaTileEntity) {
+        if (aBaseMetaTileEntity.isServerSide()) {
+            ownerUUID = processInitialSettings(aBaseMetaTileEntity);
+        }
+    }
+
+    @Override
+    public void onFirstTick(IGregTechTileEntity aBaseMetaTileEntity) {
+        super.onFirstTick(aBaseMetaTileEntity);
+        if (aBaseMetaTileEntity.isServerSide()) {
+            ownerUUID = processInitialSettings(aBaseMetaTileEntity);
+        }
+    }
+
+    /**
+     * Simulated wireless power check. Called from {@code validateRecipe} before any input is consumed.
+     *
+     * @param eut         the EU/t the recipe will actually consume in wireless mode
+     * @param duration    the recipe duration in ticks in wireless mode
+     * @param maxParallel the maximum parallel being considered
+     * @return SUCCESSFUL if wireless mode is off or enough wireless EU is available, otherwise an
+     *         insufficient-power result.
+     */
+    protected CheckRecipeResult checkWirelessPower(long eut, int duration, int maxParallel) {
+        if (!isWirelessModeActive()) return CheckRecipeResultRegistry.SUCCESSFUL;
+        if (ownerUUID == null) return CheckRecipeResultRegistry.insufficientPower(eut);
+        BigInteger required = BigInteger.valueOf(eut)
+            .multiply(BigInteger.valueOf(duration))
+            .multiply(BigInteger.valueOf(maxParallel));
+        if (getUserEU(ownerUUID).compareTo(required) < 0) {
+            return CheckRecipeResultRegistry.insufficientStartupPower(required);
+        }
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    /**
+     * Safely starts a wireless recipe: deducts the actual EU cost from the wireless network first, and only
+     * consumes inputs after the deduction succeeds. This prevents materials from being swallowed when the
+     * network balance dropped between recipe validation and recipe start.
+     */
+    protected CheckRecipeResult startWirelessRecipe(GTRecipe recipe, int parallel, long eut, int duration,
+        FluidStack[] fluidInputs, ItemStack[] itemInputs) {
+        if (!isWirelessModeActive()) return CheckRecipeResultRegistry.SUCCESSFUL;
+        if (ownerUUID == null) return CheckRecipeResultRegistry.insufficientStartupPower(BigInteger.ZERO);
+        BigInteger required = BigInteger.valueOf(eut)
+            .multiply(BigInteger.valueOf(duration));
+        if (!addEUToGlobalEnergyMap(ownerUUID, required.negate())) {
+            return CheckRecipeResultRegistry.insufficientStartupPower(required);
+        }
+        recipe.consumeInput(parallel, fluidInputs, itemInputs);
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+    // endregion
 
     // endregion
 

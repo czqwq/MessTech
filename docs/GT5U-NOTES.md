@@ -175,10 +175,16 @@ Import trap: `ISurvivalBuildEnvironment` lives in
 
 * **Textures** — `getTexture(...)`: the *front* face (`side == facing`) uses the Large Fusion
   Computer Mk-V look (`Textures.BlockIcons.MACHINE_CASING_FUSION_GLASS` + a GT++ screen overlay from
-  `TexturesGtBlock.Casing_Machine_Screen_Rainbow/1`); every other face uses the Plasma Forge (DTPF)
-  casing. To return the Plasma Forge casing you must implement `ICasingTextureProvider` /
-  `getCasingTexture()` and return `Textures.BlockIcons.casingTexturePages[0][14]`
-  (in MTEPlasmaForge that index is the constant `DIM_BRIDGE_CASING = 14`).
+  `TexturesGtBlock.Casing_Machine_Screen_Rainbow/1`); every other face uses the fusion machine casing
+  texture matching the current tier (`INVALID` falls back to MKI). This is done with
+  `Textures.BlockIcons.getCasingTextureForId(GTUtility.getCasingTextureIndex(tier.machineBlock, tier.machineMeta))`,
+  following the same tier-to-casing idea as `MTEPreciseAssembler` (`CASING_INDEX + casingTier`).
+  The side texture is built with `TextureFactory.of(tier.machineBlock, tier.machineMeta)` so it uses
+  the actual block icon directly (avoids missing casing-texture entries for GT++/higher-tier casings).
+  The tier is synced to the client through `getUpdateData()` / `receiveClientEvent()` using
+  `GregTechTileClientEvents.CHANGE_CUSTOM_DATA` (same pattern as Precise Assembler).
+  The old Plasma Forge casing is still available through `ICasingTextureProvider#getCasingTexture()`
+  returning `Textures.BlockIcons.casingTexturePages[0][14]`.
 * **GUI** — machines override `protected @NotNull MTEMultiBlockBaseGui<?> getGui()` (in
   `gregtech.api...MTEMultiBlockBase`). Modern GTNH GUI code is built on **CleanroomModularUI**
   (`com.cleanroommc.modularui.*`: `ModularPanel`, `PanelSyncManager`, `BooleanSyncValue`,
@@ -230,6 +236,37 @@ Implementation notes (all verified against GT source):
 * Fluid output is DTPF-style: `addOutput(FluidStack)` copies the stack and calls `addOutputPartial`, and
   `addFluidOutputs(...)` is overridden to route normal completion outputs through that same `addOutput` path.
 
+## 10.7 Wireless mode (direct wireless-network power)
+
+Reference: `MTETranscendentPlasmaMixer` (`gregtech/common/tileentities/machines/multi/MTETranscendentPlasmaMixer.java`)
+and `WirelessNetworkManager` (`gregtech/common/misc/WirelessNetworkManager.java`).
+
+* The machine does **not** use a wireless energy hatch. In wireless mode it draws directly from the
+  global wireless network via `WirelessNetworkManager`.
+* `MTMultiMachineBase` owns the shared helpers:
+  * `initWirelessNetwork(IGregTechTileEntity)` — calls `processInitialSettings` once on the server.
+  * `checkWirelessPower(eut, duration, maxParallel)` — called from `validateRecipe`; returns
+    `insufficientStartupPower` before any input is consumed.
+  * `startWirelessRecipe(...)` — called from `onRecipeStart`; deducts the actual EU cost first, and
+    only then calls `GTRecipe.consumeInput`. This is what prevents “insufficient power swallowing inputs”.
+* Subclasses override `isWirelessModeAvailable()` / `isWirelessModeEnabled()` (MTDTPF maps them to
+  `EnableWirelessFunc` / `EnableWireless`).
+* In wireless mode:
+  * `createParallelHelper` sets `setConsumption(false)` so `ParallelHelper` does not consume inputs
+    before the wireless deduction.
+  * `setProcessingLogicPower` gives `Long.MAX_VALUE` voltage / 1 amp / unlimited tier skips (like TPM).
+  * `createOverclockCalculator` uses `OverclockCalculator.ofNoOverclock(...)` while still applying
+    MTDTPF's EU/duration efficiency modifiers, so the wireless network pays the actual no-overclock cost.
+  * `checkMachine` skips `checkHasAnyEnergy` and, like `OTEBBPlasmaForge`, **forbids** normal energy
+    hatches while wireless mode is active (`ErrorType.TOO_MANY`).
+  * `setEnableWireless` only enables when the feature is available and no energy hatches are present.
+  * Wireless parallel is user-selectable (like `MTETranscendentPlasmaMixer`): `wirelessParallel` field,
+    right-click on the wireless button opens a selector, max `Integer.MAX_VALUE`.
+  * Wireless mode disables the 3600s runtime ramp: `getEuModifier()`/`getSpeedBonus()` return a fixed
+    `0.75` and `running_time` is neither incremented nor decayed.
+  * GUI button uses `GTGuiTextures.TT_SAFE_VOID_ON/OFF` to toggle `EnableWireless`, gated by
+    `EnableWirelessFunc`.
+
 ## 11. Gotchas
 
 * The tile factory pattern: to make `newMetaEntity(...)` work you need a **String constructor**
@@ -256,6 +293,13 @@ Implementation notes (all verified against GT source):
   (`ParallelHelper.calculateChancedOutputMultiplier` does `for roll < parallel`) plus output splitting loops,
   so a huge cap that is actually reached freezes the game with no crash/log. Keep caps sane and let
   `availableEUt / recipeEUt` and input counts do the real limiting.
+* **`IVoidable.canDumpItemToME/canDumpFluidToME` are already implemented upstream** in
+  `MTEMultiBlockBase` (see `tmp/GT5-Unofficial-master/.../MTEMultiBlockBase.java` ~line 3194/3218).
+  Do **not** re-implement them in `MTMultiMachineBase`; the upstream version also checks
+  `hasPhysicalSpace()` and `getCheckMode()`, which a naive copy may miss. If the IDE claims a
+  signature conflict or that `GTUtility.FluidId` is inaccessible, the project model is stale:
+  refresh/reimport the Gradle project (`GTUtility.FluidId` is `public abstract static class` in
+  `GTUtility.java`).
 
 ## 12. Registering a machine + animated authors
 

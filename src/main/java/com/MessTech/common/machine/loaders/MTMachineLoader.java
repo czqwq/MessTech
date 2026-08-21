@@ -13,8 +13,8 @@ public class MTMachineLoader {
         MTItemList.MTDTPF.set(
             new MTDTPF(
                 MT_ID,
-                translateToLocal("machine.dtpf.name"),
-                "Dimensionally Transcendent Plasma Fusion Computer").getStackForm(1L));
+                "Dimensionally Transcendent Plasma Fusion Computer",
+                translateToLocal("machine.dtpf.name")).getStackForm(1L));
         // 注册实时动画作者行(gtnhlib AnimatedTooltipHandler 在渲染时逐帧求值,同 GT5U LoaderMetaTileEntities 的做法)
         AuthorDynamic.registerOn(MTItemList.MTDTPF.get(1));
     }
