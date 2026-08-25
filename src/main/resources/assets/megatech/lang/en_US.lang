@@ -1,3 +1,9 @@
+# Misc
+misc.mode=Mode
+messTech.addBy=Add by:
+GT5U.gui.text.shutdown_reason.datastick=Removed or otherwise extracted the datastick before the research was completed.
+GT5U.gui.text.shutdown_reason.overheating=Machine OverHeating!
+
 # --- MTDTPF structure tooltips ---
 misc.structure_tooltip.reactor_coil=Reactor Coil Block (A)
 misc.structure_tooltip.fusion_machine_casing=Fusion Machine Casing (B)
@@ -6,6 +12,7 @@ misc.structure_tooltip.fusion_machine_casing=Fusion Machine Casing (B)
 structure.error.tier_mismatch=Reactor coil tier (%1$s) does not match the fusion machine casing tier (%2$s)!
 
 # --- MTDTPF state ---
+mt.recipe.computingcenter=Computing Center Components
 machine.dtpf.perfectoverclock=Perfect Overclock
 machine.dtpf.perfectoverclock.on=Enabled
 machine.dtpf.perfectoverclock.on.spec=Enabled~Nya
@@ -28,3 +35,37 @@ machine.dtpf.tooltip.wireless.discount=Wireless mode: fixed 0.75 EU/duration dis
 
 # --- MTDTPF Machine Name ---
 machine.dtpf.name=Dimensionally Transcendent Plasma Fusion Computer
+
+# --- Nano Computing Center GUI ---
+machine.computingcenter.wireless=Wireless Mode
+machine.computingcenter.mode.computing=Nano Computing
+machine.computingcenter.mode.research=Research Station
+machine.computingcenter.gui.output=Output: %1$s
+machine.computingcenter.gui.progress=Progress: %1$s / %2$s
+machine.computingcenter.gui.eut=Consume: %1$sEU/t
+machine.computingcenter.gui.wireless=Wireless Enable
+machine.computingcenter.waila.output=Computation Output: %1$s
+machine.computingcenter.waila.eut=Consume: %1$sEU/t
+machine.computingcenter.waila.wireless=Wireless Enable
+machine.computingcenter.waila.progress=Progress: %1$s / %2$s
+machine.computingcenter.cannot_switch_active=Cannot switch mode while running
+machine.computingcenter.cannot_switch_heat=Cannot switch mode until heat is fully dissipated
+machine.computingcenter.waila.heat=Heat: %1$s
+machine.computingcenter.overclock=Overclock
+machine.computingcenter.overclock.ratio=Overclock Ratio
+machine.computingcenter.overclock.overvoltage=Overvoltage Ratio
+machine.computingcenter.gui.overclocked=Overclock Enable
+machine.computingcenter.heat_present=Cannot disable overclock while heat is present
+
+# --- Nano Computing Center Tooltip ---
+machine.computingcenter.tooltip.0=Mode 1 - Nano Computing: produce computation with racks
+machine.computingcenter.tooltip.1=Power: Basic: consume 1A UEV + 1A UEV per 1,000,000 computation
+machine.computingcenter.tooltip.2=Mode 2 - Research Station Mode
+machine.computingcenter.tooltip.3=Power: research EU/t + computation / 2
+machine.computingcenter.tooltip.4=External computation input counts toward research progress
+machine.computingcenter.tooltip.5=Screwdriver switches modes; Wire Cutter toggles wireless in Mode 1
+machine.computingcenter.tooltip.6=No maintain hatch require!
+
+# --- Nano CC Misc
+machine.computingcenter.name=Nano Computing Center
+machine.computingcenter.hatchrack=Computing Rack

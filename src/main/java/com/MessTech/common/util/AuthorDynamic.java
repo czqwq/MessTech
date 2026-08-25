@@ -3,16 +3,21 @@ package com.MessTech.common.util;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.AQUA;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.BLUE;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.BOLD;
+import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.DARK_PURPLE;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.GOLD;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.GREEN;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.LIGHT_PURPLE;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.RED;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.YELLOW;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.addItemTooltip;
+import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.animatedText;
+import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.chain;
+import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.text;
 
 import java.util.function.Supplier;
 
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.StatCollector;
 
 import gregtech.api.enums.GTAuthors;
 
@@ -39,6 +44,10 @@ public final class AuthorDynamic {
     private static final String[] RAINBOW_BOLD = { RED + BOLD, GOLD + BOLD, YELLOW + BOLD, GREEN + BOLD, AQUA + BOLD,
         BLUE + BOLD, LIGHT_PURPLE + BOLD };
 
+    /** Purple gradient used for the animated "MessTech" mod line. */
+    private static final String[] PURPLE_FLOW = { DARK_PURPLE + BOLD, LIGHT_PURPLE + BOLD, BLUE + BOLD,
+        LIGHT_PURPLE + BOLD };
+
     private AuthorDynamic() {}
 
     /**
@@ -46,7 +55,7 @@ public final class AuthorDynamic {
      *         The whole name is rendered as one wobbling rainbow band (posstep = 1 -> colours glide
      *         neighbour to neighbour, giving the left-right wave).
      */
-    public static Supplier<String> author() {
+    public static Supplier<String> author_czqwq() {
         return wobbleAnimatedText(AUTHOR_CZQWQ, 1, 140, RAINBOW_BOLD);
     }
 
@@ -58,8 +67,27 @@ public final class AuthorDynamic {
      * @param machineStack the machine's {@link ItemStack}
      */
     public static void registerOn(ItemStack machineStack) {
-        if (machineStack == null) return;
-        addItemTooltip(machineStack, GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()));
+        registerOn(author_czqwq(), machineStack);
+    }
+
+    /**
+     * Register the author line + animated MessTech add-on line.
+     *
+     * @param author       author tooltip supplier (e.g. {@link #author_czqwq()} or a GTAuthors supplier)
+     * @param machineStack the machine's {@link ItemStack}
+     */
+    public static void registerOn(Supplier<String> author, ItemStack machineStack) {
+        if (author == null || machineStack == null) return;
+        addItemTooltip(machineStack, GTAuthors.buildAuthorsWithFormatSupplier(author));
+        addItemTooltip(
+            machineStack,
+            chain(text(StatCollector.translateToLocal("messTech.addBy") + " "), messTechAnimated()));
+    }
+
+    /** Animated "MessTech" with a flowing purple gradient. */
+    public static Supplier<String> messTechAnimated() {
+        // Gentle flowing purple gradient: slow 1000ms per step.
+        return animatedText("MessTech", 1, 1000, PURPLE_FLOW);
     }
 
     /**

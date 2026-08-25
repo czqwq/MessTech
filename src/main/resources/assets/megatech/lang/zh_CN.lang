@@ -1,3 +1,9 @@
+# 杂项
+misc.mode=模式
+messTech.addBy=添加模组:
+GT5U.gui.text.shutdown_reason.datastick=在研究完成前取出或特定方式移除了闪存
+GT5U.gui.text.shutdown_reason.overheating=机器过热!
+
 # --- MTDTPF 结构提示 ---
 misc.structure_tooltip.reactor_coil=反应堆线圈方块 (A)
 misc.structure_tooltip.fusion_machine_casing=聚变机械方块 (B)
@@ -6,6 +12,7 @@ misc.structure_tooltip.fusion_machine_casing=聚变机械方块 (B)
 structure.error.tier_mismatch=反应堆线圈方块等级 (%1$s) 与 聚变机械方块等级 (%2$s) 不匹配!
 
 # --- MTDTPF 状态 ---
+mt.recipe.computingcenter=计算中心组件
 machine.dtpf.perfectoverclock=超频状态
 machine.dtpf.perfectoverclock.on=无损超频
 machine.dtpf.perfectoverclock.on.spec=无损超频喵
@@ -28,3 +35,37 @@ machine.dtpf.tooltip.wireless.discount=无线模式: 固定耗电/时长七五�
 
 # --- MTDTPF 机器名
 machine.dtpf.name=超维度等离子聚变堆
+
+# --- 纳米计算中心 GUI ---
+machine.computingcenter.wireless=无线模式
+machine.computingcenter.mode.computing=纳米计算
+machine.computingcenter.mode.research=研究站
+machine.computingcenter.gui.output=输出算力: %1$s
+machine.computingcenter.gui.progress=进度: %1$s / %2$s
+machine.computingcenter.gui.eut=消耗电量: %1$sEU/t
+machine.computingcenter.gui.wireless=无线启用
+machine.computingcenter.waila.output=输出算力: %1$s
+machine.computingcenter.waila.eut=消耗电量: %1$sEU/t
+machine.computingcenter.waila.wireless=无线启用
+machine.computingcenter.waila.progress=进度: %1$s / %2$s
+machine.computingcenter.cannot_switch_active=运行中无法切换模式
+machine.computingcenter.cannot_switch_heat=热量未散尽无法切换模式
+machine.computingcenter.waila.heat=热量: %1$s
+machine.computingcenter.overclock=超频
+machine.computingcenter.overclock.ratio=超频比
+machine.computingcenter.overclock.overvoltage=过压比
+machine.computingcenter.gui.overclocked=超频启用
+machine.computingcenter.heat_present=热量未散尽无法关闭超频
+
+# --- 纳米计算中心 Tooltip ---
+machine.computingcenter.tooltip.0=模式1-纳米计算: 通过机柜产出算力
+machine.computingcenter.tooltip.1=耗电: 基础消耗1A UEV, 每多出1M算力额外消耗1A UEV
+machine.computingcenter.tooltip.2=模式2-研究站模式
+machine.computingcenter.tooltip.3=耗电: 研究EU/t + 算力/2
+machine.computingcenter.tooltip.4=外部输入算力会计入研究进度
+machine.computingcenter.tooltip.5=螺丝刀切换模式; 计算模式用剪线钳开关无线
+machine.computingcenter.tooltip.6=不需要维护仓!
+
+# --- 纳米计算中心杂项 ---
+machine.computingcenter.name=纳米计算中心
+machine.computingcenter.hatchrack=计算机机柜

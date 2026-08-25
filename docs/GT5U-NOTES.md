@@ -293,13 +293,67 @@ and `WirelessNetworkManager` (`gregtech/common/misc/WirelessNetworkManager.java`
   (`ParallelHelper.calculateChancedOutputMultiplier` does `for roll < parallel`) plus output splitting loops,
   so a huge cap that is actually reached freezes the game with no crash/log. Keep caps sane and let
   `availableEUt / recipeEUt` and input counts do the real limiting.
-* **`IVoidable.canDumpItemToME/canDumpFluidToME` are already implemented upstream** in
-  `MTEMultiBlockBase` (see `tmp/GT5-Unofficial-master/.../MTEMultiBlockBase.java` ~line 3194/3218).
-  Do **not** re-implement them in `MTMultiMachineBase`; the upstream version also checks
-  `hasPhysicalSpace()` and `getCheckMode()`, which a naive copy may miss. If the IDE claims a
-  signature conflict or that `GTUtility.FluidId` is inaccessible, the project model is stale:
-  refresh/reimport the Gradle project (`GTUtility.FluidId` is `public abstract static class` in
-  `GTUtility.java`).
+* **`IVoidable.canDumpItemToME/canDumpFluidToME` are implemented in `MTMultiMachineBase`**
+  so every MessTech multiblock satisfies `IVoidable` regardless of whether the GT5U `MTEMultiBlockBase`
+  in the active dependency provides them. The implementation mirrors upstream
+  (`tmp/GT5-Unofficial-master/.../MTEMultiBlockBase.java` ~line 3194/3218), including the
+  `hasPhysicalSpace()` and `getCheckMode()` checks. If the IDE claims a signature conflict, re-import
+  the Gradle project so the IDE picks up the same GT5U API as the compiler (`GTUtility.FluidId` is
+  `public abstract static class` in `GTUtility.java`).
+
+## 11.5 Nano Computing Center (`MTComputingCenter`)
+
+MessTech's computation multiblock, based on `CalculateMultiMachineBase`.
+
+* Modes:
+  * Mode 1 = **Nano Computing** (quantum-computer style): racks produce computation, data input is
+    forwarded to output automatically, wireless output is enabled with a wire cutter.
+  * Mode 2 = **Research Station** style: holder hatch (`F`) holds the research item, controller slot
+    holds a Data Stick, computation is produced internally by racks, and the finished Data Stick is
+    output to an OutputBus or left in the controller slot.
+* Structure:
+  * `A` = normal hatches + Uncertainty + Data + WirelessComputationOutput
+  * `D` = `MTHatchRack`
+  * `F` = research holder or air
+* Custom recipe map: `MTRecipeMaps.computingCenterFakeRecipes`.
+  * NEI: `MTMachineLoader` calls `MTRecipeMaps.populateComputingCenterFakeRecipes()` after
+    `MTEHatchRack.run()`. For each recipe copied from the shared rack-component pool it
+    **re-tags the recipe to this map's default `RecipeCategory`** before adding it — GT's NEI handler
+    reads `backend.getRecipesByCategory(defaultCategory)`, not `getAllRecipes()`, so without the
+    re-tag the independent Computing Center list stays empty. Title localized via
+    `mt.recipe.computingcenter`.
+* Rack class: `MTHatchRack` extends GT5U `MTEHatchRack`.
+  * `tickComponents(oc, ov)` is overridden to soften the overclock penalty: the stock
+    `(oc-ov)^2` denominator term is scaled by `PENALTY_FACTOR = 0.8f` (20% softer).
+    Component stats are looked up from the shared QC fake-recipe pool
+    (`QuantumComputerRecipeData`, cached by unique id).
+  * `getDescription()` is overridden so the item tooltip omits the "TecTech: Elemental Matter" line.
+* Research packet-loss / `checkComputationTimeout` (grace/decay/full windows) is ported into
+  `MTComputingCenter.onRunningTick`, with NBT persistence for `ticksUntilPacketLossFail` and
+  `packetLossDecayFrom`.
+* Wireless: `WirelessComputationPacket.uploadData` with a real world tick (obtained by casting the
+  base meta tile entity to `TileEntity`).
+* Heat/overclock:
+  * `machineHeat` is internal storage (max `10,000,000`), saved in NBT.
+  * While heat is present, overclock cannot be disabled, rack components stay locked, and the
+    screwdriver cannot switch modes until the heat is fully dissipated.
+  * Cooling:
+    * **Active**: `consumeCryotheumForHeat()` removes one `10,000` heat batch per `100,000L`
+      Gelid Cryotheum, looping until no full batch remains (or the fluid runs out) — applied
+      both while running and while stopped.
+    * **Passive** (machine stopped only): every second `machineHeat -= max(machineHeat/1000, 20)`
+      (mirrors the stock rack decay).
+  * If heat exceeds max, all rack components are melted and the machine stops with
+    `ExtraShutdownReason.OverHeating`.
+  * Manual shutdown (GUI on/off / redstone) never reaches `stopMachine`, so `onPostTick` clears
+    leftover Waila/GUI values (`eAvailableData`, `mEUt`, and any unfinished research progress)
+    whenever the controller is not active (`resetStoppedDisplay()`).
+  * On controller removal with residual heat, all rack components are burned (`meltAllComponents`).
+  * Lock handling: `setRacksActive(false)` is a no-op while `machineHeat > 0`, and
+    `onPostTick` re-asserts `setRacksActive(true)` whenever heat is present (covers chunk reloads).
+* Animated tooltip:
+  * `AuthorDynamic.registerOn` adds `Add by: <animated MessTech>` below the author line.
+  * The "MessTech" text uses a flowing purple gradient via gtnhlib `AnimatedTooltipHandler.animatedText`.
 
 ## 12. Registering a machine + animated authors
 

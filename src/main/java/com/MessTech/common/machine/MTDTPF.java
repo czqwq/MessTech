@@ -544,7 +544,8 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
         super.getWailaNBTData(player, tile, tag, world, x, y, z);
         final IGregTechTileEntity tileEntity = getBaseMetaTileEntity();
         if (tileEntity != null) {
-            tag.setBoolean("enablePOC", isTierAtLeast(5));
+            tag.setBoolean("enablePOC", isTierAtLeast(4));
+            tag.setBoolean("pocspec", getLevelTier() == LevelTier.TIER5);
             tag.setInteger("machineTier", getStructureTier());
             tag.setLong("runningTime", running_time);
         }
@@ -580,9 +581,13 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
         }
         if (tag.hasKey("enablePOC")) {
             boolean pocEnabled = tag.getBoolean("enablePOC");
+            boolean PocStatus = tag.getBoolean("pocspec");
             currentTip.add(
                 translateToLocal("machine.dtpf.perfectoverclock") + ": "
-                    + (pocEnabled ? EnumChatFormatting.YELLOW + translateToLocal("machine.dtpf.perfectoverclock.on")
+                    + (pocEnabled
+                        ? EnumChatFormatting.YELLOW
+                            + (PocStatus ? translateToLocal("machine.dtpf.perfectoverclock.on.spec")
+                                : translateToLocal("machine.dtpf.perfectoverclock.on"))
                         : EnumChatFormatting.GREEN + translateToLocal("machine.dtpf.perfectoverclock.off"))
                     + EnumChatFormatting.RESET);
         }

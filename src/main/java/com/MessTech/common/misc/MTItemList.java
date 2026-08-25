@@ -12,7 +12,9 @@ import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 @SuppressWarnings("SpellCheckingInspection")
 public enum MTItemList {
 
-    MTDTPF;
+    MTDTPF,
+    MTComputingCenter,
+    MTHatchRack;
 
     private boolean mHasNotBeenSet;
     private boolean mDeprecated;

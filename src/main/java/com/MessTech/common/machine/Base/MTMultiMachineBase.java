@@ -910,7 +910,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         final NBTTagCompound tag = accessor.getNBTData();
         if (tag.hasKey("mode")) {
             currentTip.add(
-                StatCollector.translateToLocal("Mode :") + " "
+                StatCollector.translateToLocal("misc.mode") + ": "
                     + EnumChatFormatting.WHITE
                     + getMachineModeName(tag.getInteger("mode"))
                     + EnumChatFormatting.RESET);
