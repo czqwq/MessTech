@@ -1,5 +1,5 @@
 # Misc
-misc.mode=Mode
+misc.mode=Running Mode
 messTech.addBy=Add by:
 GT5U.gui.text.shutdown_reason.datastick=Removed or otherwise extracted the datastick before the research was completed.
 GT5U.gui.text.shutdown_reason.overheating=Machine OverHeating!
@@ -40,6 +40,7 @@ machine.dtpf.name=Dimensionally Transcendent Plasma Fusion Computer
 machine.computingcenter.wireless=Wireless Mode
 machine.computingcenter.mode.computing=Nano Computing
 machine.computingcenter.mode.research=Research Station
+machine.computingcenter.mode.scanner=Scanner
 machine.computingcenter.gui.output=Output: %1$s
 machine.computingcenter.gui.progress=Progress: %1$s / %2$s
 machine.computingcenter.gui.eut=Consume: %1$sEU/t
@@ -62,10 +63,38 @@ machine.computingcenter.tooltip.0=Mode 1 - Nano Computing: produce computation w
 machine.computingcenter.tooltip.1=Power: Basic: consume 1A UEV + 1A UEV per 1,000,000 computation
 machine.computingcenter.tooltip.2=Mode 2 - Research Station Mode
 machine.computingcenter.tooltip.3=Power: research EU/t + computation / 2
-machine.computingcenter.tooltip.4=External computation input counts toward research progress
+machine.computingcenter.tooltip.3.5=Internal computation will counts toward research progress
+machine.computingcenter.tooltip.4=External computation input also counts toward research progress
 machine.computingcenter.tooltip.5=Screwdriver switches modes; Wire Cutter toggles wireless in Mode 1
 machine.computingcenter.tooltip.6=No maintain hatch require!
 
 # --- Nano CC Misc
 machine.computingcenter.name=Nano Computing Center
 machine.computingcenter.hatchrack=Computing Rack
+
+# --- MTAssFactory ---
+machine.assfactory.name=Omni-Primordial Assembly Matrix
+machine.assfactory.machinetype=Assembly Factory: Component Assembly Line | Assembly Line
+machine.assfactory.mode.component=Component Assembly Line
+machine.assfactory.mode.assemblyline=Assembly Line
+machine.assfactory.tooltip.0=Assembly Line mode require Adv Assembly Matrix Blocks
+machine.assfactory.tooltip.1=Use screwdriver to switch mode
+machine.assfactory.tooltip.2=Assembly Line mode needs Data Access hatches and Data Sticks
+machine.assfactory.tooltip.3=Parallel Tier1: 3 ^ Energy Hatch Tier. Tier2: Int.MAX
+machine.assfactory.tooltip.4=Structure: 11 x 12 x 34 (Width x Height x Length)
+machine.assfactory.tooltip.5=Energy hatch tier limits the Component Assembly Line recipe tier
+machine.assfactory.cannot_switch_active=Cannot switch mode while running
+machine.assfactory.require_tier2=Assembly Line mode requires higher structure level
+machine.assfactory.error.need_tier2=Assembly Line mode requires higher structure level
+machine.assfactory.error.need_data_access=Assembly Line mode requires at least one Data Access hatch
+mt.recipe.assfactory.assemblyline=Omni-Primordial Assembly Matrix:Assembly Line
+
+# --- Assembly Matrix Blocks ---
+tile.AssMatrixBlock.name=Assembly Matrix Block
+tile.AdvAssMatrixBlock.name=Advanced Assembly Matrix Block
+
+# --- MachineTemplate ---
+machine.template.machinetype=Template Machine
+machine.template.tooltip.0=Template machine: every 'A' position accepts any hatch of the base class (buses/hatches/energy/exotic/dynamo/maintenance/muffler)
+machine.template.tooltip.1=Perfect Overclock disabled, speed bonus 1.0, max parallel 1 - copy this class and adjust
+machine.template.tooltip.2=Structure: 3 x 3 x 3, controller on the middle of the front face

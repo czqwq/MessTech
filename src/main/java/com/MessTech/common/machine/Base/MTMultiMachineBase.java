@@ -19,7 +19,6 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -725,63 +724,6 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         return -1;
     }
 
-    public static boolean doSoundAtClientOTH(String aSoundName, int aTimeUntilNextSound, float aSoundStrength) {
-        if (aSoundName == null) return false;
-        return doSoundAtClientOTH(aSoundName, aTimeUntilNextSound, aSoundStrength, GT.getThePlayer());
-    }
-
-    public static boolean doSoundAtClientOTH(SoundResource sound, int aTimeUntilNextSound, float aSoundStrength) {
-        return doSoundAtClientOTH(sound.resourceLocation, aTimeUntilNextSound, aSoundStrength, GT.getThePlayer());
-    }
-
-    public static boolean doSoundAtClientOTH(ResourceLocation aSoundResourceLocation, int aTimeUntilNextSound,
-        float aSoundStrength) {
-        return doSoundAtClientOTH(aSoundResourceLocation, aTimeUntilNextSound, aSoundStrength, GT.getThePlayer());
-    }
-
-    public static boolean doSoundAtClientOTH(String aSoundName, int aTimeUntilNextSound, float aSoundStrength,
-        Entity aEntity) {
-        if (aEntity == null || aSoundName == null) return false;
-        return doSoundAtClientOTH(
-            aSoundName,
-            aTimeUntilNextSound,
-            aSoundStrength,
-            aEntity.posX,
-            aEntity.posY,
-            aEntity.posZ);
-    }
-
-    public static boolean doSoundAtClientOTH(ResourceLocation aSoundResourceLocation, int aTimeUntilNextSound,
-        float aSoundStrength, Entity aEntity) {
-        if (aEntity == null) return false;
-        return doSoundAtClientOTH(
-            aSoundResourceLocation.toString(),
-            aTimeUntilNextSound,
-            aSoundStrength,
-            aEntity.posX,
-            aEntity.posY,
-            aEntity.posZ);
-    }
-
-    public static boolean doSoundAtClientOTH(ResourceLocation aSoundResourceLocation, int aTimeUntilNextSound,
-        float aSoundStrength, double aX, double aY, double aZ) {
-        return doSoundAtClientOTH(aSoundResourceLocation, aTimeUntilNextSound, aSoundStrength, 1.01818028F, aX, aY, aZ);
-    }
-
-    @Deprecated
-    public static boolean doSoundAtClientOTH(String aSoundName, int aTimeUntilNextSound, float aSoundStrength,
-        double aX, double aY, double aZ) {
-        if (aSoundName == null) return false;
-        return doSoundAtClientOTH(
-            new ResourceLocation(aSoundName),
-            aTimeUntilNextSound,
-            aSoundStrength,
-            1.01818028F,
-            aX,
-            aY,
-            aZ);
-    }
-
     public static boolean doSoundAtClientOTH(ResourceLocation aSoundResourceLocation, int aTimeUntilNextSound,
         float aSoundStrength, float aSoundModulation, double aX, double aY, double aZ) {
         if (!FMLCommonHandler.instance()
@@ -898,8 +840,12 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
         int z) {
         super.getWailaNBTData(player, tile, tag, world, x, y, z);
+        // Upstream GT MTEMultiBlockBase#getWailaBody displays tag.getString("mode") in the Waila
+        // running-mode line, so write the localized mode name instead of a raw integer.
+        // Also keep an integer copy for subclasses that need the numeric mode in their Waila body.
         if (supportsMachineModeSwitch()) {
-            tag.setInteger("mode", machineMode);
+            tag.setString("mode", getMachineModeName(machineMode));
+            tag.setInteger("machineMode", machineMode);
         }
     }
 
@@ -907,15 +853,6 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     public void getWailaBody(ItemStack itemStack, List<String> currentTip, IWailaDataAccessor accessor,
         IWailaConfigHandler config) {
         super.getWailaBody(itemStack, currentTip, accessor, config);
-        final NBTTagCompound tag = accessor.getNBTData();
-        if (tag.hasKey("mode")) {
-            currentTip.add(
-                StatCollector.translateToLocal("misc.mode") + ": "
-                    + EnumChatFormatting.WHITE
-                    + getMachineModeName(tag.getInteger("mode"))
-                    + EnumChatFormatting.RESET);
-        }
     }
-
     // endregion
 }

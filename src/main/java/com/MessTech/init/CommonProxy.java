@@ -2,6 +2,7 @@ package com.MessTech.init;
 
 import static com.MessTech.init.MessTech.MT_LOG;
 
+import com.MessTech.common.block.MTBlocks;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
 
 import cpw.mods.fml.common.Loader;
@@ -39,6 +40,7 @@ public class CommonProxy {
     // postInit "Handle interaction with other mods, complete your setup based on this." (Remove if not needed)
     public void postInit(FMLPostInitializationEvent event) {
         MT_LOG.info("Loading Machine!");
+        MTBlocks.registerBlocks();
         MTMachineLoader.loadMachines();
         MT_LOG.info("Ciallo～(∠・ω< )⌒★");
     }

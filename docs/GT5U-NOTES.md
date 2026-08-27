@@ -311,6 +311,8 @@ MessTech's computation multiblock, based on `CalculateMultiMachineBase`.
   * Mode 2 = **Research Station** style: holder hatch (`F`) holds the research item, controller slot
     holds a Data Stick, computation is produced internally by racks, and the finished Data Stick is
     output to an OutputBus or left in the controller slot.
+  * Mode 3 = **Scanner** style: same research-style computation/packet-loss logic as the original
+    Research Station scanner, using `RecipeMaps.scannerHandlers` and `RecipeMaps.scannerFakeRecipes`.
 * Structure:
   * `A` = normal hatches + Uncertainty + Data + WirelessComputationOutput
   * `D` = `MTHatchRack`
@@ -354,6 +356,38 @@ MessTech's computation multiblock, based on `CalculateMultiMachineBase`.
 * Animated tooltip:
   * `AuthorDynamic.registerOn` adds `Add by: <animated MessTech>` below the author line.
   * The "MessTech" text uses a flowing purple gradient via gtnhlib `AnimatedTooltipHandler.animatedText`.
+
+## 11.6 Assembly Factory (`MTAssFactory`)
+
+* Two recipe pools, switched by screwdriver (also via the built-in mode button):
+  * Mode 0 = **Component Assembly Line**: `GoodGeneratorRecipeMaps.componentAssemblyLineRecipes`,
+    generic `ProcessingLogic` via the base machine; recipe casing tier (`mSpecialValue`) is limited
+    to the current energy hatch tier (`getInputVoltageTier()`).
+  * Mode 1 = **Assembly Line**: reads the authorised recipes from the controller data stick and
+    Data Access hatches, then lets standard `ProcessingLogic` search the independent Assembly Line
+    recipe map (filtered by those authorised outputs); only usable when `LevelTier == 2`.
+* Structure:
+  * `F` accepts the usual buses/hatches/energy plus **Data Access hatches**.
+  * `I` = tiered Assembly Matrix Blocks (Tier 1 / Tier 2), derived into `LevelTier`.
+* GUI: `MTAssFactoryGui` (standard multi-block GUI; mode button comes from the base machine-mode stack).
+* Independent Assembly Line recipe/NEI pool: `MTRecipeMaps.assFactoryAssemblyLineRecipes`, populated
+  as **real recipes** (not fake) from `RecipeMaps.assemblylineVisualRecipes` and re-tagged to its own
+  default `RecipeCategory`, so it can be used by `ProcessingLogic` as well as NEI.
+* Assembly Line mode requires at least one Data Access hatch; `checkMachine` reports
+  `machine.assfactory.error.need_data_access` / `need_tier2`.
+* Assembly Line mode is **unordered**: input matching uses the normal GT `ProcessingLogic` item/fluid
+  pool, so ingredients do not need to be placed in the same order as the original GT Assembly Line.
+* Debug input buses are supported natively: Assembly Line mode delegates input handling to the
+  normal `ProcessingLogic` / `getStoredInputs` path, so phantom/debug-marked items are recognised.
+* **Always reuse existing inventory methods first.** Consuming inputs must go through the machine's
+  existing `depleteInput(ItemStack)` / `depleteInput(FluidStack)` (which properly handles regular,
+  debug/phantom and ME buses/hatches). Do not directly mutate `ItemStack.stackSize` /
+  `FluidStack.amount` or call `setInventorySlotContents` on bus slots from custom processing code.
+* Controller front texture: Advanced Molecular Casing base + Quantum Force Transformer face overlay.
+* Tooltips refer to the energy hatch option as **Multi-Amp Energy (多安能源仓)** (display naming in
+  the lang files uses 多安能源仓 instead of 异域能源仓).
+* Tooltips refer to the energy hatch option as **Multi-Amp Energy (多安能源仓)** (display naming in
+  the lang files uses 多安能源仓 instead of 异域能源仓).
 
 ## 12. Registering a machine + animated authors
 

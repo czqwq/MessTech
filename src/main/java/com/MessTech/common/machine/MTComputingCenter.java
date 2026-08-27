@@ -42,16 +42,19 @@ import gregtech.api.casing.Casings;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.ItemList;
 import gregtech.api.enums.Textures;
+import gregtech.api.enums.TierEU;
 import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
 import gregtech.api.recipe.RecipeMap;
+import gregtech.api.recipe.RecipeMaps;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.recipe.check.SimpleCheckRecipeResult;
 import gregtech.api.util.AssemblyLineUtils;
+import gregtech.api.util.GTScannerResult;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.MultiblockTooltipBuilder;
@@ -214,7 +217,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
             checkHasRack(errors);
             checkHasDataOutput(errors);
         }
-        if (machineMode == 1) {
+        if (machineMode == 1 || machineMode == 2) {
             checkHasOutputBus(errors);
             checkHasHolder(errors);
         }
@@ -223,16 +226,19 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
 
     @Override
     public RecipeMap<?> getRecipeMap() {
-        // Mode 0 = Computing Center fake recipes, Mode 1 = Research Station fake recipes.
-        return machineMode == 1 ? TecTechRecipeMaps.researchStationFakeRecipes
-            : MTRecipeMaps.computingCenterFakeRecipes;
+        // Mode 0 = Computing Center fake recipes, Mode 1 = Research Station fake recipes,
+        // Mode 2 = Scanner fake recipes.
+        if (machineMode == 1) return TecTechRecipeMaps.researchStationFakeRecipes;
+        if (machineMode == 2) return RecipeMaps.scannerFakeRecipes;
+        return MTRecipeMaps.computingCenterFakeRecipes;
     }
 
     @Override
     public @NotNull Collection<RecipeMap<?>> getAvailableRecipeMaps() {
         return Arrays.<RecipeMap<?>>asList(
             MTRecipeMaps.computingCenterFakeRecipes,
-            TecTechRecipeMaps.researchStationFakeRecipes);
+            TecTechRecipeMaps.researchStationFakeRecipes,
+            RecipeMaps.scannerFakeRecipes);
     }
 
     @Override
@@ -242,13 +248,14 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
 
     @Override
     public int totalMachineMode() {
-        return 2;
+        return 3;
     }
 
     @Override
     public String getMachineModeName(int mode) {
-        return mode == 1 ? StatCollector.translateToLocal("machine.computingcenter.mode.research")
-            : StatCollector.translateToLocal("machine.computingcenter.mode.computing");
+        if (mode == 1) return StatCollector.translateToLocal("machine.computingcenter.mode.research");
+        if (mode == 2) return StatCollector.translateToLocal("machine.computingcenter.mode.scanner");
+        return StatCollector.translateToLocal("machine.computingcenter.mode.computing");
     }
 
     @Override
@@ -438,7 +445,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     private void resetStoppedDisplay() {
         if (eAvailableData != 0) eAvailableData = 0;
         if (mEUt != 0) mEUt = 0;
-        if (machineMode == 1 && computationRequired > 0) {
+        if ((machineMode == 1 || machineMode == 2) && computationRequired > 0) {
             computationRequired = computationRemaining = 0;
             eRequiredData = 0;
             currentResearchRecipe = null;
@@ -472,6 +479,9 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
         if (machineMode == 0) {
             return checkQuantumProcessing();
+        }
+        if (machineMode == 2) {
+            return checkScannerProcessing();
         }
         return checkResearchProcessing();
     }
@@ -519,6 +529,65 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
             }
         }
         return CheckRecipeResultRegistry.NO_RECIPE;
+    }
+
+    /**
+     * Scanner mode (Mode 2): same research-style computation/packet-loss logic as the original
+     * Research Station, but recipes come from the scanner handler registry.
+     */
+    private CheckRecipeResult checkScannerProcessing() {
+        ItemStack holderStack = getHolderStack();
+        if (holderStack == null) return SimpleCheckRecipeResult.ofFailure("no_research_item");
+        ItemStack specialStack = getStackInSlot(getControllerSlotIndex());
+        FluidStack fluid = getStoredFluids().stream()
+            .filter(f -> f.getFluid() != null && f.amount > 0)
+            .findFirst()
+            .orElse(null);
+
+        GTScannerResult result = RecipeMaps.scannerHandlers.findRecipe(this, holderStack, specialStack, fluid);
+        if (result == null) return CheckRecipeResultRegistry.NO_RECIPE;
+        if (result.isNotMet()) return SimpleCheckRecipeResult.ofFailure("wrongRequirements");
+        if (protectsExcessItem() && result.output != null && !canOutputAll(new ItemStack[] { result.output })) {
+            return CheckRecipeResultRegistry.ITEM_OUTPUT_FULL;
+        }
+
+        long computation;
+        if (result instanceof GTScannerResult.ALScannerResult alResult) {
+            computation = getComputationForScannerResult(
+                alResult.alRecipe.mResearchTime,
+                alResult.alRecipe.mResearchVoltage);
+        } else {
+            computation = getComputationForScannerResult(result.duration, result.eut);
+        }
+
+        if (fluid != null) fluid.amount -= result.fluidConsume;
+        if (specialStack != null) {
+            specialStack.stackSize -= result.specialConsume;
+            if (specialStack.stackSize <= 0) {
+                setInventorySlotContents(getControllerSlotIndex(), null);
+            }
+        }
+
+        holderStackToConsume = GTUtility.copyAmount(result.inputConsume, holderStack);
+        computationRequired = computationRemaining = packetLossDecayFrom = computation;
+        mEUt = -getEUtForScannerResult(result.eut);
+        mOutputItems = result.output == null ? null : new ItemStack[] { result.output };
+        eRequiredData = 1;
+        ticksUntilPacketLossFail = PACKET_LOSS_FULL_WINDOW;
+        packetLossDecayFrom = 0;
+        mMaxProgresstime = 20;
+        mEfficiencyIncrease = 10000;
+        setRacksActive(true);
+        setHoldersActive(true);
+        return SimpleCheckRecipeResult.ofSuccess("scanning");
+    }
+
+    private static long getComputationForScannerResult(long aResearchTime, long aResearchEUt) {
+        return (long) (aResearchTime * GTUtility.powInt(2, GTUtility.getTier(aResearchEUt) - 1));
+    }
+
+    private static int getEUtForScannerResult(int eut) {
+        return Math.max(Math.abs(eut), (int) TierEU.RECIPE_UV);
     }
 
     private ItemStack getHolderStack() {
@@ -637,17 +706,19 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
 
     @Override
     public boolean onRunningTick(ItemStack aStack) {
-        if (machineMode == 1 && computationRequired > 0) {
+        if ((machineMode == 1 || machineMode == 2) && computationRequired > 0) {
             if (eHolders.isEmpty() || eHolders.get(0).mInventory[0] == null) {
                 resetResearchProgress();
                 stopMachine(ShutDownReasonRegistry.STRUCTURE_INCOMPLETE);
                 return false;
             }
-            ItemStack flash = getStackInSlot(getControllerSlotIndex());
-            if (flash == null || !ItemList.Tool_DataStick.isStackEqual(flash, false, true)) {
-                resetResearchProgress();
-                stopMachine(ExtraShutdownReason.MISS_DATASTICK);
-                return false;
+            if (machineMode == 1) {
+                ItemStack flash = getStackInSlot(getControllerSlotIndex());
+                if (flash == null || !ItemList.Tool_DataStick.isStackEqual(flash, false, true)) {
+                    resetResearchProgress();
+                    stopMachine(ExtraShutdownReason.MISS_DATASTICK);
+                    return false;
+                }
             }
             long produced = getRackComputation() + getExternalInputData();
             eAvailableData = produced;
@@ -704,7 +775,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         mEUt = 0;
         setRacksActive(machineHeat > 0); // parts remain locked until heat is fully dissipated
         setHoldersActive(false);
-        if (machineMode == 1) {
+        if (machineMode == 1 || machineMode == 2) {
             resetResearchProgress();
         }
     }
@@ -719,7 +790,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
 
     @Override
     protected void outputAfterRecipe() {
-        if (machineMode == 1) {
+        if (machineMode == 1 || machineMode == 2) {
             // consume holder item
             if (holderStackToConsume != null && !eHolders.isEmpty()) {
                 ItemStack holderStack = eHolders.getFirst().mInventory[0];
@@ -733,9 +804,12 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
                     mOutputItems = null;
                 }
             }
-            // consume the original flash/data stick from the controller slot only on completion
-            setInventorySlotContents(getControllerSlotIndex(), null);
-            // if no output bus (should not happen in research mode), keep the result in the controller slot
+            // Research mode consumes the data stick only on completion; scanner mode already consumed
+            // its special item when the recipe started.
+            if (machineMode == 1) {
+                setInventorySlotContents(getControllerSlotIndex(), null);
+            }
+            // if no output bus (should not happen in research/scanner mode), keep the result in the controller slot
             if (mOutputItems != null && mOutputBusses.isEmpty()) {
                 setInventorySlotContents(getControllerSlotIndex(), mOutputItems[0]);
                 mOutputItems = null;
@@ -816,7 +890,6 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
         int z) {
         super.getWailaNBTData(player, tile, tag, world, x, y, z);
-        tag.setInteger("mode", machineMode);
         tag.setLong("compRemaining", computationRemaining);
         tag.setLong("compRequired", computationRequired);
         tag.setLong("availableData", eAvailableData);
@@ -831,8 +904,8 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         IWailaConfigHandler config) {
         super.getWailaBody(itemStack, currentTip, accessor, config);
         NBTTagCompound tag = accessor.getNBTData();
-        if (!tag.hasKey("mode")) return;
-        int mode = tag.getInteger("mode");
+        if (!tag.hasKey("machineMode")) return;
+        int mode = tag.getInteger("machineMode");
         if (mode == 0) {
             currentTip.add(
                 EnumChatFormatting.GOLD

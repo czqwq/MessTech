@@ -14,7 +14,10 @@ public enum MTItemList {
 
     MTDTPF,
     MTComputingCenter,
-    MTHatchRack;
+    MTHatchRack,
+    MTAssFactory,
+    AssMatrixBlock,
+    AdvAssMatrixBlock;
 
     private boolean mHasNotBeenSet;
     private boolean mDeprecated;

@@ -1,5 +1,5 @@
 # 杂项
-misc.mode=模式
+misc.mode=运行模式
 messTech.addBy=添加模组:
 GT5U.gui.text.shutdown_reason.datastick=在研究完成前取出或特定方式移除了闪存
 GT5U.gui.text.shutdown_reason.overheating=机器过热!
@@ -40,6 +40,7 @@ machine.dtpf.name=超维度等离子聚变堆
 machine.computingcenter.wireless=无线模式
 machine.computingcenter.mode.computing=纳米计算
 machine.computingcenter.mode.research=研究站
+machine.computingcenter.mode.scanner=扫描仪
 machine.computingcenter.gui.output=输出算力: %1$s
 machine.computingcenter.gui.progress=进度: %1$s / %2$s
 machine.computingcenter.gui.eut=消耗电量: %1$sEU/t
@@ -62,10 +63,39 @@ machine.computingcenter.tooltip.0=模式1-纳米计算: 通过机柜产出算力
 machine.computingcenter.tooltip.1=耗电: 基础消耗1A UEV, 每多出1M算力额外消耗1A UEV
 machine.computingcenter.tooltip.2=模式2-研究站模式
 machine.computingcenter.tooltip.3=耗电: 研究EU/t + 算力/2
-machine.computingcenter.tooltip.4=外部输入算力会计入研究进度
+machine.computingcenter.tooltip.3.5=可以由内部机柜直接生成可用算力计入进度
+machine.computingcenter.tooltip.4=外部输入算力也会计入研究进度
 machine.computingcenter.tooltip.5=螺丝刀切换模式; 计算模式用剪线钳开关无线
 machine.computingcenter.tooltip.6=不需要维护仓!
 
 # --- 纳米计算中心杂项 ---
 machine.computingcenter.name=纳米计算中心
 machine.computingcenter.hatchrack=计算机机柜
+
+# --- MTAssFactory ---
+machine.assfactory.name=全能原初装配矩阵
+machine.assfactory.machinetype=装配工厂: 部件装配线|装配线
+machine.assfactory.mode.component=部件装配线
+machine.assfactory.mode.assemblyline=装配线
+machine.assfactory.poc=启用无损超频
+machine.assfactory.tooltip.0=装配线模式需要更高级的装配矩阵方块
+machine.assfactory.tooltip.1=使用螺丝刀切换模式
+machine.assfactory.tooltip.2=装配线模式需要数据访问仓和对应闪存
+machine.assfactory.tooltip.3=并行: 等级1: 3^输入能源仓等级,等级2: Int.MAX
+machine.assfactory.tooltip.4=结构: 11 x 12 x 34 (宽 x 高 x 长)
+machine.assfactory.tooltip.5=能源仓等级限制部件装配线配方等级
+machine.assfactory.cannot_switch_active=运行中无法切换模式
+machine.assfactory.require_tier2=装配线模式需要更高级结构方块
+machine.assfactory.error.need_tier2=装配线模式需要更高级结构方块
+machine.assfactory.error.need_data_access=装配线模式至少需要一个数据访问仓
+mt.recipe.assfactory.assemblyline=全能原初装配矩阵-装配线
+
+# --- Assembly Matrix Blocks ---
+tile.AssMatrixBlock.name=装配矩阵方块
+tile.AdvAssMatrixBlock.name=高级装配矩阵方块
+
+# --- MachineTemplate ---
+machine.template.machinetype=模板机器
+machine.template.tooltip.0=模板机器: 每个A位置可放置基类任意舱室(总线/流体仓/能源仓/异域能源仓/动力仓/维护仓/消音仓)
+machine.template.tooltip.1=默认关闭无损超频, 速度加成1.0, 最大并行1 - 复制此类后自行调整
+machine.template.tooltip.2=结构: 3 x 3 x 3, 控制器位于正面中央

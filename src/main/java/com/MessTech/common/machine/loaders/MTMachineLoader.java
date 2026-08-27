@@ -2,6 +2,9 @@ package com.MessTech.common.machine.loaders;
 
 import static net.minecraft.util.StatCollector.translateToLocal;
 
+import com.MessTech.common.block.AdvAssMatrixBlock;
+import com.MessTech.common.block.AssMatrixBlock;
+import com.MessTech.common.machine.MTAssFactory;
 import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDTPF;
 import com.MessTech.common.machine.hatch.MTHatchRack;
@@ -26,6 +29,8 @@ public class MTMachineLoader {
         MTEHatchRack.run();
         // Register the rack components into our own Computing Center NEI list (independent from GT5U's QC list).
         MTRecipeMaps.populateComputingCenterFakeRecipes();
+        // Register an independent Assembly Line NEI list for the Assembly Factory.
+        MTRecipeMaps.populateAssFactoryAssemblyLineRecipes();
 
         MTItemList.MTComputingCenter.set(
             new MTComputingCenter(MT_ID + 1, "Nano Computing Center", translateToLocal("machine.computingcenter.name"))
@@ -35,5 +40,13 @@ public class MTMachineLoader {
             new MTHatchRack(MT_ID + 2, "Computing Rack", translateToLocal("machine.computingcenter.hatchrack"), 8)
                 .getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTHatchRack.get(1));
+
+        MTItemList.MTAssFactory.set(
+            new MTAssFactory(MT_ID + 3, "Assembly Factory", translateToLocal("machine.assfactory.name"))
+                .getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTAssFactory.get(1));
+
+        MTItemList.AssMatrixBlock.set(AssMatrixBlock.getItemStack());
+        MTItemList.AdvAssMatrixBlock.set(AdvAssMatrixBlock.getItemStack());
     }
 }
