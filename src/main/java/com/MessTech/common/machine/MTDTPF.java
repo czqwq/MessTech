@@ -29,8 +29,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import com.MessTech.common.gui.MTDTPFGui;
-import com.MessTech.common.machine.Base.MTMultiMachineBase;
 import com.MessTech.common.machine.Base.MTProcessingLogic;
+import com.MessTech.common.machine.Base.MTWirelessMultiMachineBase;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
@@ -71,7 +71,7 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 import tectech.thing.CustomItemList;
 
-public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConstructable, ICasingTextureProvider {
+public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF> implements ISurvivalConstructable, ICasingTextureProvider {
 
     public MTDTPF(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional);
@@ -252,32 +252,6 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
     private LevelTier levelTier = LevelTier.INVALID;
     /** Client-synced tier used for the controller's side texture; INVALID is rendered as MKI (1). */
     private int renderTier = 1;
-    @Getter
-    @Setter
-    private boolean EnableWirelessFunc = false;
-    @Getter
-    private boolean EnableWireless = false;
-    @Getter
-    private int wirelessParallel = 1;
-
-    @Override
-    public boolean isWirelessModeAvailable() {
-        return EnableWirelessFunc;
-    }
-
-    @Override
-    public boolean isWirelessModeEnabled() {
-        return EnableWireless;
-    }
-
-    public void setEnableWireless(boolean value) {
-        this.EnableWireless = value && EnableWirelessFunc && areEnergyHatchesEmpty();
-    }
-
-    public void setWirelessParallel(int value) {
-        this.wirelessParallel = Math.max(1, value);
-    }
-
     /** Structure tier as a plain int (1..5), or -1 ({@link LevelTier#INVALID_TIER}) if not formed / mismatched. */
     public int getStructureTier() {
         return levelTier.tier;
@@ -354,8 +328,6 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
     public void saveNBTData(NBTTagCompound aNBT) {
         aNBT.setInteger("catalystType", catalystTypeForRecipesWithoutCatalyst);
         aNBT.setBoolean("convergence", convergence);
-        aNBT.setBoolean("enableWireless", EnableWireless);
-        aNBT.setInteger("wirelessParallel", wirelessParallel);
         aNBT.setLong("eRunningTime", running_time);
         super.saveNBTData(aNBT);
     }
@@ -364,8 +336,6 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
     public void loadNBTData(NBTTagCompound aNBT) {
         if (aNBT.hasKey("catalystType")) catalystTypeForRecipesWithoutCatalyst = aNBT.getInteger("catalystType");
         convergence = aNBT.getBoolean("convergence");
-        if (aNBT.hasKey("enableWireless")) EnableWireless = aNBT.getBoolean("enableWireless");
-        if (aNBT.hasKey("wirelessParallel")) wirelessParallel = Math.max(1, aNBT.getInteger("wirelessParallel"));
         if (aNBT.hasKey("eRunningTime")) running_time = aNBT.getLong("eRunningTime");
         super.loadNBTData(aNBT);
     }
@@ -786,18 +756,6 @@ public class MTDTPF extends MTMultiMachineBase<MTDTPF> implements ISurvivalConst
             running_time += mMaxProgresstime;
         }
         return result;
-    }
-
-    @Override
-    public void onPreTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        super.onPreTick(aBaseMetaTileEntity, aTick);
-        if (aBaseMetaTileEntity.isServerSide()) {
-            if (ownerUUID == null) {
-                initWirelessNetwork(aBaseMetaTileEntity);
-            }
-            // do not add dectecttier here,it causes large lag in server thread
-            // detecttier();
-        }
     }
 
     @Override

@@ -1,5 +1,7 @@
 # Misc
 misc.mode=Running Mode
+machine.wirelessbase.mode=Wireless Mode
+machine.wirelessbase.cost=EU Cost
 messTech.addBy=Add by:
 GT5U.gui.text.shutdown_reason.datastick=Removed or otherwise extracted the datastick before the research was completed.
 GT5U.gui.text.shutdown_reason.overheating=Machine OverHeating!
@@ -58,7 +60,7 @@ machine.computingcenter.overclock.overvoltage=Overvoltage Ratio
 machine.computingcenter.gui.overclocked=Overclock Enable
 machine.computingcenter.heat_present=Cannot disable overclock while heat is present
 
-# --- Nano Computing Center Tooltip ---
+# --- Nano CC Tooltip ---
 machine.computingcenter.tooltip.0=Mode 1 - Nano Computing: produce computation with racks
 machine.computingcenter.tooltip.1=Power: Basic: consume 1A UEV + 1A UEV per 1,000,000 computation
 machine.computingcenter.tooltip.2=Mode 2 - Research Station Mode
@@ -68,7 +70,7 @@ machine.computingcenter.tooltip.4=External computation input also counts toward 
 machine.computingcenter.tooltip.5=Screwdriver switches modes; Wire Cutter toggles wireless in Mode 1
 machine.computingcenter.tooltip.6=No maintain hatch require!
 
-# --- Nano CC Misc
+# --- Nano CC Misc ---
 machine.computingcenter.name=Nano Computing Center
 machine.computingcenter.hatchrack=Computing Rack
 

@@ -1,5 +1,7 @@
 # 杂项
 misc.mode=运行模式
+machine.wirelessbase.mode=无线模式
+machine.wirelessbase.cost=耗电
 messTech.addBy=添加模组:
 GT5U.gui.text.shutdown_reason.datastick=在研究完成前取出或特定方式移除了闪存
 GT5U.gui.text.shutdown_reason.overheating=机器过热!
