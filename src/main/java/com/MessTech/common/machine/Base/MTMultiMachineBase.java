@@ -80,7 +80,6 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         super(aName);
     }
 
-
     // endregion
 
     // region Processing Logic
