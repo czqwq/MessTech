@@ -374,6 +374,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         aNBT.setInteger("overclockRatio", overclockRatio);
         aNBT.setInteger("overvoltageRatio", overvoltageRatio);
         aNBT.setLong("machineHeat", machineHeat);
+        aNBT.setBoolean("wirelessMode", wirelessMode);
         if (holderStackToConsume != null) {
             aNBT.setTag("holderStackToConsume", holderStackToConsume.writeToNBT(new NBTTagCompound()));
         }
@@ -395,6 +396,12 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         if (aNBT.hasKey("overclockRatio")) overclockRatio = Math.max(1, aNBT.getInteger("overclockRatio"));
         if (aNBT.hasKey("overvoltageRatio")) overvoltageRatio = Math.max(1, aNBT.getInteger("overvoltageRatio"));
         if (aNBT.hasKey("machineHeat")) machineHeat = aNBT.getLong("machineHeat");
+        if (aNBT.hasKey("wirelessMode")) {
+            wirelessMode = aNBT.getBoolean("wirelessMode");
+            if (wirelessMode && getBaseMetaTileEntity() != null) {
+                WirelessComputationPacket.enableWirelessNetWork(getBaseMetaTileEntity());
+            }
+        }
         if (aNBT.hasKey("holderStackToConsume")) {
             holderStackToConsume = ItemStack.loadItemStackFromNBT(aNBT.getCompoundTag("holderStackToConsume"));
         }

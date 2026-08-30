@@ -17,7 +17,9 @@ public enum MTItemList {
     MTHatchRack,
     MTAssFactory,
     AssMatrixBlock,
-    AdvAssMatrixBlock;
+    AdvAssMatrixBlock,
+    SpaceModulePumpInfinity,
+    SpaceModuleMinerInfinity;
 
     private boolean mHasNotBeenSet;
     private boolean mDeprecated;

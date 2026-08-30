@@ -71,7 +71,8 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 import tectech.thing.CustomItemList;
 
-public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF> implements ISurvivalConstructable, ICasingTextureProvider {
+public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
+    implements ISurvivalConstructable, ICasingTextureProvider {
 
     public MTDTPF(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional);
@@ -252,6 +253,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF> implements ISurvi
     private LevelTier levelTier = LevelTier.INVALID;
     /** Client-synced tier used for the controller's side texture; INVALID is rendered as MKI (1). */
     private int renderTier = 1;
+
     /** Structure tier as a plain int (1..5), or -1 ({@link LevelTier#INVALID_TIER}) if not formed / mismatched. */
     public int getStructureTier() {
         return levelTier.tier;
@@ -688,7 +690,10 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF> implements ISurvi
                 }
 
                 // Wireless mode: final shared safety check before input consumption.
-                CheckRecipeResult wirelessResult = validateWirelessPowerForRecipe(wirelessEUt, wirelessDuration, maxParallel);
+                CheckRecipeResult wirelessResult = validateWirelessPowerForRecipe(
+                    wirelessEUt,
+                    wirelessDuration,
+                    maxParallel);
                 if (!wirelessResult.wasSuccessful()) {
                     return wirelessResult;
                 }

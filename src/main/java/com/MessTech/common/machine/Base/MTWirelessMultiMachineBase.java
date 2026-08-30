@@ -159,7 +159,8 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
         super.getWailaBody(itemStack, currentTip, accessor, config);
         final NBTTagCompound tag = accessor.getNBTData();
         if (tag.getBoolean("wirelessMode")) {
-            currentTip.add(EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.wirelessbase.mode"));
+            currentTip
+                .add(EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.wirelessbase.mode"));
             currentTip.add(
                 EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.wirelessbase.cost")
                     + EnumChatFormatting.RESET
@@ -321,6 +322,9 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
         if (!addEUToGlobalEnergyMap(ownerUUID, required.negate())) {
             return CheckRecipeResultRegistry.insufficientStartupPower(required);
         }
+        // Keep Waila/GUI cost display in sync with the actual lump-sum wireless deduction.
+        costingEU = required;
+        costingEUText = String.valueOf(required);
         recipe.consumeInput(parallel, fluidInputs, itemInputs);
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }

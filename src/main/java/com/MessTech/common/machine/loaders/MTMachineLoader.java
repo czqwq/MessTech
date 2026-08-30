@@ -8,6 +8,8 @@ import com.MessTech.common.machine.MTAssFactory;
 import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDTPF;
 import com.MessTech.common.machine.hatch.MTHatchRack;
+import com.MessTech.common.machine.module.SpaceModuleMinerInfinity;
+import com.MessTech.common.machine.module.SpaceModulePumpInfinity;
 import com.MessTech.common.misc.MTItemList;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.util.AuthorDynamic;
@@ -48,5 +50,18 @@ public class MTMachineLoader {
 
         MTItemList.AssMatrixBlock.set(AssMatrixBlock.getItemStack());
         MTItemList.AdvAssMatrixBlock.set(AdvAssMatrixBlock.getItemStack());
+
+        MTItemList.SpaceModulePumpInfinity.set(
+            new SpaceModulePumpInfinity(
+                MT_ID + 4,
+                "Space Module Pump Infinity",
+                translateToLocal("machine.spacemodulepump.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModulePumpInfinity.get(1));
+        MTItemList.SpaceModuleMinerInfinity.set(
+            new SpaceModuleMinerInfinity(
+                MT_ID + 5,
+                "Space Module Miner Infinity",
+                translateToLocal("machine.spacemoduleminer.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleMinerInfinity.get(1));
     }
 }

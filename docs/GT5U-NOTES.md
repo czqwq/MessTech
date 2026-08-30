@@ -448,3 +448,29 @@ Keep it as ONE registration path: the loader calls `AuthorDynamic.registerOn(...
 `addItemTooltip`. Click-through: `postInit -> MTMachineLoader.loadMachines -> MTItemList.set(stack) +
 AuthorDynamic.registerOn(stack) -> AnimatedTooltipHandler.addItemTooltip(stack,
 GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
+
+## 13. GT5U API knowledge from recent work
+
+* Upstream `MTEMultiBlockBase#getWailaBody` displays a running-mode line by reading `tag.getString("mode")`.
+  To show a localized machine-mode name, write `tag.setString("mode", getMachineModeName(machineMode))`.
+  Writing `tag.setInteger("mode", machineMode)` makes Waila show `运行模式: 0/1`.
+* `ProcessingLogic#findRecipeMatches` uses `recipeMap.findRecipeQuery().items(...).fluids(...).specialSlot(...).findAll()`.
+  Fake recipes (`addFakeRecipe`) are **not** found by `findRecipeQuery`; a machine that processes from a custom
+  pool needs real recipes (`addRecipe(copy, false, false, false)`).
+* NEI's `GTNEIDefaultHandler` reads `recipeMap.getBackend().getRecipesByCategory(defaultCategory)`.
+  When copying recipes from one recipe map to another, call `recipe.setRecipeCategory(targetDefaultCategory)`
+  or the copied list will stay empty in the new NEI tab.
+* Scanner mode (original Research Station scanner): `RecipeMaps.scannerHandlers.findRecipe(this, holder, special, fluid)`
+  returns `GTScannerResult`; required computation = `researchTime * 2^(tier-1)`, `eRequiredData = 1`,
+  EU = `max(|recipeEUt|, TierEU.RECIPE_UV)`.
+* `MTEHatchDataAccess#getAssemblyLineRecipes()` returns recipes from the data sticks stored inside the hatch.
+  Original Assembly Line processing is **ordered** by input-bus slots; an "unordered assembly line" must instead
+  delegate to normal `ProcessingLogic` / `getStoredInputs`.
+* `MTEHatchInputBusDebug` exposes phantom inventory via `getStackInSlot()` returning copied stacks with a huge
+  stack size (`Integer.MAX_VALUE` when not finite). Standard `getStoredInputs()` / `depleteInput()` handle it.
+* `COAL_CASING_TIER` is aliased into `GTRecipe.mSpecialValue` (`GTRecipeConstants.SPECIAL_VALUE_ALIASES`).
+* `RecipeMaps.scannerFakeRecipes` / `RecipeMaps.assemblylineVisualRecipes` are NEI/visual pools; they are not
+  meant to be searched by normal recipe processing unless copied into a real recipe map.
+* `WirelessNetworkManager` helpers: `processInitialSettings` (owner UUID), `getUserEU`, `addEUToGlobalEnergyMap`.
+  Safe wireless order: validate balance first (`checkWirelessPower`/`validateWirelessPowerForRecipe`), then
+  `startWirelessRecipe` deducts and consumes inputs.
