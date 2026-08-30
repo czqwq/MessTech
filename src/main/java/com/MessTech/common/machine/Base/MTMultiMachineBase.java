@@ -80,16 +80,6 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         super(aName);
     }
 
-    // endregion
-
-    // region new methods
-    public void repairMachine() {
-        mHardHammer = true;
-        mScrewdriver = true;
-        mCrowbar = true;
-        mSolderingTool = true;
-        mWrench = true;
-    }
 
     // endregion
 
