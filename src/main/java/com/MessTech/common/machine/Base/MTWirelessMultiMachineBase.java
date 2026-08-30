@@ -292,6 +292,23 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
     }
 
     /**
+     * Wireless recipe validation shared by subclasses: checks that the wireless network can cover
+     * {@code eut * duration * maxParallel}. If the balance is too low, returns an insufficient-power
+     * result; otherwise returns SUCCESSFUL so the caller can continue to consuming inputs + power.
+     */
+    protected CheckRecipeResult validateWirelessPowerForRecipe(long eut, int duration, int maxParallel) {
+        if (!isEnableWireless()) return CheckRecipeResultRegistry.SUCCESSFUL;
+        if (ownerUUID == null) return CheckRecipeResultRegistry.insufficientPower(eut);
+        BigInteger required = BigInteger.valueOf(eut)
+            .multiply(BigInteger.valueOf(duration))
+            .multiply(BigInteger.valueOf(maxParallel));
+        if (getUserEU(ownerUUID).compareTo(required) < 0) {
+            return CheckRecipeResultRegistry.insufficientStartupPower(required);
+        }
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    /**
      * Safely starts a wireless recipe: deducts the actual EU cost from the wireless network first, and only
      * consumes inputs after the deduction succeeds.
      */

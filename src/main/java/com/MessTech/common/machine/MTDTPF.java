@@ -688,7 +688,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF> implements ISurvi
                 }
 
                 // Wireless mode: final shared safety check before input consumption.
-                CheckRecipeResult wirelessResult = checkWirelessPower(wirelessEUt, wirelessDuration, maxParallel);
+                CheckRecipeResult wirelessResult = validateWirelessPowerForRecipe(wirelessEUt, wirelessDuration, maxParallel);
                 if (!wirelessResult.wasSuccessful()) {
                     return wirelessResult;
                 }
