@@ -277,13 +277,7 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         return StructureDefinition.<SpaceModuleMinerInfinity>builder()
             .addShape(
                 "main",
-                transpose(new String[][] {
-                    { "H", "H" },
-                    { "~", "H" },
-                    { "H", "H" },
-                    { "H", "H" },
-                    { "H", "H" }
-                }))
+                transpose(new String[][] { { "H", "H" }, { "~", "H" }, { "H", "H" }, { "H", "H" }, { "H", "H" } }))
             .addElement(
                 'H',
                 GTStructureUtility.ofHatchAdderOptional(
@@ -477,8 +471,7 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
 
         // Use the same ParallelHelper path as the original module: it caps by inputs and consumes
         // the item/fluid inputs once parallels are known.
-        ParallelHelper helper = new ParallelHelper()
-            .setMaxParallel(maxParallels)
+        ParallelHelper helper = new ParallelHelper().setMaxParallel(maxParallels)
             .setRecipe(recipe)
             .setFluidInputs(fluidInputs)
             .setItemInputs(itemInputs)
@@ -535,7 +528,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
             itemCounts.merge(key, (long) input.stackSize, Long::sum);
         }
         int res = 0;
-        for (int tier = ItemMiningDrones.DroneTiers.LV.ordinal(); tier <= ItemMiningDrones.DroneTiers.UXV.ordinal(); ++tier) {
+        for (int tier = ItemMiningDrones.DroneTiers.LV.ordinal(); tier
+            <= ItemMiningDrones.DroneTiers.UXV.ordinal(); ++tier) {
             if (Arrays.stream(gtnhintergalactic.recipe.SpaceMiningRecipes.getTieredInputs(tier))
                 .allMatch(
                     input -> itemCounts.getOrDefault(GTUtility.ItemId.createWithoutNBT(input), 0L)
@@ -568,7 +562,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     private int getPlasmaTierType(FluidStack fluidStack) {
         if (fluidStack == null) return 0;
         if (fluidStack.isFluidEqual(Materials.Plutonium241.getPlasma(1))) return 5;
-        if (fluidStack.isFluidEqual(new FluidStack(MaterialsElements.getInstance().TECHNETIUM.getPlasma(), 1))) return 4;
+        if (fluidStack.isFluidEqual(new FluidStack(MaterialsElements.getInstance().TECHNETIUM.getPlasma(), 1)))
+            return 4;
         if (fluidStack.isFluidEqual(Materials.Radon.getPlasma(1))) return 3;
         if (fluidStack.isFluidEqual(Materials.Bismuth.getPlasma(1))) return 2;
         if (fluidStack.isFluidEqual(Materials.Helium.getPlasma(1))) return 1;
@@ -713,21 +708,27 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(StatCollector.translateToLocal(getMachineTypeKey()))
             .addSeparator()
-            .addInfo(EnumChatFormatting.LIGHT_PURPLE.toString() + EnumChatFormatting.BOLD.toString()
-                + StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.meme"))
+            .addInfo(
+                EnumChatFormatting.LIGHT_PURPLE.toString() + EnumChatFormatting.BOLD.toString()
+                    + StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.meme"))
             .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.need_t5"))
             .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.plasma"))
             .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.computation"))
             .addInfo(EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.spacemodule.tooltip.0"))
             .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.spacemodule.tooltip.1"))
-            .addInfo(EnumChatFormatting.GREEN + StatCollector.translateToLocal("machine.spacemodule.tooltip.crossparallel"))
+            .addInfo(
+                EnumChatFormatting.GREEN + StatCollector.translateToLocal("machine.spacemodule.tooltip.crossparallel"))
             .beginStructureBlock(1, 5, 2, false)
             .addController(StatCollector.translateToLocal("gt.mbtt.structure.front_center_4th_layer"))
             .addCasing("0-8", StatCollector.translateToLocal("gt.blockcasings.ig.0.name"), false)
             .addInputHatch("1+", StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
             .addInputBus("1+", StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
             .addOutputBus("1+", StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
-            .addMiscHatch("1+", StatCollector.translateToLocal("ig.elevator.structure.DataInputHatch"), StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
+            .addMiscHatch(
+                "1+",
+                StatCollector.translateToLocal("ig.elevator.structure.DataInputHatch"),
+                StatCollector.translateToLocal("gt.mbtt.structure.any_casing"),
+                1)
             .addStructureInfo("")
             .addStructureFooter(StatCollector.translateToLocal("ig.elevator.structure.SharedResources"))
             .toolTipFinisher();

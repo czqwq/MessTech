@@ -2,7 +2,6 @@ package com.MessTech.common.machine.module;
 
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
@@ -17,6 +16,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.jetbrains.annotations.NotNull;
 
 import com.MessTech.common.gui.module.SpaceModulePumpInfinityGui;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
@@ -40,9 +40,7 @@ import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.GTStructureUtility;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gtnhintergalactic.recipe.SpacePumpingRecipes;
-
 import gtnhintergalactic.tile.multi.elevator.TileEntitySpaceElevator;
-import org.jetbrains.annotations.NotNull;
 import tectech.thing.metaTileEntity.multi.base.render.TTRenderedExtendedFacingTexture;
 
 public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModulePumpInfinity> {
@@ -120,13 +118,7 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
         return StructureDefinition.<SpaceModulePumpInfinity>builder()
             .addShape(
                 "main",
-                transpose(new String[][] {
-                    { "H", "H" },
-                    { "~", "H" },
-                    { "H", "H" },
-                    { "H", "H" },
-                    { "H", "H" }
-                }))
+                transpose(new String[][] { { "H", "H" }, { "~", "H" }, { "H", "H" }, { "H", "H" }, { "H", "H" } }))
             .addElement(
                 'H',
                 GTStructureUtility.ofHatchAdderOptional(
@@ -225,8 +217,7 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
             FluidStack out = fluid.copy();
             out.amount = (int) Math.min(amount, Integer.MAX_VALUE);
 
-            long eut = gregtech.api.enums.GTValues.V[14]
-                + (long) (parallel - 1) * gregtech.api.enums.GTValues.V[13];
+            long eut = gregtech.api.enums.GTValues.V[14] + (long) (parallel - 1) * gregtech.api.enums.GTValues.V[13];
             int duration = 20 * batch;
             CheckRecipeResult result = validateWirelessPowerForRecipe(eut, duration, 1);
             if (!result.wasSuccessful()) return false;
@@ -253,8 +244,9 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(StatCollector.translateToLocal(getMachineTypeKey()))
             .addSeparator()
-            .addInfo(EnumChatFormatting.LIGHT_PURPLE.toString() + EnumChatFormatting.BOLD.toString()
-                + StatCollector.translateToLocal("machine.spacemodulepump.tooltip.meme"))
+            .addInfo(
+                EnumChatFormatting.LIGHT_PURPLE.toString() + EnumChatFormatting.BOLD.toString()
+                    + StatCollector.translateToLocal("machine.spacemodulepump.tooltip.meme"))
             .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.need_t5"))
             .addInfo(EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.spacemodule.tooltip.0"))
             .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.spacemodule.tooltip.1"))

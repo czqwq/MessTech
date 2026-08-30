@@ -7,11 +7,11 @@ import com.MessTech.common.machine.Base.ParallelismAcrossMultiMachineBase;
 import com.cleanroommc.modularui.api.IPanelHandler;
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
-import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.value.sync.IntSyncValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
@@ -30,7 +30,8 @@ public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<ParallelismAcro
 
     @Override
     protected Widget<? extends Widget<?>> makeLogoWidget(PanelSyncManager syncManager, ModularPanel parent) {
-        return new IDrawable.DrawableWidget(MTGuiTextures.PICTURE_MT_SPACE).size(18).marginTop(4);
+        return new IDrawable.DrawableWidget(MTGuiTextures.PICTURE_MT_SPACE).size(18)
+            .marginTop(4);
     }
 
     @Override
@@ -39,7 +40,7 @@ public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<ParallelismAcro
         syncManager.syncValue(
             "parallel",
             new IntSyncValue(multiblock::getWirelessParallel, multiblock::setWirelessParallel).allowC2S());
-        if (multiblock instanceof com.MessTech.common.machine.module.SpaceModuleInfinityBase<?> base) {
+        if (multiblock instanceof com.MessTech.common.machine.module.SpaceModuleInfinityBase<?>base) {
             syncManager.syncValue(
                 "crossParallel",
                 new IntSyncValue(base::getCrossRecipeParallel, base::setCrossRecipeParallel).allowC2S());
@@ -154,31 +155,28 @@ public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<ParallelismAcro
      */
     protected IPanelHandler addIntPanelButton(Flow row, PanelSyncManager syncManager, ModularPanel parent,
         String panelName, String langKey, IntSyncValue syncer, int min, int max, int defaultValue) {
-        IPanelHandler panel = syncManager.syncedPanel(
-            panelName,
-            true,
-            (p_syncManager, syncHandler) -> {
-                ModularPanel p = new ModularPanel(panelName).size(90, 50)
-                    .relative(parent)
-                    .leftRel(1)
-                    .topRel(0.7f);
-                Flow column = Flow.column()
-                    .full()
-                    .paddingTop(4);
-                column.child(
-                    IKey.lang(langKey)
-                        .asWidget()
-                        .marginBottom(3));
-                column.child(
-                    new TextFieldWidget().formatAsInteger(true)
-                        .numbersInt(min, max)
-                        .setTextAlignment(Alignment.CENTER)
-                        .defaultNumber(defaultValue)
-                        .value(syncer)
-                        .size(80, 16));
-                p.child(column);
-                return p;
-            });
+        IPanelHandler panel = syncManager.syncedPanel(panelName, true, (p_syncManager, syncHandler) -> {
+            ModularPanel p = new ModularPanel(panelName).size(90, 50)
+                .relative(parent)
+                .leftRel(1)
+                .topRel(0.7f);
+            Flow column = Flow.column()
+                .full()
+                .paddingTop(4);
+            column.child(
+                IKey.lang(langKey)
+                    .asWidget()
+                    .marginBottom(3));
+            column.child(
+                new TextFieldWidget().formatAsInteger(true)
+                    .numbersInt(min, max)
+                    .setTextAlignment(Alignment.CENTER)
+                    .defaultNumber(defaultValue)
+                    .value(syncer)
+                    .size(80, 16));
+            p.child(column);
+            return p;
+        });
         row.child(
             new ButtonWidget<>().size(18, 18)
                 .overlay(GTGuiTextures.OVERLAY_BUTTON_CRYOTHEUM_OFF)

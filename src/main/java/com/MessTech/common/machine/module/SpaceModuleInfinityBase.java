@@ -14,9 +14,6 @@ import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
 
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
-
 import com.MessTech.common.gui.module.SpaceModuleInfinityGui;
 import com.MessTech.common.machine.Base.ParallelismAcrossMultiMachineBase;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
@@ -25,6 +22,8 @@ import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.api.casing.Casings;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.Textures;
@@ -196,8 +195,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
 
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        if (aBaseMetaTileEntity.isServerSide() && hasPendingBatchWork()
-            && !aBaseMetaTileEntity.isAllowedToWork()) {
+        if (aBaseMetaTileEntity.isServerSide() && hasPendingBatchWork() && !aBaseMetaTileEntity.isAllowedToWork()) {
             // The player (or redstone) asked to stop mid-batch; remember that and force the machine
             // to continue until every planned output has been emitted.
             shutdownRequestedDuringBatch = true;
