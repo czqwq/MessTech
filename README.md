@@ -8,9 +8,10 @@ start the game
 
 ### Current support version
 
-|  GTNH Version  | Start Version  | Newest Support Version |                                                     Download                                                     | Maintenance status |
-|:---------:|:-------:|:----------------------:|:----------------------------------------------------------------------------------------------------------------:| :--: |
-|   2.9.0-beta2    |  1.0  |          1.3           | [![1.7.0](https://img.shields.io/badge/release-v1.2-00FF00)](https://github.com/czqwq/MessTech/releases/tag/1.3) |  ✔️  |
+| GTNH Version | Start Version | Newest Support Version |                                                       Download                                                       | Maintenance status |
+|:------------:|:-------------:|:----------------------:|:--------------------------------------------------------------------------------------------------------------------:|:------------------:|
+| 2.9.0-beta2  |      1.0      |          1.3           |   [![1.7.0](https://img.shields.io/badge/release-v1.3-00FF00)](https://github.com/czqwq/MessTech/releases/tag/1.3)   |         ✔️         |
+| 2.9.0-beta1  |    1.3-pre    |        1.3-pre         | [![1.7.0](https://img.shields.io/badge/release-v1.3-00FF00)](https://github.com/czqwq/MessTech/releases/tag/1.3-pre) |     Might Be?      |
 
 ### Why I write this mod
 I don't know. Maybe just for fun.Enjoy it
