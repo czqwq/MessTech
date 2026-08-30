@@ -166,9 +166,27 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
                     + EnumChatFormatting.RESET
                     + ": "
                     + EnumChatFormatting.GOLD
-                    + tag.getString("costingEUText")
+                    + formatWirelessEU(tag.getString("costingEUText"))
                     + EnumChatFormatting.RESET
                     + " EU");
+        }
+    }
+
+    /**
+     * Formats a wireless EU value with thousands separators and a compact scientific-notation
+     * suffix, e.g. {@code 1,000,000 (1.00e6)}.
+     */
+    protected String formatWirelessEU(String raw) {
+        try {
+            BigInteger value = new BigInteger(raw);
+            String grouped = String.format("%,d", value);
+            String scientific = String.format("%.2e", value.doubleValue());
+            // Normalize "e+07" / "e-07" to "e7" / "e-7" for a cleaner display.
+            scientific = scientific.replace("e+", "e").replace("e-", "e-");
+            scientific = scientific.replaceAll("e(-?)0(\\d)", "e$1$2");
+            return grouped + " (" + scientific + ")";
+        } catch (Exception e) {
+            return raw;
         }
     }
     // endregion

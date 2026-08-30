@@ -152,6 +152,16 @@ MTMultiMachineBase<T>
 - Power formula: base 1A MAX (`GTValues.V[14]`), each extra parallel adds 1A UXV (`GTValues.V[13]`).
 - `checkProcessing()`: validates wireless balance, deducts cost, sets `lEUt` and 20-tick duration.
 
+### Tick-batched output framework (latest)
+- `SpaceModuleInfinityBase` now owns a shared tick-batched output framework:
+  - `batchRemainingTasks`, `batchItemOutputs`, `batchFluidOutputs`
+  - `startBatchedProcessing()`, `generateOneBatchTask()`, `getMainBatchDuration()`
+- A batch runs as one continuous main recipe:
+  - total duration = main duration + remaining sub-outputs × 1 tick
+  - each tick generates one sub-output and accumulates it
+  - final `mOutputItems`/`mOutputFluids` are the accumulated total
+- Shutdown is deferred until all sub-outputs finish (`shutdownRequestedDuringBatch`).
+
 ### Mixin / elevator mounting (latest)
 - New late Mixin infra:
   - `com.MessTech.common.mixin.LateMixinPlugin` (implements `ILateMixinLoader`, `@LateMixin`)
@@ -168,6 +178,7 @@ MTMultiMachineBase<T>
 ### Pump port status (latest)
 - `SpaceModulePumpInfinity` now uses real `SpacePumpingRecipes.RECIPES`; `getRecipeMap()` returns
   `null` because the pump has no GT RecipeMap (custom map only).
+- NBT saves/loads all 4 recipe sub-panels (planet/gas/parallel arrays) and batch size.
 - GUI: `SpaceModulePumpInfinityGui` has separate Parallel / Planet Type / Gas Type buttons/panels.
 - Structure: original module frame (1 wide × 5 tall × 2 deep) with optional casing/output hatch.
 - `checkProcessing()`: looks up fluid by `(planetType, gasType)`, validates/deducts wireless EU,
@@ -196,6 +207,6 @@ MTMultiMachineBase<T>
   - caps parallels by wireless parallel, local/parent computation, plasma, and input stack sizes
   - validates/deducts wireless EU, consumes inputs via `recipe.consumeInput` + `depleteInput` for plasma,
     generates weighted ore outputs and applies whitelist/blacklist filtering
-- NBT saves/loads whitelist flag + filter inventory.
+- NBT saves/loads distance, overdrive, cycle/range/step, cycleDistance, whitelist flag, and filter inventory.
 - Remaining relative to original: full asteroid info/calculator panels and 64-slot filter grid (GUI
   currently uses a compact 8-slot filter).

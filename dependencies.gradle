@@ -34,6 +34,7 @@ dependencies {
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.125-GTNH:dev")
     runtimeOnlyNonPublishable(gtnhDev("OpenComputers"))
     runtimeOnlyNonPublishable rfg.deobf(files("libs/spark.jar"))
+    runtimeOnlyNonPublishable rfg.deobf(files("libs/OmniOcularUnofficial.jar"))
     runtimeOnlyNonPublishable(gtnhDev("ThaumicEnergistics"))
     runtimeOnlyNonPublishable(gtnhDev("Universal-Singularities"))
     runtimeOnlyNonPublishable(rfg.deobf("curse.maven:BiomesOPlenty-220318:2499612"))

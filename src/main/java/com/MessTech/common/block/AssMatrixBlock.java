@@ -32,7 +32,7 @@ public class AssMatrixBlock extends Block {
     public AssMatrixBlock() {
         super(Material.iron);
         this.setBlockName("AssMatrixBlock");
-        this.setBlockTextureName("megatech:AssMatrixBlock");
+        this.setBlockTextureName("messtech:AssMatrixBlock");
         this.setHardness(6.0F);
         this.setResistance(20.0F);
         this.setStepSound(soundTypeMetal);

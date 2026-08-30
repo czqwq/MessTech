@@ -194,5 +194,36 @@ public class GTRecipes {
             .duration(MINUTES * 2)
             .requiresCleanRoom()
             .addTo(assemblerRecipes);
+
+        TTRecipeAdder.addResearchableAssemblylineRecipe(
+            ItemList.SpaceElevatorModuleMinerT3.get(1),
+            16_777_216 * 2,
+            16384,
+            (int) TierEU.RECIPE_MAX,
+            1,
+            new Object[] { ItemList.SpaceElevatorModuleMinerT3.get(64), ItemList.InfiniteFluidDrillingRig.get(64),GTOreDictUnificator.get(OrePrefixes.frameGt,Materials.Universium,16),ItemList.Electric_Pump_UXV.get(64), ItemList.Field_Generator_UXV.get(16),
+                GTOreDictUnificator.get(OrePrefixes.gearGt, Materials.Universium, 16),
+                GTOreDictUnificator.get(OrePrefixes.screw, Materials.Universium, 64),GTOreDictUnificator.get(OrePrefixes.plateDense, Materials.Eternity, 64),new Object[] { OrePrefixes.circuit.get(Materials.MAX), 64 } },
+            new FluidStack[] { MaterialMisc.MUTATED_LIVING_SOLDER.getFluidStack(STACKS * INGOTS),
+                Materials.Universium.getMolten(144 * 2048),
+                Materials.Eternity.getMolten(144 * 4096) },
+            MTItemList.SpaceModuleMinerInfinity.get(1),
+            20 * 6000,
+            (int) TierEU.RECIPE_MAX);
+
+        TTRecipeAdder.addResearchableAssemblylineRecipe(
+            ItemList.SpaceElevatorModulePumpT3.get(1),
+            16_777_216 * 2,
+            16384,
+            (int) TierEU.RECIPE_MAX,
+            1,
+            new Object[] { ItemList.SpaceElevatorModulePumpT3.get(64), ItemList.Sensor_UXV.get(64),ItemList.Field_Generator_UXV.get(64), new Object[] { OrePrefixes.circuit.get(Materials.MAX), 16 },ItemList.Robot_Arm_UXV.get(64),ItemList.Robot_Arm_UXV.get(64),GTOreDictUnificator.get(OrePrefixes.round,Materials.Universium,64),GTOreDictUnificator.get(OrePrefixes.wireGt04,Materials.SpaceTime,32),GTOreDictUnificator.get(OrePrefixes.frameGt,Materials.Universium,16)},
+            new FluidStack[] { MaterialMisc.MUTATED_LIVING_SOLDER.getFluidStack(STACKS * INGOTS),
+                Materials.Universium.getMolten(144 * 1024),
+                Materials.Eternity.getMolten(144 * 2048),Materials.SpaceTime.getMolten(144 * 4096)},
+            MTItemList.SpaceModulePumpInfinity.get(1),
+            20 * 6000,
+            (int) TierEU.RECIPE_MAX);
+
     }
 }

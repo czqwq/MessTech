@@ -6,8 +6,10 @@ import net.minecraft.util.StatCollector;
 
 import com.MessTech.common.machine.MTComputingCenter;
 import com.cleanroommc.modularui.api.IPanelHandler;
+import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.api.widget.IWidget;
+import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.drawable.DynamicDrawable;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
@@ -33,6 +35,11 @@ public class MTComputingCenterGui extends MTEMultiBlockBaseGui<MTComputingCenter
 
     public MTComputingCenterGui(MTComputingCenter multiblock) {
         super(multiblock);
+    }
+
+    @Override
+    protected Widget<? extends Widget<?>> makeLogoWidget(PanelSyncManager syncManager, ModularPanel parent) {
+        return new IDrawable.DrawableWidget(MTGuiTextures.PICTURE_MT_LOGO).size(18).marginTop(4);
     }
 
     @Override

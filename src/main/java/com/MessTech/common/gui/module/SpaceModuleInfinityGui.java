@@ -2,9 +2,12 @@ package com.MessTech.common.gui.module;
 
 import static net.minecraft.util.StatCollector.translateToLocal;
 
+import com.MessTech.common.gui.MTGuiTextures;
 import com.MessTech.common.machine.Base.ParallelismAcrossMultiMachineBase;
 import com.cleanroommc.modularui.api.IPanelHandler;
+import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.value.sync.IntSyncValue;
@@ -23,6 +26,11 @@ public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<ParallelismAcro
 
     public SpaceModuleInfinityGui(ParallelismAcrossMultiMachineBase<?> multiblock) {
         super(multiblock);
+    }
+
+    @Override
+    protected Widget<? extends Widget<?>> makeLogoWidget(PanelSyncManager syncManager, ModularPanel parent) {
+        return new IDrawable.DrawableWidget(MTGuiTextures.PICTURE_MT_SPACE).size(18).marginTop(4);
     }
 
     @Override

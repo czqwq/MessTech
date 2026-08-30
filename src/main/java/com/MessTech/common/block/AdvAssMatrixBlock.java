@@ -16,7 +16,7 @@ public class AdvAssMatrixBlock extends AssMatrixBlock {
         super();
         this.setLevelTier(2);
         this.setBlockName("AdvAssMatrixBlock");
-        this.setBlockTextureName("megatech:AdvAssMatrixBlock");
+        this.setBlockTextureName("messtech:AdvAssMatrixBlock");
     }
 
     public static AdvAssMatrixBlock getBlock() {

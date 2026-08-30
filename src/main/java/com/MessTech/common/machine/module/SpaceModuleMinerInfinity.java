@@ -6,6 +6,7 @@ import static gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -118,7 +119,6 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     private int cycleDistance = 30;
     protected ArrayList<MTEHatchDataInput> eInputData = new ArrayList<>();
     protected long eRequiredData = 0;
-    private int remainingCrossCycles = 0;
 
     public SpaceModuleMinerInfinity(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional);
@@ -369,35 +369,37 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         // Bracketing is required for ME fluid hatches to report their real drainable amounts.
         startRecipeProcessing();
         try {
-            // Batch cross-recipe cycles across ticks: run one mining cycle per checkProcessing call.
-            // Each successful cycle is output by the normal GT output path before the next cycle starts.
-            if (remainingCrossCycles <= 0) {
-                remainingCrossCycles = Math.clamp(getCrossRecipeParallel(), 1, MAX_CROSS_RECIPE_CYCLES);
-            }
-            if (remainingCrossCycles <= 0) {
-                return CheckRecipeResultRegistry.NO_RECIPE;
-            }
-
-            CheckRecipeResult result = doMiningCheck();
-            if (!result.wasSuccessful()) {
-                remainingCrossCycles = 0;
-                return result;
-            }
-
-            remainingCrossCycles--;
-            if (remainingCrossCycles > 0) {
-                // Force the machine to finish this tick so the next cycle is planned next tick.
-                mMaxProgresstime = 1;
-            }
-            return CheckRecipeResultRegistry.SUCCESSFUL;
+            return startBatchedProcessing();
         } finally {
             endRecipeProcessing();
         }
     }
 
     @Override
-    protected boolean hasPendingBatchWork() {
-        return remainingCrossCycles > 0;
+    protected int getBatchTaskCount() {
+        return Math.clamp(getCrossRecipeParallel(), 1, MAX_CROSS_RECIPE_CYCLES);
+    }
+
+    @Override
+    protected int getMainBatchDuration() {
+        return 20;
+    }
+
+    @Override
+    protected boolean generateOneBatchTask() {
+        CheckRecipeResult result = doMiningCheck();
+        if (!result.wasSuccessful()) {
+            return false;
+        }
+        if (mOutputItems != null) {
+            Collections.addAll(batchItemOutputs, mOutputItems);
+            mOutputItems = null;
+        }
+        if (mOutputFluids != null) {
+            Collections.addAll(batchFluidOutputs, mOutputFluids);
+            mOutputFluids = null;
+        }
+        return true;
     }
 
     private CheckRecipeResult doMiningCheck() {
@@ -510,7 +512,7 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         // Wireless power was already deducted in one lump; don't drain energy hatches too.
         lEUt = 0;
         eRequiredData = (int) Math.ceil(data.computation * maxParallels * compModifier);
-        mMaxProgresstime = duration;
+        // Duration is managed by the tick-batched main batch; do not overwrite it here.
         mEfficiencyIncrease = 10000;
         cycleDistance();
         return CheckRecipeResultRegistry.SUCCESSFUL;
@@ -678,6 +680,12 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     @Override
     public void saveNBTData(NBTTagCompound aNBT) {
         super.saveNBTData(aNBT);
+        aNBT.setInteger("distance", distance);
+        aNBT.setInteger("overdrive", overdrive);
+        aNBT.setBoolean("cycleEnabled", cycleEnabled);
+        aNBT.setInteger("range", range);
+        aNBT.setInteger("step", step);
+        aNBT.setInteger("cycleDistance", cycleDistance);
         aNBT.setBoolean("isWhitelisted", isWhitelisted);
         if (filterInventory != null) {
             aNBT.setTag("whitelist", filterInventory.serializeNBT());
@@ -687,6 +695,12 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     @Override
     public void loadNBTData(NBTTagCompound aNBT) {
         super.loadNBTData(aNBT);
+        if (aNBT.hasKey("distance")) setDistance(aNBT.getInteger("distance"));
+        if (aNBT.hasKey("overdrive")) setOverdrive(aNBT.getInteger("overdrive"));
+        if (aNBT.hasKey("cycleEnabled")) setCycleEnabled(aNBT.getBoolean("cycleEnabled"));
+        if (aNBT.hasKey("range")) setRange(aNBT.getInteger("range"));
+        if (aNBT.hasKey("step")) setStep(aNBT.getInteger("step"));
+        if (aNBT.hasKey("cycleDistance")) setCycleDistance(aNBT.getInteger("cycleDistance"));
         isWhitelisted = aNBT.getBoolean("isWhitelisted");
         if (filterInventory != null) {
             filterInventory.deserializeNBT(aNBT.getCompoundTag("whitelist"));
@@ -699,6 +713,11 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(StatCollector.translateToLocal(getMachineTypeKey()))
             .addSeparator()
+            .addInfo(EnumChatFormatting.LIGHT_PURPLE.toString() + EnumChatFormatting.BOLD.toString()
+                + StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.meme"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.need_t5"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.plasma"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.computation"))
             .addInfo(EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.spacemodule.tooltip.0"))
             .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.spacemodule.tooltip.1"))
             .addInfo(EnumChatFormatting.GREEN + StatCollector.translateToLocal("machine.spacemodule.tooltip.crossparallel"))

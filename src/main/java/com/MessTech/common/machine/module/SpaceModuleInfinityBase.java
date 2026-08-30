@@ -4,6 +4,7 @@ import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose
 import static gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -11,6 +12,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraftforge.fluids.FluidStack;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -61,6 +63,12 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     private int crossRecipeParallel = 1;
     protected boolean shutdownRequestedDuringBatch = false;
 
+    // Tick-batched output state: the machine runs one continuous main batch and generates one
+    // sub-output per tick, accumulating everything into these lists until the batch finishes.
+    protected int batchRemainingTasks = 0;
+    protected ArrayList<ItemStack> batchItemOutputs = new ArrayList<>();
+    protected ArrayList<FluidStack> batchFluidOutputs = new ArrayList<>();
+
     protected static IIconContainer ScreenOFF;
     protected static IIconContainer ScreenON;
 
@@ -76,10 +84,6 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         setEnableWirelessFunc(true);
         setEnableWireless(true);
         setWirelessParallel(1);
-    }
-
-    public int getCrossRecipeParallel() {
-        return crossRecipeParallel;
     }
 
     public void setCrossRecipeParallel(int value) {
@@ -105,6 +109,69 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         }
     }
 
+    /**
+     * @return number of sub-outputs in the current tick-batched batch.
+     */
+    protected abstract int getBatchTaskCount();
+
+    /**
+     * Generates one sub-output and adds it to {@link #batchItemOutputs} / {@link #batchFluidOutputs}.
+     *
+     * @return true if a sub-output was generated, false if there are no more valid sub-outputs.
+     */
+    protected abstract boolean generateOneBatchTask();
+
+    /**
+     * @return base duration of the main batch, before the 1-tick distributed sub-outputs.
+     */
+    protected abstract int getMainBatchDuration();
+
+    /**
+     * Called when a new tick-batched batch starts. Subclasses can reset per-batch cursors here.
+     */
+    protected void onBatchStart() {}
+
+    /**
+     * Starts a continuous tick-batched batch. The first sub-output is generated immediately so the
+     * machine has a valid recipe; remaining sub-outputs are generated one per tick.
+     */
+    protected CheckRecipeResult startBatchedProcessing() {
+        batchItemOutputs.clear();
+        batchFluidOutputs.clear();
+        mOutputItems = null;
+        mOutputFluids = null;
+        batchRemainingTasks = getBatchTaskCount();
+        if (batchRemainingTasks <= 0) {
+            return CheckRecipeResultRegistry.NO_RECIPE;
+        }
+        onBatchStart();
+        if (!generateOneBatchTask()) {
+            batchRemainingTasks = 0;
+            return CheckRecipeResultRegistry.NO_RECIPE;
+        }
+        batchRemainingTasks--;
+        mMaxProgresstime = getMainBatchDuration() + batchRemainingTasks;
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    @Override
+    public boolean onRunningTick(ItemStack aStack) {
+        boolean result = super.onRunningTick(aStack);
+        if (result && batchRemainingTasks > 0) {
+            if (generateOneBatchTask()) {
+                batchRemainingTasks--;
+            } else {
+                batchRemainingTasks = 0;
+            }
+        }
+        // Keep the GUI/Waila display updated with the accumulated total output while the batch runs.
+        if (mMaxProgresstime > 0) {
+            mOutputItems = batchItemOutputs.toArray(new ItemStack[0]);
+            mOutputFluids = batchFluidOutputs.toArray(new FluidStack[0]);
+        }
+        return result;
+    }
+
     @Override
     public int getMaxParallelRecipes() {
         return Math.max(1, getWirelessParallel());
@@ -114,7 +181,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
      * @return true while a tick-batched output sequence is still running and must not be interrupted.
      */
     protected boolean hasPendingBatchWork() {
-        return false;
+        return batchRemainingTasks > 0;
     }
 
     @Override
