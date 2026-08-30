@@ -1,14 +1,14 @@
 dependencies {
     elytraModpackVersion {
         // 在这配置的gtnh版本 用于自动拉取依赖版本
-        gtnhVersion = "2.9.0-beta-2"
+        gtnhVersion = "2.9.0-beta-1"
         // 是否不缓存拉取的依赖清单文件
         manifestNoCache = false
         // 是否自动为输出的jar添加 `gtnhVersion` 后缀
         attachManifestVersionToJar = false
     }
-    implementation("com.github.GTNewHorizons:GT5-Unofficial:5.09.54.108:dev")
-    implementation("com.github.GTNewHorizons:NewHorizonsCoreMod:2.9.49:dev")
+    implementation(gtnhDev("GT5-Unofficial"))
+    implementation(gtnhDev("NewHorizonsCoreMod"))
     implementation(gtnhDev("Mobs-Info"))
     implementation(gtnhDev("Infernal-Mobs"))
     implementation(gtnhDev("Galaxy-Space-GTNH"))
@@ -31,7 +31,7 @@ dependencies {
     implementation(gtnhDev("WitcheryExtras"))
 
     //runtime
-    runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.125-GTNH:dev")
+    runtimeOnlyNonPublishable(gtnhDev("NotEnoughItems"))
     runtimeOnlyNonPublishable(gtnhDev("OpenComputers"))
     runtimeOnlyNonPublishable rfg.deobf(files("libs/spark.jar"))
     runtimeOnlyNonPublishable rfg.deobf(files("libs/OmniOcularUnofficial.jar"))
@@ -42,7 +42,6 @@ dependencies {
     runtimeOnlyNonPublishable(gtnhDev("MagicBees"))
     runtimeOnlyNonPublishable("thaumcraft:Thaumcraft:1.7.10-4.2.3.5:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:Chisel:2.17.5-GTNH:dev")
-    runtimeOnlyNonPublishable(gtnhDev("BetterP2P"))
     runtimeOnlyNonPublishable(gtnhDev("StructureLib"))
     runtimeOnlyNonPublishable(gtnhDev("BlockRenderer6343")) { transitive = false }
     //extra mods

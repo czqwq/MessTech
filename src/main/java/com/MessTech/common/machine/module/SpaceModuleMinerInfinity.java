@@ -720,17 +720,7 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
                 EnumChatFormatting.GREEN + StatCollector.translateToLocal("machine.spacemodule.tooltip.crossparallel"))
             .beginStructureBlock(1, 5, 2, false)
             .addController(StatCollector.translateToLocal("gt.mbtt.structure.front_center_4th_layer"))
-            .addCasing("0-8", StatCollector.translateToLocal("gt.blockcasings.ig.0.name"), false)
-            .addInputHatch("1+", StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
-            .addInputBus("1+", StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
-            .addOutputBus("1+", StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
-            .addMiscHatch(
-                "1+",
-                StatCollector.translateToLocal("ig.elevator.structure.DataInputHatch"),
-                StatCollector.translateToLocal("gt.mbtt.structure.any_casing"),
-                1)
             .addStructureInfo("")
-            .addStructureFooter(StatCollector.translateToLocal("ig.elevator.structure.SharedResources"))
             .toolTipFinisher();
         return tt;
     }

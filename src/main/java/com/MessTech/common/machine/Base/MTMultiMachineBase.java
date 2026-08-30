@@ -69,6 +69,8 @@ import mcp.mobius.waila.api.IWailaDataAccessor;
 public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extends MTEExtendedPowerMultiBlockBase<T>
     implements IConstructable, ISurvivalConstructable {
 
+    protected boolean doPeriodicChecks = false;
+
     // region Class Constructor
     public MTMultiMachineBase(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional);
@@ -753,6 +755,14 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
             .setPos(getMachineModeSwitchButtonPos())
             .setSize(16, 16);
         return (ButtonWidget) button;
+    }
+
+    public void addIfSmartInput(IMetaTileEntity mte) {
+        if (mte instanceof ISmartInputHatch hatch) {
+            mSmartInputHatches.add((gregtech.common.tileentities.machines.ISmartInputHatch) hatch);
+            hatch.addWatcher((IHatchWatcher) this);
+            doPeriodicChecks |= hatch.needsPeriodicChecks();
+        }
     }
 
     @Override

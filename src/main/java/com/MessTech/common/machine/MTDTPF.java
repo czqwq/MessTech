@@ -22,7 +22,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
-import net.minecraftforge.fluids.FluidStack;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
@@ -31,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 import com.MessTech.common.gui.MTDTPFGui;
 import com.MessTech.common.machine.Base.MTProcessingLogic;
 import com.MessTech.common.machine.Base.MTWirelessMultiMachineBase;
+import com.MessTech.common.misc.ICasingTextureProvider;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
@@ -44,7 +44,6 @@ import gregtech.api.enums.HatchElement;
 import gregtech.api.enums.Textures;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
-import gregtech.api.interfaces.tileentity.ICasingTextureProvider;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.logic.ProcessingLogic;
 import gregtech.api.metatileentity.GregTechTileClientEvents;
@@ -740,7 +739,6 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType("Plasma Fusion, DTPF")
-            .addSupportAny()
             .addInfo(EnumChatFormatting.YELLOW + translateToLocal("machine.dtpf.tooltip.runtime"))
             .addInfo(EnumChatFormatting.GRAY + translateToLocal("machine.dtpf.tooltip.runtime.ramp"))
             .addInfo(EnumChatFormatting.GOLD + translateToLocal("machine.dtpf.tooltip.runtime.maxparallel"))
@@ -844,31 +842,6 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
     public IMetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
         // Same tile factory pattern as MTELargeFusionComputer5.
         return new MTDTPF(mName);
-    }
-
-    @Override
-    public boolean addOutput(FluidStack aLiquid) {
-        if (aLiquid == null) return false;
-        FluidStack tLiquid = aLiquid.copy();
-        addOutputPartial(tLiquid);
-        return tLiquid.amount == 0;
-    }
-
-    /**
-     * Route the normal recipe-completion fluid output through {@link #addOutput(FluidStack)} (DTPF-style partial
-     * ejection). This avoids the generic path being the only one used and matches how DTPF handles fluid output.
-     */
-    @Override
-    protected boolean addFluidOutputs(FluidStack[] outputFluids) {
-        boolean succeed = true;
-        if (outputFluids == null) return true;
-        for (FluidStack output : outputFluids) {
-            if (output == null) continue;
-            if (!addOutput(output)) {
-                succeed = false;
-            }
-        }
-        return succeed;
     }
 
     @Override

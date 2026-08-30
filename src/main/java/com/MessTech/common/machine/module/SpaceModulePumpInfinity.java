@@ -252,10 +252,7 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
             .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.spacemodule.tooltip.1"))
             .beginStructureBlock(1, 5, 2, false)
             .addController(StatCollector.translateToLocal("gt.mbtt.structure.front_center_4th_layer"))
-            .addCasing("0-8", StatCollector.translateToLocal("gt.blockcasings.ig.0.name"), false)
-            .addOutputHatch("1+", StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
             .addStructureInfo("")
-            .addStructureFooter(StatCollector.translateToLocal("ig.elevator.structure.SharedPower"))
             .toolTipFinisher();
         return tt;
     }
