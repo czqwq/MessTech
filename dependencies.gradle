@@ -8,7 +8,8 @@ dependencies {
         attachManifestVersionToJar = false
     }
     implementation(gtnhDev("GT5-Unofficial"))
-    implementation(gtnhDev("NewHorizonsCoreMod"))
+    implementation("com.github.GTNewHorizons:NewHorizonsCoreMod:2.8.287:dev") { transitive = false }
+    api("com.github.GTNewHorizons:Yamcl:0.7.5:dev")
     implementation(gtnhDev("Mobs-Info"))
     implementation(gtnhDev("Infernal-Mobs"))
     implementation(gtnhDev("Galaxy-Space-GTNH"))
