@@ -51,6 +51,14 @@ public class MTDTPFGui extends MTEMultiBlockBaseGui<MTDTPF> {
         syncManager.syncValue(
             "wirelessParallel",
             new IntSyncValue(multiblock::getWirelessParallel, multiblock::setWirelessParallel).allowC2S());
+        IntSyncValue structureUpdateSyncer = new IntSyncValue(
+            multiblock::getStructureUpdateTime,
+            multiblock::setStructureUpdateTime).allowC2S();
+        BooleanSyncValue structureUpdateButtonSyncer = new BooleanSyncValue(
+            () -> structureUpdateSyncer.getValue() > -20,
+            val -> { if (val) structureUpdateSyncer.setValue(1); }).allowC2S();
+        syncManager.syncValue("structureUpdate", structureUpdateSyncer);
+        syncManager.syncValue("structureUpdateButton", structureUpdateButtonSyncer);
     }
 
     @Override
@@ -88,6 +96,8 @@ public class MTDTPFGui extends MTEMultiBlockBaseGui<MTDTPF> {
                 } else if (mouseButton == 0 && wirelessFuncSyncer.getBoolValue()) { // left click: toggle wireless
                     wirelessSyncer.setBoolValue(!wirelessSyncer.getBoolValue());
                 }
+                IntSyncValue structureUpdateSyncer = syncManager.findSyncHandler("structureUpdate", IntSyncValue.class);
+                structureUpdateSyncer.setValue(1);
                 return true;
             });
     }
