@@ -19,7 +19,8 @@ public enum MTItemList {
     AssMatrixBlock,
     AdvAssMatrixBlock,
     SpaceModulePumpInfinity,
-    SpaceModuleMinerInfinity;
+    SpaceModuleMinerInfinity,
+    MTNQDAFReactor;
 
     private boolean mHasNotBeenSet;
     private boolean mDeprecated;

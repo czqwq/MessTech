@@ -42,7 +42,6 @@ dependencies {
     runtimeOnlyNonPublishable(gtnhDev("MagicBees"))
     runtimeOnlyNonPublishable("thaumcraft:Thaumcraft:1.7.10-4.2.3.5:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:Chisel:2.17.5-GTNH:dev")
-    runtimeOnlyNonPublishable(gtnhDev("BetterP2P"))
     runtimeOnlyNonPublishable(gtnhDev("StructureLib"))
     runtimeOnlyNonPublishable(gtnhDev("BlockRenderer6343")) { transitive = false }
     //extra mods

@@ -7,6 +7,7 @@ import com.MessTech.common.block.AssMatrixBlock;
 import com.MessTech.common.machine.MTAssFactory;
 import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDTPF;
+import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.hatch.MTHatchRack;
 import com.MessTech.common.machine.module.SpaceModuleMinerInfinity;
 import com.MessTech.common.machine.module.SpaceModulePumpInfinity;
@@ -63,5 +64,7 @@ public class MTMachineLoader {
                 "Space Module Miner Infinity",
                 translateToLocal("machine.spacemoduleminer.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleMinerInfinity.get(1));
+        MTItemList.MTNQDAFReactor.set(new MTNQDAFReactor(MT_ID + 6,"Large Naquadah Annihilation Field Reactor",translateToLocal("machine.nqdafreactor.name")).getStackForm(1));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTNQDAFReactor.get(1));
     }
 }

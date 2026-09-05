@@ -14,12 +14,13 @@ compressed/removed. See also `repo-readme.md` (own-code notes) and `GT5U-NOTES.m
 - Block registration: `com.MessTech.common.block.MTBlocks.registerBlocks()` called before machine loading.
 - Item list enum: `com.MessTech.common.misc.MTItemList` (GT-style ItemList pattern).
 - Machine IDs: MTDTPF = 32400, MTComputingCenter = 32401, MTHatchRack = 32402, MTAssFactory = 32403.
-- Language files: `src/main/resources/assets/megatech/lang/{en_US,zh_CN}.lang`.
+- Language files: `src/main/resources/assets/messtech/lang/{en_US,zh_CN}.lang`.
 
 ## Machine base hierarchy
 
 ```
 MTMultiMachineBase<T>
+├── MTGeneratorMultiBase<T>
 ├── MTWirelessMultiMachineBase<T>
 │   └── ParallelismAcrossMultiMachineBase<T>
 └── CalculateMultiMachineBase<T>
@@ -48,6 +49,33 @@ MTMultiMachineBase<T>
     `getDefaultWirelessMode()`, `setupWirelessProcessingPowerLogic()`
 - Waila: writes `wirelessMode` + `costingEUText`; displays `无线模式` / `耗电`.
 - NBT: saves `enableWireless`, `wirelessParallel`.
+
+### MTGeneratorMultiBase
+- Extends `MTMultiMachineBase` (not the wireless-consumption base).
+- For generator multiblocks: keeps `lEUt` positive; `checkProcessing()` returns `GENERATING`
+  when the generic ProcessingLogic path succeeds with `lEUt > 0`.
+- Wireless EU output is supported and defaults **off**.
+  - State: `ownerUUID`, `EnableWirelessFunc` (available, default true), `EnableWireless`.
+  - `setEnableWireless(true)` only works when wireless is available and no dynamo/exotic-dynamo
+    hatches are present.
+  - `onRunningTick()` in wireless mode sends `getCurrentGenerationEUt()` directly to the owner's
+    wireless network instead of feeding dynamo hatches.
+- Hatches: `addToMachineList()` also accepts dynamo, exotic dynamo (multi-Amp) and laser-output
+  hatches; `addEnergyOutputMultipleDynamos()` fills both normal and exotic dynamo lists.
+- Waila: wired mode uses GT's normal generation line; wireless mode writes `wirelessMode` +
+  `generatedEUText` and displays `无线模式` / `无线发电` with the same comma + scientific formatting
+  as `MTWirelessMultiMachineBase`, followed by current-process `总发电量` (compact `(n MAX)`
+  suffix when it exceeds MAX-tier voltage; `n = floor(total / 2147483640)`).
+- Current-process wireless total is computed as
+  `wirelessGenerationPerTick * mMaxProgresstime` (BigInteger), so it shows the complete process
+  output instead of a real-time running total.
+- NBT: saves `enableWireless`.
+- Parallelism:
+  - Default `getMaxParallelRecipes()` is `Integer.MAX_VALUE` (subclasses may lower it).
+  - `getParallelForAvailable(availableAmount, requiredAmount)` caps by the GT power-panel parallel
+    override and by the actual available fuel/input amount.
+- Helpers: `getCurrentGenerationEUt()`, `startGenerating(...)`, `setEnergyUsage()` keeps EU positive,
+  `getParallelForAvailable(...)` for fuel/input based auto-parallel.
 
 ### ParallelismAcrossMultiMachineBase
 - Extends `MTWirelessMultiMachineBase`.
@@ -80,6 +108,23 @@ MTMultiMachineBase<T>
   2. cap wireless parallel by wireless balance;
   3. `validateWirelessPowerForRecipe(...)` — insufficient -> return insufficient power;
   4. `onRecipeStart` -> `startWirelessRecipe(...)` — deduct power + consume inputs -> start.
+
+### MTNQDAFReactor
+- Extends `MTGeneratorMultiBase` (generator + optional wireless output).
+- Structure uses Naquadah-fuel reactor casings/coils; no energy input; dynamo or wireless.
+- Work efficiency: starts 100%, +1% per 30 s running, max 400%; a fuel batch burns
+  `baseDuration * efficiency / 100` ticks. Idle decay follows DTPF/Plasma Forge style, floor 100%.
+- Fluid mechanics copied from Large Naquadah Reactor:
+  - Liquid Air: 1,000,000 L/s while running.
+  - Coolant: IC2/Super Coolant/Cryotheum/Tachyon -> 105/150/275/500% output.
+  - Excited liquids: Caesium/U-235/Naquadah/Atomic Separation Catalyst/Space ->
+    2/3/4/16/64x output and fuel usage.
+- Coil tier I-IV gives 1x-4x EU/t output multiplier.
+- Auto parallel: fuel amount / per-batch fuel requirement decides parallel (capped by the GT
+  power-panel parallel override); each parallel multiplies fuel consumption, EU/t, and byproducts.
+- Spacetime: input molten spacetime to freeze efficiency decay for 30 s; cost doubles per dose,
+  starts at 1 L/s (one drain per dose), max 1,073,741,824 L/s. It does **not** pause efficiency growth.
+- No dynamo hatch in `checkMachine` -> auto enables wireless output mode (`MTGeneratorMultiBase`).
 
 ### MTComputingCenter
 - 3 modes, screwdriver switches, blocked while active or heat present.
