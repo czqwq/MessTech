@@ -126,8 +126,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
         if (mMaxProgresstime <= 0) {
             return BigInteger.ZERO;
         }
-        BigInteger perTick = wirelessGenerationPerTick.signum() > 0
-            ? wirelessGenerationPerTick
+        BigInteger perTick = wirelessGenerationPerTick.signum() > 0 ? wirelessGenerationPerTick
             : BigInteger.valueOf(Math.max(0, getCurrentGenerationEUt()));
         return perTick.multiply(BigInteger.valueOf(mMaxProgresstime));
     }
@@ -279,7 +278,8 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     @Override
     public boolean onRunningTick(ItemStack aStack) {
         IGregTechTileEntity tileEntity = getBaseMetaTileEntity();
-        if (tileEntity != null && tileEntity.isServerSide() && isWirelessModeActive()
+        if (tileEntity != null && tileEntity.isServerSide()
+            && isWirelessModeActive()
             && (lEUt > 0 || wirelessGenerationPerTick.signum() > 0)) {
             if (ownerUUID == null) {
                 ownerUUID = processInitialSettings(tileEntity);
@@ -309,8 +309,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
         final IGregTechTileEntity tileEntity = getBaseMetaTileEntity();
         if (tileEntity != null && tileEntity.isActive() && isWirelessModeEnabled()) {
             tag.setBoolean("wirelessMode", true);
-            BigInteger generation = wirelessGenerationPerTick.signum() > 0
-                ? wirelessGenerationPerTick
+            BigInteger generation = wirelessGenerationPerTick.signum() > 0 ? wirelessGenerationPerTick
                 : BigInteger.valueOf(Math.max(0, getCurrentGenerationEUt()));
             if (generation.bitLength() <= 63) {
                 tag.setLong("wirelessGenerationEUt", generation.longValue());
@@ -381,8 +380,13 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
                 return formatted;
             }
             BigInteger count = value.divide(TOTAL_DISPLAY_CHUNK);
-            return EnumChatFormatting.RESET + " (" + String.format("%,d", count) + " " + EnumChatFormatting.RED + "MAX"
-                + EnumChatFormatting.RESET + ")";
+            return EnumChatFormatting.RESET + " ("
+                + String.format("%,d", count)
+                + " "
+                + EnumChatFormatting.RED
+                + "MAX"
+                + EnumChatFormatting.RESET
+                + ")";
         } catch (Exception e) {
             return raw;
         }

@@ -69,7 +69,8 @@ import mcp.mobius.waila.api.IWailaDataAccessor;
  * gains work efficiency while running, and can freeze its idle efficiency decay with molten
  * spacetime. When no dynamo hatch is installed it automatically switches to wireless output.
  */
-public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor> implements ISurvivalConstructable, ICasingTextureProvider {
+public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
+    implements ISurvivalConstructable, ICasingTextureProvider {
     // MTNQDAFReactor full name called Large NQD Annihilation Field Reactor
 
     // region Structure piece offsets
@@ -283,7 +284,7 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor> impleme
                 Collections.singletonList("misc.structure_tooltip.coil")))
         .addElement('C', Casings.FieldRestrictionCasing.asElement())
         .addElement('D', Casings.FieldRestrictionGlass.asElement())
-        //.addElement('', Casings.ContainmentCasing.asElement())
+        // .addElement('', Casings.ContainmentCasing.asElement())
         .addElement('F', Casings.RadiationProofMachineCasing.asElement())
         .addElement('G', Casings.EuropiumReinforcedRadiationProofMachineCasing.asElement())
         .addElement(
@@ -379,9 +380,7 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor> impleme
 
     // region Efficiency / spacetime
     public int getWorkEfficiency() {
-        return Math.min(
-            MAX_WORK_EFFICIENCY,
-            BASE_WORK_EFFICIENCY + (int) (workEfficiencyTime / EFFICIENCY_STEP_TICKS));
+        return Math.min(MAX_WORK_EFFICIENCY, BASE_WORK_EFFICIENCY + (int) (workEfficiencyTime / EFFICIENCY_STEP_TICKS));
     }
 
     private int getCoilTierForOutput() {
@@ -419,7 +418,10 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor> impleme
         aNBT.setInteger("nqdCurrentCoolantEfficiency", currentCoolantEfficiency);
         aNBT.setInteger("nqdCurrentParallel", currentParallel);
         if (lockedExcitedFluid != null) {
-            aNBT.setString("nqdLockedExcitedFluid", lockedExcitedFluid.getFluid().getName());
+            aNBT.setString(
+                "nqdLockedExcitedFluid",
+                lockedExcitedFluid.getFluid()
+                    .getName());
             aNBT.setInteger("nqdLockedExcitedFluidAmount", lockedExcitedFluid.amount);
         } else {
             aNBT.removeTag("nqdLockedExcitedFluid");
@@ -555,7 +557,8 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor> impleme
             if (mMaxProgresstime > 0) {
                 workEfficiencyTime = Math.min(MAX_EFFICIENCY_TIME_TICKS, workEfficiencyTime + 1);
             }
-            if (tileEntity.getWorld() != null && tileEntity.getWorld().getTotalWorldTime() % 20 == 0) {
+            if (tileEntity.getWorld() != null && tileEntity.getWorld()
+                .getTotalWorldTime() % 20 == 0) {
                 updateReactorSecond();
             }
         }
@@ -804,11 +807,10 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor> impleme
         if (side == facing) {
             // Same front overlay as GT5U's "Shielded Lagrangian Annihilation Matrix" (AntimatterGenerator),
             // but with Naquadah Fuel Refinery Casing as the base texture.
-            return new ITexture[] { baseCasing,
-                TextureFactory.builder()
-                    .addIcon(OVERLAY_FUSION1)
-                    .extFacing()
-                    .build(),
+            return new ITexture[] { baseCasing, TextureFactory.builder()
+                .addIcon(OVERLAY_FUSION1)
+                .extFacing()
+                .build(),
                 TextureFactory.builder()
                     .addIcon(OVERLAY_FUSION1_GLOW)
                     .extFacing()

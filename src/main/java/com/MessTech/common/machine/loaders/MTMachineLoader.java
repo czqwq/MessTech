@@ -64,7 +64,11 @@ public class MTMachineLoader {
                 "Space Module Miner Infinity",
                 translateToLocal("machine.spacemoduleminer.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleMinerInfinity.get(1));
-        MTItemList.MTNQDAFReactor.set(new MTNQDAFReactor(MT_ID + 6,"Large Naquadah Annihilation Field Reactor",translateToLocal("machine.nqdafreactor.name")).getStackForm(1));
+        MTItemList.MTNQDAFReactor.set(
+            new MTNQDAFReactor(
+                MT_ID + 6,
+                "Large Naquadah Annihilation Field Reactor",
+                translateToLocal("machine.nqdafreactor.name")).getStackForm(1));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTNQDAFReactor.get(1));
     }
 }
