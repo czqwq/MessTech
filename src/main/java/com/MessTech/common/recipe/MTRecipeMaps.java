@@ -27,8 +27,8 @@ import gregtech.api.recipe.RecipeMapBuilder;
 import gregtech.api.recipe.RecipeMaps;
 import gregtech.api.recipe.RecipeMetadataKey;
 import gregtech.api.recipe.maps.AssemblyLineFrontend;
-import gregtech.api.recipe.maps.LargeNEIFrontend;
 import gregtech.api.recipe.maps.QuantumComputerFrontend;
+import gregtech.api.recipe.metadata.SimpleRecipeMetadataKey;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTRecipeBuilder;
 import gregtech.api.util.GTUtility;
@@ -40,6 +40,15 @@ import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponen
 public final class MTRecipeMaps {
 
     private MTRecipeMaps() {}
+
+    /**
+     * Optional 1-4 circuit selector for the 24 one-step pool.
+     * <p>
+     * 1 = Processor, 2 = Processor Cluster/Assembly, 3 = Supercomputer/Computer,
+     * 4 = Mainframe. Special independent circuits (Piko/Quantum/Planck etc.) have level 0.
+     */
+    public static final RecipeMetadataKey<Integer> ONE_STEP_CIRCUIT_LEVEL = SimpleRecipeMetadataKey
+        .create(Integer.class, "mt_onestep_circuit_level");
 
     /** Fake recipe pool for the Computing Center (Nano Computing mode), with proper NEI/frontend registration. */
     public static final RecipeMap<RecipeMapBackend> computingCenterFakeRecipes = RecipeMapBuilder
@@ -188,13 +197,14 @@ public final class MTRecipeMaps {
     public static final RecipeMap<RecipeMapBackend> nanoScaleFoundry24PoolRecipes = RecipeMapBuilder
         .of("mt.recipe.nanoscale.pool24")
         // Measured from the full recursive expansion: PlanckCircuit peaks at 47 distinct item inputs
-        // and 18 distinct fluid inputs. 48 keeps a full 16x3 item grid while still being tight.
+        // and 18 distinct fluid inputs. 48 fills a 6x8 item grid; 18 fills a 6x3 fluid grid below it.
         .maxIO(48, 1, 18, 0)
         .minInputs(0, 0)
-        .frontend(LargeNEIFrontend::new)
+        .useSpecialSlot()
+        .frontend(NanoScaleFoundry24PoolFrontend::new)
         .neiHandlerInfo(
-            builder -> builder.setDisplayStack(GTUtility.getIntegratedCircuit(24))
-                .setHeight(430))
+            builder -> builder.setDisplayStack(MTItemList.MTNanoScaleFoundry.get(1))
+                .setHeight(230))
         .build();
 
     /**
@@ -304,6 +314,7 @@ public final class MTRecipeMaps {
         // and their Mainframe/主机 tier. Mainframes are intentionally retained.
         ItemStack realOutput = outputComponent.realComponent.get();
         if (realOutput == null) return null;
+        int circuitLevel = getOneStepCircuitLevel(outputComponent);
 
         FlattenContext ctx = new FlattenContext();
         Set<Integer> visiting = new HashSet<>();
@@ -326,20 +337,31 @@ public final class MTRecipeMaps {
 
         int duration = (int) Math.min(Integer.MAX_VALUE, Math.max(1, ctx.duration));
         int eut = (int) Math.min(Integer.MAX_VALUE, Math.max(1, ctx.maxEUt));
-        return new GTRecipe(
-            false,
-            itemInputs,
-            new ItemStack[] { output },
-            null,
-            null,
-            null,
-            null,
-            null,
-            fluidInputs,
-            null,
-            duration,
-            eut,
-            0);
+
+        GTRecipeBuilder builder = GTRecipeBuilder.builder()
+            .itemInputs(itemInputs)
+            .itemOutputs(new ItemStack[] { output })
+            .fluidInputs(fluidInputs)
+            .duration(duration)
+            .eut(eut)
+            .metadata(ONE_STEP_CIRCUIT_LEVEL, circuitLevel);
+        // Show the required non-consumed selector as a ghost/special slot in NEI. It is not part of
+        // mInputs, so it never affects real recipe matching, parallel calculations or consumption.
+        if (circuitLevel >= 1 && circuitLevel <= 4) {
+            builder.special(GTUtility.getIntegratedCircuit(circuitLevel));
+        }
+        return builder.build()
+            .orElse(null);
+    }
+
+    private static int getOneStepCircuitLevel(CircuitComponent component) {
+        if (component == null) return 0;
+        String name = component.name();
+        if (name.contains("Mainframe")) return 4;
+        if (name.contains("Computer")) return 3;
+        if (name.contains("Assembly")) return 2;
+        if (name.contains("Processor")) return 1;
+        return 0;
     }
 
     /**

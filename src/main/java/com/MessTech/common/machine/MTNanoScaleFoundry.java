@@ -314,6 +314,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             case 9 -> MTRecipeMaps.nanoScaleFoundryOpticalOrganizerRecipes;
             case 10 -> MTRecipeMaps.nanoScaleFoundryEncasementWrapperRecipes;
             case 11 -> MTRecipeMaps.nanoScaleFoundryBiologicalCoordinatorRecipes;
+            case 12 -> MTRecipeMaps.nanoScaleFoundry24PoolRecipes;
             default -> null;
         };
     }
@@ -331,7 +332,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             MTRecipeMaps.nanoScaleFoundrySuperconductorSplitterRecipes,
             MTRecipeMaps.nanoScaleFoundryOpticalOrganizerRecipes,
             MTRecipeMaps.nanoScaleFoundryEncasementWrapperRecipes,
-            MTRecipeMaps.nanoScaleFoundryBiologicalCoordinatorRecipes);
+            MTRecipeMaps.nanoScaleFoundryBiologicalCoordinatorRecipes,
+            MTRecipeMaps.nanoScaleFoundry24PoolRecipes);
     }
 
     @Override
@@ -521,32 +523,66 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     private CheckRecipeResult checkAndStartOneStepPool(IGregTechTileEntity base, WorkThread thread) {
         if (!astralArrayUnlocked) return CheckRecipeResultRegistry.NO_RECIPE;
 
-        ArrayList<MTEHatchInputBus> allBuses = new ArrayList<>(GTUtility.filterValidMTEs(mInputBusses));
+        // 24 pool input buses are marked with circuit 24 in their circuit slot, unless the controller
+        // slot itself is set to circuit 12 (single-pool mode).
+        int controllerCircuit = getControllerCircuitNumber();
+        if (controllerCircuit > 0 && controllerCircuit != 12) return CheckRecipeResultRegistry.NO_RECIPE;
+
+        ArrayList<MTEHatchInputBus> allBuses = new ArrayList<>();
+        for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
+            if (bus == null) continue;
+            if (controllerCircuit == 12) {
+                allBuses.add(bus);
+            } else {
+                Integer busCircuit = inputBusCircuitNumbers.get(bus);
+                if (busCircuit != null && busCircuit == 24) allBuses.add(bus);
+            }
+        }
         if (allBuses.isEmpty()) return CheckRecipeResultRegistry.NO_RECIPE;
 
         ArrayList<ItemStack> items = new ArrayList<>();
+        int selectedLevel = 0;
         for (MTEHatchInputBus bus : allBuses) {
             IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
             int circuitSlot = getBusCircuitSlotDuringProcessing(bus);
             for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
                 if (i == circuitSlot) continue;
                 ItemStack stack = busTile.getStackInSlot(i);
-                if (stack != null) items.add(stack);
+                if (stack == null) continue;
+                // Optional non-consumed selector: integrated circuits 1-4 in normal slots choose the
+                // target circuit level (Processor/Cluster/Supercomputer/Mainframe).
+                if (GTUtility.isAnyIntegratedCircuit(stack)) {
+                    int damage = stack.getItemDamage();
+                    if (damage >= 1 && damage <= 4) {
+                        if (selectedLevel == 0) selectedLevel = damage;
+                        continue;
+                    }
+                }
+                items.add(stack);
             }
         }
         if (items.isEmpty()) return CheckRecipeResultRegistry.NO_RECIPE;
 
         ArrayList<FluidStack> fluidStacks = getStoredFluids();
 
+        // Pick the most complete matching recipe. If the player selected a 1-4 level circuit in a
+        // normal slot, restrict to recipes of that level so lower-tier recipes cannot hijack a full
+        // higher-tier input set.
         GTRecipe recipe = null;
+        int recipeLevel = 0;
         for (GTRecipe candidate : MTRecipeMaps.nanoScaleFoundry24PoolRecipes.getAllRecipes()) {
-            if (candidate.isRecipeInputEqual(
+            if (!candidate.isRecipeInputEqual(
                 false,
                 false,
                 fluidStacks.toArray(new FluidStack[0]),
                 items.toArray(new ItemStack[0]))) {
+                continue;
+            }
+            int level = candidate.getMetadataOrDefault(MTRecipeMaps.ONE_STEP_CIRCUIT_LEVEL, 0);
+            if (selectedLevel > 0 && level != selectedLevel) continue;
+            if (recipe == null || level > recipeLevel) {
                 recipe = candidate;
-                break;
+                recipeLevel = level;
             }
         }
         if (recipe == null) return CheckRecipeResultRegistry.NO_RECIPE;

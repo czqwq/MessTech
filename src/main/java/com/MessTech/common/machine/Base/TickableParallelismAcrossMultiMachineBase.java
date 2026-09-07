@@ -23,6 +23,8 @@ import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.VoidProtectionHelper;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * Base class for tick-driven, multi-threaded parallel machines.
@@ -395,6 +397,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
     /**
      * A thread is a named worker bound to one recipe pool. It can hold multiple {@link RecipeTask}s.
      */
+    @Getter
     public class WorkThread {
 
         private final String name;
@@ -406,30 +409,14 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
             this.name = name;
         }
 
-        public String getName() {
-            return name;
-        }
-
-        public RecipeMap<?> getRecipeMap() {
-            return recipeMap;
-        }
-
         public WorkThread setRecipeMap(RecipeMap<?> recipeMap) {
             this.recipeMap = recipeMap;
             return this;
         }
 
-        public int getCircuitNumber() {
-            return circuitNumber;
-        }
-
         public WorkThread setCircuitNumber(int circuitNumber) {
             this.circuitNumber = circuitNumber;
             return this;
-        }
-
-        public List<RecipeTask> getTasks() {
-            return tasks;
         }
 
         public boolean isActive() {
@@ -493,14 +480,24 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
      */
     public class RecipeTask {
 
+        @Getter
         private final RecipeMap<?> recipeMap;
+        @Getter
         private int progressTime = 0;
+        @Getter
         private final int maxProgressTime;
         private long eut = 0;
+        @Getter
         private int parallel = 1;
+        @Setter
+        @Getter
         private boolean awaitingOutput = false;
+        @Setter
+        @Getter
         private Object moduleData = null;
+        @Getter
         private ItemStack[] outputItems;
+        @Getter
         private FluidStack[] outputFluids;
 
         public RecipeTask(int duration, RecipeMap<?> recipeMap, ItemStack[] outputItems, FluidStack[] outputFluids) {
@@ -508,18 +505,6 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
             this.recipeMap = recipeMap;
             this.outputItems = outputItems;
             this.outputFluids = outputFluids;
-        }
-
-        public RecipeMap<?> getRecipeMap() {
-            return recipeMap;
-        }
-
-        public int getProgressTime() {
-            return progressTime;
-        }
-
-        public int getMaxProgressTime() {
-            return maxProgressTime;
         }
 
         public long getEUt() {
@@ -530,36 +515,9 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
             this.eut = eut;
         }
 
-        public int getParallel() {
-            return parallel;
-        }
-
         public void setParallel(int parallel) {
             this.parallel = Math.max(1, parallel);
         }
 
-        public boolean isAwaitingOutput() {
-            return awaitingOutput;
-        }
-
-        public void setAwaitingOutput(boolean awaitingOutput) {
-            this.awaitingOutput = awaitingOutput;
-        }
-
-        public Object getModuleData() {
-            return moduleData;
-        }
-
-        public void setModuleData(Object moduleData) {
-            this.moduleData = moduleData;
-        }
-
-        public ItemStack[] getOutputItems() {
-            return outputItems;
-        }
-
-        public FluidStack[] getOutputFluids() {
-            return outputFluids;
-        }
     }
 }
