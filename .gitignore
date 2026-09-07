@@ -9,6 +9,7 @@
 .classpath
 .project
 /bin/
+/tools/
 /config/
 /crash-reports/
 /logs/
@@ -36,4 +37,3 @@ addon.local.gradle.kts
 addon.late.local.gradle
 addon.late.local.gradle.kts
 layout.json
-/tools/analyze_nanoscale_io.py
