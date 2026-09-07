@@ -149,6 +149,66 @@ MTMultiMachineBase<T>
 - Front texture: Advanced Molecular Casing base + Quantum Force Transformer face overlay.
 - Tooltips mention modes, data access, energy tier limit.
 
+### MTInventoryInputBusME / MTInventoryInputHatchME
+- New ME hatches registered as `32407` (item bus) and `32408` (fluid hatch).
+- They extend the GT5U advanced stocking ME bus/hatch classes, so they use the advanced GUI with the
+  auto-pull toggle (only the first 16 entries are shown in the GUI).
+- In auto-pull mode they snapshot the whole AE storage list at every `startRecipeProcessing()`; every
+  distinct ME item/fluid type meeting the configured minimum stock size/amount is exposed to the
+  multiblock during one recipe check. This mirrors the original GT5U stocking hatch's per-recipe-check
+  pull notification, so machines can be fed continuously.
+- `autoPullRefreshTime` continues to govern the parent GT5U GUI's first-16 auto-refresh; it does not
+  throttle the per-recipe-check full snapshot.
+- In manual mode (auto-pull off) they behave like the normal GT5U stocking bus and only expose the
+  manually configured 16 slots; no automatic full-network pull happens.
+- End-of-processing extracts only the consumed difference from AE (`endRecipeProcessing`).
+- Registered in `MTMachineLoader` and `MTItemList`.
+
+### MTWirelessVacuumConveyorInput / MTWirelessVacuumConveyorOutput
+- Registered as `32409` (wireless input) and `32410` (wireless output).
+- Extend the normal GT5U VCI/VCO classes so existing NAC module structure code accepts them.
+- Wireless pairing uses string frequency + optional owner UUID (private), mirroring advanced wireless
+  redstone covers. The hatch dye colour is also part of the match, so NAC colour routing from VCI to
+  VCO is preserved. Uncoloured hatches (`color == -1`) do not form wireless links.
+- A dedicated registry tracks all wireless hatches because `VacuumFactoryGrid.vertices` only contains
+  elements that already have an edge.
+- `getNeighbours()` returns every registered wireless hatch with the same colour/frequency/private key.
+- `canConnectOnSide()` is false so normal Vacuum Conveyor Pipes cannot connect to these hatches.
+- The wireless input overrides `onPostTick()` to allow cross-NAC output extraction (no `mainController`
+  equality requirement) while keeping the original 1:1 output rule. It queries the dedicated registry
+  directly instead of depending on `VacuumFactoryGrid` edge formation, so isolated wireless pairs still
+  transfer reliably.
+- Same GUI as the GT5U vacuum hatch plus frequency/popup and private toggle controls.
+
+### MTNanoScaleFoundry and the 24 pool
+- Registered as `32411`, extends `TickableParallelismAcrossMultiMachineBase`, 3x3x3 structure.
+- 11 normal threads/circuits 1-11 map to the 11 normal NAC pools; 24 pool is intentionally not a
+  machine thread yet.
+- Binding: a controller-slot circuit (1-11) selects one active pool; with the controller slot empty,
+  each input bus circuit slot can bind that bus to its own pool so several pools run simultaneously.
+- `checkProcessing()` now keeps the machine on a one-second GT cycle and calls the thread scheduler
+  inside the standard `checkRecipe()` wrapper, so `startRecipeProcessing()` / `endRecipeProcessing()`
+  are active for ME input buses/hatches. `lEUt` is set from running task totals so GT drains energy
+  normally.
+- Input-bus circuit numbers are snapshotted in `onPostTick` before GT recipe processing starts,
+  because ME buses move their circuit to a virtual offset during recipe processing.
+- Each thread currently runs one active recipe at a time.
+- Board Processor uses per-thread internal immersion tanks (`BoardTankState`), not direct recipe fluid
+  depletion.
+- Waila now sends per-thread name/index/active/progress/EU/parallel plus first-task output item
+  names/counts; body prints progress bar then output item lines.
+- `MTRecipeMaps.nanoScaleFoundry24PoolRecipes` is a separate one-step NEI pool
+  (`mt.recipe.nanoscale.pool24`, display stack = circuit 24), using `LargeNEIFrontend`.
+- `populateNanoScaleFoundry24PoolRecipes()` recursively flattens every original Assembly Matrix
+  recipe through Assembly Matrix + all module pools down to `CircuitComponent.realComponent` real
+  inputs. It keeps the whole Crystal/Wetware/Bio/Optical line (Processor/Assembly/Supercomputer/
+  Mainframe) plus the independent special circuits Pico/Quantum/Planck.
+  Board Processor fluid inputs are removed (machine-internal/NEI display only); other module fluids and
+  Assembly Matrix fluids are kept; duplicate item/fluid inputs are merged and recipes are deduplicated.
+- Measured max IO: 47 distinct item inputs / 18 distinct fluid inputs (PlanckCircuit); the map is
+  declared as `maxIO(48, 1, 18, 0)` and analyzed by `tools/analyze_nanoscale_io.py`.
+- 24 pool duration/EUt are informational only until the actual 24 machine mode is implemented.
+
 ### Blocks
 - `AssMatrixBlock` (Tier 1) / `AdvAssMatrixBlock` (Tier 2).
 - Static helpers: `getBlock()`, `getItem()`, `getItemStack()`, `getItemStack(int)`.

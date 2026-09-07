@@ -8,7 +8,12 @@ import com.MessTech.common.machine.MTAssFactory;
 import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDTPF;
 import com.MessTech.common.machine.MTNQDAFReactor;
+import com.MessTech.common.machine.MTNanoScaleFoundry;
 import com.MessTech.common.machine.hatch.MTHatchRack;
+import com.MessTech.common.machine.hatch.MTInventoryInputBusME;
+import com.MessTech.common.machine.hatch.MTInventoryInputHatchME;
+import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorInput;
+import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorOutput;
 import com.MessTech.common.machine.module.SpaceModuleMinerInfinity;
 import com.MessTech.common.machine.module.SpaceModulePumpInfinity;
 import com.MessTech.common.misc.MTItemList;
@@ -70,5 +75,40 @@ public class MTMachineLoader {
                 "Large Naquadah Annihilation Field Reactor",
                 translateToLocal("machine.nqdafreactor.name")).getStackForm(1));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTNQDAFReactor.get(1));
+
+        MTItemList.MTInventoryInputBusME.set(
+            new MTInventoryInputBusME(
+                MT_ID + 7,
+                "Inventory Input Bus (ME)",
+                translateToLocal("machine.meinventory.inputbus.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTInventoryInputBusME.get(1));
+        MTItemList.MTInventoryInputHatchME.set(
+            new MTInventoryInputHatchME(
+                MT_ID + 8,
+                "Inventory Input Hatch (ME)",
+                translateToLocal("machine.meinventory.inputhatch.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTInventoryInputHatchME.get(1));
+
+        MTItemList.MTWirelessVacuumConveyorInput.set(
+            new MTWirelessVacuumConveyorInput(
+                MT_ID + 9,
+                "Wireless Vacuum Conveyor Input",
+                translateToLocal("machine.wirelessvacuum.input.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTWirelessVacuumConveyorInput.get(1));
+        MTItemList.MTWirelessVacuumConveyorOutput.set(
+            new MTWirelessVacuumConveyorOutput(
+                MT_ID + 10,
+                "Wireless Vacuum Conveyor Output",
+                translateToLocal("machine.wirelessvacuum.output.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTWirelessVacuumConveyorOutput.get(1));
+
+        MTItemList.MTNanoScaleFoundry.set(
+            new MTNanoScaleFoundry(MT_ID + 11, "Nano-Scale Foundry", translateToLocal("machine.nanoscale.name"))
+                .getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTNanoScaleFoundry.get(1));
+
+        // Populate after the machine item list is set so the NEI handler can reference the catalyst.
+        MTRecipeMaps.populateNanoScaleFoundryRecipes();
+        MTRecipeMaps.populateNanoScaleFoundry24PoolRecipes();
     }
 }

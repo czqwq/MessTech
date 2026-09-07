@@ -1,14 +1,16 @@
 dependencies {
     elytraModpackVersion {
         // 在这配置的gtnh版本 用于自动拉取依赖版本
-        gtnhVersion = "2.9.0-beta-2"
+        gtnhVersion = "2.9.0-beta-3"
         // 是否不缓存拉取的依赖清单文件
         manifestNoCache = false
         // 是否自动为输出的jar添加 `gtnhVersion` 后缀
         attachManifestVersionToJar = false
     }
-    implementation("com.github.GTNewHorizons:GT5-Unofficial:5.09.54.108:dev")
-    implementation("com.github.GTNewHorizons:NewHorizonsCoreMod:2.9.49:dev")
+    //implementation("com.github.GTNewHorizons:GT5-Unofficial:5.09.54.108:dev")
+    //implementation("com.github.GTNewHorizons:NewHorizonsCoreMod:2.9.49:dev")
+    implementation(gtnhDev("GT5-Unofficial"))
+    implementation(gtnhDev("NewHorizonsCoreMod"))
     implementation(gtnhDev("Mobs-Info"))
     implementation(gtnhDev("Infernal-Mobs"))
     implementation(gtnhDev("Galaxy-Space-GTNH"))
@@ -31,7 +33,8 @@ dependencies {
     implementation(gtnhDev("WitcheryExtras"))
 
     //runtime
-    runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.125-GTNH:dev")
+    //runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.125-GTNH:dev")
+    runtimeOnlyNonPublishable(gtnhDev("NotEnoughItems"))
     runtimeOnlyNonPublishable(gtnhDev("OpenComputers"))
     runtimeOnlyNonPublishable rfg.deobf(files("libs/spark.jar"))
     runtimeOnlyNonPublishable rfg.deobf(files("libs/OmniOcularUnofficial.jar"))
@@ -63,7 +66,7 @@ dependencies {
 
     configurations.all {
         resolutionStrategy {
-            force "com.github.GTNewHorizons:GTNHLib:0.11.14"
+            force "com.github.GTNewHorizons:GTNHLib:0.11.46"
         }
     }
 }

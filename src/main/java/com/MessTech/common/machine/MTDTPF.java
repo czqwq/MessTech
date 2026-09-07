@@ -807,7 +807,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         LevelTier machineLevel = LevelTier.fromTier(getFusionMachineTier());
 
         // A (reactor coil) and B (fusion machine casing) must match their tier exactly.
-        if (coilLevel == LevelTier.INVALID || machineLevel == LevelTier.INVALID || coilLevel != machineLevel) {
+        if (machineLevel == LevelTier.INVALID || coilLevel != machineLevel) {
             errors.add(
                 StructureErrors.of(
                     "structure.error.tier_mismatch",
