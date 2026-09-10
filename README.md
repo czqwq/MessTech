@@ -10,8 +10,8 @@ start the game
 
 | GTNH Version | Start Version | Newest Support Version |                                                       Download                                                       | Maintenance status |
 |:------------:|:-------------:|:----------------------:|:--------------------------------------------------------------------------------------------------------------------:|:------------------:|
-| 2.9.0-beta3  |      1,3      |          1.6           |   [![1.7.0](https://img.shields.io/badge/release-v1.4-00FF00)](https://github.com/czqwq/MessTech/releases/tag/1.6)   |         ✔️         |
-| 2.9.0-beta2  |      1.0      |          1.6           |   [![1.7.0](https://img.shields.io/badge/release-v1.3-00FF00)](https://github.com/czqwq/MessTech/releases/tag/1.6)   |         ✔️         |
+| 2.9.0-beta3  |      1,3      |          1.6           |   [![1.7.0](https://img.shields.io/badge/release-v1.6-00FF00)](https://github.com/czqwq/MessTech/releases/tag/1.6)   |         ✔️         |
+| 2.9.0-beta2  |      1.0      |          1.6           |   [![1.7.0](https://img.shields.io/badge/release-v1.6-00FF00)](https://github.com/czqwq/MessTech/releases/tag/1.6)   |         ✔️         |
 | 2.9.0-beta1  |    1.3-pre    |        1.4-pre         | [![1.7.0](https://img.shields.io/badge/release-v1.4-00FF00)](https://github.com/czqwq/MessTech/releases/tag/1.4-pre) |       Maybe?       |
 
 ### Why I write this mod
