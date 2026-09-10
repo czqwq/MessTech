@@ -3,7 +3,9 @@ package com.MessTech.init;
 import static com.MessTech.init.MessTech.MT_LOG;
 
 import com.MessTech.common.block.MTBlocks;
+import com.MessTech.common.item.MTItems;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
+import com.MessTech.common.recipe.MTRecipeMaps;
 
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -18,6 +20,7 @@ public class CommonProxy {
     // GameRegistry." (Remove if not needed)
     public void preInit(FMLPreInitializationEvent event) {
         Config.synchronizeConfiguration(event.getSuggestedConfigurationFile());
+        MTItems.registerItems();
         if (Loader.isModLoaded("Torcherino")) {
             MT_LOG.info("拿火把捅你皮撅子");
         }
@@ -50,5 +53,9 @@ public class CommonProxy {
         MT_LOG.debug("Hello the mess world!");
     }
 
-    public void serverStarted(FMLServerStartedEvent event) {}
+    public void serverStarted(FMLServerStartedEvent event) {
+        // Fallback in case GT5U's NAC pools are only populated after MessTech postInit.
+        MTRecipeMaps.populateNanoScaleFoundryRecipes();
+        MTRecipeMaps.populateNanoScaleFoundry24PoolRecipes();
+    }
 }

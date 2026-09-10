@@ -114,7 +114,7 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
     }
 
     @Override
-    public IStructureDefinition<SpaceModulePumpInfinity> getStructureDefinition() {
+    public IStructureDefinition<? extends tectech.thing.metaTileEntity.multi.base.TTMultiblockBase> getStructure_EM() {
         return StructureDefinition.<SpaceModulePumpInfinity>builder()
             .addShape(
                 "main",
@@ -181,7 +181,7 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
     }
 
     @Override
-    public @NotNull CheckRecipeResult checkProcessing() {
+    public @NotNull CheckRecipeResult checkProcessing_EM() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
         if (parentElevator == null || parentElevator.getMotorTier() < 5) {
             return CheckRecipeResultRegistry.NO_RECIPE;

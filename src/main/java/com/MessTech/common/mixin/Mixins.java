@@ -16,10 +16,13 @@ import java.util.stream.Collectors;
  */
 @SuppressWarnings("unused")
 public enum Mixins {
+    ;
 
-    SPACE_ELEVATOR_MODULES(new MixinClass("MixinTileEntitySpaceElevator").setClass("MixinTileEntitySpaceElevator")
-        .setPhase(Phase.LATE)
-        .addTargetMod(TargetMod.GTNH_INTERGALACTIC));
+    /*
+     * SPACE_ELEVATOR_MODULES(new MixinClass("MixinTileEntitySpaceElevator").setClass("MixinTileEntitySpaceElevator")
+     * .setPhase(Phase.LATE)
+     * .addTargetMod(TargetMod.GTNH_INTERGALACTIC));
+     */
 
     private final MixinClass[] MIXIN_CLASS;
     private final Supplier<Boolean> shouldApplyThisMixinGroup;

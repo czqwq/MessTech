@@ -1,56 +1,67 @@
 package com.MessTech.common.machine.module;
 
-import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
-import static gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap;
+import static gregtech.common.misc.WirelessNetworkManager.processInitialSettings;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.StatCollector;
-import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraft.world.World;
+import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.jetbrains.annotations.NotNull;
+
 import com.MessTech.common.gui.module.SpaceModuleInfinityGui;
-import com.MessTech.common.machine.Base.ParallelismAcrossMultiMachineBase;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
-import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
-import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
-import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import gregtech.api.casing.Casings;
-import gregtech.api.enums.GTValues;
-import gregtech.api.enums.Textures;
 import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
+import gregtech.api.logic.ProcessingLogic;
+import gregtech.api.metatileentity.implementations.MTEHatchInput;
+import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
+import gregtech.api.metatileentity.implementations.MTEHatchMultiInput;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
-import gregtech.api.render.TextureFactory;
-import gregtech.api.structure.error.StructureError;
-import gregtech.api.util.MultiblockTooltipBuilder;
+import gregtech.api.util.GTUtility;
+import gregtech.common.tileentities.machines.IDualInputHatch;
+import gregtech.common.tileentities.machines.IDualInputInventory;
+import gregtech.common.tileentities.machines.MTEHatchInputBusME;
+import gregtech.common.tileentities.machines.MTEHatchInputME;
 import gtnhintergalactic.tile.multi.elevator.TileEntitySpaceElevator;
+import gtnhintergalactic.tile.multi.elevatormodules.TileEntityModuleBase;
 import lombok.Getter;
+import mcp.mobius.waila.api.IWailaConfigHandler;
+import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
- * Shared base for the infinite space modules.
+ * Shared base for the wireless MessTech space modules.
  * <p>
- * Always wireless: draws power directly from the GT wireless network, with a GUI-adjustable
- * parallel count. Base power = 1A MAX; every extra parallel adds 1A UXV.
- * Implements {@link ISpaceElevatorModule} so the vanilla Space Elevator can mount it via the
- * MessTech Mixin.
+ * This class now extends GTNH's native {@link TileEntityModuleBase} instead of a regular GT
+ * multiblock base. That means the vanilla Space Elevator recognises it as a real project module and
+ * adds it to {@code mProjectModuleHatches} through the normal structure check, with no separate
+ * mixin module list.
+ * <p>
+ * The modules remain wireless: they draw power directly from the GT wireless network and do not draw
+ * from the elevator's internal EU buffer.
  */
 @Getter
-public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<T>>
-    extends ParallelismAcrossMultiMachineBase<T> implements ISurvivalConstructable, ISpaceElevatorModule {
+public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<T>> extends TileEntityModuleBase
+    implements ISurvivalConstructable {
 
     /**
      * -- GETTER --
@@ -71,15 +82,23 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     protected static IIconContainer ScreenOFF;
     protected static IIconContainer ScreenON;
 
+    // Wireless state
+    protected UUID ownerUUID;
+    protected boolean EnableWirelessFunc = false;
+    protected boolean EnableWireless = false;
+    protected int wirelessParallel = 1;
+    protected BigInteger costingEU = BigInteger.ZERO;
+    protected String costingEUText = "0";
+
     public SpaceModuleInfinityBase(int aID, String aName, String aNameRegional) {
-        super(aID, aName, aNameRegional);
+        super(aID, aName, aNameRegional, 14, 5, 5);
         setEnableWirelessFunc(true);
         setEnableWireless(true);
         setWirelessParallel(1);
     }
 
     public SpaceModuleInfinityBase(String aName) {
-        super(aName);
+        super(aName, 14, 5, 5);
         setEnableWirelessFunc(true);
         setEnableWireless(true);
         setWirelessParallel(1);
@@ -89,24 +108,216 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         this.crossRecipeParallel = Math.clamp(value, 1, 64);
     }
 
-    @Override
     public void setWirelessParallel(int value) {
-        super.setWirelessParallel(value);
+        this.wirelessParallel = Math.max(1, value);
+    }
+
+    // region Wireless API
+
+    public boolean isWirelessModeAvailable() {
+        return EnableWirelessFunc;
+    }
+
+    public boolean isWirelessModeEnabled() {
+        return EnableWireless;
+    }
+
+    public boolean isEnableWireless() {
+        return EnableWireless;
+    }
+
+    public void setEnableWireless(boolean value) {
+        this.EnableWireless = value && EnableWirelessFunc && areEnergyHatchesEmpty();
+    }
+
+    public int getWirelessParallel() {
+        return wirelessParallel;
+    }
+
+    public void setEnableWirelessFunc(boolean value) {
+        this.EnableWirelessFunc = value;
+        if (!value) {
+            this.EnableWireless = false;
+        }
+    }
+
+    public boolean getDefaultWirelessMode() {
+        return false;
+    }
+
+    protected boolean isWirelessModeActive() {
+        return isWirelessModeAvailable() && isWirelessModeEnabled();
+    }
+
+    public boolean areEnergyHatchesEmpty() {
+        return mEnergyHatches.isEmpty() && mExoticEnergyHatches.isEmpty() && eEnergyMulti.isEmpty();
+    }
+
+    protected void initWirelessNetwork(IGregTechTileEntity aBaseMetaTileEntity) {
+        if (aBaseMetaTileEntity.isServerSide()) {
+            ownerUUID = processInitialSettings(aBaseMetaTileEntity);
+        }
     }
 
     @Override
-    public void saveNBTData(net.minecraft.nbt.NBTTagCompound aNBT) {
+    public void onFirstTick_EM(IGregTechTileEntity aBaseMetaTileEntity) {
+        super.onFirstTick_EM(aBaseMetaTileEntity);
+        if (aBaseMetaTileEntity.isServerSide()) {
+            ownerUUID = processInitialSettings(aBaseMetaTileEntity);
+        }
+    }
+
+    @Override
+    public void onPreTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
+        super.onPreTick(aBaseMetaTileEntity, aTick);
+        if (aBaseMetaTileEntity.isServerSide() && ownerUUID == null) {
+            initWirelessNetwork(aBaseMetaTileEntity);
+        }
+    }
+
+    @Override
+    public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
+        int z) {
+        super.getWailaNBTData(player, tile, tag, world, x, y, z);
+        if (isWirelessModeEnabled()) {
+            tag.setBoolean("wirelessMode", true);
+            tag.setString("costingEUText", costingEUText);
+        }
+    }
+
+    @Override
+    public void getWailaBody(ItemStack itemStack, List<String> currentTip, IWailaDataAccessor accessor,
+        IWailaConfigHandler config) {
+        super.getWailaBody(itemStack, currentTip, accessor, config);
+        final NBTTagCompound tag = accessor.getNBTData();
+        if (tag.getBoolean("wirelessMode")) {
+            currentTip.add(
+                net.minecraft.util.EnumChatFormatting.LIGHT_PURPLE
+                    + StatCollector.translateToLocal("machine.wirelessbase.mode"));
+            currentTip.add(
+                net.minecraft.util.EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.wirelessbase.cost")
+                    + net.minecraft.util.EnumChatFormatting.RESET
+                    + ": "
+                    + net.minecraft.util.EnumChatFormatting.GOLD
+                    + formatWirelessEU(tag.getString("costingEUText"))
+                    + net.minecraft.util.EnumChatFormatting.RESET
+                    + " EU");
+        }
+    }
+
+    /**
+     * Formats a wireless EU value with thousands separators and a compact scientific-notation
+     * suffix, e.g. {@code 1,000,000 (1.00e6)}.
+     */
+    protected String formatWirelessEU(String raw) {
+        try {
+            BigInteger value = new BigInteger(raw);
+            String grouped = String.format("%,d", value);
+            String scientific = String.format("%.2e", value.doubleValue());
+            scientific = scientific.replace("e+", "e")
+                .replace("e-", "e-");
+            scientific = scientific.replaceAll("e(-?)0(\\d)", "e$1$2");
+            return grouped + " (" + scientific + ")";
+        } catch (Exception e) {
+            return raw;
+        }
+    }
+    // endregion
+
+    @Override
+    public void saveNBTData(NBTTagCompound aNBT) {
+        aNBT.setBoolean("enableWireless", EnableWireless);
+        aNBT.setInteger("wirelessParallel", wirelessParallel);
         super.saveNBTData(aNBT);
         aNBT.setInteger("crossRecipeParallel", crossRecipeParallel);
     }
 
     @Override
-    public void loadNBTData(net.minecraft.nbt.NBTTagCompound aNBT) {
+    public void loadNBTData(NBTTagCompound aNBT) {
+        if (aNBT.hasKey("enableWireless")) EnableWireless = aNBT.getBoolean("enableWireless");
+        if (aNBT.hasKey("wirelessParallel")) wirelessParallel = Math.max(1, aNBT.getInteger("wirelessParallel"));
         super.loadNBTData(aNBT);
         if (aNBT.hasKey("crossRecipeParallel")) {
             crossRecipeParallel = Math.max(1, aNBT.getInteger("crossRecipeParallel"));
         }
     }
+
+    // region Native module lifecycle
+
+    @Override
+    public void connect(TileEntitySpaceElevator parent) {
+        this.parentElevator = parent;
+        super.connect(parent);
+    }
+
+    @Override
+    public void disconnect() {
+        this.parentElevator = null;
+        super.disconnect();
+    }
+
+    @Override
+    public long increaseStoredEU(long amount) {
+        // Wireless modules draw directly from the wireless network; no elevator EU buffer is used.
+        return 0;
+    }
+
+    @Override
+    protected long getAvailableData_EM() {
+        if (eInputData.isEmpty()) {
+            if (parentElevator == null) return 0;
+            return parentElevator.getAvailableDataForModules();
+        }
+        return super.getAvailableData_EM();
+    }
+
+    /**
+     * @return The amount of computation this module may draw from the connected Space Elevator.
+     */
+    public long getAvailableDataForModule() {
+        return getAvailableData_EM();
+    }
+
+    /**
+     * Keep a non-zero fake internal EU buffer while the module is structurally valid and connected.
+     * The real power is paid wirelessly, so this only prevents the module base from stopping us for
+     * an empty internal EU tank.
+     */
+    @Override
+    protected void chargeController_EM(IGregTechTileEntity aBaseMetaTileEntity) {
+        if (mMachine) {
+            setEUVar(maxEUStore());
+        }
+    }
+
+    @Override
+    public boolean isAllowedToWork() {
+        // If a cross-recipe / multi-recipe batch is mid-way, keep the machine running even if the
+        // player toggled it off, so all planned outputs are finished before shutdown.
+        if (hasPendingBatchWork()) {
+            return true;
+        }
+        return super.isAllowedToWork();
+    }
+
+    @Override
+    public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
+        if (aBaseMetaTileEntity.isServerSide() && hasPendingBatchWork() && !aBaseMetaTileEntity.isAllowedToWork()) {
+            // The player (or redstone) asked to stop mid-batch; remember that and force the machine
+            // to continue until every planned output has been emitted.
+            shutdownRequestedDuringBatch = true;
+            aBaseMetaTileEntity.enableWorking();
+        }
+        super.onPostTick(aBaseMetaTileEntity, aTick);
+        if (aBaseMetaTileEntity.isServerSide() && !hasPendingBatchWork() && shutdownRequestedDuringBatch) {
+            // Batch fully finished; now honor the previously requested shutdown.
+            shutdownRequestedDuringBatch = false;
+            aBaseMetaTileEntity.disableWorking();
+        }
+    }
+    // endregion
+
+    // region Tick-batched processing
 
     /**
      * @return number of sub-outputs in the current tick-batched batch.
@@ -164,11 +375,21 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
             }
         }
         // Keep the GUI/Waila display updated with the accumulated total output while the batch runs.
-        if (mMaxProgresstime > 0) {
+        // Modules that finish their whole batch inside checkProcessing must not have their real
+        // mOutputItems overwritten by the (empty) tick-batched lists.
+        if (mMaxProgresstime > 0 && usesTickBatchedOutputs()) {
             mOutputItems = batchItemOutputs.toArray(new ItemStack[0]);
             mOutputFluids = batchFluidOutputs.toArray(new FluidStack[0]);
         }
         return result;
+    }
+
+    /**
+     * @return true for modules that spread their outputs over the running ticks (miner/pump),
+     *         false for modules that generate all outputs at once inside checkProcessing.
+     */
+    protected boolean usesTickBatchedOutputs() {
+        return true;
     }
 
     @Override
@@ -183,31 +404,257 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         return batchRemainingTasks > 0;
     }
 
+    /**
+     * TT module recipe hook. MessTech modules no longer override the final {@code checkProcessing()};
+     * they override this method like every native elevator module does.
+     */
     @Override
-    public boolean isAllowedToWork() {
-        // If a cross-recipe / multi-recipe batch is mid-way, keep the machine running even if the
-        // player toggled it off, so all planned outputs are finished before shutdown.
-        if (hasPendingBatchWork()) {
-            return true;
+    public @NotNull CheckRecipeResult checkProcessing_EM() {
+        if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
+        int parallel = Math.max(1, getWirelessParallel());
+        long eut = gregtech.api.enums.GTValues.V[14] + (long) (parallel - 1) * gregtech.api.enums.GTValues.V[13];
+        int duration = 20;
+        CheckRecipeResult result = validateWirelessPowerForRecipe(eut, duration, 1);
+        if (!result.wasSuccessful()) return result;
+        java.math.BigInteger cost = java.math.BigInteger.valueOf(eut)
+            .multiply(java.math.BigInteger.valueOf(duration));
+        if (ownerUUID == null
+            || !gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap(ownerUUID, cost.negate())) {
+            return CheckRecipeResultRegistry.insufficientStartupPower(cost);
         }
-        return super.isAllowedToWork();
+        costingEU = cost;
+        costingEUText = String.valueOf(cost);
+        // Wireless power was already deducted in one lump; keep the machine from also trying to
+        // drain energy hatches (which would cause an instant power-loss shutdown).
+        lEUt = 0;
+        mMaxProgresstime = duration;
+        mEfficiencyIncrease = 10000;
+        return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    @Override
-    public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        if (aBaseMetaTileEntity.isServerSide() && hasPendingBatchWork() && !aBaseMetaTileEntity.isAllowedToWork()) {
-            // The player (or redstone) asked to stop mid-batch; remember that and force the machine
-            // to continue until every planned output has been emitted.
-            shutdownRequestedDuringBatch = true;
-            aBaseMetaTileEntity.enableWorking();
+    /**
+     * Simulated wireless power check. Called before any input is consumed.
+     */
+    protected CheckRecipeResult checkWirelessPower(long eut, int duration, int maxParallel) {
+        if (!isWirelessModeActive()) return CheckRecipeResultRegistry.SUCCESSFUL;
+        if (ownerUUID == null) return CheckRecipeResultRegistry.insufficientPower(eut);
+        BigInteger required = BigInteger.valueOf(eut)
+            .multiply(BigInteger.valueOf(duration))
+            .multiply(BigInteger.valueOf(maxParallel));
+        if (gregtech.common.misc.WirelessNetworkManager.getUserEU(ownerUUID)
+            .compareTo(required) < 0) {
+            return CheckRecipeResultRegistry.insufficientStartupPower(required);
         }
-        super.onPostTick(aBaseMetaTileEntity, aTick);
-        if (aBaseMetaTileEntity.isServerSide() && !hasPendingBatchWork() && shutdownRequestedDuringBatch) {
-            // Batch fully finished; now honor the previously requested shutdown.
-            shutdownRequestedDuringBatch = false;
-            aBaseMetaTileEntity.disableWorking();
-        }
+        return CheckRecipeResultRegistry.SUCCESSFUL;
     }
+
+    /**
+     * Wireless recipe validation shared by subclasses: checks that the wireless network can cover
+     * {@code eut * duration * maxParallel}. If the balance is too low, returns an insufficient-power
+     * result; otherwise returns SUCCESSFUL so the caller can continue to consuming inputs + power.
+     */
+    protected CheckRecipeResult validateWirelessPowerForRecipe(long eut, int duration, int maxParallel) {
+        if (!isEnableWireless()) return CheckRecipeResultRegistry.SUCCESSFUL;
+        if (ownerUUID == null) return CheckRecipeResultRegistry.insufficientPower(eut);
+        BigInteger required = BigInteger.valueOf(eut)
+            .multiply(BigInteger.valueOf(duration))
+            .multiply(BigInteger.valueOf(maxParallel));
+        if (gregtech.common.misc.WirelessNetworkManager.getUserEU(ownerUUID)
+            .compareTo(required) < 0) {
+            return CheckRecipeResultRegistry.insufficientStartupPower(required);
+        }
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    /**
+     * Wireless-mode power setup for {@link ProcessingLogic}-driven modules. The module has no real
+     * energy hatches; the wireless network is the only power source.
+     */
+    protected void setupWirelessProcessingPowerLogic(ProcessingLogic logic) {
+        logic.setAvailableVoltage(Long.MAX_VALUE);
+        logic.setAvailableAmperage(1);
+        logic.setAmperageOC(false);
+    }
+
+    /**
+     * Runs one wireless recipe cycle through the inherited {@link ProcessingLogic}. Used by modules that
+     * want normal recipe lookup/parallel calculation but still pay from the GT wireless network.
+     */
+    protected CheckRecipeResult wirelessModeProcessOnce() {
+        if (processingLogic == null) return CheckRecipeResultRegistry.NO_RECIPE;
+
+        setupProcessingLogic(processingLogic);
+        setupWirelessProcessingPowerLogic(processingLogic);
+
+        CheckRecipeResult result = doCheckRecipe();
+        if (!result.wasSuccessful()) return result;
+
+        long calculatedEut = processingLogic.getCalculatedEut();
+        int duration = Math.max(1, processingLogic.getDuration());
+        BigInteger cost = BigInteger.valueOf(Math.max(0, calculatedEut))
+            .multiply(BigInteger.valueOf(duration));
+
+        if (cost.signum() > 0) {
+            if (ownerUUID == null || gregtech.common.misc.WirelessNetworkManager.getUserEU(ownerUUID)
+                .compareTo(cost) < 0) {
+                return CheckRecipeResultRegistry.insufficientStartupPower(cost);
+            }
+            if (!gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap(ownerUUID, cost.negate())) {
+                return CheckRecipeResultRegistry.insufficientStartupPower(cost);
+            }
+            costingEU = costingEU.add(cost);
+            costingEUText = String.valueOf(costingEU);
+        }
+
+        if (processingLogic.getOutputItems() != null) {
+            mOutputItems = ArrayUtils.addAll(mOutputItems, processingLogic.getOutputItems());
+        }
+        if (processingLogic.getOutputFluids() != null) {
+            mOutputFluids = ArrayUtils.addAll(mOutputFluids, processingLogic.getOutputFluids());
+        }
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    /**
+     * Runs up to {@code maxCycles} independent wireless recipe cycles. Each cycle may match a different
+     * recipe against the remaining inputs, giving cross-recipe parallelism.
+     */
+    protected CheckRecipeResult checkProcessingWirelessLoop(int maxCycles) {
+        costingEU = BigInteger.ZERO;
+        costingEUText = "0";
+        mOutputItems = null;
+        mOutputFluids = null;
+
+        CheckRecipeResult failure = CheckRecipeResultRegistry.NO_RECIPE;
+        boolean anySuccess = false;
+
+        startRecipeProcessing();
+        try {
+            for (int i = 0; i < maxCycles; i++) {
+                CheckRecipeResult result = wirelessModeProcessOnce();
+                if (!result.wasSuccessful()) {
+                    failure = result;
+                    break;
+                }
+                anySuccess = true;
+                updateSlots();
+            }
+        } finally {
+            endRecipeProcessing();
+        }
+
+        if (!anySuccess) {
+            return failure;
+        }
+
+        mEfficiency = 10000;
+        mEfficiencyIncrease = 10000;
+        mMaxProgresstime = 1;
+        lEUt = 0;
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    // endregion
+
+    // Input helpers preserved from the former MessTech multiblock base. These are not provided by
+    // TileEntityModuleBase but are still required by the custom mining code.
+    public ArrayList<ItemStack> getStoredInputsNoSeparation() {
+        ArrayList<ItemStack> rList = new ArrayList<>();
+
+        if (supportsCraftingMEBuffer()) {
+            for (IDualInputHatch dualInputHatch : mDualInputHatches) {
+                Iterator<? extends IDualInputInventory> inventoryIterator = dualInputHatch.inventories();
+                while (inventoryIterator.hasNext()) {
+                    ItemStack[] items = inventoryIterator.next()
+                        .getItemInputs();
+                    if (items == null || items.length == 0) continue;
+
+                    for (int i = 0; i < items.length; i++) {
+                        if (items[i] != null) {
+                            rList.add(items[i]);
+                        }
+                    }
+                }
+            }
+        }
+
+        Map<GTUtility.ItemId, ItemStack> inputsFromME = new java.util.HashMap<>();
+        for (MTEHatchInputBus tHatch : GTUtility.filterValidMTEs(mInputBusses)) {
+            tHatch.mRecipeMap = getRecipeMap();
+            IGregTechTileEntity tileEntity = tHatch.getBaseMetaTileEntity();
+            boolean isMEBus = tHatch instanceof MTEHatchInputBusME;
+            for (int i = tileEntity.getSizeInventory() - 1; i >= 0; i--) {
+                ItemStack itemStack = tileEntity.getStackInSlot(i);
+                if (itemStack != null) {
+                    if (isMEBus) {
+                        // Prevent the same item from different ME buses from being recognized
+                        inputsFromME.put(GTUtility.ItemId.createNoCopy(itemStack), itemStack);
+                    } else {
+                        rList.add(itemStack);
+                    }
+                }
+            }
+        }
+
+        if (getStackInSlot(1) != null && getStackInSlot(1).getUnlocalizedName()
+            .startsWith("gt.integrated_circuit")) rList.add(getStackInSlot(1));
+        if (!inputsFromME.isEmpty()) {
+            rList.addAll(inputsFromME.values());
+        }
+        return rList;
+    }
+
+    public ArrayList<FluidStack> getStoredFluidsWithDualInput() {
+        ArrayList<FluidStack> rList = new ArrayList<>();
+        Map<Fluid, FluidStack> inputsFromME = new java.util.HashMap<>();
+        for (MTEHatchInput tHatch : GTUtility.filterValidMTEs(mInputHatches)) {
+            setHatchRecipeMap(tHatch);
+            if (tHatch instanceof MTEHatchMultiInput multiInputHatch) {
+                for (FluidStack tFluid : multiInputHatch.getStoredFluid()) {
+                    if (tFluid != null) {
+                        rList.add(tFluid);
+                    }
+                }
+            } else if (tHatch instanceof MTEHatchInputME meHatch) {
+                for (FluidStack fluidStack : meHatch.getStoredFluids()) {
+                    if (fluidStack != null) {
+                        // Prevent the same fluid from different ME hatches from being recognized
+                        inputsFromME.put(fluidStack.getFluid(), fluidStack);
+                    }
+                }
+            } else {
+                if (tHatch.getFillableStack() != null) {
+                    rList.add(tHatch.getFillableStack());
+                }
+            }
+        }
+
+        if (!inputsFromME.isEmpty()) {
+            rList.addAll(inputsFromME.values());
+        }
+
+        // get all fluids from Dual input
+        if (supportsCraftingMEBuffer()) {
+            for (IDualInputHatch dualInputHatch : mDualInputHatches) {
+                Iterator<? extends IDualInputInventory> inventoryIterator = dualInputHatch.inventories();
+                while (inventoryIterator.hasNext()) {
+                    FluidStack[] fluids = inventoryIterator.next()
+                        .getFluidInputs();
+                    if (fluids == null || fluids.length == 0) continue;
+
+                    for (int i = 0; i < fluids.length; i++) {
+                        if (fluids[i] != null && fluids[i].amount > 0) {
+                            rList.add(fluids[i]);
+                        }
+                    }
+                }
+            }
+        }
+
+        return rList;
+    }
+
+    // endregion
 
     // Original space modules don't expose batch/input-separation/void-protection/power-panel buttons.
     @Override
@@ -236,138 +683,6 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     }
 
     @Override
-    public int getWirelessModeProcessingTime() {
-        return 20;
-    }
-
-    @Override
-    protected boolean isEnablePerfectOverclock() {
-        return false;
-    }
-
-    @Override
-    protected float getSpeedBonus() {
-        return 1;
-    }
-
-    @Override
-    public CheckRecipeResult checkProcessing() {
-        if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
-        int parallel = Math.max(1, getWirelessParallel());
-        long eut = GTValues.V[14] + (long) (parallel - 1) * GTValues.V[13];
-        int duration = 20;
-        CheckRecipeResult result = validateWirelessPowerForRecipe(eut, duration, 1);
-        if (!result.wasSuccessful()) return result;
-        BigInteger cost = BigInteger.valueOf(eut)
-            .multiply(BigInteger.valueOf(duration));
-        if (ownerUUID == null || !addEUToGlobalEnergyMap(ownerUUID, cost.negate())) {
-            return CheckRecipeResultRegistry.insufficientStartupPower(cost);
-        }
-        costingEU = cost;
-        costingEUText = String.valueOf(cost);
-        // Wireless power was already deducted in one lump; keep the machine from also trying to
-        // drain energy hatches (which would cause an instant power-loss shutdown).
-        lEUt = 0;
-        mMaxProgresstime = duration;
-        mEfficiencyIncrease = 10000;
-        return CheckRecipeResultRegistry.SUCCESSFUL;
-    }
-
-    @Override
-    public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack,
-        java.util.List<StructureError> errors) {
-        if (!checkPiece("main", 0, 0, 0, errors)) return;
-    }
-
-    @Override
-    public IStructureDefinition<T> getStructureDefinition() {
-        return StructureDefinition.<T>builder()
-            .addShape("main", transpose(new String[][] { { "~" } }))
-            .build();
-    }
-
-    @Override
-    public void construct(ItemStack stackSize, boolean hintsOnly) {
-        buildPiece("main", stackSize, hintsOnly, 0, 0, 0);
-    }
-
-    @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
-    }
-
-    @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, ISurvivalBuildEnvironment env) {
-        return survivalBuildPiece("main", stackSize, 0, 0, 0, elementBudget, env, false, true);
-    }
-
-    @Override
-    protected MultiblockTooltipBuilder createTooltip() {
-        MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
-        tt.addMachineType(StatCollector.translateToLocal(getMachineTypeKey()))
-            .addSeparator()
-            .addInfo(EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.spacemodule.tooltip.0"))
-            .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.spacemodule.tooltip.1"))
-            .addStructureInfo(EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.spacemodule.tooltip.2"))
-            .toolTipFinisher();
-        return tt;
-    }
-
-    @Override
-    @SideOnly(Side.CLIENT)
-    public void registerIcons(IIconRegister aBlockIconRegister) {
-        ScreenOFF = Textures.BlockIcons.custom("iconsets/EM_CONTROLLER");
-        ScreenON = Textures.BlockIcons.custom("iconsets/EM_CONTROLLER_ACTIVE");
-        super.registerIcons(aBlockIconRegister);
-    }
-
-    @Override
-    public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity, ForgeDirection side, ForgeDirection facing,
-        int colorIndex, boolean aActive, boolean aRedstone) {
-        return new ITexture[] { TextureFactory
-            .of(Casings.UltimateMolecularCasing.getBlock(), Casings.UltimateMolecularCasing.getBlockMeta()) };
-    }
-
-    // region ISpaceElevatorModule
-    @Override
-    public void connect(TileEntitySpaceElevator parent) {
-        this.parentElevator = parent;
-    }
-
-    @Override
-    public void disconnect() {
-        this.parentElevator = null;
-    }
-
-    /**
-     * @return The amount of computation this module may draw from the connected Space Elevator.
-     */
-    public long getAvailableDataForModule() {
-        return parentElevator == null ? 0 : parentElevator.getAvailableDataForModules();
-    }
-
-    @Override
-    public int getNeededMotorTier() {
-        return 5;
-    }
-
-    @Override
-    public long increaseStoredEU(long amount) {
-        // Wireless modules draw directly from the wireless network; no elevator EU buffer is used.
-        return 0;
-    }
-
-    @Override
-    public boolean isDataInputListEmpty() {
-        return true;
-    }
-    // endregion
-
-    protected abstract String getMachineTypeKey();
-
-    protected abstract RecipeMap<?> getRecipeMapImpl();
-
-    @Override
     public RecipeMap<?> getRecipeMap() {
         return getRecipeMapImpl();
     }
@@ -376,6 +691,37 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     protected SpaceModuleInfinityGui getGui() {
         return new SpaceModuleInfinityGui(this);
     }
+
+    /**
+     * The original GTNH space modules (miner/pump) do not use the TecTech LED GUI inherited from
+     * {@code TTMultiblockBase}; they explicitly opt back into MUI2 so the custom
+     * {@link SpaceModuleInfinityGui} subclasses are used.
+     */
+    @Override
+    protected boolean useMui2() {
+        return true;
+    }
+
+    @Override
+    @SideOnly(Side.CLIENT)
+    public void registerIcons(net.minecraft.client.renderer.texture.IIconRegister aBlockIconRegister) {
+        ScreenOFF = gregtech.api.enums.Textures.BlockIcons.custom("iconsets/EM_CONTROLLER");
+        ScreenON = gregtech.api.enums.Textures.BlockIcons.custom("iconsets/EM_CONTROLLER_ACTIVE");
+        super.registerIcons(aBlockIconRegister);
+    }
+
+    @Override
+    public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity,
+        net.minecraftforge.common.util.ForgeDirection side, net.minecraftforge.common.util.ForgeDirection facing,
+        int colorIndex, boolean aActive, boolean aRedstone) {
+        return new ITexture[] { gregtech.api.render.TextureFactory.of(
+            gregtech.api.casing.Casings.UltimateMolecularCasing.getBlock(),
+            gregtech.api.casing.Casings.UltimateMolecularCasing.getBlockMeta()) };
+    }
+
+    protected abstract String getMachineTypeKey();
+
+    protected abstract RecipeMap<?> getRecipeMapImpl();
 
     @Override
     public abstract IMetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity);

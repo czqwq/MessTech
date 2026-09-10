@@ -3,7 +3,7 @@ package com.MessTech.common.gui.module;
 import static net.minecraft.util.StatCollector.translateToLocal;
 
 import com.MessTech.common.gui.MTGuiTextures;
-import com.MessTech.common.machine.Base.ParallelismAcrossMultiMachineBase;
+import com.MessTech.common.machine.module.SpaceModuleInfinityBase;
 import com.cleanroommc.modularui.api.IPanelHandler;
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
@@ -22,9 +22,9 @@ import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 /**
  * Shared MUI2 GUI for the infinite space modules: shows a wireless parallel selector.
  */
-public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<ParallelismAcrossMultiMachineBase<?>> {
+public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<SpaceModuleInfinityBase<?>> {
 
-    public SpaceModuleInfinityGui(ParallelismAcrossMultiMachineBase<?> multiblock) {
+    public SpaceModuleInfinityGui(SpaceModuleInfinityBase<?> multiblock) {
         super(multiblock);
     }
 
@@ -49,23 +49,29 @@ public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<ParallelismAcro
 
     @Override
     protected Flow createLeftPanelGapRow(ModularPanel parent, PanelSyncManager syncManager) {
-        IntSyncValue parallelSyncer = syncManager.findSyncHandler("parallel", IntSyncValue.class);
-        IPanelHandler parallelPanel = syncManager
-            .syncedPanel("parallelPanel", true, (p_syncManager, syncHandler) -> openParallelPanel(syncManager, parent));
-
         Flow row = super.createLeftPanelGapRow(parent, syncManager);
-        row.child(
-            new ButtonWidget<>().size(18, 18)
-                .overlay(GTGuiTextures.OVERLAY_BUTTON_CRYOTHEUM_OFF)
-                .tooltip(t -> t.addLine(translateToLocal("machine.spacemodule.parallel")))
-                .onMousePressed(mouseButton -> {
-                    if (!parallelPanel.isPanelOpen()) {
-                        parallelPanel.openPanel();
-                    } else {
-                        parallelPanel.closePanel();
-                    }
-                    return true;
-                }));
+
+        // Modules with a fixed parallel/cross-recipe behaviour (e.g. the infinite assembler) hide
+        // this button completely instead of leaving an empty panel button behind.
+        if (shouldShowParallelField() || shouldShowCrossRecipeParallelField()) {
+            IPanelHandler parallelPanel = syncManager.syncedPanel(
+                "parallelPanel",
+                true,
+                (p_syncManager, syncHandler) -> openParallelPanel(syncManager, parent));
+            row.child(
+                new ButtonWidget<>().size(18, 18)
+                    .overlay(GTGuiTextures.OVERLAY_BUTTON_CRYOTHEUM_OFF)
+                    .tooltip(t -> t.addLine(translateToLocal("machine.spacemodule.parallel")))
+                    .onMousePressed(mouseButton -> {
+                        if (!parallelPanel.isPanelOpen()) {
+                            parallelPanel.openPanel();
+                        } else {
+                            parallelPanel.closePanel();
+                        }
+                        return true;
+                    }));
+        }
+
         addExtraPanelButtons(row, syncManager, parent);
         return row;
     }

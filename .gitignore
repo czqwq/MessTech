@@ -9,6 +9,7 @@
 .classpath
 .project
 /bin/
+/tools/
 /config/
 /crash-reports/
 /logs/

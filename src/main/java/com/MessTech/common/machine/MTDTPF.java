@@ -486,7 +486,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         .addElement(
             'D',
             HatchElementBuilder.<MTDTPF>builder()
-                .anyOf(
+                .atLeast(
                     HatchElement.InputBus,
                     HatchElement.OutputBus,
                     HatchElement.InputHatch,
@@ -559,7 +559,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
                         ? EnumChatFormatting.YELLOW
                             + (PocStatus ? translateToLocal("machine.dtpf.perfectoverclock.on.spec")
                                 : translateToLocal("machine.dtpf.perfectoverclock.on"))
-                        : EnumChatFormatting.GREEN + translateToLocal("machine.dtpf.perfectoverclock.off"))
+                        : EnumChatFormatting.GREEN + translateToLocal("machine.dtpf.perfectoverclock.normal"))
                     + EnumChatFormatting.RESET);
         }
     }
@@ -615,10 +615,10 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
             public CheckRecipeResult process() {
                 setEuModifier(getEuModifier());
                 setSpeedBonus(getSpeedBonus());
-                setOverclock(isEnablePerfectOverclock() ? 4 : 2, isTierAtLeast(4) ? 2 : 4);
-                // level 5->4 speed 2 power
-                // level 4->2 speed 2 power
-                // level 1-3->2 speed 4 power
+                setOverclock(isTierAtLeast(4) ? 4 : 2, getLevelTier() == LevelTier.TIER5 ? 2 : 4);
+                // 等级5 → speed=4, power=2
+                // 等级4 → speed=4, power=4
+                // 等级1-3 → speed=2, power=2
                 return super.process();
             }
 
@@ -743,6 +743,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
             .addInfo(EnumChatFormatting.GRAY + translateToLocal("machine.dtpf.tooltip.runtime.ramp"))
             .addInfo(EnumChatFormatting.GOLD + translateToLocal("machine.dtpf.tooltip.runtime.maxparallel"))
             .addInfo(EnumChatFormatting.AQUA + translateToLocal("machine.dtpf.tooltip.runtime.maxeff"))
+            .addInfo(EnumChatFormatting.BLUE + translateToLocal("machine.dtpf.tooltip.overlock"))
             .addInfo(EnumChatFormatting.LIGHT_PURPLE + translateToLocal("machine.dtpf.tooltip.wireless.parallel"))
             .addInfo(EnumChatFormatting.LIGHT_PURPLE + translateToLocal("machine.dtpf.tooltip.wireless.discount"))
             .addStructureInfo("")
@@ -804,7 +805,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         LevelTier machineLevel = LevelTier.fromTier(getFusionMachineTier());
 
         // A (reactor coil) and B (fusion machine casing) must match their tier exactly.
-        if (coilLevel == LevelTier.INVALID || machineLevel == LevelTier.INVALID || coilLevel != machineLevel) {
+        if (machineLevel == LevelTier.INVALID || coilLevel != machineLevel) {
             errors.add(
                 StructureErrors.of(
                     "structure.error.tier_mismatch",

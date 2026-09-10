@@ -117,8 +117,6 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     private int step = 1;
     @Getter
     private int cycleDistance = 30;
-    protected ArrayList<MTEHatchDataInput> eInputData = new ArrayList<>();
-    protected long eRequiredData = 0;
 
     public SpaceModuleMinerInfinity(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional);
@@ -212,18 +210,6 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
             + oreStack.getItemDamage();
     }
 
-    public boolean addDataInputToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex) {
-        if (aTileEntity == null) return false;
-        IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
-        if (aMetaTileEntity instanceof MTEHatchDataInput hatch) {
-            addIfSmartInput(hatch);
-            hatch.updateTexture(aBaseCasingIndex);
-            hatch.updateCraftingIcon(getMachineCraftingIcon());
-            return eInputData.add(hatch);
-        }
-        return false;
-    }
-
     public boolean addModuleHatchToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex) {
         return addInputHatchToMachineList(aTileEntity, aBaseCasingIndex)
             || addInputBusToMachineList(aTileEntity, aBaseCasingIndex)
@@ -273,7 +259,7 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     }
 
     @Override
-    public IStructureDefinition<SpaceModuleMinerInfinity> getStructureDefinition() {
+    public IStructureDefinition<? extends tectech.thing.metaTileEntity.multi.base.TTMultiblockBase> getStructure_EM() {
         return StructureDefinition.<SpaceModuleMinerInfinity>builder()
             .addShape(
                 "main",
@@ -355,7 +341,7 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     }
 
     @Override
-    public @NotNull CheckRecipeResult checkProcessing() {
+    public @NotNull CheckRecipeResult checkProcessing_EM() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
         if (parentElevator == null || parentElevator.getMotorTier() < 5) {
             return CheckRecipeResultRegistry.NO_RECIPE;
@@ -372,6 +358,22 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     @Override
     protected int getBatchTaskCount() {
         return Math.clamp(getCrossRecipeParallel(), 1, MAX_CROSS_RECIPE_CYCLES);
+    }
+
+    /**
+     * The custom mining check already caps parallels using the data available at recipe-start time.
+     * TT's generic computation-timeout check can otherwise see a temporarily lower
+     * {@code eAvailableData} right after the module becomes active (elevator data is divided among
+     * active miners) and shut the machine down with a false "computation_loss" even though enough
+     * computation exists. Keep {@code eAvailableData} at least at the amount this recipe actually
+     * reserved.
+     */
+    @Override
+    public boolean onRunningTickCheck(ItemStack aStack) {
+        if (eRequiredData > eAvailableData) {
+            eAvailableData = eRequiredData;
+        }
+        return super.onRunningTickCheck(aStack);
     }
 
     @Override
@@ -505,6 +507,11 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         // Wireless power was already deducted in one lump; don't drain energy hatches too.
         lEUt = 0;
         eRequiredData = (int) Math.ceil(data.computation * maxParallels * compModifier);
+        // The custom check above already reserved only as much computation as was available. Keep TT's
+        // internal view consistent so its generic computation timeout does not fire a false loss right
+        // after this module becomes active and the elevator recalculates the per-module share.
+        eAvailableData = Math.max(eAvailableData, availableData);
+        eComputationTimeout = 100;
         // Duration is managed by the tick-batched main batch; do not overwrite it here.
         mEfficiencyIncrease = 10000;
         cycleDistance();

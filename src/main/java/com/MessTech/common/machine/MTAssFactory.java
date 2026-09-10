@@ -247,7 +247,7 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
         .addElement(
             'F',
             HatchElementBuilder.<MTAssFactory>builder()
-                .anyOf(
+                .atLeast(
                     HatchElement.InputBus,
                     HatchElement.InputHatch,
                     HatchElement.OutputBus,
