@@ -49,23 +49,29 @@ public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<SpaceModuleInfi
 
     @Override
     protected Flow createLeftPanelGapRow(ModularPanel parent, PanelSyncManager syncManager) {
-        IntSyncValue parallelSyncer = syncManager.findSyncHandler("parallel", IntSyncValue.class);
-        IPanelHandler parallelPanel = syncManager
-            .syncedPanel("parallelPanel", true, (p_syncManager, syncHandler) -> openParallelPanel(syncManager, parent));
-
         Flow row = super.createLeftPanelGapRow(parent, syncManager);
-        row.child(
-            new ButtonWidget<>().size(18, 18)
-                .overlay(GTGuiTextures.OVERLAY_BUTTON_CRYOTHEUM_OFF)
-                .tooltip(t -> t.addLine(translateToLocal("machine.spacemodule.parallel")))
-                .onMousePressed(mouseButton -> {
-                    if (!parallelPanel.isPanelOpen()) {
-                        parallelPanel.openPanel();
-                    } else {
-                        parallelPanel.closePanel();
-                    }
-                    return true;
-                }));
+
+        // Modules with a fixed parallel/cross-recipe behaviour (e.g. the infinite assembler) hide
+        // this button completely instead of leaving an empty panel button behind.
+        if (shouldShowParallelField() || shouldShowCrossRecipeParallelField()) {
+            IPanelHandler parallelPanel = syncManager.syncedPanel(
+                "parallelPanel",
+                true,
+                (p_syncManager, syncHandler) -> openParallelPanel(syncManager, parent));
+            row.child(
+                new ButtonWidget<>().size(18, 18)
+                    .overlay(GTGuiTextures.OVERLAY_BUTTON_CRYOTHEUM_OFF)
+                    .tooltip(t -> t.addLine(translateToLocal("machine.spacemodule.parallel")))
+                    .onMousePressed(mouseButton -> {
+                        if (!parallelPanel.isPanelOpen()) {
+                            parallelPanel.openPanel();
+                        } else {
+                            parallelPanel.closePanel();
+                        }
+                        return true;
+                    }));
+        }
+
         addExtraPanelButtons(row, syncManager, parent);
         return row;
     }

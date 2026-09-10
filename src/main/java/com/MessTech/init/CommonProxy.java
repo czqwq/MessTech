@@ -57,5 +57,7 @@ public class CommonProxy {
         // Fallback in case GT5U's NAC pools are only populated after MessTech postInit.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();
         MTRecipeMaps.populateNanoScaleFoundry24PoolRecipes();
+        // BEC recipes are registered by GT5U's postload recipe loader.
+        MTRecipeMaps.populateBosesCraftingArrayRecipes();
     }
 }

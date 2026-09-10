@@ -16,7 +16,9 @@ import com.MessTech.common.item.MTNACComponentItem;
 import com.MessTech.common.item.MTNACComponentItems;
 import com.MessTech.common.misc.MTItemList;
 
+import gregtech.api.enums.CondensateType;
 import gregtech.api.enums.ItemList;
+import gregtech.api.enums.NaniteTier;
 import gregtech.api.gui.modularui.GTUITextures;
 import gregtech.api.items.CircuitComponentFakeItem;
 import gregtech.api.modularui2.GTGuiTextures;
@@ -31,8 +33,11 @@ import gregtech.api.recipe.maps.QuantumComputerFrontend;
 import gregtech.api.recipe.metadata.SimpleRecipeMetadataKey;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTRecipeBuilder;
+import gregtech.api.util.GTRecipeConstants;
 import gregtech.api.util.GTUtility;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
+import tectech.recipe.BECAssemblyFrontend;
+import tectech.recipe.TecTechRecipeMaps;
 
 /**
  * Custom recipe maps for MessTech machines.
@@ -126,6 +131,12 @@ public final class MTRecipeMaps {
                 .setHeight(110))
         .build();
 
+    public static final RecipeMap<RecipeMapBackend> Steel_brick_Recipes = RecipeMapBuilder.of("mt.recipe.steel_brick")
+        .maxIO(4, 3, 0, 0)
+        .minInputs(1, 0)
+        .neiHandlerInfo(builder -> builder.setDisplayStack(MTItemList.MTDBBFurnace.get(1)))
+        .build();
+
     public static final RecipeMap<RecipeMapBackend> nanoScaleFoundrySMDProcessorRecipes = RecipeMapBuilder
         .of("mt.recipe.nanoscale.smdprocessor")
         .maxIO(1, 1, 0, 0)
@@ -205,6 +216,22 @@ public final class MTRecipeMaps {
         .neiHandlerInfo(
             builder -> builder.setDisplayStack(MTItemList.MTNanoScaleFoundry.get(1))
                 .setHeight(230))
+        .build();
+
+    /**
+     * Independent recipe pool for {@code BosesCraftingArray}.
+     * <p>
+     * BEC's assembling recipes store their original entangled condensate inputs in metadata and clear the
+     * real fluid input array. This pool is the converted version: entangled condensate is replaced 1:1 by
+     * its corresponding real source fluid/molten, while the nanite tier metadata is preserved.
+     */
+    public static final RecipeMap<RecipeMapBackend> bosesCraftingArrayRecipes = RecipeMapBuilder
+        .of("mt.recipe.boses_crafting_array")
+        .maxIO(16, 1, 4, 0)
+        .minInputs(1, 0)
+        .frontend(BECAssemblyFrontend::new)
+        .neiRecipeBackgroundSize(170, 90)
+        .neiHandlerInfo(builder -> builder.setDisplayStack(MTItemList.BosesCraftingArray.get(1)))
         .build();
 
     /**
@@ -301,6 +328,64 @@ public final class MTRecipeMaps {
             // input alternative/unification branch exponentially and hang world load.
             nanoScaleFoundry24PoolRecipes.addFakeRecipe(false, recipe);
         }
+    }
+
+    /**
+     * Converts TecTech's {@code condensateAssemblingRecipes} into the independent
+     * {@link #bosesCraftingArrayRecipes} pool used by BosesCraftingArray. Entangled condensate fluids are
+     * replaced 1:1 by their real source fluid/molten; the {@code NANITE_TIERS} metadata is kept so the
+     * machine can enforce the original BEC nanite-tier steps.
+     */
+    public static void populateBosesCraftingArrayRecipes() {
+        if (!bosesCraftingArrayRecipes.getAllRecipes()
+            .isEmpty()) {
+            return;
+        }
+
+        for (GTRecipe becRecipe : TecTechRecipeMaps.condensateAssemblingRecipes.getAllRecipes()) {
+            FluidStack[] condensateInputs = becRecipe.getMetadata(GTRecipeConstants.CONDENSATE_INPUT);
+            if (condensateInputs == null || condensateInputs.length == 0) continue;
+
+            FluidStack[] realFluidInputs = new FluidStack[condensateInputs.length];
+            boolean valid = true;
+            for (int i = 0; i < condensateInputs.length; i++) {
+                FluidStack converted = convertCondensateToSourceFluid(condensateInputs[i]);
+                if (converted == null) {
+                    valid = false;
+                    break;
+                }
+                realFluidInputs[i] = converted;
+            }
+            if (!valid) continue;
+
+            NaniteTier[] naniteTiers = becRecipe.getMetadata(GTRecipeConstants.NANITE_TIERS);
+            GTRecipeBuilder builder = GTRecipeBuilder.builder()
+                .itemInputs(becRecipe.mInputs)
+                .itemOutputs(becRecipe.mOutputs)
+                .fluidInputs(realFluidInputs)
+                .duration(becRecipe.mDuration)
+                .eut(becRecipe.mEUt);
+            if (naniteTiers != null) {
+                builder.metadata(GTRecipeConstants.NANITE_TIERS, naniteTiers);
+            }
+            builder.addTo(bosesCraftingArrayRecipes);
+        }
+    }
+
+    /**
+     * Converts one entangled condensate stack to its real source fluid, preserving the original mB amount.
+     *
+     * @return converted stack, or null when the fluid is not a known condensate type.
+     */
+    private static FluidStack convertCondensateToSourceFluid(FluidStack condensate) {
+        if (condensate == null || condensate.getFluid() == null) return null;
+        CondensateType type = CondensateType.getCondensateType(condensate.getFluid());
+        if (type == null) return null;
+        FluidStack source = type.getSourceFluid();
+        if (source == null || source.getFluid() == null) return null;
+        FluidStack converted = source.copy();
+        converted.amount = condensate.amount;
+        return converted;
     }
 
     private static GTRecipe flattenAssemblyTo24Pool(GTRecipe assembly) {

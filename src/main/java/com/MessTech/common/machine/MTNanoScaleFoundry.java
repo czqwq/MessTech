@@ -172,7 +172,11 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         .addElement(
             'H',
             HatchElementBuilder.<MTNanoScaleFoundry>builder()
-                .anyOf(HatchElement.InputBus, HatchElement.OutputBus, HatchElement.InputHatch, HatchElement.OutputHatch)
+                .atLeast(
+                    HatchElement.InputBus,
+                    HatchElement.OutputBus,
+                    HatchElement.InputHatch,
+                    HatchElement.OutputHatch)
                 .casingIndex(Casings.NanochipMeshInterfaceCasing.textureId)
                 .hint(1)
                 .buildAndChain(
@@ -188,7 +192,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         .addElement(
             'G',
             HatchElementBuilder.<MTNanoScaleFoundry>builder()
-                .anyOf(HatchElement.Energy.or(HatchElement.ExoticEnergy))
+                .atLeast(HatchElement.Energy.or(HatchElement.ExoticEnergy))
                 .hint(2)
                 .casingIndex(Casings.NanochipComputationalMatrixCasing.textureId)
                 .buildAndChain(

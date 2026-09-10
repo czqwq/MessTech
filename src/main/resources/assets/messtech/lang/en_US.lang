@@ -139,6 +139,14 @@ machine.spacemoduleminer.tooltip.0=Consumes drones, drills, rods and plasma
 machine.spacemoduleminer.tooltip.1=Requires computation from the Space Elevator data hatches
 machine.spacemodulepump.tooltip.meme=Drink Drunk Drank
 machine.spacemodulepump.tooltip.need_t5=Requires §9MK-V§7 acceleration orbit.
+machine.spacemoduleassembler.name=Infinite Space Assembler Module
+machine.spacemoduleassembler.machinetype=Space Assembler Module
+machine.spacemoduleassembler.tooltip.meme=Assemble! Craft! Combine!
+machine.spacemoduleassembler.tooltip.need_t5=Requires §9MK-V§7 acceleration orbit.
+machine.spacemoduleassembler.tooltip.wireless=Draws power directly from the wireless network; uses no internal EU.
+machine.spacemoduleassembler.tooltip.parallel=Each recipe runs with §bInt§7 parallel, limited only by available inputs.
+machine.spacemoduleassembler.tooltip.crossrecipe=Automatically runs cross-recipe cycles every work period; no GUI configuration needed.
+machine.spacemoduleassembler.tooltip.project=Requires the space project and location needed by the recipe.
 machine.spacemodule.need_elevator_t5=Requires a Space Elevator at Orbital Tier V
 GT5U.gui.text.recipe_result.insufficient_computation=Not enough computation
 
@@ -266,3 +274,24 @@ mt.recipe.nanoscale.opticalorganizer=Nano-Scale Foundry: Optical Organizer
 mt.recipe.nanoscale.encasementwrapper=Nano-Scale Foundry: Encasement Wrapper
 mt.recipe.nanoscale.biologicalcoordinator=Nano-Scale Foundry: Biological Coordinator
 mt.recipe.nanoscale.pool24=Nano-Scale Foundry: Precision Circuit Aggregation
+
+# --- Dimensionally Brick Furnace ---
+machine.dbbfurnace.machinetype=Dimensionally Brick Furnace
+machine.dbbfurnace.mode.1=Brick Blast Furnace Mode
+machine.dbbfurnace.mode.2=Metallurgy Mode
+machine.dbbfurnace.tooltip.0=No energy required and energy hatches are not accepted.
+machine.dbbfurnace.tooltip.1=Mode 1: Brick Blast Furnace; Mode 2: Metallurgy (switch with screwdriver).
+machine.dbbfurnace.tooltip.2=Drain CO2 from the air and convert it into materials required for smelting.
+machine.dbbfurnace.tooltip.3=Machine always process recipes in 1 tick
+
+# --- Boses Crafting Array ---
+machine.bosescraftingarray.name=Bose-Einstein Condensate Crafting Array
+machine.bosescraftingarray.machinetype=Bose-Einstein Condensate Crafting Array
+machine.bosescraftingarray.tooltip.0=§lGenerate, contain, observe, aggregate.§r
+machine.bosescraftingarray.tooltip.1=Uses Singularity Nanite Containment Buses to identify nanites; nanites are not consumed.
+machine.bosescraftingarray.tooltip.2=Reads the highest nanite tier from all buses; each nanite grants 0.5 base speed.
+machine.bosescraftingarray.tooltip.3=Recipe nanite tier steps follow the same mechanism as the original BEC.
+machine.bosescraftingarray.need_nanite_bus=Requires at least 1 Singularity Nanite Containment Bus
+machine.bosescraftingarray.poc=Enable Perfect Overclock
+
+GT5U.gui.text.recipe_result.nanite_stalled=§cNanite tier too low or no nanites

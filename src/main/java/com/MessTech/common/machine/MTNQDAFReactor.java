@@ -267,7 +267,7 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
         .addElement(
             'A',
             HatchElementBuilder.<MTNQDAFReactor>builder()
-                .anyOf(HatchElement.Dynamo.or(HatchElement.ExoticDynamo))
+                .atLeast(HatchElement.Dynamo.or(HatchElement.ExoticDynamo))
                 .casingIndex(Casings.NaquadahFuelRefineryCasing.textureId)
                 .hint(2)
                 .buildAndChain(
@@ -290,7 +290,11 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
         .addElement(
             'E',
             HatchElementBuilder.<MTNQDAFReactor>builder()
-                .anyOf(HatchElement.InputHatch, HatchElement.OutputHatch, HatchElement.InputBus, HatchElement.OutputBus)
+                .atLeast(
+                    HatchElement.InputHatch,
+                    HatchElement.OutputHatch,
+                    HatchElement.InputBus,
+                    HatchElement.OutputBus)
                 .casingIndex(Casings.NaquadahReactorCasing.textureId)
                 .hint(1)
                 .buildAndChain(

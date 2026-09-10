@@ -140,6 +140,14 @@ machine.spacemoduleminer.tooltip.0=消耗无人机、钻头和等离子
 machine.spacemoduleminer.tooltip.1=需要太空电梯数据仓提供算力
 machine.spacemodulepump.tooltip.meme=稀！悉！吸！
 machine.spacemodulepump.tooltip.need_t5=需要§9MK-V§7加速轨道.
+machine.spacemoduleassembler.name=无限太空组装模块
+machine.spacemoduleassembler.machinetype=太空组装模块
+machine.spacemoduleassembler.tooltip.meme=装！配！合！
+machine.spacemoduleassembler.tooltip.need_t5=需要§9MK-V§7加速轨道.
+machine.spacemoduleassembler.tooltip.wireless=直接从无线电网取电，不消耗机器内部 EU.
+machine.spacemoduleassembler.tooltip.parallel=每道配方按 §bInt§7 并行处理，实际受输入数量限制.
+machine.spacemoduleassembler.tooltip.crossrecipe=每个工作周期自动跨配方并行，无需 GUI 配置.
+machine.spacemoduleassembler.tooltip.project=需要完成配方所需的太空项目与地点.
 machine.spacemodule.need_elevator_t5=需要轨道等级V的太空电梯
 GT5U.gui.text.recipe_result.insufficient_computation=算力不足
 
@@ -267,3 +275,27 @@ mt.recipe.nanoscale.opticalorganizer=纳米铸造厂：光学整理器
 mt.recipe.nanoscale.encasementwrapper=纳米铸造厂：封装机
 mt.recipe.nanoscale.biologicalcoordinator=纳米铸造厂：生物协调器
 mt.recipe.nanoscale.pool24=纳米铸造厂：精密电路聚合
+mt.recipe.steel_brick=超泥土锻炉: 冶金模式
+mt.recipe.boses_crafting_array=玻色-爱因斯坦凝聚态物质聚合阵列
+
+# --- 超泥土锻炉 --- 
+machine.dbbfurnace.name=超泥土等一等锻炉
+machine.dbbfurnace.machinetype=超泥土等一等锻炉
+machine.dbbfurnace.mode.1=砖高炉模式
+machine.dbbfurnace.mode.2=冶金模式
+machine.dbbfurnace.tooltip.0=无需耗电，不能安装能源仓
+machine.dbbfurnace.tooltip.1=模式1：砖高炉模式；模式2：冶金模式（用螺丝刀切换）
+machine.dbbfurnace.tooltip.2=吸取空气中的CO2,将其转化为冶炼所需的材料.
+machine.dbbfurnace.tooltip.3=好吧,等一等是骗你的,机器将始终以1tick处理配方
+
+# --- 玻色-爱因斯坦凝聚态物质聚合阵列 ---
+machine.bosescraftingarray.name=玻色-爱因斯坦凝聚态物质聚合阵列
+machine.bosescraftingarray.machinetype=玻色-爱因斯坦凝聚态物质聚合阵列
+machine.bosescraftingarray.tooltip.0=§l生成,收容,观测,聚合§r
+machine.bosescraftingarray.tooltip.1=使用奇点纳米收容总线识别纳米蜂群，纳米蜂群不会被消耗
+machine.bosescraftingarray.tooltip.2=机器读取所有总线中的最高纳米蜂群等级；每个纳米蜂群提供 0.5 基础速度
+machine.bosescraftingarray.tooltip.3=配方的纳米蜂群等级分步机制与原版 BEC 相同
+machine.bosescraftingarray.need_nanite_bus=至少需要 1 个奇点纳米蜂群总线
+machine.bosescraftingarray.poc=启用无损超频
+
+GT5U.gui.text.recipe_result.nanite_stalled=§c纳米蜂群等级不足或没有纳米蜂群

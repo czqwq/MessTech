@@ -18,6 +18,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.NotNull;
 
 import com.MessTech.common.gui.module.SpaceModuleInfinityGui;
@@ -29,6 +30,7 @@ import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
+import gregtech.api.logic.ProcessingLogic;
 import gregtech.api.metatileentity.implementations.MTEHatchInput;
 import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
 import gregtech.api.metatileentity.implementations.MTEHatchMultiInput;
@@ -373,11 +375,21 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
             }
         }
         // Keep the GUI/Waila display updated with the accumulated total output while the batch runs.
-        if (mMaxProgresstime > 0) {
+        // Modules that finish their whole batch inside checkProcessing must not have their real
+        // mOutputItems overwritten by the (empty) tick-batched lists.
+        if (mMaxProgresstime > 0 && usesTickBatchedOutputs()) {
             mOutputItems = batchItemOutputs.toArray(new ItemStack[0]);
             mOutputFluids = batchFluidOutputs.toArray(new FluidStack[0]);
         }
         return result;
+    }
+
+    /**
+     * @return true for modules that spread their outputs over the running ticks (miner/pump),
+     *         false for modules that generate all outputs at once inside checkProcessing.
+     */
+    protected boolean usesTickBatchedOutputs() {
+        return true;
     }
 
     @Override
@@ -451,6 +463,94 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
             .compareTo(required) < 0) {
             return CheckRecipeResultRegistry.insufficientStartupPower(required);
         }
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    /**
+     * Wireless-mode power setup for {@link ProcessingLogic}-driven modules. The module has no real
+     * energy hatches; the wireless network is the only power source.
+     */
+    protected void setupWirelessProcessingPowerLogic(ProcessingLogic logic) {
+        logic.setAvailableVoltage(Long.MAX_VALUE);
+        logic.setAvailableAmperage(1);
+        logic.setAmperageOC(false);
+    }
+
+    /**
+     * Runs one wireless recipe cycle through the inherited {@link ProcessingLogic}. Used by modules that
+     * want normal recipe lookup/parallel calculation but still pay from the GT wireless network.
+     */
+    protected CheckRecipeResult wirelessModeProcessOnce() {
+        if (processingLogic == null) return CheckRecipeResultRegistry.NO_RECIPE;
+
+        setupProcessingLogic(processingLogic);
+        setupWirelessProcessingPowerLogic(processingLogic);
+
+        CheckRecipeResult result = doCheckRecipe();
+        if (!result.wasSuccessful()) return result;
+
+        long calculatedEut = processingLogic.getCalculatedEut();
+        int duration = Math.max(1, processingLogic.getDuration());
+        BigInteger cost = BigInteger.valueOf(Math.max(0, calculatedEut))
+            .multiply(BigInteger.valueOf(duration));
+
+        if (cost.signum() > 0) {
+            if (ownerUUID == null || gregtech.common.misc.WirelessNetworkManager.getUserEU(ownerUUID)
+                .compareTo(cost) < 0) {
+                return CheckRecipeResultRegistry.insufficientStartupPower(cost);
+            }
+            if (!gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap(ownerUUID, cost.negate())) {
+                return CheckRecipeResultRegistry.insufficientStartupPower(cost);
+            }
+            costingEU = costingEU.add(cost);
+            costingEUText = String.valueOf(costingEU);
+        }
+
+        if (processingLogic.getOutputItems() != null) {
+            mOutputItems = ArrayUtils.addAll(mOutputItems, processingLogic.getOutputItems());
+        }
+        if (processingLogic.getOutputFluids() != null) {
+            mOutputFluids = ArrayUtils.addAll(mOutputFluids, processingLogic.getOutputFluids());
+        }
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    /**
+     * Runs up to {@code maxCycles} independent wireless recipe cycles. Each cycle may match a different
+     * recipe against the remaining inputs, giving cross-recipe parallelism.
+     */
+    protected CheckRecipeResult checkProcessingWirelessLoop(int maxCycles) {
+        costingEU = BigInteger.ZERO;
+        costingEUText = "0";
+        mOutputItems = null;
+        mOutputFluids = null;
+
+        CheckRecipeResult failure = CheckRecipeResultRegistry.NO_RECIPE;
+        boolean anySuccess = false;
+
+        startRecipeProcessing();
+        try {
+            for (int i = 0; i < maxCycles; i++) {
+                CheckRecipeResult result = wirelessModeProcessOnce();
+                if (!result.wasSuccessful()) {
+                    failure = result;
+                    break;
+                }
+                anySuccess = true;
+                updateSlots();
+            }
+        } finally {
+            endRecipeProcessing();
+        }
+
+        if (!anySuccess) {
+            return failure;
+        }
+
+        mEfficiency = 10000;
+        mEfficiencyIncrease = 10000;
+        mMaxProgresstime = 1;
+        lEUt = 0;
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 

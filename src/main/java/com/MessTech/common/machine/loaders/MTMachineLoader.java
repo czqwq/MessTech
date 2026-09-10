@@ -4,8 +4,10 @@ import static net.minecraft.util.StatCollector.translateToLocal;
 
 import com.MessTech.common.block.AdvAssMatrixBlock;
 import com.MessTech.common.block.AssMatrixBlock;
+import com.MessTech.common.machine.BosesCraftingArray;
 import com.MessTech.common.machine.MTAssFactory;
 import com.MessTech.common.machine.MTComputingCenter;
+import com.MessTech.common.machine.MTDBBFurnace;
 import com.MessTech.common.machine.MTDTPF;
 import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.MTNanoScaleFoundry;
@@ -14,6 +16,7 @@ import com.MessTech.common.machine.hatch.MTInventoryInputBusME;
 import com.MessTech.common.machine.hatch.MTInventoryInputHatchME;
 import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorInput;
 import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorOutput;
+import com.MessTech.common.machine.module.SpaceModuleAssemblerInfinity;
 import com.MessTech.common.machine.module.SpaceModuleMinerInfinity;
 import com.MessTech.common.machine.module.SpaceModulePumpInfinity;
 import com.MessTech.common.misc.MTItemList;
@@ -69,6 +72,12 @@ public class MTMachineLoader {
                 "Space Module Miner Infinity",
                 translateToLocal("machine.spacemoduleminer.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleMinerInfinity.get(1));
+        MTItemList.SpaceModuleAssemblerInfinity.set(
+            new SpaceModuleAssemblerInfinity(
+                MT_ID + 14,
+                "Space Module Assembler Infinity",
+                translateToLocal("machine.spacemoduleassembler.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleAssemblerInfinity.get(1));
         MTItemList.MTNQDAFReactor.set(
             new MTNQDAFReactor(
                 MT_ID + 6,
@@ -106,6 +115,18 @@ public class MTMachineLoader {
             new MTNanoScaleFoundry(MT_ID + 11, "Nano-Scale Foundry", translateToLocal("machine.nanoscale.name"))
                 .getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTNanoScaleFoundry.get(1));
+
+        MTItemList.MTDBBFurnace.set(
+            new MTDBBFurnace(MT_ID + 12, "Dimensionally Brick Furnace", translateToLocal("machine.dbbfurnace.name"))
+                .getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTDBBFurnace.get(1));
+
+        MTItemList.BosesCraftingArray.set(
+            new BosesCraftingArray(
+                MT_ID + 13,
+                "Boses Crafting Array",
+                translateToLocal("machine.bosescraftingarray.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.BosesCraftingArray.get(1));
 
         // Populate after the machine item list is set so the NEI handler can reference the catalyst.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();

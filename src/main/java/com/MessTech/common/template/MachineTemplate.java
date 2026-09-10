@@ -78,7 +78,7 @@ public class MachineTemplate extends MTMultiMachineBase<MachineTemplate> impleme
         .addElement(
             'A',
             HatchElementBuilder.<MachineTemplate>builder()
-                .anyOf(
+                .atLeast(
                     HatchElement.InputBus,
                     HatchElement.OutputBus,
                     HatchElement.InputHatch,

@@ -1,9 +1,12 @@
 package com.MessTech.common.recipe;
 
+import static com.MessTech.common.recipe.MTRecipeMaps.Steel_brick_Recipes;
 import static goodgenerator.loader.Loaders.compactFusionCoil;
 import static gregtech.api.casing.Casings.NanochipFirewallProjectionCasing;
 import static gregtech.api.casing.Casings.NanochipMeshInterfaceCasing;
 import static gregtech.api.enums.TierEU.RECIPE_IV;
+import static gregtech.api.enums.TierEU.RECIPE_LV;
+import static gregtech.api.enums.TierEU.RECIPE_MAX;
 import static gregtech.api.enums.TierEU.RECIPE_UEV;
 import static gregtech.api.enums.TierEU.RECIPE_UHV;
 import static gregtech.api.enums.TierEU.RECIPE_UIV;
@@ -16,14 +19,17 @@ import static gregtech.api.util.GTRecipeBuilder.INGOTS;
 import static gregtech.api.util.GTRecipeBuilder.MINUTES;
 import static gregtech.api.util.GTRecipeBuilder.STACKS;
 import static gregtech.api.util.GTRecipeConstants.AssemblyLine;
+import static gregtech.api.util.GTRecipeConstants.NANITE_TIERS;
 import static gregtech.api.util.GTRecipeConstants.RESEARCH_ITEM;
 import static gregtech.api.util.GTRecipeConstants.SCANNING;
 import static tectech.thing.CustomItemList.DATApipe;
+import static tectech.thing.CustomItemList.Machine_Multi_BECGenerator;
 import static tectech.thing.CustomItemList.Machine_Multi_Computer;
 import static tectech.thing.CustomItemList.Machine_Multi_DataBank;
 import static tectech.thing.CustomItemList.UncertaintyX_Hatch;
 import static tectech.thing.CustomItemList.rack_Hatch;
 
+import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 
@@ -33,10 +39,12 @@ import com.MessTech.common.misc.MTItemList;
 import goodgenerator.items.GGMaterial;
 import goodgenerator.loader.Loaders;
 import gregtech.api.casing.Casings;
+import gregtech.api.enums.CondensateType;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.ItemList;
 import gregtech.api.enums.Materials;
 import gregtech.api.enums.Mods;
+import gregtech.api.enums.NaniteTier;
 import gregtech.api.enums.OrePrefixes;
 import gregtech.api.enums.TierEU;
 import gregtech.api.util.GTModHandler;
@@ -49,6 +57,7 @@ import gtPlusPlus.core.material.MaterialsElements;
 import gtPlusPlus.xmod.gregtech.api.enums.GregtechItemList;
 import gtPlusPlus.xmod.thermalfoundation.fluid.TFFluids;
 import tectech.recipe.TTRecipeAdder;
+import tectech.recipe.TecTechRecipeMaps;
 import tectech.thing.CustomItemList;
 
 public class GTRecipes {
@@ -206,7 +215,7 @@ public class GTRecipes {
             ItemList.SpaceElevatorModuleMinerT3.get(1),
             16_777_216 * 2,
             16384,
-            (int) TierEU.RECIPE_MAX,
+            (int) RECIPE_MAX,
             1,
             new Object[] { ItemList.SpaceElevatorModuleMinerT3.get(64), ItemList.InfiniteFluidDrillingRig.get(64),
                 GTOreDictUnificator.get(OrePrefixes.frameGt, Materials.Universium, 16),
@@ -219,13 +228,13 @@ public class GTRecipes {
                 Materials.Universium.getMolten(144 * 2048), Materials.Eternity.getMolten(144 * 4096) },
             MTItemList.SpaceModuleMinerInfinity.get(1),
             20 * 6000,
-            (int) TierEU.RECIPE_MAX);
+            (int) RECIPE_MAX);
 
         TTRecipeAdder.addResearchableAssemblylineRecipe(
             ItemList.SpaceElevatorModulePumpT3.get(1),
             16_777_216 * 2,
             16384,
-            (int) TierEU.RECIPE_MAX,
+            (int) RECIPE_MAX,
             1,
             new Object[] { ItemList.SpaceElevatorModulePumpT3.get(64), ItemList.Sensor_UXV.get(64),
                 ItemList.Field_Generator_UXV.get(64), new Object[] { OrePrefixes.circuit.get(Materials.MAX), 16 },
@@ -238,7 +247,7 @@ public class GTRecipes {
                 Materials.SpaceTime.getMolten(144 * 4096) },
             MTItemList.SpaceModulePumpInfinity.get(1),
             20 * 6000,
-            (int) TierEU.RECIPE_MAX);
+            (int) RECIPE_MAX);
 
         TTRecipeAdder.addResearchableAssemblylineRecipe(
             new ItemStack(Loaders.AMGenerator.getItem(), 1, 32028),
@@ -352,5 +361,101 @@ public class GTRecipes {
             .eut(RECIPE_UIV)
             .duration(MINUTES)
             .addTo(compressorRecipes);
+
+        GTValues.RA.stdBuilder()
+            .circuit(1)
+            .itemInputs(new ItemStack(Items.iron_ingot, 1))
+            .itemOutputs(Materials.Steel.getIngots(1))
+            .eut(0)
+            .duration(1)
+            .addTo(Steel_brick_Recipes);
+
+        GTValues.RA.stdBuilder()
+            .itemInputs(Materials.Bronze.getPlates(4), new ItemStack(Items.brick, 1))
+            .itemOutputs(new ItemStack(Casings.BronzePlatedBricks.getItem(), 1, 10))
+            .eut(0)
+            .duration(1)
+            .addTo(Steel_brick_Recipes);
+
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.Machine_Bricked_BlastFurnace.get(64),
+                ItemList.Machine_Bricked_BlastFurnace.get(64),
+                ItemList.Machine_Bricked_BlastFurnace.get(64),
+                ItemList.Hull_Bronze_Bricks.get(64),
+                GTOreDictUnificator.get(OrePrefixes.gearGt, Materials.Bronze, 64),
+                GTOreDictUnificator.get(OrePrefixes.gearGtSmall, Materials.Bronze, 64),
+                new ItemStack(Items.brick, 64))
+            .circuit(1)
+            .fluidInputs(Materials.Bronze.getMolten(144 * 512))
+            .itemOutputs(MTItemList.MTDBBFurnace.get(1))
+            .eut(RECIPE_LV)
+            .duration(114514 * 20)
+            .addTo(assemblerRecipes);
+
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.SpaceElevatorModuleAssemblerT3.get(1),
+                GTOreDictUnificator.get(OrePrefixes.gearGt, Materials.Eternity, 16),
+                GTOreDictUnificator.get(OrePrefixes.gearGtSmall, Materials.Eternity, 8),
+                GTOreDictUnificator.get(OrePrefixes.gearGt, Materials.MagMatter, 16),
+                GTOreDictUnificator.get(OrePrefixes.gearGtSmall, Materials.MagMatter, 8),
+                GTOreDictUnificator.get(OrePrefixes.frameGt, Materials.Universium, 16),
+                GTOreDictUnificator.get(OrePrefixes.screw, Materials.Universium, 64),
+                ItemList.Robot_Arm_UXV.get(64),
+                new Object[] { OrePrefixes.circuit.get(Materials.UXV), 16 })
+            .fluidInputs(Materials.MHDCSM.getMolten(1145140))
+            .itemOutputs(MTItemList.SpaceModuleAssemblerInfinity.get(1))
+            .eut(RECIPE_UV)
+            .duration(1919810)
+            .addTo(assemblerRecipes);
+
+        addBec(
+            MTItemList.BosesCraftingArray.get(1),
+            new ItemStack[] { CustomItemList.Machine_Multi_BECAssembler.get(8),
+                CustomItemList.Machine_Multi_BECIONode.get(1), CustomItemList.Machine_Multi_BECStorage.get(1),
+                Machine_Multi_BECGenerator.get(1), ItemList.Robot_Arm_UMV.get(32), ItemList.Sensor_UMV.get(16),
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UXV, 16),
+                new ItemStack(Casings.CoherencePreservingPlasmaConduit.getItem(), 16),
+                new ItemStack(Casings.CondensateTransformativeCoil.getItem(), 16, 5),
+                new ItemStack(Casings.PeaceEnforcementCasing.getItem(), 16, 4),
+                new ItemStack(
+                    Casings.ElectromagneticallyIsolatedCasing.getItem(),
+                    16,
+                    Casings.ElectromagneticallyIsolatedCasing.getBlockMeta()),
+                CustomItemList.Pipe_BEC.get(64), GTOreDictUnificator.get(OrePrefixes.gearGt, Materials.SpaceTime, 8),
+                GTOreDictUnificator.get(OrePrefixes.gearGtSmall, Materials.SpaceTime, 16) },
+            nanites(1, 1, 4, 5, 1, 4, 1, 1, 4, 5, 1, 4, 4, 4),
+            new FluidStack[] { CondensateType.Infinity.getEntangled(1_080_000),
+                CondensateType.ChromaticGlass.getEntangled(2_001_600),
+                CondensateType.Neutronium.getEntangled(3_024_000), CondensateType.Bedrockium.getEntangled(4_032_000) },
+            10 * MINUTES,
+            TierEU.RECIPE_UIV);
     }
+
+    // BEC RECIPE REQUIRE THIS BUILDER
+    private static void addBec(ItemStack output, ItemStack[] inputs, NaniteTier[] nanites, FluidStack[] condensates,
+        int duration, long eut) {
+        GTValues.RA.stdBuilder()
+            .itemInputs(inputs)
+            .fluidInputs(condensates)
+            .itemOutputs(output)
+            .metadata(NANITE_TIERS, nanites)
+            .duration(duration)
+            .eut(eut)
+            .addTo(TecTechRecipeMaps.condensateAssemblingRecipes);
+    }
+
+    private static NaniteTier[] nanites(int... tiers) {
+        NaniteTier[] result = new NaniteTier[tiers.length];
+        for (int i = 0; i < tiers.length; i++) {
+            result[i] = TIER_TO_NANITE[tiers[i] - 1];
+        }
+        return result;
+    }
+
+    private static final NaniteTier[] TIER_TO_NANITE = { NaniteTier.Carbon, NaniteTier.Silver, NaniteTier.Gold,
+        NaniteTier.Transcendent, NaniteTier.SixPhasedCopper, NaniteTier.WhiteDwarf, NaniteTier.BlackDwarf,
+        NaniteTier.Universium, NaniteTier.Eternity, NaniteTier.MagMatter };
+
 }

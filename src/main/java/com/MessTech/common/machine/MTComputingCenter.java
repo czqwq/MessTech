@@ -152,7 +152,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         .addElement(
             'A',
             HatchElementBuilder.<MTComputingCenter>builder()
-                .anyOf(
+                .atLeast(
                     HatchElement.InputBus,
                     HatchElement.InputHatch,
                     HatchElement.OutputBus,
@@ -171,7 +171,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         .addElement(
             'D',
             HatchElementBuilder.<MTComputingCenter>builder()
-                .anyOf(CalculateMultiMachineBase.HatchElement.Rack)
+                .atLeast(CalculateMultiMachineBase.HatchElement.Rack)
                 .casingIndex(Casings.NanochipFirewallProjectionCasing.textureId)
                 .hint(2)
                 .buildAndChain(ofBlock(Casings.NanochipFirewallProjectionCasing.getBlock(), 4)))
@@ -181,7 +181,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         .addElement(
             'F',
             HatchElementBuilder.<MTComputingCenter>builder()
-                .anyOf(CalculateMultiMachineBase.HatchElement.Holder)
+                .atLeast(CalculateMultiMachineBase.HatchElement.Holder)
                 .casingIndex(Casings.NanochipMeshInterfaceCasing.textureId)
                 .hint(3)
                 .buildAndChain(StructureUtility.isAir()))

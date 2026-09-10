@@ -487,7 +487,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         .addElement(
             'D',
             HatchElementBuilder.<MTDTPF>builder()
-                .anyOf(
+                .atLeast(
                     HatchElement.InputBus,
                     HatchElement.OutputBus,
                     HatchElement.InputHatch,

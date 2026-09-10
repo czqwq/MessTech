@@ -20,12 +20,15 @@ public enum MTItemList {
     AdvAssMatrixBlock,
     SpaceModulePumpInfinity,
     SpaceModuleMinerInfinity,
+    SpaceModuleAssemblerInfinity,
     MTNQDAFReactor,
     MTInventoryInputBusME,
     MTInventoryInputHatchME,
     MTWirelessVacuumConveyorInput,
     MTWirelessVacuumConveyorOutput,
-    MTNanoScaleFoundry;
+    MTNanoScaleFoundry,
+    MTDBBFurnace,
+    BosesCraftingArray;
 
     private boolean mHasNotBeenSet;
     private boolean mDeprecated;
