@@ -27,8 +27,7 @@ public enum MTItemList {
     MTWirelessVacuumConveyorInput,
     MTWirelessVacuumConveyorOutput,
     MTNanoScaleFoundry,
-    MTDBBFurnace,
-    BosesCraftingArray;
+    MTDBBFurnace;
 
     private boolean mHasNotBeenSet;
     private boolean mDeprecated;

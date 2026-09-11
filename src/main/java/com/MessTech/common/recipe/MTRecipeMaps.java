@@ -33,7 +33,6 @@ import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTRecipeBuilder;
 import gregtech.api.util.GTUtility;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
-import tectech.recipe.BECAssemblyFrontend;
 
 /**
  * Custom recipe maps for MessTech machines.
@@ -212,22 +211,6 @@ public final class MTRecipeMaps {
         .neiHandlerInfo(
             builder -> builder.setDisplayStack(MTItemList.MTNanoScaleFoundry.get(1))
                 .setHeight(230))
-        .build();
-
-    /**
-     * Independent recipe pool for {@code BosesCraftingArray}.
-     * <p>
-     * BEC's assembling recipes store their original entangled condensate inputs in metadata and clear the
-     * real fluid input array. This pool is the converted version: entangled condensate is replaced 1:1 by
-     * its corresponding real source fluid/molten, while the nanite tier metadata is preserved.
-     */
-    public static final RecipeMap<RecipeMapBackend> bosesCraftingArrayRecipes = RecipeMapBuilder
-        .of("mt.recipe.boses_crafting_array")
-        .maxIO(16, 1, 4, 0)
-        .minInputs(1, 0)
-        .frontend(BECAssemblyFrontend::new)
-        .neiRecipeBackgroundSize(170, 90)
-        .neiHandlerInfo(builder -> builder.setDisplayStack(MTItemList.BosesCraftingArray.get(1)))
         .build();
 
     /**
