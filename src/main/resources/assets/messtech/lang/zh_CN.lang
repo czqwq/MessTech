@@ -139,7 +139,7 @@ machine.spacemoduleminer.tooltip.computation=运行需要消耗算力,并行会�
 machine.spacemoduleminer.tooltip.0=消耗无人机、钻头和等离子
 machine.spacemoduleminer.tooltip.1=需要太空电梯数据仓提供算力
 machine.spacemodulepump.tooltip.meme=稀！悉！吸！
-machine.spacemodulepump.tooltip.need_t5=需要§9MK-V§7加速轨道.
+machine.spacemodulepump.tooltip.need_t5=需要在搭载了加速轨道 MK-V的太空电梯上才能工作
 machine.spacemoduleassembler.name=无限太空组装模块
 machine.spacemoduleassembler.machinetype=太空组装模块
 machine.spacemoduleassembler.tooltip.meme=我！超！盒！
@@ -148,7 +148,7 @@ machine.spacemoduleassembler.tooltip.wireless=直接从无线电网取电，不�
 machine.spacemoduleassembler.tooltip.parallel=每道配方按 §bInt§7 并行处理，实际受输入数量限制.
 machine.spacemoduleassembler.tooltip.crossrecipe=每个工作周期自动跨配方并行，无需 GUI 配置.
 machine.spacemoduleassembler.tooltip.project=需要完成配方所需的太空项目与地点.
-machine.spacemodule.need_elevator_t5=需要轨道等级V的太空电梯
+machine.spacemodule.need_elevator_t5=需要在搭载了加速轨道 MK-V的太空电梯上才能工作
 GT5U.gui.text.recipe_result.insufficient_computation=算力不足
 
 # --- 硅岩湮灭场发电机 ---
