@@ -259,9 +259,6 @@ public class SpaceModuleAssemblerInfinity extends SpaceModuleInfinityBase<SpaceM
             .addInfo(
                 EnumChatFormatting.GREEN
                     + StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.crossrecipe"))
-            .addInfo(
-                EnumChatFormatting.GRAY
-                    + StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.project"))
             .beginStructureBlock(1, 5, 2, false)
             .addController(StatCollector.translateToLocal("gt.mbtt.structure.front_center_4th_layer"))
             // .addCasing("0-8", StatCollector.translateToLocal("gt.blockcasings.ig.0.name"), false)
