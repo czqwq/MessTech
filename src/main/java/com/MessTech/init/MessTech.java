@@ -29,6 +29,13 @@ public class MessTech {
     @SidedProxy(clientSide = "com.MessTech.init.ClientProxy", serverSide = "com.MessTech.init.CommonProxy")
     public static CommonProxy proxy;
 
+    /** The mod object itself; {@code EntityRegistry#registerModEntity} wants it. Set by FML's constructor call. */
+    public static MessTech instance;
+
+    public MessTech() {
+        instance = this;
+    }
+
     @Mod.EventHandler
     // preInit "Run before anything else. Read your config, create blocks, items, etc, and register them with the
     // GameRegistry." (Remove if not needed)

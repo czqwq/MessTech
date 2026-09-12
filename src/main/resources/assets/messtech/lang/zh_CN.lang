@@ -373,3 +373,29 @@ gt.rodTranscendentMetalDepleted.name=枯竭超时空金属燃料棒
 gt.rodTranscendentMetalDepleted2.name=枯竭超时空金属双联燃料棒
 gt.rodTranscendentMetalDepleted4.name=枯竭超时空金属四联燃料棒
 death.attack.damage.messtech.reactorExplode=%1$s 被 MessTech 反应堆熔毁气化了
+
+# --- 一只猪猪 ---
+item.messtech.piggy.plain.name=一只猪猪
+item.messtech.piggy.transcendentMetal.name=一只猪猪（超时空金属）
+item.messtech.piggy.infinity.name=一只猪猪（无尽）
+item.messtech.piggy.magMatter.name=一只猪猪（磁流体物质）
+item.messtech.piggy.eternity.name=一只猪猪（永恒）
+item.messtech.piggy.universium.name=一只猪猪（宇宙素）
+item.messtech.piggy.sixPhasedCopper.name=一只猪猪（六相铜）
+messtech.piggy.effect=材质
+messtech.piggy.tooltip=右键投掷，潜行 + 右键循环切换外观
+messtech.piggy.switched=材质已切换为 %s
+messtech.piggy.kill.failed=这只猪猪也啃不动 %s
+# 玩家被猪猪砸死时的死亡提示词（MTTrueKill.PiggyDamageSource 的 DEATH_MESSAGE_KEY）。%1$s 是玩家的名字。
+# 死亡提示词由客户端翻译，所以这条中文在 zh_CN，英文文本在同名的 en_US 键里。
+death.attack.messtech.piggy=%1$s被猪猪创飞了
+messtech.itemEffect.plain=普通
+messtech.itemEffect.transcendentMetal=超时空金属
+messtech.itemEffect.infinity=无尽
+messtech.itemEffect.magMatter=磁流体物质
+messtech.itemEffect.eternity=永恒
+messtech.itemEffect.universium=宇宙素
+messtech.itemEffect.sixPhasedCopper=六相铜
+# “PigTech” 动画（MTPigTechText）作用的字符串，改这里动画会跟着改。它显示在
+# messTech.addBy 那条静态的“添加模组:”之后，前缀本身不参与动画。
+messtech.pigTech=PigTech

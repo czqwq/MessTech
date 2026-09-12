@@ -98,12 +98,16 @@ public final class MTItems {
     public static final MTNACComponentItem nacComponentItem = new MTNACComponentItem();
     public static final ItemMessFood messFood = new ItemMessFood();
 
+    /** Decoration item whose look is cycled through the GT5U material effects (see {@code MTDynamicItemHelper}). */
+    public static final MTItemPiggy piggy = new MTItemPiggy();
+
     private MTItems() {}
 
     public static void registerItems() {
         GameRegistry.registerItem(meCreativeOreDisk, "MECreativeOreDisk");
         GameRegistry.registerItem(nacComponentItem, "MTNACComponentItem");
         GameRegistry.registerItem(messFood, "MessFood");
+        GameRegistry.registerItem(piggy, "MTItemPiggy");
         // The fuel rods extend GT's GTGenericItem, whose constructor already calls
         // GameRegistry.registerItem(this, "gt.<unlocalized>") (the same path GT's own rods use), so they must
         // not be registered here a second time.

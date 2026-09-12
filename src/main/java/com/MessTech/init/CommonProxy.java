@@ -3,11 +3,13 @@ package com.MessTech.init;
 import static com.MessTech.init.MessTech.MT_LOG;
 
 import com.MessTech.common.block.MTBlocks;
+import com.MessTech.common.entity.MTEntityPiggy;
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
 import com.MessTech.common.process.MTProcessHandler;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.recipe.RecipeMessFood;
+import com.MessTech.common.util.MTTrueKill;
 
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -23,6 +25,11 @@ public class CommonProxy {
     public void preInit(FMLPreInitializationEvent event) {
         Config.synchronizeConfiguration(event.getSuggestedConfigurationFile());
         MTItems.registerItems();
+        // The thrown "A Piggy" (ids are per mod, so the single entity of this mod is id 0).
+        MTEntityPiggy.register();
+        // The piggy's true kill needs to know whether a death path really ran (see MTTrueKill), so it watches the
+        // death event of the game.
+        MTTrueKill.init();
         MTProcessHandler.init();
         if (Loader.isModLoaded("Torcherino")) {
             MT_LOG.info("拿火把捅你皮撅子");

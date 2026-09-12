@@ -369,3 +369,29 @@ gt.rodTranscendentMetalDepleted.name=Fuel Rod (Depleted Transcendent Metal)
 gt.rodTranscendentMetalDepleted2.name=Dual Fuel Rod (Depleted Transcendent Metal)
 gt.rodTranscendentMetalDepleted4.name=Quad Fuel Rod (Depleted Transcendent Metal)
 death.attack.damage.messtech.reactorExplode=%1$s was vaporized by a MessTech reactor meltdown
+
+# --- A Piggy ---
+item.messtech.piggy.plain.name=A Piggy
+item.messtech.piggy.transcendentMetal.name=A Piggy (Transcendent Metal)
+item.messtech.piggy.infinity.name=A Piggy (Infinity)
+item.messtech.piggy.magMatter.name=A Piggy (MagMatter)
+item.messtech.piggy.eternity.name=A Piggy (Eternity)
+item.messtech.piggy.universium.name=A Piggy (Universium)
+item.messtech.piggy.sixPhasedCopper.name=A Piggy (Six-Phased Copper)
+messtech.piggy.effect=Material
+messtech.piggy.tooltip=Right click throws it, shift + right click cycles the look
+messtech.piggy.switched=Material switched to %s
+messtech.piggy.kill.failed=Even the piggy cannot chew through %s
+# The death message of a player the piggy kills (DEATH_MESSAGE_KEY of MTTrueKill.PiggyDamageSource). %1$s is the name
+# of the victim; death messages are translated on the client, so this is what an English client reads.
+death.attack.messtech.piggy=%1$s was knocked flying by a Piggy
+messtech.itemEffect.plain=Plain
+messtech.itemEffect.transcendentMetal=Transcendent Metal
+messtech.itemEffect.infinity=Infinity
+messtech.itemEffect.magMatter=MagMatter
+messtech.itemEffect.eternity=Eternity
+messtech.itemEffect.universium=Universium
+messtech.itemEffect.sixPhasedCopper=Six-Phased Copper
+# The string the "PigTech" animation (MTPigTechText) animates; edit it and the animation follows. It is shown behind
+# the static "Add by:" prefix of messTech.addBy, which is not animated.
+messtech.pigTech=PigTech
