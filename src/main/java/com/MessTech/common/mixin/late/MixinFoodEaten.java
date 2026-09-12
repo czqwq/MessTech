@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import com.MessTech.common.item.MessFoodHelper;
+import com.MessTech.common.items.MessFoodHelper;
 
 import squeek.spiceoflife.foodtracker.FoodEaten;
 

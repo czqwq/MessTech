@@ -1,6 +1,6 @@
 package com.MessTech.common.nei;
 
-import com.MessTech.common.misc.MTItemList;
+import com.MessTech.common.items.MTItemList;
 
 import codechicken.nei.api.API;
 import codechicken.nei.api.IConfigureNEI;

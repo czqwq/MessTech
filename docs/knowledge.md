@@ -12,7 +12,7 @@ compressed/removed. See also `repo-readme.md` (own-code notes) and `GT5U-NOTES.m
 - Machine registration: `com.MessTech.common.machine.loaders.MTMachineLoader.loadMachines()` called in
   `CommonProxy.postInit()`.
 - Block registration: `com.MessTech.common.block.MTBlocks.registerBlocks()` called before machine loading.
-- Item list enum: `com.MessTech.common.misc.MTItemList` (GT-style ItemList pattern).
+- Item list enum: `com.MessTech.common.item.MTItemList` (GT-style ItemList pattern).
 - Machine IDs: MTDTPF = 32400, MTComputingCenter = 32401, MTHatchRack = 32402, MTAssFactory = 32403.
 - Language files: `src/main/resources/assets/messtech/lang/{en_US,zh_CN}.lang`.
 

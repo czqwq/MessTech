@@ -13,10 +13,13 @@ import static gregtech.api.enums.TierEU.RECIPE_UIV;
 import static gregtech.api.enums.TierEU.RECIPE_UV;
 import static gregtech.api.enums.TierEU.RECIPE_ZPM;
 import static gregtech.api.recipe.RecipeMaps.assemblerRecipes;
+import static gregtech.api.recipe.RecipeMaps.cannerRecipes;
+import static gregtech.api.recipe.RecipeMaps.centrifugeRecipes;
 import static gregtech.api.recipe.RecipeMaps.compressorRecipes;
 import static gregtech.api.util.GTRecipeBuilder.HOURS;
 import static gregtech.api.util.GTRecipeBuilder.INGOTS;
 import static gregtech.api.util.GTRecipeBuilder.MINUTES;
+import static gregtech.api.util.GTRecipeBuilder.SECONDS;
 import static gregtech.api.util.GTRecipeBuilder.STACKS;
 import static gregtech.api.util.GTRecipeConstants.AssemblyLine;
 import static gregtech.api.util.GTRecipeConstants.NANITE_TIERS;
@@ -29,12 +32,15 @@ import static tectech.thing.CustomItemList.Machine_Multi_DataBank;
 import static tectech.thing.CustomItemList.UncertaintyX_Hatch;
 import static tectech.thing.CustomItemList.rack_Hatch;
 
+import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 
-import com.MessTech.common.item.MTNACComponentItems;
-import com.MessTech.common.misc.MTItemList;
+import com.MessTech.common.items.MTItemList;
+import com.MessTech.common.items.MTItems;
+import com.MessTech.common.items.MTNACComponentItems;
+import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
 
 import goodgenerator.items.GGMaterial;
 import goodgenerator.loader.Loaders;
@@ -49,6 +55,7 @@ import gregtech.api.enums.OrePrefixes;
 import gregtech.api.enums.TierEU;
 import gregtech.api.util.GTModHandler;
 import gregtech.api.util.GTOreDictUnificator;
+import gregtech.api.util.GTUtility;
 import gregtech.api.util.recipe.Scanning;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
 import gtPlusPlus.core.material.MaterialMisc;
@@ -56,6 +63,7 @@ import gtPlusPlus.core.material.MaterialsAlloy;
 import gtPlusPlus.core.material.MaterialsElements;
 import gtPlusPlus.xmod.gregtech.api.enums.GregtechItemList;
 import gtPlusPlus.xmod.thermalfoundation.fluid.TFFluids;
+import ic2.core.Ic2Items;
 import tectech.recipe.TTRecipeAdder;
 import tectech.recipe.TecTechRecipeMaps;
 import tectech.thing.CustomItemList;
@@ -431,6 +439,132 @@ public class GTRecipes {
                 CondensateType.Neutronium.getEntangled(3_024_000), CondensateType.Bedrockium.getEntangled(4_032_000) },
             10 * MINUTES,
             TierEU.RECIPE_UIV);
+
+        addReactorRecipes();
+    }
+
+    /**
+     * Nuclear reactor parts: reactor access hatches, heat control hatches, the controller and the Transcendent Metal
+     * fuel rods. The hatch recipes are one assembler recipe per tier (EV..UIV); the single rod is made in the canning
+     * machine from The Core and Avaritia Star Fuel, the dual/quad rods in the UIV assembler (same shape as GT's own
+     * fission fuel rod recipes in {@code FissionFuelLoader}).
+     */
+    private static void addReactorRecipes() {
+        for (int i = 0; i < MTItemList.REACTOR_ACCESS_HATCHES.length; i++) {
+            int tier = MTReactorAccessHatch.MIN_TIER + i;
+            long eut = TIER_RECIPE_EU[tier];
+
+            // Access hatch: tier casing + lever + 4 tier circuits.
+            GTValues.RA.stdBuilder()
+                .itemInputs(
+                    ItemList.MACHINE_CASINGS[tier].get(1),
+                    new ItemStack(Blocks.lever, 1),
+                    new Object[] { OrePrefixes.circuit.get(TIER_CIRCUIT_MATERIALS[tier]), 4 })
+                .circuit(1)
+                .itemOutputs(MTItemList.REACTOR_ACCESS_HATCHES[i].get(1))
+                .eut(eut)
+                .duration(MINUTES * 2)
+                .addTo(assemblerRecipes);
+
+            // Heat control hatch: tier casing + 4 solid steel casings + 4 tier circuits.
+            GTValues.RA.stdBuilder()
+                .itemInputs(
+                    ItemList.MACHINE_CASINGS[tier].get(1),
+                    ItemList.Casing_SolidSteel.get(4),
+                    new Object[] { OrePrefixes.circuit.get(TIER_CIRCUIT_MATERIALS[tier]), 4 })
+                .circuit(2)
+                .itemOutputs(MTItemList.REACTOR_HEAT_HATCHES[i].get(1))
+                .eut(eut)
+                .duration(MINUTES * 2)
+                .addTo(assemblerRecipes);
+        }
+
+        // Reactor controller: 16 solid steel casings, 16 IC2 nuclear reactors, 64 IC2 reactor chambers, molten lead.
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.Casing_SolidSteel.get(16),
+                GTUtility.copyAmount(16, Ic2Items.nuclearReactor),
+                GTUtility.copyAmount(64, Ic2Items.reactorChamber))
+            .circuit(1)
+            .fluidInputs(Materials.Lead.getMolten(144 * 256))
+            .itemOutputs(MTItemList.MTReactor.get(1))
+            .eut(TierEU.RECIPE_EV)
+            .duration(MINUTES * 2)
+            .addTo(assemblerRecipes);
+
+        // Single rod: The Core + Avaritia Star Fuel ("Resource" meta 8) in the canning machine.
+        if (Mods.Avaritia.isModLoaded()) {
+            GTValues.RA.stdBuilder()
+                .itemInputs(ItemList.RodNaquadah32.get(1), GTModHandler.getModItem(Mods.Avaritia.ID, "Resource", 1, 8))
+                .fluidInputs(Materials.TranscendentMetal.getMolten(INGOTS * 4))
+                .itemOutputs(new ItemStack(MTItems.rodTranscendentMetal, 1))
+                .eut(RECIPE_UEV)
+                .duration(32 * SECONDS)
+                .addTo(cannerRecipes);
+        }
+
+        // Dual rod: 2 single rods + 4 transcendent sticks.
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                new ItemStack(MTItems.rodTranscendentMetal, 2),
+                GTOreDictUnificator.get(OrePrefixes.stick, Materials.TranscendentMetal, 4))
+            .circuit(2)
+            .itemOutputs(new ItemStack(MTItems.rodTranscendentMetal2, 1))
+            .eut(RECIPE_UIV)
+            .duration(100 * SECONDS)
+            .addTo(assemblerRecipes);
+
+        // Quad rod (main recipe): 4 single rods + 6 long transcendent sticks.
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                new ItemStack(MTItems.rodTranscendentMetal, 4),
+                GTOreDictUnificator.get(OrePrefixes.stickLong, Materials.TranscendentMetal, 6))
+            .circuit(4)
+            .itemOutputs(new ItemStack(MTItems.rodTranscendentMetal4, 1))
+            .eut(RECIPE_UIV)
+            .duration(100 * SECONDS)
+            .addTo(assemblerRecipes);
+
+        // Quad rod (alternative recipe): 2 dual rods + 2 long transcendent sticks.
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                new ItemStack(MTItems.rodTranscendentMetal2, 2),
+                GTOreDictUnificator.get(OrePrefixes.stickLong, Materials.TranscendentMetal, 2))
+            .itemOutputs(new ItemStack(MTItems.rodTranscendentMetal4, 1))
+            .eut(RECIPE_UIV)
+            .duration(50 * SECONDS)
+            .addTo(assemblerRecipes);
+
+        // Depleted rods: centrifuge recycling, scaled with the rod size (single 1x / dual 2x / quad 4x).
+        addDepletedRodRecycling(new ItemStack(MTItems.rodTranscendentMetalDepleted, 1), 1, 50 * SECONDS);
+        addDepletedRodRecycling(new ItemStack(MTItems.rodTranscendentMetalDepleted2, 1), 2, 100 * SECONDS);
+        addDepletedRodRecycling(new ItemStack(MTItems.rodTranscendentMetalDepleted4, 1), 4, 200 * SECONDS);
+    }
+
+    /**
+     * Centrifuge recycling for one depleted Transcendent Metal rod, following GT's own depleted naquadah rod
+     * recycling (same output chances): the fuel itself is burned off, so the player gets back the tungstensteel
+     * frame, the naquadah family remains and a part of the rod shell as Transcendent Metal dust.
+     *
+     * @param rod        the depleted rod (stack size is ignored, the recipe always consumes one)
+     * @param multiplier 1 for a single, 2 for a dual and 4 for a quad rod
+     * @param duration   recipe duration in ticks
+     */
+    private static void addDepletedRodRecycling(ItemStack rod, int multiplier, int duration) {
+        GTValues.RA.stdBuilder()
+            .itemInputs(rod)
+            .itemOutputs(
+                Materials.TranscendentMetal.getDust(4 * multiplier),
+                Materials.Naquadah.getDust(8 * multiplier),
+                Materials.Naquadah.getDust(8 * multiplier),
+                Materials.Naquadria.getDustSmall(4 * multiplier),
+                Materials.NaquadahEnriched.getDustTiny(8 * multiplier),
+                Materials.TungstenSteel.getDust(16 * multiplier),
+                Materials.Platinum.getDust(2 * multiplier))
+            .outputChances(100_00, 100_00, 50_00, 50_00, 25_00, 100_00, 100_00)
+            .duration(duration)
+            .eut(RECIPE_UIV)
+            .addTo(centrifugeRecipes);
     }
 
     // BEC RECIPE REQUIRE THIS BUILDER
@@ -457,5 +591,16 @@ public class GTRecipes {
     private static final NaniteTier[] TIER_TO_NANITE = { NaniteTier.Carbon, NaniteTier.Silver, NaniteTier.Gold,
         NaniteTier.Transcendent, NaniteTier.SixPhasedCopper, NaniteTier.WhiteDwarf, NaniteTier.BlackDwarf,
         NaniteTier.Universium, NaniteTier.Eternity, NaniteTier.MagMatter };
+
+    /** Recipe EU/t of every voltage tier (GT's {@code TierEU.RECIPE_*} convention), indexed by tier. */
+    private static final long[] TIER_RECIPE_EU = { TierEU.RECIPE_ULV, TierEU.RECIPE_LV, TierEU.RECIPE_MV,
+        TierEU.RECIPE_HV, TierEU.RECIPE_EV, TierEU.RECIPE_IV, TierEU.RECIPE_LuV, TierEU.RECIPE_ZPM, TierEU.RECIPE_UV,
+        TierEU.RECIPE_UHV, TierEU.RECIPE_UEV, TierEU.RECIPE_UIV, TierEU.RECIPE_UMV, TierEU.RECIPE_UXV,
+        TierEU.RECIPE_MAX };
+
+    /** Circuit material of every voltage tier, the same mapping GT uses for its machine recipes. */
+    private static final Materials[] TIER_CIRCUIT_MATERIALS = { Materials.ULV, Materials.LV, Materials.MV, Materials.HV,
+        Materials.EV, Materials.IV, Materials.LuV, Materials.ZPM, Materials.UV, Materials.UHV, Materials.UEV,
+        Materials.UIV, Materials.UMV, Materials.UXV, Materials.MAX };
 
 }

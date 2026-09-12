@@ -4,6 +4,7 @@ import static net.minecraft.util.StatCollector.translateToLocal;
 
 import com.MessTech.common.block.AdvAssMatrixBlock;
 import com.MessTech.common.block.AssMatrixBlock;
+import com.MessTech.common.items.MTItemList;
 import com.MessTech.common.machine.BosesCraftingArray;
 import com.MessTech.common.machine.MTAssFactory;
 import com.MessTech.common.machine.MTComputingCenter;
@@ -11,18 +12,21 @@ import com.MessTech.common.machine.MTDBBFurnace;
 import com.MessTech.common.machine.MTDTPF;
 import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.MTNanoScaleFoundry;
+import com.MessTech.common.machine.MTReactor;
 import com.MessTech.common.machine.hatch.MTHatchRack;
 import com.MessTech.common.machine.hatch.MTInventoryInputBusME;
 import com.MessTech.common.machine.hatch.MTInventoryInputHatchME;
+import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
+import com.MessTech.common.machine.hatch.MTReactorHeatHatch;
 import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorInput;
 import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorOutput;
 import com.MessTech.common.machine.module.SpaceModuleAssemblerInfinity;
 import com.MessTech.common.machine.module.SpaceModuleMinerInfinity;
 import com.MessTech.common.machine.module.SpaceModulePumpInfinity;
-import com.MessTech.common.misc.MTItemList;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.util.AuthorDynamic;
 
+import gregtech.api.enums.GTValues;
 import tectech.thing.metaTileEntity.hatch.MTEHatchRack;
 
 public class MTMachineLoader {
@@ -127,6 +131,39 @@ public class MTMachineLoader {
                 "Boses Crafting Array",
                 translateToLocal("machine.bosescraftingarray.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.BosesCraftingArray.get(1));
+
+        MTItemList.MTReactor
+            .set(new MTReactor(MT_ID + 15, "MTReactor", translateToLocal("machine.mtreactor.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTReactor.get(1));
+
+        // Reactor access hatches: one variant per tier, EV (1 page) through UIV (8 pages).
+        for (int i = 0; i < MTItemList.REACTOR_ACCESS_HATCHES.length; i++) {
+            int tier = MTReactorAccessHatch.MIN_TIER + i;
+            String tierName = GTValues.VN[tier];
+            MTItemList item = MTItemList.REACTOR_ACCESS_HATCHES[i];
+            item.set(
+                new MTReactorAccessHatch(
+                    MT_ID + 16 + i,
+                    "MTReactorAccessHatch_" + tierName,
+                    translateToLocal("machine.mtreactor.accesshatch.name") + " (" + tierName + ")",
+                    tier).getStackForm(1L));
+            AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
+        }
+
+        // Reactor heat control hatches: one variant per tier, setting the reactor heat ceiling (EV 10k ... UIV int
+        // max).
+        for (int i = 0; i < MTItemList.REACTOR_HEAT_HATCHES.length; i++) {
+            int tier = MTReactorHeatHatch.MIN_TIER + i;
+            String tierName = GTValues.VN[tier];
+            MTItemList item = MTItemList.REACTOR_HEAT_HATCHES[i];
+            item.set(
+                new MTReactorHeatHatch(
+                    MT_ID + 24 + i,
+                    "MTReactorHeatHatch_" + tierName,
+                    translateToLocal("machine.mtreactor.heathatch.name") + " (" + tierName + ")",
+                    tier).getStackForm(1L));
+            AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
+        }
 
         // Populate after the machine item list is set so the NEI handler can reference the catalyst.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();

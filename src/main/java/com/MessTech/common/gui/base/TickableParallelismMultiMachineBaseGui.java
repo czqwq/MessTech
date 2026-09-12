@@ -14,15 +14,15 @@ import com.cleanroommc.modularui.widgets.TextWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 
 import gregtech.api.modularui2.GTGuiTextures;
-import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 
 /**
  * Base GUI for {@link TickableParallelismAcrossMultiMachineBase} machines.
  * <p>
- * Shows one MUI2 progress bar per thread, enabled only while that thread is active.
+ * Shows one MUI2 progress bar per thread, enabled only while that thread is active. The MT logo comes from
+ * {@link MTMultiMachineBaseGui}.
  */
 public class TickableParallelismMultiMachineBaseGui<T extends TickableParallelismAcrossMultiMachineBase<T>>
-    extends MTEMultiBlockBaseGui<T> {
+    extends MTMultiMachineBaseGui<T> {
 
     public TickableParallelismMultiMachineBaseGui(T multiblock) {
         super(multiblock);

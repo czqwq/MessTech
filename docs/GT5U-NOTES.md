@@ -3,6 +3,29 @@
 > What was learned while implementing `MTDTPF`, distilled so future machines can be written
 > (and debugged) without re-reading the whole monorepo.
 
+## 0. Local reference source trees (offline lookup)
+
+The workspace already contains decompiled/source copies of the common dependencies. **Check these local paths
+first** when verifying API behaviour instead of guessing:
+
+| Path | Contents / use |
+|---|---|
+| `tmp/GT5-Unofficial-5.09.54.133/` | **GT5U source matching the current compile dependency** (5.09.54.133); first choice for `gregtech.api.*` / `gregtech.common.*` |
+| `tmp/GT5-Unofficial-master/` | GT5U master-branch snapshot, **noticeably older than the versioned 5.09.54.133**; historical/diff reference only — always verify against `tmp/GT5-Unofficial-5.09.54.133/` |
+| `tmp/ic2-decompiled/`, `tmp/ic2-src/` | Decompiled IC2 source incl. `ic2.core.*` internals (`ItemReactorUranium`, `ItemReactorHeatStorage`, `TileEntityNuclearReactorElectric`, ...) |
+| `build/rfg/minecraft-src/java/` | **Forge + Minecraft 1.7.10 decompiled source** (`net.minecraft.*` such as `RenderItem`, `ItemRenderer`, `FontRenderer`, plus `cpw.mods.fml.*`) |
+| `build/rfg/minecraft-src/resources/` | Vanilla MC assets |
+| `tmp/GTNHLib-master/` | GTNHLib source (`ItemRenderUtil`, `ItemRenderUtils`, `TexturedItemRenderer`, `AnimatedTooltipHandler`) |
+| `tmp/ModularUI2-master/` | ModularUI2 source (widgets, sync handlers, animation, slot layout) |
+| `tmp/NotEnoughItems-master/` | NEI source (how NEI invokes `IItemRenderer`, item preview, ...) |
+| `tmp/waila-master/` | Waila source (`getWailaBody`, ...) |
+| `tmp/StructureLib-master/` | StructureLib source (multiblock structure matching) |
+| `tmp/NewHorizonsCoreMod-2.9.61/`, `tmp/AppleCore-master/`, `tmp/SpiceOfLife-master/`, `tmp/Applied-Energistics-2-Unofficial-rv3-beta-1050-GTNH/`, `tmp/Twist-Space-Technology-Mod-main/`, `tmp/BlockRenderer6343-master/`, `tmp/UniMixins-0.3.1/` | Other reference implementations (recipes, compat, rendering, ...) |
+| `tmp/FuelRod_backup/`, `tmp/fuelrod_recolor/` | Transcendent Metal fuel rod texture sources and recolour intermediates (PNG / rgba data) |
+
+> Unpacking/decompiling other dependencies (e.g. the IC2 jar):
+> `java -cp tools/java-decompiler.jar org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler -dgs=true <in.jar> <outDir>`
+
 ## 1. The project layout
 
 `tmp/GT5-Unofficial-master` is a **monorepo**: many "mods" live inside it as plain packages
@@ -160,6 +183,17 @@ All "at least" checks return `false` when the machine is `INVALID` (unformed). T
 * Add the keys to **your own** lang files (`assets/<modid>/lang/en_US.lang`, `zh_CN.lang`).
   `%1$s`/`%2$s` are the argument slots (see `structure.error.tier_mismatch`).
 * Do the `errors.add(...); return;` dance for fatal problems; hatch-count errors just append.
+* **The GUI only shows the list if the terminal widget contains it.**
+  `MTEMultiBlockBaseGui.createTerminalTextWidget()` puts `createStructureErrorWidget(syncManager)` into the
+  terminal flow. A machine that overrides `createTerminalTextWidget()` (as `MTReactorGui` does) silently drops
+  every detailed structure error and only shows whatever the override itself draws — the reactor then showed a
+  generic "incomplete structure" line while `missing_access_hatch` / `missing_heat_hatch` were in the error list
+  all along. Fix: append `.child(createStructureErrorWidget(syncManager))` to your own terminal list as well.
+  The widget is gated on `shouldDisplayShutDownReason() && !isActive && !isAllowedToWork()`, so it appears after
+  the controller stopped itself with `STRUCTURE_INCOMPLETE` (that shutdown calls `disableWorking()`).
+* A hatch-count error for a *custom* (non-`HatchElement`) hatch: use
+  `StructureErrors.of("your.missing_key")` / `StructureErrors.of("your.too_many_key")` and check
+  `list.isEmpty()` / `list.size() > 1` in `checkMachine(..., List<StructureError> errors)`.
 
 ## 9. Construct / survival construct offsets
 
@@ -474,3 +508,125 @@ GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
 * `WirelessNetworkManager` helpers: `processInitialSettings` (owner UUID), `getUserEU`, `addEUToGlobalEnergyMap`.
   Safe wireless order: validate balance first (`checkWirelessPower`/`validateWirelessPowerForRecipe`), then
   `startWirelessRecipe` deducts and consumes inputs.
+
+## 14. MessTech's IC2/GT fuel rods (Transcendent Metal)
+
+* Classes:
+  * `com.MessTech.common.items.MTFuelRod extends gregtech.api.items.ItemRadioactiveCellIC` — burnable rods.
+  * `com.MessTech.common.items.MTDepletedFuelRod extends gregtech.common.items.ItemDepletedCell` — inert rods.
+  * `com.MessTech.common.items.MTFuelRodItemRenderer` — client `IItemRenderer`; copies
+    `TranscendentalMetaItemRenderer`'s oblique-axis tumble (3.5 deg per client tick around (0.3, 0.5, 0.2),
+    then 180 deg around X, pivot = quad centre; angle from `GTMod.clientProxy().getAnimationRenderTicks()`).
+  * Instances + stats live in `com.MessTech.common.items.MTItems` (region "Transcendent Metal fuel rods").
+* Why extend GT instead of IC2: `ItemReactorUranium`'s constructor needs an IC2 `InternalName` and hardcodes the
+  IC2 depleted stacks, while `ItemRadioactiveCellIC` is the public addon API: custom depleted `ItemStack`,
+  `IReactorComponent`, radiation, NBT `advDmg` + vanilla 0..99 damage bar, and the NEI nuclear fake recipe.
+* Registration gotcha: `GTGenericItem`'s constructor already calls
+  `GameRegistry.registerItem(this, "gt." + aUnlocalized)` (the 3-arg FML method ignores its modId in 1.7.10),
+  so the rods must NOT be registered again in `MTItems.registerItems()`. Display name / lang key:
+  `gt.rodTranscendentMetal.name` (and `...2` / `...4` / `...Depleted...`).
+* Current stats (`MTItems`): `maxDamage 250_000`, `radiation 32`, `MOX=true`, `heatBonus=2`,
+  **`heat 4_096`** and one energy per size — `ENERGY_SINGLE 9_000_000`, `ENERGY_DUAL 4_500_000`,
+  `ENERGY_QUAD 3_000_000`. MTReactor formulas: `output += pulses * sEnergy`, `EU/t = output * 5`;
+  a lone rod adds `1 + cells / 2` pulses on each of its `cells` passes, so
+  `EU/t = sEnergy * cells * (1 + cells / 2) * 5` → **single 45,000,000 / dual 90,000,000 / quad 180,000,000 EU/t**
+  (exact 1x/2x/4x scaling, the single rod is 1.34A UIV). The same formula is what the NEI nuclear fake recipe
+  prints, so the tooltip numbers match the real output.
+  Heat per cycle is `cells * triangular(1 + cells / 2) * sHeat` → 4,096 / 24,576 / 98,304 HU/s bare, which a
+  single `ItemList.neutroniumHeatCapacitor` (1G Neutronium Heat Capacitor, 1,000,000,000 HU) buffers for ~2.8 h.
+* `MTReactorAccessHatch.isFuelRod` was widened to `ItemReactorUranium || (ItemRadioactiveCell
+  && !ItemDepletedCell)` so GT-style rods also get the fuel durability line in the slot sub-panel.
+
+## 15. MTReactor heat control hatch (`MTReactorHeatHatch`)
+
+* `com.MessTech.common.machine.hatch.MTReactorHeatHatch extends MTEHatch` — no inventory (0 slots, like
+  `MTEHatchMuffler`), tier EV..UIV, front decal
+  `assets/messtech/textures/blocks/hatch/Hatch_Reactor_Temp_Control.png` (base texture = multiblock casing,
+  same `updateTexture(aBaseCasingIndex)` + `withOverlay` pattern as `MTReactorAccessHatch`).
+* Heat ceilings (`HEAT_CAPACITY`, index `tier - MIN_TIER`): EV 10,000 / IV 20,000 / LuV 50,000 / ZPM 100,000 /
+  UV 200,000 / UHV 500,000 / UEV 1,000,000 / **UIV `Integer.MAX_VALUE`**. EV equals the old hardcoded default.
+* Structure: registered as another custom `IHatchElement` (`MTReactor.REACTOR_HEAT_HATCH`, `name() =
+  "mt_reactor_heat_hatch"`, `count()` = `getReactorHeatHatchCount()`) and added to the `'C'`
+  `HatchElementBuilder.atLeast(...)` group, so it can go on any of the 0-25 casings of the shell.
+  `checkMachine()` requires **exactly one**: empty → `missing_heat_hatch`, `size() > 1` → `too_many_heat_hatch`
+  (both are our own lang keys; a duplicate hatch cannot be resolved by picking one, so it is a structure error).
+* The hatch sets the heat ceiling of the reactor: `MTReactor.getReactorHeatCapacity()` returns the (lowest)
+  hatch value or `DEFAULT_HEAT_CAPACITY = 10,000` while the structure is broken.
+  `ReactorContext.bind()` / `bindSimulation()` seed `maxHeat` with it, and **`ReactorContext.setMaxHeat()` is a
+  no-op on purpose** — in IC2 reactor plating (`ItemReactorHeatStorage`) raises `maxHeat` through that call, but
+  here the hatch is the only thing that may set the ceiling, so plating no longer stacks. If plating should stack
+  again, change that no-op back to `this.maxHeat = newMaxHeat` and start `maxHeat` from the hatch value.
+* Explosion/stability math is unchanged: `calculateHeatEffects()` does `power = heat / maxHeat` with the hatch
+  value, so `>= 1.0F` explodes and `>= 0.85F` ignites the surroundings.
+* **The heat effects never replace a block** (the IC2 code they were copied from did): the `>= 0.85F` branch only
+  places `Blocks.fire` into **air** (`isAir` check), the `Blocks.flowing_lava` replacement is gone. In IC2 that
+  branch turned any non-air block into fire or lava — GT casings use their own `MaterialCasings`, so they became
+  fire and stone/ground became lava, which ate the reactor's own casings/hatches and dissolved the multiblock.
+  Fire in an air block cannot break the structure: every structure position requires a specific non-air block and
+  the unchecked `' '` positions ignore the block. The `>= 0.5F` water removal and the `>= 0.4F` wood/leaves/cloth
+  ignition are kept (they can never touch a casing/hatch).
+* Explosion power is **IC2's number remapped onto the Draconic Evolution scale**: `explodeReactor()` still mirrors
+  IC2's `explode()` (start at 10, add every component's `influenceExplosion`, multiply the `0 < influence < 1` ones
+  into `boomMod`, then `* hem * boomMod`) and clamps the result to `IC2_EXPLOSION_POWER_LIMIT = 45` (IC2's own
+  `protection/reactorExplosionPowerLimit` default — the config is **not** read, no IC2 dependency/mixin), but the
+  blast itself is now `MTExplosionDE`:
+  `dePower = min(boomPower, 45) / 45 * Config.REACTOR_EXPLOSION_DE_POWER_LIMIT` (default 40, `Reactor` category).
+  `explodeMultiblock()` + `doExplosion(GTValues.V[8])` on the access hatches still remove the machine itself first.
+* **Why IC2's `ExplosionIC2` was dropped** (it looked like a "powerless" explosion in game): IC2 shoots
+  `2 * steps^2` rays with `steps = ceil(pi / atan(0.4 / power))`, i.e. ~250k rays at power 45 but ~**25 million** at
+  power 450, each ray stepping through the blocks until its energy runs out (up to 900 blocks in air). The whole
+  destruction list is only written back *after* every ray finished, so a 450 power IC2 explosion freezes the server
+  for minutes and effectively removes nothing — the only blocks the player sees vanishing are the small
+  `doExplosion(V[8])` craters from the controller/hatches. DE's algorithm scales instead: one ring per tick, one
+  column per ring block.
+* `MTExplosionDE` / `MTExplosionDETrace` are a 1:1 port of Draconic Evolution's `ReactorExplosion` /
+  `ReactorExplosionTrace` (+ its `IProcess` / `ProcessHandler`, kept as `IMTProcess` / `MTProcessHandler` and ticked
+  on `TickEvent.ServerTickEvent`): the ring expands to `power * 10` blocks of radius, every ring block spawns a
+  column trace that blasts its column downwards (`energy = power * 10`, resisted per block, fire/lava puddles at the
+  end) and then upwards (`energy = power * 20`), damaging every entity it passes with `power * 100` of the
+  `damage.messtech.reactorExplode` damage source (armour bypassing, creative allowed). The port hard caps the power
+  at `MTExplosionDE.MAX_POWER = 40` — twice DE's own full reactor (2..20), one power unit being ~10 blocks of
+  radius, so the worst meltdown vaporises a 400 block radius. Cost notice: 40 power is ~500k columns and therefore
+  tens of millions of block updates spread over 400 ticks; lower `REACTOR_EXPLOSION_DE_POWER_LIMIT` if that is too
+  heavy for the server.
+* **Never cache the ceiling.** It used to live in a per-page `int[] mPageMaxHeat` that was only written during a
+  reactor cycle / stability simulation of a non-empty page and was also persisted to NBT. Consequences: an empty,
+  idle or freshly built reactor kept showing the old 10,000, and old saves reloaded the stale array. The array is
+  gone; `MTReactor.getHottestPageMaxHeat()` reads `getReactorHeatCapacity()` live (used by the GUI sync value,
+  Waila, the scanner info and the heat percentage), so replacing the hatch is visible immediately.
+* **Sentinel trap:** `getReactorHeatCapacity()` searches for the lowest hatch value and used `Integer.MAX_VALUE`
+  as the starting/sentinel value — but UIV's real ceiling *is* `Integer.MAX_VALUE`, so a UIV heat hatch was
+  mistaken for "no hatch" and fell back to 10,000. Use a separate `boolean found` flag for the empty case.
+* Registration: `MTItemList.MTReactorHeatHatch_EV..UIV`, IDs `MT_ID + 24 .. + 31` (32424..32431), built in
+  `MTMachineLoader` exactly like the access hatches. MTEs self-register in the `CommonMetaTileEntity(int, ...)`
+  constructor, so the ID must be unused (it throws otherwise) — the access hatches occupy `MT_ID + 16 .. + 23`.
+  Both loops now iterate the shared arrays `MTItemList.REACTOR_ACCESS_HATCHES` / `REACTOR_HEAT_HATCHES`, which
+  `GTRecipes.addReactorRecipes()` also uses so the recipe order cannot drift from the registration order.
+
+## 16. Reactor recipes (`GTRecipes.addReactorRecipes()`)
+
+* Tier helpers: `ItemList.MACHINE_CASINGS[tier]` gives the tier machine casing (index 9 = UHV, GT calls it
+  `Casing_MAX`); `OrePrefixes.circuit.get(Materials.<TIER>)` gives the tier circuit, the same mapping
+  `GTModHandler.addMachineCraftingRecipe` uses (tier 4 → `Materials.EV`, ..., tier 11 → `Materials.UIV`).
+  `TIER_RECIPE_EU[]` / `TIER_CIRCUIT_MATERIALS[]` in `GTRecipes` hold both tables.
+* Access hatch (assembler, `TierEU.RECIPE_<TIER>`, 2 min, circuit 1): tier casing + lever + 4 tier circuits.
+* Heat control hatch (assembler, same EU/t and time, circuit 2): tier casing + 4 solid steel casings
+  (`ItemList.Casing_SolidSteel`, "脱氧钢机械方块") + 4 tier circuits.
+* Reactor controller (assembler, `RECIPE_EV`, 2 min, circuit 1): 16 solid steel casings + 16
+  `Ic2Items.nuclearReactor` + 64 `Ic2Items.reactorChamber` + 144×256 molten lead (36864 L). Use
+  `GTUtility.copyAmount(...)` on the IC2 static stacks — they are singletons and the recipe builder must not
+  mutate them (and `copyAmount` clamps at 64, use `copyAmountUnsafe` for bigger stacks).
+* Fuel rods (mirrors `FissionFuelLoader`: single = canner, dual/quad = assembler):
+  * single: The Core (`ItemList.RodNaquadah32`) + Avaritia Star Fuel (`getModItem(Avaritia, "Resource", 1, 8)`,
+    meta 8 in Avaritia 1.97/1.99) → canner, `RECIPE_UEV`, 32 s, guarded by `Mods.Avaritia.isModLoaded()`.
+  * dual: 2 single rods + 4 `stick` Transcendent Metal, circuit 2, UIV assembler, 100 s.
+  * quad: 4 single rods + 6 `stickLong`, circuit 4, UIV assembler, 100 s; alternative 2 dual rods + 2
+    `stickLong`, UIV assembler, 50 s.
+  * "NC 编程电路 N" just means GT's programmed circuit with config N → `.circuit(N)` (N = the "not consumed"
+    number shown in NEI).
+* Depleted rod recycling (`addDepletedRodRecycling`, `centrifugeRecipes`, `RECIPE_UIV`, 50/100/200 s) copies GT's
+  own depleted naquadah rod recycling chances (100/50/50/25/100/100 %) and scales the amounts by the rod size
+  (single 1x / dual 2x / quad 4x): Transcendent Metal dust 4/8/16, Naquadah dust 8/16/32 (100 %) plus the same
+  amount again at 50 %, Naquadria dustSmall 4/8/16 (50 %), NaquadahEnriched dustTiny 8/16/32 (25 %),
+  TungstenSteel dust 16/32/64 and Platinum dust 2/4/8.
+

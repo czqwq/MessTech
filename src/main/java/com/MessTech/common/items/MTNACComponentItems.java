@@ -1,4 +1,4 @@
-package com.MessTech.common.item;
+package com.MessTech.common.items;
 
 import net.minecraft.item.ItemStack;
 

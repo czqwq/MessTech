@@ -3,8 +3,9 @@ package com.MessTech.init;
 import static com.MessTech.init.MessTech.MT_LOG;
 
 import com.MessTech.common.block.MTBlocks;
-import com.MessTech.common.item.MTItems;
+import com.MessTech.common.items.MTItems;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
+import com.MessTech.common.process.MTProcessHandler;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.recipe.RecipeMessFood;
 
@@ -22,6 +23,7 @@ public class CommonProxy {
     public void preInit(FMLPreInitializationEvent event) {
         Config.synchronizeConfiguration(event.getSuggestedConfigurationFile());
         MTItems.registerItems();
+        MTProcessHandler.init();
         if (Loader.isModLoaded("Torcherino")) {
             MT_LOG.info("拿火把捅你皮撅子");
         }

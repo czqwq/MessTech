@@ -1,4 +1,4 @@
-package com.MessTech.common.misc;
+package com.MessTech.common.items;
 
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
@@ -28,7 +28,34 @@ public enum MTItemList {
     MTWirelessVacuumConveyorOutput,
     MTNanoScaleFoundry,
     MTDBBFurnace,
-    BosesCraftingArray;
+    BosesCraftingArray,
+    MTReactor,
+    MTReactorAccessHatch_EV,
+    MTReactorAccessHatch_IV,
+    MTReactorAccessHatch_LuV,
+    MTReactorAccessHatch_ZPM,
+    MTReactorAccessHatch_UV,
+    MTReactorAccessHatch_UHV,
+    MTReactorAccessHatch_UEV,
+    MTReactorAccessHatch_UIV,
+    MTReactorHeatHatch_EV,
+    MTReactorHeatHatch_IV,
+    MTReactorHeatHatch_LuV,
+    MTReactorHeatHatch_ZPM,
+    MTReactorHeatHatch_UV,
+    MTReactorHeatHatch_UHV,
+    MTReactorHeatHatch_UEV,
+    MTReactorHeatHatch_UIV;
+
+    /** Reactor access hatches ordered EV..UIV (index {@code tier - MTReactorAccessHatch.MIN_TIER}). */
+    public static final MTItemList[] REACTOR_ACCESS_HATCHES = { MTReactorAccessHatch_EV, MTReactorAccessHatch_IV,
+        MTReactorAccessHatch_LuV, MTReactorAccessHatch_ZPM, MTReactorAccessHatch_UV, MTReactorAccessHatch_UHV,
+        MTReactorAccessHatch_UEV, MTReactorAccessHatch_UIV };
+
+    /** Reactor heat control hatches ordered EV..UIV (index {@code tier - MTReactorHeatHatch.MIN_TIER}). */
+    public static final MTItemList[] REACTOR_HEAT_HATCHES = { MTReactorHeatHatch_EV, MTReactorHeatHatch_IV,
+        MTReactorHeatHatch_LuV, MTReactorHeatHatch_ZPM, MTReactorHeatHatch_UV, MTReactorHeatHatch_UHV,
+        MTReactorHeatHatch_UEV, MTReactorHeatHatch_UIV };
 
     private boolean mHasNotBeenSet;
     private boolean mDeprecated;

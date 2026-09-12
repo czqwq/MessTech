@@ -2,8 +2,9 @@ package com.MessTech.init;
 
 import net.minecraftforge.client.MinecraftForgeClient;
 
-import com.MessTech.common.item.MTItems;
-import com.MessTech.common.item.MTNACComponentItemRenderer;
+import com.MessTech.common.items.MTFuelRodItemRenderer;
+import com.MessTech.common.items.MTItems;
+import com.MessTech.common.items.MTNACComponentItemRenderer;
 
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
@@ -13,6 +14,8 @@ public class ClientProxy extends CommonProxy {
     public void preInit(FMLPreInitializationEvent event) {
         super.preInit(event);
         MinecraftForgeClient.registerItemRenderer(MTItems.nacComponentItem, new MTNACComponentItemRenderer());
+        // Fuel rods: same oblique-axis tumble preview as Transcendent Metal (burnable + depleted).
+        MTFuelRodItemRenderer.registerItemRenderers();
     }
 
 }

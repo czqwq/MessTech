@@ -1,4 +1,4 @@
-package com.MessTech.common.item;
+package com.MessTech.common.items;
 
 import java.util.ArrayList;
 import java.util.Collections;

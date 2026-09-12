@@ -294,6 +294,15 @@ public final class Utils {
         return null == main ? instead : main;
     }
 
+    /**
+     * Ported from Draconic Evolution's {@code Utils} (used by {@code MTExplosionDE}).
+     */
+    public static double getDistanceAtoB(double x1, double z1, double x2, double z2) {
+        double dx = x1 - x2;
+        double dz = z1 - z2;
+        return Math.sqrt((dx * dx + dz * dz));
+    }
+
     public static int safeInt(long number, int margin) {
         return number > Integer.MAX_VALUE - margin ? Integer.MAX_VALUE - margin : (int) number;
     }

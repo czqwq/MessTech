@@ -28,6 +28,7 @@ import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
+import com.MessTech.common.gui.base.MTMultiMachineBaseGui;
 import com.MessTech.init.Config;
 import com.gtnewhorizon.structurelib.alignment.constructable.IConstructable;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
@@ -59,6 +60,7 @@ import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.threads.RunnableSound;
 import gregtech.api.util.GTUtility;
 import gregtech.client.GTSoundLoop;
+import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 import gregtech.common.tileentities.machines.IDualInputHatch;
 import gregtech.common.tileentities.machines.IDualInputInventory;
 import gregtech.common.tileentities.machines.MTEHatchInputBusME;
@@ -76,6 +78,15 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
 
     public MTMultiMachineBase(String aName) {
         super(aName);
+    }
+
+    /**
+     * All MessTech machines share the MT logo in their controller GUI. Machines with a specialised GUI subclass
+     * override this or the GUI's logo widget; space modules use their own picture and are not affected.
+     */
+    @Override
+    protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
+        return new MTMultiMachineBaseGui<>(this);
     }
 
     // endregion

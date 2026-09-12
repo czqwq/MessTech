@@ -12,9 +12,9 @@ import java.util.TreeSet;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 
-import com.MessTech.common.item.MTNACComponentItem;
-import com.MessTech.common.item.MTNACComponentItems;
-import com.MessTech.common.misc.MTItemList;
+import com.MessTech.common.items.MTItemList;
+import com.MessTech.common.items.MTNACComponentItem;
+import com.MessTech.common.items.MTNACComponentItems;
 
 import gregtech.api.enums.CondensateType;
 import gregtech.api.enums.ItemList;
