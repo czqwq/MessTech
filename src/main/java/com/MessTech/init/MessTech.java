@@ -19,7 +19,7 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
     version = com.MessTech.init.Tags.VERSION,
     name = "MessTech",
     acceptedMinecraftVersions = "[1.7.10]",
-    dependencies = "required-after:gregtech; required-after:tectech; required-after:structurelib")
+    dependencies = "required-after:gregtech; required-after:tectech; required-after:structurelib; required-after:AppleCore")
 public class MessTech {
 
     public static final String MODID = "MessTech";

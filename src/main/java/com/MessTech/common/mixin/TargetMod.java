@@ -6,7 +6,8 @@ package com.MessTech.common.mixin;
 @SuppressWarnings("unused")
 public enum TargetMod {
 
-    GTNH_INTERGALACTIC("GTNH Intergalactic", "gtnhintergalactic");
+    GTNH_INTERGALACTIC("GTNH Intergalactic", "gtnhintergalactic"),
+    SPICE_OF_LIFE("The Spice of Life - Carrot Edition", "SpiceOfLife");
 
     private final String modName;
     private final String modId;

@@ -167,6 +167,11 @@ machine.meinventory.inputhatch.desc.0=库存输入仓(ME)
 machine.meinventory.inputhatch.desc.1=配方检查时从ME网络中拉取全部流体类型。
 machine.meinventory.inputhatch.desc.2=开启拉取后GUI只显示前16种流体；实际处理时仍拉取全部。
 item.messtech.meCreativeOreDisk.name=ME创造矿物磁盘
+
+# --- 混乱大杂烩 ---
+item.messtech.messFood.name=混乱大杂烩
+item.messtech.messFood.display=%s(%s)
+item.messtech.messFood.tooltip.ingredients=合成材料:
 machine.nqdafreactor.tooltip.desc=§q湮灭一切§r
 machine.nqdafreactor.tooltip.eff.ramp=§6工作效率§r决定燃料消耗减免,运行每§a30秒§r增加§a1%§r，最高§d400%§r。
 machine.nqdafreactor.tooltip.eff.burn=更高工作效率会§d延长§r每份燃料的燃烧时间。
