@@ -166,6 +166,11 @@ machine.meinventory.inputhatch.desc.0=Inventory Input Hatch (ME)
 machine.meinventory.inputhatch.desc.1=Pulls every fluid type from the ME network during recipe checks.
 machine.meinventory.inputhatch.desc.2=GUI shows the first 16 pulled fluids when auto-pull is enabled; actual processing sees all.
 item.messtech.meCreativeOreDisk.name=ME Creative Ore Disk
+
+# --- Mess Food ---
+item.messtech.messFood.name=Mess Food
+item.messtech.messFood.display=%s(%s)
+item.messtech.messFood.tooltip.ingredients=Ingredients:
 machine.nqdafreactor.tooltip.desc=§yAnnihilate everything§r
 machine.nqdafreactor.tooltip.eff.ramp=§6Work efficiency§r determines fuel-consumption reduction: rises §a1% every 30s§r of running, up to §d400%§r.
 machine.nqdafreactor.tooltip.eff.burn=Higher work efficiency §dextends§r the burn time of each fuel.

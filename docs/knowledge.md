@@ -315,3 +315,32 @@ MTMultiMachineBase<T>
 - NBT saves/loads distance, overdrive, cycle/range/step, cycleDistance, whitelist flag, and filter inventory.
 - Remaining relative to original: full asteroid info/calculator panels and 64-slot filter grid (GUI
   currently uses a compact 8-slot filter).
+
+## Mess Food (混乱大杂烩)
+
+- Item: `com.MessTech.common.item.ItemMessFood`, registered as `MessFood` in `MTItems`, texture
+  `assets/messtech/textures/items/food.png`.
+- NBT key `Ingredients` stores the ordered ingredient list (one `ItemStack` with stack size 1 per
+  entry), which is also the food's identity.
+- Recipe: `com.MessTech.common.recipe.RecipeMessFood` — a custom `IRecipe` appended to the crafting
+  manager in `CommonProxy.init()`. It is shapeless but order sensitive: any 2-9 AppleCore foods may
+  be placed anywhere in the grid, and the ingredients are recorded in crafting slot order
+  (top-left -> bottom-right). Every ingredient must be distinct (item + damage + NBT), so duplicates
+  such as apple+apple are rejected. Mess Food itself is excluded, so it cannot be used to craft
+  another mess food. Appending keeps every pre-existing recipe's priority.
+- Hunger: the sum of the ingredients' AppleCore hunger values. Saturation: the sum of the
+  ingredients' saturation increments, converted back into a `FoodValues` modifier. Implemented with
+  AppleCore `IEdible#getFoodValues` plus `func_150905_g`/`func_150906_h` overrides.
+- Display name: localized base name plus `(ingredient1,ingredient2,...)`, e.g.
+  `Mess Food(apple,bread)` / `混乱大杂烩(苹果,面包)`. Key: `item.messtech.messFood.display=%s(%s)`,
+  so Spice of Life's journal can tell every variant apart.
+- Tooltip: ingredient names one per line, in crafting order.
+- Spice of Life compat (late mixins, applied only when `SpiceOfLife` is loaded):
+  - `MixinFoodEaten` adds the NBT tag to `FoodEaten.equals`/`hashCode` for Mess Foods only.
+  - `MixinFoodHistory` redirects `ItemStack.isItemEqual` to `MessFoodHelper.sameFoodIdentity` in
+    `getFoodCountForFoodGroup`, `containsFoodOrItsFoodGroups` and `getTotalFoodValuesForFoodGroup`.
+  - Result: every ordered combination has its own journal entry, diminishing-returns counter and
+    extra-heart milestone.
+- `AppleCore` was added as a required mod dependency (`required-after:AppleCore`).
+- Dev smoke test (temporary, already removed): NBT round trip, order sensitivity, hunger/saturation
+  sums, 2-9 food recipe matching, identity/hash consistency.

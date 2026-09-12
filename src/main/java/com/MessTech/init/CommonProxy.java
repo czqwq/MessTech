@@ -6,6 +6,7 @@ import com.MessTech.common.block.MTBlocks;
 import com.MessTech.common.item.MTItems;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
 import com.MessTech.common.recipe.MTRecipeMaps;
+import com.MessTech.common.recipe.RecipeMessFood;
 
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -38,6 +39,7 @@ public class CommonProxy {
     // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
     public void init(FMLInitializationEvent event) {
         MT_LOG.info("I'm a info here watching you");
+        RecipeMessFood.register();
     }
 
     // postInit "Handle interaction with other mods, complete your setup based on this." (Remove if not needed)

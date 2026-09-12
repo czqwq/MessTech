@@ -16,7 +16,17 @@ import java.util.stream.Collectors;
  */
 @SuppressWarnings("unused")
 public enum Mixins {
-    ;
+
+    /**
+     * Makes Spice of Life treat every distinct mess food (i.e. every ordered ingredient list) as a
+     * separate food. The mixins are only applied when Spice of Life is present.
+     */
+    SPICE_OF_LIFE_FOOD_IDENTITY(new MixinClass("MixinFoodEaten").setClass("MixinFoodEaten")
+        .setPhase(Phase.LATE)
+        .addTargetMod(TargetMod.SPICE_OF_LIFE),
+        new MixinClass("MixinFoodHistory").setClass("MixinFoodHistory")
+            .setPhase(Phase.LATE)
+            .addTargetMod(TargetMod.SPICE_OF_LIFE));
 
     /*
      * SPACE_ELEVATOR_MODULES(new MixinClass("MixinTileEntitySpaceElevator").setClass("MixinTileEntitySpaceElevator")
