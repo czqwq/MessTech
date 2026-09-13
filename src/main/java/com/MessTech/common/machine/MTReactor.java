@@ -49,7 +49,10 @@ import gregtech.api.casing.Casings;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.HatchElement;
 import gregtech.api.enums.Materials;
+import gregtech.api.enums.Mods;
+import gregtech.api.enums.Textures;
 import gregtech.api.interfaces.IHatchElement;
+import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
@@ -100,6 +103,23 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     private static final float IC2_EXPLOSION_POWER_LIMIT = 45.0F;
     /** Safety cap for pages processed per cycle (a 3x3x3 shell cannot hold that many hatches anyway). */
     private static final int MAX_PAGES = 256;
+
+    // region Controller face
+    /**
+     * Face art of the controller, taken from GoodGenerator's neutron activator ({@code MTENeutronActivator}): the four
+     * icons that machine draws on its own face, idle and running, each with the glow layer that is drawn on top of it.
+     * They live in the gregtech assets, so they are looked up by their path there; the two glow icons are optional,
+     * exactly as in the machine they come from. See {@link #getTexture}.
+     */
+    private static final IIconContainer FACE_NEUTRON_ACTIVATOR_OFF = Textures.BlockIcons
+        .custom(Mods.GregTech.resourceDomain, "icons/NeutronActivator_Off");
+    private static final IIconContainer FACE_NEUTRON_ACTIVATOR_OFF_GLOW = Textures.BlockIcons
+        .customOptional(Mods.GregTech.resourceDomain, "icons/NeutronActivator_Off_GLOW");
+    private static final IIconContainer FACE_NEUTRON_ACTIVATOR_ON = Textures.BlockIcons
+        .custom(Mods.GregTech.resourceDomain, "icons/NeutronActivator_On");
+    private static final IIconContainer FACE_NEUTRON_ACTIVATOR_ON_GLOW = Textures.BlockIcons
+        .customOptional(Mods.GregTech.resourceDomain, "icons/NeutronActivator_On_GLOW");
+    // endregion
 
     // region Hatch element
     /** Custom structure element letting the template-style structure accept reactor access hatches. */
@@ -208,7 +228,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                     ofBlock(
                         Casings.SolidSteelMachineCasing.getBlock(),
                         Casings.SolidSteelMachineCasing.getBlockMeta())))
-        .addElement('D', Casings.ContainmentFieldMachineCasing.asElement())
+        .addElement('D', Casings.SolidSteelMachineCasing.asElement())
         .addElement('E', Casings.SteelPipeCasing.asElement())
         .addElement('F', Casings.YellowStripesBlockA.asElement())
         .addElement('G', Casings.RadioactiveHazardSignBlock.asElement())
@@ -1147,12 +1167,28 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     @Override
     public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity, ForgeDirection side, ForgeDirection facing,
         int colorIndex, boolean aActive, boolean aRedstone) {
-        if (side == facing) {
-            return new ITexture[] {
-                TextureFactory.of(Casings.AssemblyLineCasing.getBlock(), Casings.AssemblyLineCasing.getBlockMeta()) };
+        if (side != facing) {
+            return new ITexture[] { TextureFactory
+                .of(Casings.AssemblerMachineCasing.getBlock(), Casings.AssemblerMachineCasing.getBlockMeta()) };
         }
-        return new ITexture[] { TextureFactory
-            .of(Casings.AssemblerMachineCasing.getBlock(), Casings.AssemblerMachineCasing.getBlockMeta()) };
+
+        // The face of the controller is the face art of GoodGenerator's neutron activator - idle or running, each with
+        // its glow layer drawn on top - over the casing that was already under that face. Only the overlay is taken
+        // from the other machine: the base layer is unchanged, the neutron activator would bring a casing texture of
+        // its own along (it draws its face over its own casing id).
+        IIconContainer face = aActive ? FACE_NEUTRON_ACTIVATOR_ON : FACE_NEUTRON_ACTIVATOR_OFF;
+        IIconContainer glow = aActive ? FACE_NEUTRON_ACTIVATOR_ON_GLOW : FACE_NEUTRON_ACTIVATOR_OFF_GLOW;
+        return new ITexture[] {
+            TextureFactory.of(Casings.AssemblyLineCasing.getBlock(), Casings.AssemblyLineCasing.getBlockMeta()),
+            TextureFactory.builder()
+                .addIcon(face)
+                .extFacing()
+                .build(),
+            TextureFactory.builder()
+                .addIcon(glow)
+                .extFacing()
+                .glow()
+                .build() };
     }
     // endregion
 
