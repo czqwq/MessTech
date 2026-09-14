@@ -7,6 +7,7 @@ import com.MessTech.common.block.AssMatrixBlock;
 import com.MessTech.common.items.MTItemList;
 import com.MessTech.common.machine.BosesCraftingArray;
 import com.MessTech.common.machine.MTAssFactory;
+import com.MessTech.common.machine.MTChemicalTwister;
 import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDBBFurnace;
 import com.MessTech.common.machine.MTDTPF;
@@ -164,6 +165,13 @@ public class MTMachineLoader {
                     tier).getStackForm(1L));
             AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
         }
+
+        MTItemList.MTChemicalTwister.set(
+            new MTChemicalTwister(
+                MT_ID + 33,
+                "Large Chemical Twister",
+                translateToLocal("machine.largechemicaltwister.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTChemicalTwister.get(1));
 
         // Populate after the machine item list is set so the NEI handler can reference the catalyst.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();

@@ -395,3 +395,17 @@ messtech.itemEffect.sixPhasedCopper=Six-Phased Copper
 # The string the "PigTech" animation (MTPigTechText) animates; edit it and the animation follows. It is shown behind
 # the static "Add by:" prefix of messTech.addBy, which is not animated.
 messtech.pigTech=PigTech
+
+# ---ChemicalTwister---
+machine.largechemicaltwister.name=Large Chemical Twister
+machine.chemicaltwister.machinetype=Chemical Twister | Probability Destroyer
+mt.recipe.chemicaltwister=Chemical Twister
+mt.recipe.chemicaltwister.structure_level=Required Structure Level
+mt.recipe.qft_probability_destroyer=Probability Destroyer (QFT)
+machine.largechemicaltwister.mode.chemical_twister=Chemical Twister
+machine.largechemicaltwister.mode.probability_destroyer=Probability Destroyer
+machine.largechemicaltwister.cannot_switch_active=Cannot switch mode while the machine is running!
+machine.largechemicaltwister.tooltip.modes=Screwdriver switches mode: Chemical Twister / Probability Destroyer (QFT)
+machine.largechemicaltwister.tooltip.qft=Probability Destroyer: QFT recipes, every output chance 100%, fixed 12601 K
+mt.machine.tooltip.twisted=§6§lA sound suddenly appear in your mind when you are watching this machine...§m§0Twist§r
+machine.chemicaltwister.structureinfo.1=§l§9A deep voice echoes nearby:§r Some §krecipes§r come from §kT§rS§kT§r

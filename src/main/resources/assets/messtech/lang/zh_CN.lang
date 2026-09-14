@@ -399,3 +399,18 @@ messtech.itemEffect.sixPhasedCopper=六相铜
 # “PigTech” 动画（MTPigTechText）作用的字符串，改这里动画会跟着改。它显示在
 # messTech.addBy 那条静态的“添加模组:”之后，前缀本身不参与动画。
 messtech.pigTech=PigTech
+
+# ---化学扭曲者---
+machine.largechemicaltwister.name=大型化学扭曲者
+mt.recipe.chemicaltwister=化学扭曲
+machine.chemicaltwister.machinetype=化学扭曲者 | 概率毁灭者
+mt.recipe.chemicaltwister.structure_level=需要结构等级
+mt.recipe.qft_probability_destroyer=概率毁灭者(QFT)
+machine.largechemicaltwister.mode.chemical_twister=化学扭曲
+machine.largechemicaltwister.mode.probability_destroyer=概率毁灭者
+machine.largechemicaltwister.cannot_switch_active=机器运行时无法切换模式!
+machine.largechemicaltwister.tooltip.modes=螺丝刀切换模式: 化学扭曲 / 概率毁灭者(QFT)
+machine.largechemicaltwister.tooltip.qft=概率毁灭者: QFT配方, 所有产出概率100%, 固定12601K
+mt.machine.tooltip.twisted=§6§l望着这个机器,脑海中突然有一道声音传出§r...§m§0§l扭曲§r
+machine.chemicaltwister.poc=启用无损超频
+machine.chemicaltwister.structureinfo.1=§l§9一道低沉的声音在身边回响:§r 部分§k配方§r来自§kT§rS§kT§r

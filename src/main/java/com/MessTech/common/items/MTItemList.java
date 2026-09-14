@@ -45,7 +45,8 @@ public enum MTItemList {
     MTReactorHeatHatch_UV,
     MTReactorHeatHatch_UHV,
     MTReactorHeatHatch_UEV,
-    MTReactorHeatHatch_UIV;
+    MTReactorHeatHatch_UIV,
+    MTChemicalTwister;
 
     /** Reactor access hatches ordered EV..UIV (index {@code tier - MTReactorAccessHatch.MIN_TIER}). */
     public static final MTItemList[] REACTOR_ACCESS_HATCHES = { MTReactorAccessHatch_EV, MTReactorAccessHatch_IV,

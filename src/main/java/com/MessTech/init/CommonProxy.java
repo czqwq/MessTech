@@ -7,6 +7,7 @@ import com.MessTech.common.entity.MTEntityPiggy;
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
 import com.MessTech.common.process.MTProcessHandler;
+import com.MessTech.common.recipe.MTChemicalTwisterRecipes;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.recipe.RecipeMessFood;
 import com.MessTech.common.util.MTTrueKill;
@@ -57,6 +58,7 @@ public class CommonProxy {
         MTBlocks.registerBlocks();
         MTMachineLoader.loadMachines();
         MT_LOG.info("Ciallo～(∠・ω< )⌒★");
+        MTChemicalTwisterRecipes.loadRecipePostInit();
     }
 
     // register server commands in this event handler (Remove if not needed)
@@ -70,5 +72,7 @@ public class CommonProxy {
         MTRecipeMaps.populateNanoScaleFoundry24PoolRecipes();
         // BEC recipes are registered by GT5U's postload recipe loader.
         MTRecipeMaps.populateBosesCraftingArrayRecipes();
+        // The QFT pool is filled while the GT recipe loaders run, i.e. possibly after our postInit.
+        MTRecipeMaps.populateQftProbabilityDestroyerRecipes();
     }
 }

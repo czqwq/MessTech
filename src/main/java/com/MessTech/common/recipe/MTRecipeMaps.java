@@ -1,6 +1,7 @@
 package com.MessTech.common.recipe;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -9,12 +10,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import javax.annotation.Nullable;
+
+import gtPlusPlus.xmod.gregtech.api.enums.GregtechItemList;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.StatCollector;
 import net.minecraftforge.fluids.FluidStack;
 
 import com.MessTech.common.items.MTItemList;
 import com.MessTech.common.items.MTNACComponentItem;
 import com.MessTech.common.items.MTNACComponentItems;
+import com.gtnewhorizons.modularui.api.drawable.UITexture;
 
 import gregtech.api.enums.CondensateType;
 import gregtech.api.enums.ItemList;
@@ -29,6 +35,7 @@ import gregtech.api.recipe.RecipeMapBuilder;
 import gregtech.api.recipe.RecipeMaps;
 import gregtech.api.recipe.RecipeMetadataKey;
 import gregtech.api.recipe.maps.AssemblyLineFrontend;
+import gregtech.api.recipe.maps.LargeNEIFrontend;
 import gregtech.api.recipe.maps.QuantumComputerFrontend;
 import gregtech.api.recipe.metadata.SimpleRecipeMetadataKey;
 import gregtech.api.util.GTRecipe;
@@ -36,6 +43,8 @@ import gregtech.api.util.GTRecipeBuilder;
 import gregtech.api.util.GTRecipeConstants;
 import gregtech.api.util.GTUtility;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
+import gregtech.nei.RecipeDisplayInfo;
+import gregtech.nei.formatter.HeatingCoilSpecialValueFormatter;
 import tectech.recipe.BECAssemblyFrontend;
 import tectech.recipe.TecTechRecipeMaps;
 
@@ -54,6 +63,46 @@ public final class MTRecipeMaps {
      */
     public static final RecipeMetadataKey<Integer> ONE_STEP_CIRCUIT_LEVEL = SimpleRecipeMetadataKey
         .create(Integer.class, "mt_onestep_circuit_level");
+
+    /**
+     * Minimum structure level a Chemical Twister recipe needs, as
+     * {@link com.MessTech.common.machine.MTChemicalTwister#getStructureLevel()}. Levels 2..4 structures will be added
+     * later; a recipe without this metadata needs level {@link #DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL}.
+     * <p>
+     * This is independent from the heat requirement ({@code mSpecialValue}): the structure level says whether the
+     * machine is big enough for the recipe at all, the heat says whether its coil ring is hot enough. A recipe can
+     * fail either check on its own, and the NEI page shows the required level through {@link #drawInfo}.
+     */
+    public static final ChemicalTwisterStructureLevelKey CHEMICAL_TWISTER_STRUCTURE_LEVEL = ChemicalTwisterStructureLevelKey.INSTANCE;
+
+    /** Level a recipe needs when it does not carry {@link #CHEMICAL_TWISTER_STRUCTURE_LEVEL}: the base structure. */
+    public static final int DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL = 1;
+
+    /**
+     * The MessTech logo drawn on the NEI pages of this mod (17x17, the size of GT's own recipe logo). This is the
+     * GregTech/ModularUI flavour of {@code MTGuiTextures.PICTURE_MT_LOGO}, which is the same texture in the MUI2 type
+     * that {@code RecipeMapBuilder#logo} does not accept.
+     */
+    public static final UITexture MT_LOGO = UITexture.fullImage("messtech", "gui/picture/mt_logo");
+
+    /**
+     * {@link RecipeMetadataKey} for the required Chemical Twister structure level. Metadata keys draw their own NEI
+     * line, so the NEI page of the pool shows "Structure Level: N" next to the heat requirement.
+     */
+    public static final class ChemicalTwisterStructureLevelKey extends RecipeMetadataKey<Integer> {
+
+        public static final ChemicalTwisterStructureLevelKey INSTANCE = new ChemicalTwisterStructureLevelKey();
+
+        private ChemicalTwisterStructureLevelKey() {
+            super(Integer.class, "mt_chemical_twister_structure_level");
+        }
+
+        @Override
+        public void drawInfo(RecipeDisplayInfo recipeInfo, @Nullable Object value) {
+            recipeInfo.drawText(
+                StatCollector.translateToLocal("mt.recipe.chemicaltwister.structure_level") + ": " + cast(value, 1));
+        }
+    }
 
     /** Fake recipe pool for the Computing Center (Nano Computing mode), with proper NEI/frontend registration. */
     public static final RecipeMap<RecipeMapBackend> computingCenterFakeRecipes = RecipeMapBuilder
@@ -199,6 +248,112 @@ public final class MTRecipeMaps {
         .minInputs(1, 0)
         .neiHandlerInfo(builder -> builder.setDisplayStack(MTItemList.MTNanoScaleFoundry.get(1)))
         .build();
+
+    /**
+     * Recipe pool of the {@code MTChemicalTwister}. A recipe's {@code mSpecialValue} is the heat it needs: the machine
+     * checks it against {@code coil heat + 100 K per energy tier above MV}, exactly like the EBF, so the NEI page uses
+     * GT's own heating-coil formatter to show the requirement.
+     * <p>
+     * The page uses GT's large layout, the same one the Large Chemical Reactor and the Plasma Forge use: item inputs on
+     * the top left with the fluid inputs <i>below</i> them, item outputs on the top right with the fluid outputs below
+     * them. The default frontend instead pins the fluid row at a fixed y=62 while the item grid grows downward from
+     * y=6, so with a big {@code maxIO} the two grids are drawn on top of each other; {@code maxIO} therefore has to
+     * stay in sync with the biggest recipe of the pool (the platinum recipe fills 6 item input slots, 5 fluid inputs,
+     * 12 item outputs and 7 fluid outputs).
+     * <p>
+     * {@code maxIO(15, 15, 15, 15)} is a 3 x 5 grid per block, so the page is 170 x 190: five item rows
+     * (y = 8..80), then five fluid rows below them (y = 98..170).
+     */
+    public static final RecipeMap<RecipeMapBackend> MTChemicalTwisterRecipes = RecipeMapBuilder
+        .of("mt.recipe.chemicaltwister")
+        .maxIO(15, 15, 15, 15)
+        .minInputs(1, 0)
+        .frontend(LargeNEIFrontend::new)
+        .logo(MT_LOGO)
+        .neiHandlerInfo(
+            builder -> builder.setDisplayStack(MTItemList.MTChemicalTwister.get(1))
+                .setShiftY(8)
+                .setHeight(240))
+        .neiSpecialInfoFormatter(HeatingCoilSpecialValueFormatter.INSTANCE)
+        .build();
+
+    /** Coil temperature the Chemical Twister's mode 1 (概率毁灭者) runs at, fixed: that structure has no coil ring. */
+    public static final int QFT_PROBABILITY_DESTROYER_HEAT = 12601;
+
+    /**
+     * Recipe pool of the Chemical Twister's mode 1, the 概率毁灭者 (Probability Destroyer): the Quantum Force
+     * Transformer recipes, copied out into an independent pool with <b>every output chance at 100%</b>, filled by
+     * {@link #populateQftProbabilityDestroyerRecipes()}. Its recipes ask for structure level 2 and for the mode's fixed
+     * {@link #QFT_PROBABILITY_DESTROYER_HEAT}, so they can only run in the QFT shaped structure.
+     */
+    public static final RecipeMap<RecipeMapBackend> qftProbabilityDestroyerRecipes = RecipeMapBuilder
+        .of("mt.recipe.qft_probability_destroyer")
+        .maxIO(9, 9, 9, 9)
+        .minInputs(0, 0)
+        .frontend(LargeNEIFrontend::new)
+        .logo(MT_LOGO)
+        .neiHandlerInfo(
+            builder -> builder.setDisplayStack(GregtechItemList.QuantumForceTransformer.get(1))
+                .setShiftY(8)
+                .setHeight(166))
+        .neiSpecialInfoFormatter(HeatingCoilSpecialValueFormatter.INSTANCE)
+        .build();
+
+    /**
+     * Copies every Quantum Force Transformer recipe into {@link #qftProbabilityDestroyerRecipes}, with all item and
+     * fluid output chances set to 10000 (= 100%). The QFT catalyst from the recipe metadata becomes a non-consumed
+     * input (stack size 0, GT only requires it to be present in the bus), the focus tier metadata is kept for NEI, the
+     * recipes get structure level 2 and the mode's fixed heat, and every recipe is re-tagged to this map's own
+     * {@link RecipeCategory} so it shows up on its own NEI page. Idempotent, like the other populate* methods.
+     */
+    public static void populateQftProbabilityDestroyerRecipes() {
+        if (!qftProbabilityDestroyerRecipes.getAllRecipes()
+            .isEmpty()) {
+            return;
+        }
+
+        RecipeCategory defaultCategory = qftProbabilityDestroyerRecipes.getDefaultRecipeCategory();
+        for (GTRecipe recipe : RecipeMaps.quantumForceTransformerRecipes.getAllRecipes()) {
+            List<ItemStack> itemInputs = new ArrayList<>(Arrays.asList(recipe.mInputs));
+            // The QFT catalyst is a metadata stack (usually size 0); GT enforces stackSize 0 inputs as "present in
+            // the bus, not consumed", which is exactly the QFT behaviour.
+            ItemStack catalyst = recipe.getMetadata(GTRecipeConstants.QFT_CATALYST);
+            if (catalyst != null && catalyst.getItem() != null) {
+                // stackSize 0 = non-consumed input: GT requires the item to be in the bus but does not consume it
+                itemInputs.add(GTUtility.copyAmountUnsafe(0, catalyst));
+            }
+
+            GTRecipeBuilder builder = GTRecipeBuilder.builder()
+                .itemInputsUnsafe(itemInputs.toArray(new ItemStack[0]))
+                .fluidInputs(recipe.mFluidInputs)
+                .itemOutputs(recipe.mOutputs)
+                .fluidOutputs(recipe.mFluidOutputs)
+                .duration(recipe.mDuration)
+                .eut(recipe.mEUt)
+                .specialValue(QFT_PROBABILITY_DESTROYER_HEAT)
+                .metadata(CHEMICAL_TWISTER_STRUCTURE_LEVEL, 2)
+                .recipeCategory(defaultCategory)
+                .ignoreCollision();
+
+            if (recipe.mOutputs != null && recipe.mOutputs.length > 0) {
+                int[] chances = new int[recipe.mOutputs.length];
+                Arrays.fill(chances, 10000);
+                builder.outputChances(chances);
+            }
+            if (recipe.mFluidOutputs != null && recipe.mFluidOutputs.length > 0) {
+                int[] chances = new int[recipe.mFluidOutputs.length];
+                Arrays.fill(chances, 10000);
+                builder.fluidOutputChances(chances);
+            }
+            // keep the QFT's own metadata (catalyst + focus tier) for the NEI page
+            for (Map.Entry<RecipeMetadataKey<?>, Object> entry : recipe.getMetadataStorage()
+                .getEntries()) {
+                builder.metadata((RecipeMetadataKey<Object>) entry.getKey(), entry.getValue());
+            }
+
+            builder.addTo(qftProbabilityDestroyerRecipes);
+        }
+    }
 
     /**
      * Independent one-step NEI pool for the future "24" Nano-Scale Foundry mode. Not used by the

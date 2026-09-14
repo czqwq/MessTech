@@ -126,6 +126,168 @@ MTMultiMachineBase<T>
   starts at 1 L/s (one drain per dose), max 1,073,741,824 L/s. It does **not** pause efficiency growth.
 - No dynamo hatch in `checkMachine` -> auto enables wireless output mode (`MTGeneratorMultiBase`).
 
+### MTReactor (nuclear reactor)
+- Controller face: the face art of GoodGenerator's neutron activator - `icons/NeutronActivator_Off` / `_On` and their
+  two optional glow layers from the gregtech assets (five animated 16x16 frames each, `frametime: 8`) - over the casing
+  that was already under the face (`Casings.AssemblyLineCasing`); the other five faces stay
+  `Casings.AssemblerMachineCasing`. Only the overlay is taken from the other machine: the base layer is unchanged, the
+  neutron activator would otherwise bring a casing texture of its own (`getCasingTextureForId(49)`) along. The art is a
+  12x12 panel inside a two pixel transparent border, so that border is where the casing shows through.
+- `tmp/reactorface/verify_reactor_face.py` checks that wiring (the icon names against the donor class, the three layer
+  face, the untouched base) and writes the previews of the art into `tmp/reactorface/`.
+
+### MTChemicalTwister
+- Structure: `A` containment field machine casing, `B` fusion coil block, `C` **heating coils**, `D` chemically inert
+  machine casing with the hatches.
+- Controller face/casing: both follow **the structure that is formed**, not the mode (see the structure level below).
+  Level 1 draws the face of GT's Large Chemical Reactor - `createTextureWithCasing` with the four
+  `OVERLAY_FRONT_LARGE_CHEMICAL_REACTOR*` overlays (idle/running plus their glow layers) - on
+  `Casings.ChemicallyInertMachineCasing`, i.e. the casing the machine itself (element `D`) and the LCR are built from.
+  Level 2 draws the face of GT++'s Quantum Force Transformer (the four `TexturesGtBlock.oMCAQFT*` icon containers) on
+  `Casings.BulkProductionFrame` (`blockCasings2Misc:12`), the casing its shell (element `F`) is made of - so a machine
+  built as 概率毁灭者 looks like the QFT it took the recipes from. `getCasingTexture()` publishes that casing, so the
+  controller is a proper GT face and not a bare casing.
+- Element `C` is `GTStructureChannels.HEATING_COIL.use(activeCoils(ofCoil(this::setCoilLevel, this::getCoilLevel)))`,
+  i.e. the EBF wiring: the `coil` channel (StructureLib can hint/register the tiers with it), the active-coil
+  bookkeeping for the coil upgrades, and GT's coil element, which rejects a ring of mixed coil levels.
+- Coil/heat API: `getCoilLevel()` / `setCoilLevel(HeatingCoilLevel)` (the pair `ofCoil` calls, as in the EBF),
+  `getCoilHeat()` (the raw `HeatingCoilLevel#getHeat()`) and `getHeatingCapacity()` (the heat the recipes are checked
+  against).
+- `checkMachine` forgets the coil level, the heat *and* the structure level before it checks the structure, reports a
+  missing coil with GT's own `StructureErrorRegistry.COIL_LEVEL_NOT_ENOUGH`, and then computes
+  `getHeatingCapacity() = getCoilHeat() + 100 * (GTUtility.getTier(getMaxInputVoltage()) - 2)` - the EBF formula, so
+  MV energy is the neutral tier: a cupronickel ring on LV energy gives 1701 K, on MV energy 1801 K.
+- Structure level 2 (概率毁灭者): `structure_tier2` is registered as the piece `tier2` (same bounding box and the same
+  controller spot as level 1, so the `8, 8, 0` offsets work for both). Its letters are **F-J**, not the comment's A-E:
+  StructureLib binds one element map to the whole structure definition, and level 1 already means other casings with
+  A-E, so a collision would make both pieces accept each other's blocks (and let hatches be placed anywhere).
+  Mapping: F `BulkProductionFrame`, G `QuantumForceTransformerCoilCasing`, **H `SpaceTimeContinuumRipper` + the hatches
+  of that piece**, I `SpaceTimeBendingCore`, J `ForceFieldGlass` (`tmp/chemicaltwister/remap_tier2_letters.py` did the
+  letter move, the geometry is untouched). The piece has **no heating coil ring**, so level 1 keeps the EBF heat
+  formula and the coil error, while level 2 runs at the fixed `MTRecipeMaps.QFT_PROBABILITY_DESTROYER_HEAT = 12601`
+  (Hypogen) and needs no coil. `checkMachine` checks level 2 first, speculatively (`null` error list).
+- Machine modes: `totalMachineMode() = 2` (mode 0 化学扭曲, mode 1 概率毁灭者); the base class then enables the GUI
+  button, the NBT round-trip and the Waila line, and the screwdriver (`onScrewdriverRightClick`, refused while the
+  machine runs) switches. `getRecipeMap()` picks `MTRecipeMaps.qftProbabilityDestroyerRecipes` in mode 1 and
+  `MTRecipeMaps.MTChemicalTwisterRecipes` in mode 0; `getAvailableRecipeMaps()` lists both, so NEI shows the machine as
+  the catalyst for either page. A mode 1 recipe asks for structure level 2, so switching mode without the tier-2
+  structure is reported as `insufficientMachineTier(2)` instead of running; mode 0 still runs on the level 2 structure
+  (level 2 >= 1, heat 12601). `construct`/`survivalConstruct` build the piece of the selected mode.
+- Structure level in the NEI preview / build hints: the piece is chosen from the trigger's stack size
+  (`MTChemicalTwister.STRUCTURE_LEVEL_TIER2 = 2`: tier 1 = level 1, tier >= 2 = level 2), with the machine's mode as
+  the fallback. That is GT's usual structure tier switch (the PCB Factory picks its tier 1/2/3 the same way) and it is
+  what makes BlockRenderer6343's preview offer its **Tier slider** for this machine: BR6343 finds the tiers by calling
+  `construct()` with `stackSize = 1, 2, 3, ...` until the world stops changing (`ObserverWorld#estimateTier`), then
+  creates its tier slider up to the highest tier that changed, and rebuilds with
+  `survivalConstruct(getBuildTriggerStack(), ...)` / `construct(trigger, false)`. So sliding that slider to 2 shows the
+  level 2 (概率毁灭者) shell, and 1 shows the level 1 shell. The machine also offers its own "Heating Coil" channel
+  slider (the coil element is channel wrapped), which is why the tier slider's range can go above 2 - any value >= 2
+  means level 2. No mixin and no extra dependency on BlockRenderer6343 is involved; the in-game hologram projector
+  follows the same rule (scroll it to tier 2 for the level 2 hints).
+- The level reaches the client through GT's own update-data byte: `getUpdateData()` returns `mStructureLevel`, and GT's
+  `BaseMetaTileEntity` compares it every tick server side (`handleUpdateDataChangeServer`), sends
+  `CHANGE_CUSTOM_DATA` when it changed, writes it into the tile data packet (`tileWriteToStream`, read back as
+  `receiveClientEvent(..., buffer.readByte() & 0x7F)` when the chunk loads) and hands it to `onValueUpdate(byte)`, which
+  stores it. That is the only way the client can know: `MTEMultiBlockBase#checkStructure` returns early on the client, so
+  a client copy never finds the level itself. The byte is masked with `0x7F` - keep the value below 128 (here 0/1/2).
+- A build hint / preview publishes the level it is showing itself: `construct`/`survivalConstruct` call
+  `updatePreviewStructureLevel(trigger)` (a *formed* machine is skipped - its level is the structure-checked one). The
+  BlockRenderer6343 preview is a dummy multiblock in a dummy world that is never ticked (`DummyWorld.isRemote` is even
+  `false`, so GT considers that copy server side), so its controller can only learn the tier from the trigger: moving its
+  Tier slider to 2 now switches both the shape and the face of the previewed controller.
+- The 概率毁灭者 pool (`mt.recipe.qft_probability_destroyer`, NEI name `概率毁灭者(QFT)`): an independent copy of
+  `RecipeMaps.quantumForceTransformerRecipes` filled by `MTRecipeMaps.populateQftProbabilityDestroyerRecipes()` (called
+  from `CommonProxy.serverStarted`, idempotent like the other populate* methods) with **all item and fluid output
+  chances at 10000 = 100%**, `metadata(CHEMICAL_TWISTER_STRUCTURE_LEVEL, 2)`, `specialValue(12601)` (QFT recipes carry
+  their focus tier in `mSpecialValue` through `GTRecipeMapUtil.SPECIAL_VALUE_ALIASES`, which this machine would read as
+  heat, so it is set explicitly), the QFT catalyst turned into a **non-consumed input** (stackSize 0: GT requires it in
+  the bus but does not consume it) and the QFT metadata kept for NEI. Page: `maxIO(9, 9, 9, 9)`, `LargeNEIFrontend`,
+  height 166, MessTech logo.
+- `tmp/chemicaltwister/verify_tier2_qft.py` checks all of the above against the GT sources (shape integrity, letters,
+  hatch host, mode wiring, fixed heat, pool copy semantics, and in section X the level-dependent face/casing plus the
+  client sync and the icon-load timing it depends on).
+- Recipes ask for a level with `MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL` (a `RecipeMetadataKey<Integer>` whose
+  `drawInfo` draws "Required Structure Level: N" on the NEI page; a recipe without it needs
+  `MTRecipeMaps.DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL = 1`). The processing logic checks the level *before* the
+  heat and refuses a too big recipe with `CheckRecipeResultRegistry.insufficientMachineTier(requiredLevel)`.
+- `createProcessingLogic()` refuses a recipe whose heat requirement (`mSpecialValue`) is above the available heat with
+  `CheckRecipeResultRegistry.insufficientHeat(...)`, and overclocks a recipe that asks for heat with the EBF's
+  `.setRecipeHeat(...).setMachineHeat(...).setHeatOC(true).setHeatDiscount(true)`. A recipe without a heat requirement
+  (`mSpecialValue == 0`, e.g. the assembler recipes of the template) keeps the standard overclocking.
+- The heat is published to the scanner/sensor card/metrics with `getExtraInfoData` under GT's own `GT5U.EBF.heat.s`.
+- Registered as `MTItemList.MTChemicalTwister` by `MTMachineLoader` (lang key `machine.largechemicaltwister.name`),
+  with its own recipe map `MTRecipeMaps.MTChemicalTwisterRecipes`.
+- The pool is a normal GT recipe map, so it registers itself: `MTRecipeMap` -> `RecipeMap.ALL_RECIPE_MAPS`
+  (duplicate names throw) plus a default `RecipeCategory`, i.e. a NEI page. The NEI tab name is
+  `mt.recipe.chemicaltwister` (lang keys exist in `en_US`/`zh_CN`), its icon comes from
+  `neiHandlerInfo(setDisplayStack(MTItemList.MTChemicalTwister.get(1)))`, and the machine becomes the NEI recipe
+  catalyst automatically because `MTEMultiBlockBase` is a `RecipeMapWorkable` (through
+  `IControllerWithOptionalFeatures` -> `IRecipeLockable`) and `MTChemicalTwister.getRecipeMap()` returns this pool.
+  `MTRecipeMaps` is class-initialised from `GTRecipes.loadRecipes()` (FMLLoadComplete), i.e. before NEI loads its
+  plugins when a world is entered, so the category is registered in time. The pool uses
+  `neiSpecialInfoFormatter(HeatingCoilSpecialValueFormatter.INSTANCE)` so NEI shows the heat requirement exactly like
+  the EBF page.
+- NEI page layout: the map uses GT's `LargeNEIFrontend` with `maxIO(15, 15, 15, 15)` (a 3 x 5 slot grid per block),
+  `logo(MTRecipeMaps.MT_LOGO)` and `setShiftY(8).setHeight(240)`, i.e. the layout family the Large Chemical Reactor and
+  the Plasma Forge use - item inputs top left with the fluid inputs *below* them (y = 8 + item rows * 18) and item
+  outputs top right with the fluid outputs below them. With 5 item rows and 5 fluid rows the background is 170x190
+  (items y = 8..80, fluids y = 98..170) and the description text is drawn below it, so the handler needs ~240.
+  `MT_LOGO` is the GregTech/ModularUI flavour of the MessTech logo texture
+  (`UITexture.fullImage("messtech", "gui/picture/mt_logo")`); `NanoScaleFoundry24PoolFrontend` reuses the same
+  constant. `LargeNEIFrontend` only overrides the logo *position* (80, 62), not the texture.
+  The default frontend must not be used here: `UIHelper.getFluidInputPositions` pins every fluid slot to the fixed row
+  y=62 while `UIHelper.getItemInputPositions` grows the item grid downward from y=6, so with a big `maxIO` (the old
+  `18, 18, 12, 12`) the item slots and the fluid row are drawn on top of each other. `maxIO` is display-only ("does not
+  actually restrict the number of items that can be used in recipes"), but it does size that phantom grid, so it has to
+  be raised together with any recipe that outgrows it. `tmp/chemicaltwister/verify_nei_layout.py` re-implements both
+  layouts from the GT sources and checks the geometry (old config overlaps, new one does not, everything fits the
+  background and the text area, maxIO is the requested 3 x 5 grid, the logo is ours);
+  `make_layout_preview.py` renders the before/after mock.
+- Recipe classes: the pool's recipes live in `com.MessTech.common.recipe.MTChemicalTwisterRecipes`
+  (`addChemicalTwisterRecipes()`, called once from `GTRecipes.loadRecipes()` at FMLLoadComplete) plus
+  `loadRecipePostInit()` (called once from `CommonProxy.postInit()`) for recipes that have to wait for other mods (the
+  H2O2 one). Every builder grabs the pool as `RecipeMap<RecipeMapBackend> MT = MTRecipeMaps.MTChemicalTwisterRecipes;`
+  and ends with `.addTo(MT)`. `tmp/chemicaltwister/verify_recipe_pool.py` audits the whole pool: exactly one call site
+  (no double registration), all builders added to `MT`, duration/EU/t/heat/structure-level present on every recipe, no
+  >64 stack clamped by the stack factories, no >64 stack inside a plain `itemInputs`, every recipe fits the NEI grid
+  and no two recipes share the same input signature.
+- One-step platinum-group-metal recipe in that pool (the first builder of `addChemicalTwisterRecipes()`): 45
+  `WerkstoffLoader.PTMetallicPowder` + NaOH/saltpeter/zinc/calcium + 81 potassium disulfate dust (the chain burns
+  11579 mB of the molten form; 1 dust == 144 mB, so it is fed as dust to keep the fluid list short) + ammonia/HCl/HNO3/
+  CO/salt water -> 32 Pt, 21 Pd, 10 Ir, 24 Ru, 7 Rh, 1 Os **plus the whole net byproduct list of the line** (every
+  species nothing in the chain consumes again): 162288 mB chlorine, 144737 mB NO2, 51265 mB water, 30000 mB calcium
+  chloride (fluid), 10338 mB ethylene, 3333 mB steam, 2105 mB molten potassium, and 172 sodium nitrate / 69 zinc
+  sulfate / 48 calcium chloride / 22 salt / 10 + 10 PGS residue dust. At `RECIPE_IV` (7680 EU/t) / 256 s / heat
+  requirement 2701 K / required structure level 1 (`.metadata(MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL, 1)`).
+  Werkstoff ingredients must be built with `Werkstoff#get`; `GTOreDictUnificator.get(prefix, werkstoff, amount)` looks
+  the ore dictionary up by `Werkstoff#toString`, which a Werkstoff does not override, so it returns `null` silently.
+- Stack sizes above 64 go through `GTUtility.copyAmountUnsafe(amount, stack)` (that is exactly what it is for -
+  `copyAmount`/`Materials#getDust` clamp to 64) **and the builder must be `itemInputsUnsafe(...)`**: the plain
+  `itemInputs(ItemStack...)` re-copies every input through `GTUtility.copyAmount` (`fixItemArray(inputs, false)` ->
+  `GTOreDictUnificator.setStackArray(.., false, ..)`), which would silently clamp 124 back to 64, while
+  `itemInputsUnsafe` is the `copyAmountUnsafe` branch. Outputs are stored as they are (`itemOutputs`), so 172/69 survive
+  there. `GTRecipe#buildItemInputCache` merges duplicate inputs of the same type by summing, so the old "two 62 stacks"
+  form matched identically, but NEI draws one slot per recipe input entry, i.e. it showed two slots; a single unsafe
+  stack keeps every ingredient on one NEI slot (NaOH 124, K2S2O7 81, sodium nitrate 172, zinc sulfate 69).
+- That recipe is the *net* stoichiometry of the whole GT5U platinum line (`bartworks` `PlatinumSludgeRecipes`), not a
+  guess: every recipe of the line is transcribed as a stoichiometric vector in `tmp/platinum/solve_pgm.py`, all cyclic
+  intermediates are balanced exactly, everything the line produces but never eats again is dropped, and the remaining
+  free directions were fixed by requiring a physically realisable steady state (no negative recipe runs).
+  `tmp/platinum/derive_platinum_recipe.py` prints the derivation, `tmp/platinum/verify_platinum_recipe.py` re-derives
+  the numbers from the chain and cross-checks the Java recipe, the pool registration and the heat semantics.
+- Notes on the derivation: Platinum Metallic Powder is the only metal feed - the Pt line's "palladium enriched
+  ammonia" byproduct carries the palladium, so no Palladium Metallic Powder (palladium ore) is needed. The Pd line's
+  circuit-2 recipe (`PDAmmonia` -> `PDSalt`) is deliberately excluded: it turns the loop into a palladium printer
+  (ammonia in, palladium out), which is not the intended flow and would make the recipe ratio meaningless. Sifter
+  yields are taken at their expected value (0.95). The final amounts are rounded from the exact ratio (worst case
+  6 %, rhodium 6.6 -> 7) and the sodium hydroxide is written as two 62 dust stacks because `Materials#getDust` caps a
+  stack at 64.
+- Heat: the recipe asks for 2701 K (Kanthal), and at IV energy the machine reaches 3001 K, so a Kanthal ring is the
+  minimum coil; a cupronickel ring at IV only reaches 2101 K and is refused. The IV EU/t of the recipe itself needs an
+  IV energy hatch (the recipe search only returns recipes the machine's voltage can pay for).
+- `tmp/chemicaltwister/verify_chemical_twister.py` checks the machine side (coil wiring, heat formula, formula table)
+  against the EBF sources and prints the heat table of every coil level on every energy tier.
+
 ### MTComputingCenter
 - 3 modes, screwdriver switches, blocked while active or heat present.
 - Mode 0: racks produce computation; energy = 1A UEV + 1A UEV per 1,000,000 computation (ceil).
@@ -239,6 +401,36 @@ MTMultiMachineBase<T>
 4. Re-tag copied recipes to the target map's default `RecipeCategory`.
 5. Registration stays in one path: `postInit -> MTMachineLoader.loadMachines()`.
 6. Do not commit randomly; `git fetch origin` was requested, not `git commit`.
+7. A borrowed face art keeps the machine's own casing as the base layer: `MTNQDAFReactor` draws the Antimatter
+   Generator's fusion overlay on Naquadah Fuel Refinery Casing, `MTReactor` the neutron activator art on the casing it
+   already had. Never import the donor's casing with the overlay. When the *machine itself* changes structure, though,
+   the layer may change with it - `MTChemicalTwister` draws the QFT face on the BulkProductionFrame, which is the casing
+   its level 2 shell is built from, so the look stays self-consistent.
+8. `HatchElementBuilder#casingIndex` only accepts values > 0, and `Casings#getTextureId()` throws for every casing that
+   is declared with `-1` (the GT++ casings such as `SpaceTimeContinuumRipper`, `ForceFieldGlass`, `BulkProductionFrame`,
+   `SpaceTimeBendingCore`, `NeutronShieldingCore` ... have no entry in the GT casing texture pages). Passing such a
+   `textureId` happens in the structure definition's static initialiser, so it fails mod loading with
+   `ExceptionInInitializerError: IllegalArgumentException` (this crashed once in `MTChemicalTwister`).
+   Use `TAE.getIndexFromPage(page, slot)` instead: GT++ registers its casings into the casing texture pages at
+   `64 + page * 16 + slot` (e.g. `TAE.getIndexFromPage(0, 10)` = 74, the index GT++'s Quantum Force Transformer uses
+   for the hatch host of the SpaceTimeContinuumRipper). A texture-less casing is still fine as a plain
+   `.asElement()` or as the `buildAndChain` block - only the hatch texture index needs a real one.
+   A casing with `textureId == -1` usually has **no** registered slot of its own either (e.g. `BulkProductionFrame` =
+   `blockCasings2Misc:12`, and `GregtechMetaCasingBlocks2` skips meta 12, so
+   `getCasingTextureForId(TAE.getIndexFromPage(1, 12))` would return null). For those, copy the block with
+   `TextureFactory.of(casing.getBlock(), casing.getBlockMeta())` instead of looking up an id - that is what the level 2
+   controller casing does. `tmp/chemicaltwister/verify_tier2_qft.py` (T12-T18, X4-X7) guards this for the whole repo.
+9. An `IIconContainer` created lazily is never stitched: `TexturesGtBlock.CustomIcon` adds itself to
+   `GregTechAPI.sGTBlockIconload` in its constructor and GT only walks that list in `BlockMachines#registerBlockIcons`
+   during the icon load phase. Reading such a field inside `getTexture(...)` (i.e. on the first frame) therefore leaves
+   it `null`, so icon containers that are not already forced by the donor mod must be held in `static final` fields of a
+   class that is loaded while the mods load (our machines are, `MTMachineLoader` is called from `postInit`, and
+   `postInit` runs before the client's first resource reload). `MTAssFactory` reads `TexturesGtBlock.oMCAQFT*` inline -
+   that only works because the class is loaded early by such a field, so do not copy that part of it.
+10. A machine state that only changes how it renders belongs in `getUpdateData()`/`onValueUpdate(byte)` rather than in a
+   custom packet: GT compares that byte every tick (`handleUpdateDataChangeServer`), sends `CHANGE_CUSTOM_DATA` when it
+   changes and writes it into the tile data packet, so it survives a chunk reload for free. Values are masked with
+   `0x7F`, and multiblock structure checks never run on the client - the client has to be told.
 
 ## Known pending / open items
 

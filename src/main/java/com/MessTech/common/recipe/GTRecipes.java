@@ -1,12 +1,15 @@
 package com.MessTech.common.recipe;
 
+import static com.MessTech.common.recipe.MTChemicalTwisterRecipes.addChemicalTwisterRecipes;
 import static com.MessTech.common.recipe.MTRecipeMaps.Steel_brick_Recipes;
 import static goodgenerator.loader.Loaders.compactFusionCoil;
 import static gregtech.api.casing.Casings.NanochipFirewallProjectionCasing;
 import static gregtech.api.casing.Casings.NanochipMeshInterfaceCasing;
+import static gregtech.api.enums.TierEU.RECIPE_HV;
 import static gregtech.api.enums.TierEU.RECIPE_IV;
 import static gregtech.api.enums.TierEU.RECIPE_LV;
 import static gregtech.api.enums.TierEU.RECIPE_MAX;
+import static gregtech.api.enums.TierEU.RECIPE_MV;
 import static gregtech.api.enums.TierEU.RECIPE_UEV;
 import static gregtech.api.enums.TierEU.RECIPE_UHV;
 import static gregtech.api.enums.TierEU.RECIPE_UIV;
@@ -418,6 +421,8 @@ public class GTRecipes {
             .duration(1919810)
             .addTo(assemblerRecipes);
 
+        GTValues.RA.stdBuilder().itemInputsUnsafe(GTUtility.copyAmountUnsafe(10000,GTOreDictUnificator.get(OrePrefixes.nanite,Materials.Carbon,1)),ItemList.MegaChemicalReactor.get(8),ItemList.Robot_Arm_UV.get(64),ItemList.Field_Generator_UV.get(16),new ItemStack(compactFusionCoil,16,3),GTOreDictUnificator.get(OrePrefixes.circuit,Materials.UHV,32)).fluidInputs(Materials.Kevlar.getMolten(1024*144)).circuit(24).itemOutputs(MTItemList.MTChemicalTwister.get(1)).eut(RECIPE_UHV).duration(MINUTES*16).addTo(assemblerRecipes);
+
         addBec(
             MTItemList.BosesCraftingArray.get(1),
             new ItemStack[] { CustomItemList.Machine_Multi_BECAssembler.get(8),
@@ -441,6 +446,8 @@ public class GTRecipes {
             TierEU.RECIPE_UIV);
 
         addReactorRecipes();
+        addChemicalTwisterRecipes();
+        // chemical recipe has been moved to MTChemicalTwisterRecipes
     }
 
     /**
@@ -535,6 +542,21 @@ public class GTRecipes {
             .duration(50 * SECONDS)
             .addTo(assemblerRecipes);
 
+        // Containment Field casing
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                GTUtility.getIntegratedCircuit(11),
+                GTOreDictUnificator.get(OrePrefixes.frameGt, Materials.Steel, 1),
+                ItemList.Field_Generator_LuV.get(4),
+                new Object[] { OrePrefixes.circuit.get(Materials.ZPM), 8 },
+                GTOreDictUnificator.get(OrePrefixes.cableGt01, Materials.Naquadah, 4),
+                GTOreDictUnificator.get(OrePrefixes.plate, Materials.Steel, 8))
+            .fluidInputs(Materials.NaquadahAlloy.getMolten(144 * 4))
+            .itemOutputs(new ItemStack(Casings.ContainmentFieldMachineCasing.getItem(), 8, 1))
+            .eut(RECIPE_UV)
+            .duration(20 * 30)
+            .addTo(assemblerRecipes);
+
         // Depleted rods: centrifuge recycling, scaled with the rod size (single 1x / dual 2x / quad 4x).
         addDepletedRodRecycling(new ItemStack(MTItems.rodTranscendentMetalDepleted, 1), 1, 50 * SECONDS);
         addDepletedRodRecycling(new ItemStack(MTItems.rodTranscendentMetalDepleted2, 1), 2, 100 * SECONDS);
@@ -593,10 +615,9 @@ public class GTRecipes {
         NaniteTier.Universium, NaniteTier.Eternity, NaniteTier.MagMatter };
 
     /** Recipe EU/t of every voltage tier (GT's {@code TierEU.RECIPE_*} convention), indexed by tier. */
-    private static final long[] TIER_RECIPE_EU = { TierEU.RECIPE_ULV, TierEU.RECIPE_LV, TierEU.RECIPE_MV,
-        TierEU.RECIPE_HV, TierEU.RECIPE_EV, TierEU.RECIPE_IV, TierEU.RECIPE_LuV, TierEU.RECIPE_ZPM, TierEU.RECIPE_UV,
-        TierEU.RECIPE_UHV, TierEU.RECIPE_UEV, TierEU.RECIPE_UIV, TierEU.RECIPE_UMV, TierEU.RECIPE_UXV,
-        TierEU.RECIPE_MAX };
+    private static final long[] TIER_RECIPE_EU = { TierEU.RECIPE_ULV, TierEU.RECIPE_LV, RECIPE_MV, RECIPE_HV,
+        TierEU.RECIPE_EV, TierEU.RECIPE_IV, TierEU.RECIPE_LuV, TierEU.RECIPE_ZPM, TierEU.RECIPE_UV, TierEU.RECIPE_UHV,
+        TierEU.RECIPE_UEV, TierEU.RECIPE_UIV, TierEU.RECIPE_UMV, TierEU.RECIPE_UXV, TierEU.RECIPE_MAX };
 
     /** Circuit material of every voltage tier, the same mapping GT uses for its machine recipes. */
     private static final Materials[] TIER_CIRCUIT_MATERIALS = { Materials.ULV, Materials.LV, Materials.MV, Materials.HV,
