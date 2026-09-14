@@ -421,7 +421,20 @@ public class GTRecipes {
             .duration(1919810)
             .addTo(assemblerRecipes);
 
-        GTValues.RA.stdBuilder().itemInputsUnsafe(GTUtility.copyAmountUnsafe(10000,GTOreDictUnificator.get(OrePrefixes.nanite,Materials.Carbon,1)),ItemList.MegaChemicalReactor.get(8),ItemList.Robot_Arm_UV.get(64),ItemList.Field_Generator_UV.get(16),new ItemStack(compactFusionCoil,16,3),GTOreDictUnificator.get(OrePrefixes.circuit,Materials.UHV,32)).fluidInputs(Materials.Kevlar.getMolten(1024*144)).circuit(24).itemOutputs(MTItemList.MTChemicalTwister.get(1)).eut(RECIPE_UHV).duration(MINUTES*16).addTo(assemblerRecipes);
+        GTValues.RA.stdBuilder()
+            .itemInputsUnsafe(
+                GTUtility.copyAmountUnsafe(10000, GTOreDictUnificator.get(OrePrefixes.nanite, Materials.Carbon, 1)),
+                ItemList.MegaChemicalReactor.get(8),
+                ItemList.Robot_Arm_UV.get(64),
+                ItemList.Field_Generator_UV.get(16),
+                new ItemStack(compactFusionCoil, 16, 3),
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UHV, 32))
+            .fluidInputs(Materials.Kevlar.getMolten(1024 * 144))
+            .circuit(24)
+            .itemOutputs(MTItemList.MTChemicalTwister.get(1))
+            .eut(RECIPE_UHV)
+            .duration(MINUTES * 16)
+            .addTo(assemblerRecipes);
 
         addBec(
             MTItemList.BosesCraftingArray.get(1),

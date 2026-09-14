@@ -12,7 +12,6 @@ import java.util.TreeSet;
 
 import javax.annotation.Nullable;
 
-import gtPlusPlus.xmod.gregtech.api.enums.GregtechItemList;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.fluids.FluidStack;
@@ -45,6 +44,7 @@ import gregtech.api.util.GTUtility;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
 import gregtech.nei.RecipeDisplayInfo;
 import gregtech.nei.formatter.HeatingCoilSpecialValueFormatter;
+import gtPlusPlus.xmod.gregtech.api.enums.GregtechItemList;
 import tectech.recipe.BECAssemblyFrontend;
 import tectech.recipe.TecTechRecipeMaps;
 
