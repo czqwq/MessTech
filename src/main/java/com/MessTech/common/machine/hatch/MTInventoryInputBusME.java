@@ -7,6 +7,11 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 
+import com.cleanroommc.modularui.factory.PosGuiData;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+
 import appeng.api.networking.energy.IEnergyGrid;
 import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.data.IAEItemStack;
@@ -54,6 +59,11 @@ public class MTInventoryInputBusME extends MTEHatchInputBusME {
     @Override
     public MetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
         return new MTInventoryInputBusME(mName, mTier, mDescriptionArray, mTextures);
+    }
+
+    @Override
+    public ModularPanel buildUI(PosGuiData data, PanelSyncManager syncManager, UISettings uiSettings) {
+        return new MTInventoryInputBusMEGui(this, slots).build(data, syncManager, uiSettings);
     }
 
     @Override

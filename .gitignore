@@ -9,6 +9,7 @@
 .classpath
 .project
 /bin/
+/.dsh-vision-router/
 /tools/
 /config/
 /crash-reports/

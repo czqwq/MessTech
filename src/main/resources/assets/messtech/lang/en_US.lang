@@ -289,14 +289,112 @@ machine.dbbfurnace.tooltip.1=Mode 1: Brick Blast Furnace; Mode 2: Metallurgy (sw
 machine.dbbfurnace.tooltip.2=Drain CO2 from the air and convert it into materials required for smelting.
 machine.dbbfurnace.tooltip.3=Machine always process recipes in 1 tick
 
-# --- Boses Crafting Array ---
-machine.bosescraftingarray.name=Bose-Einstein Condensate Crafting Array
-machine.bosescraftingarray.machinetype=Bose-Einstein Condensate Crafting Array
-machine.bosescraftingarray.tooltip.0=§lGenerate, contain, observe, aggregate.§r
-machine.bosescraftingarray.tooltip.1=Uses Singularity Nanite Containment Buses to identify nanites; nanites are not consumed.
-machine.bosescraftingarray.tooltip.2=Reads the highest nanite tier from all buses; each nanite grants 0.5 base speed.
-machine.bosescraftingarray.tooltip.3=Recipe nanite tier steps follow the same mechanism as the original BEC.
-machine.bosescraftingarray.need_nanite_bus=Requires at least 1 Singularity Nanite Containment Bus
-machine.bosescraftingarray.poc=Enable Perfect Overclock
+# --- Nuclear Reactor ---
+machine.mtreactor.name=Nuclear Reactor
+machine.mtreactor.machinetype=Nuclear Reactor
+machine.mtreactor.tooltip.0=Ports IC2's nuclear reactor heat and generation mechanics.
+machine.mtreactor.tooltip.1=Reactor components go into a Reactor Access Hatch (EV..UIV); every 9x6 page is an independent, isolated reactor.
+machine.mtreactor.tooltip.2=One heat cycle every 20 ticks; heat and explosion checks are calculated per page, with the ceiling set by the heat control hatch.
+machine.mtreactor.tooltip.3=Generation is core output * 5 EU/t, emitted through dynamo hatches.
+machine.mtreactor.tooltip.4=Overheating (100%) causes a nuclear explosion and destroys the machine.
+machine.mtreactor.tooltip.5=Requires exactly one Reactor Heat Control Hatch (EV..UIV); its tier sets the heat ceiling.
+machine.mtreactor.structure.error.missing_access_hatch=Missing Reactor Access Hatch
+machine.mtreactor.structure.error.missing_heat_hatch=Missing Reactor Heat Control Hatch
+machine.mtreactor.structure.error.too_many_heat_hatch=Only one Reactor Heat Control Hatch is allowed
+machine.mtreactor.waila.access_hatches=Access Hatches: %s
+machine.mtreactor.waila.components=Components: %s
+machine.mtreactor.waila.incomplete=Incomplete Structure
+machine.mtreactor.waila.heat=Heat: %s / %s
+machine.mtreactor.waila.heat_percent=Core Heat: %s%%
+machine.mtreactor.waila.stable=Stable: %s
+machine.mtreactor.waila.stable.yes=Yes
+machine.mtreactor.waila.stable.no=No
+machine.mtreactor.waila.output=Generation: %s EU/t
+machine.mtreactor.gui.access_hatches=Access Hatches: %s
+machine.mtreactor.gui.components=Components: %s
+machine.mtreactor.gui.heat=Heat: %s / %s
+machine.mtreactor.gui.heat_percent=Core Heat: %s%%
+machine.mtreactor.gui.stable=Stable: %s
+machine.mtreactor.gui.stable.tooltip=Live simulation of the next IC2 cycle, assuming the reactor is running.
+machine.mtreactor.gui.stable.yes=Yes
+machine.mtreactor.gui.stable.no=No
+machine.mtreactor.gui.auto_match=Auto input/output matching target
+machine.mtreactor.gui.auto_match.on=Enabled
+machine.mtreactor.gui.auto_match.off=Disabled
+machine.mtreactor.gui.auto_match.tooltip=Outputs finished components (and refills empty locked slots) through the matching buses.
+machine.mtreactor.slot.panel.title=Slot %s
+machine.mtreactor.slot.empty=Empty slot
+machine.mtreactor.slot.fuel_durability=Fuel rod durability left: %s%%
+machine.mtreactor.slot.coolant_heat=Coolant cell heat: %s / %s (%s%%)
+machine.mtreactor.slot.threshold=Auto output percentage:
+machine.mtreactor.slot.threshold.short=Locked, auto output when durability ≤ %s%%
+machine.mtreactor.slot.percent=%
+machine.mtreactor.slot.hint=Shift+Right click: lock same item type (all pages) / unlock this slot; Alt+Shift+Right click: unlock all slots of the same item type; Middle click: settings
+machine.mtreactor.structure.error.missing_locked_component=Locked slot is missing its component
+machine.mtreactor.structure.error.missing_input_bus=Auto mode requires an input bus
+machine.mtreactor.structure.error.missing_output_bus=Auto mode requires an output bus
+machine.mtreactor.gui.component_low=Locked component durability is at or below its threshold
+GT5U.gui.text.shutdown_reason.reactor_component_missing=§4Shut down: a locked reactor slot is missing its component.
+GT5U.gui.text.shutdown_reason.reactor_component_low=§4Shut down: a locked reactor component is at or below its threshold.
+machine.mtreactor.gui.page=Page %s / %s
+machine.mtreactor.gui.previous=Previous page
+machine.mtreactor.gui.next=Next page
+machine.mtreactor.accesshatch.name=Reactor Access Hatch
+machine.mtreactor.accesshatch.desc.0=Holds %s independent 9x6 reactor grid(s), %s component slots in total
+machine.mtreactor.accesshatch.desc.1=Each page matches an IC2 reactor grid exactly
+machine.mtreactor.accesshatch.desc.2=Only IC2 reactor components can be inserted
+machine.mtreactor.accesshatch.desc.3=Logistics/OC slot index: page*54 + y*9 + x (page 0..N-1, y 0..5, x 0..8)
+machine.mtreactor.heathatch.name=Reactor Heat Control Hatch
+machine.mtreactor.heathatch.desc.0=Heat ceiling: %s
+machine.mtreactor.heathatch.desc.1=Each reactor needs exactly one heat control hatch
+machine.mtreactor.heathatch.desc.2=The tier of the hatch sets the heat ceiling of the whole reactor
 
-GT5U.gui.text.recipe_result.nanite_stalled=§cNanite tier too low or no nanites
+# --- Transcendent Metal Fuel Rods ---
+gt.rodTranscendentMetal.name=Fuel Rod (Transcendent Metal)
+gt.rodTranscendentMetal2.name=Dual Fuel Rod (Transcendent Metal)
+gt.rodTranscendentMetal4.name=Quad Fuel Rod (Transcendent Metal)
+gt.rodTranscendentMetalDepleted.name=Fuel Rod (Depleted Transcendent Metal)
+gt.rodTranscendentMetalDepleted2.name=Dual Fuel Rod (Depleted Transcendent Metal)
+gt.rodTranscendentMetalDepleted4.name=Quad Fuel Rod (Depleted Transcendent Metal)
+death.attack.damage.messtech.reactorExplode=%1$s was vaporized by a MessTech reactor meltdown
+
+# --- A Piggy ---
+item.messtech.piggy.plain.name=A Piggy
+item.messtech.piggy.transcendentMetal.name=A Piggy (Transcendent Metal)
+item.messtech.piggy.infinity.name=A Piggy (Infinity)
+item.messtech.piggy.magMatter.name=A Piggy (MagMatter)
+item.messtech.piggy.eternity.name=A Piggy (Eternity)
+item.messtech.piggy.universium.name=A Piggy (Universium)
+item.messtech.piggy.sixPhasedCopper.name=A Piggy (Six-Phased Copper)
+messtech.piggy.effect=Material
+messtech.piggy.tooltip=Right click throws it (not used up), shift + right click cycles the look
+messtech.piggy.hat=Wears on the head: put it in the helmet slot and it stands on top of you
+messtech.piggy.switched=Material switched to %s
+messtech.piggy.kill.failed=Even the piggy cannot chew through %s
+# The death message of a player the piggy kills (DEATH_MESSAGE_KEY of MTTrueKill.PiggyDamageSource). %1$s is the name
+# of the victim; death messages are translated on the client, so this is what an English client reads.
+death.attack.messtech.piggy=%1$s was knocked flying by a Piggy
+messtech.itemEffect.plain=Plain
+messtech.itemEffect.transcendentMetal=Transcendent Metal
+messtech.itemEffect.infinity=Infinity
+messtech.itemEffect.magMatter=MagMatter
+messtech.itemEffect.eternity=Eternity
+messtech.itemEffect.universium=Universium
+messtech.itemEffect.sixPhasedCopper=Six-Phased Copper
+# The string the "PigTech" animation (MTPigTechText) animates; edit it and the animation follows. It is shown behind
+# the static "Add by:" prefix of messTech.addBy, which is not animated.
+messtech.pigTech=PigTech
+
+# ---ChemicalTwister---
+machine.largechemicaltwister.name=Large Chemical Twister
+machine.chemicaltwister.machinetype=Chemical Twister | Probability Destroyer
+mt.recipe.chemicaltwister=Chemical Twister
+mt.recipe.chemicaltwister.structure_level=Required Structure Level
+mt.recipe.qft_probability_destroyer=Probability Destroyer (QFT)
+machine.largechemicaltwister.mode.chemical_twister=Chemical Twister
+machine.largechemicaltwister.mode.probability_destroyer=Probability Destroyer
+machine.largechemicaltwister.cannot_switch_active=Cannot switch mode while the machine is running!
+machine.largechemicaltwister.tooltip.modes=Screwdriver switches mode: Chemical Twister / Probability Destroyer (QFT)
+machine.largechemicaltwister.tooltip.qft=Probability Destroyer: QFT recipes, every output chance 100%, fixed 12601 K
+mt.machine.tooltip.twisted=§6§lA sound suddenly appear in your mind when you are watching this machine...§m§0Twist§r
+machine.chemicaltwister.structureinfo.1=§l§9A deep voice echoes nearby:§r Some §krecipes§r come from §kT§rS§kT§r

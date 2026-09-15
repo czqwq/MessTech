@@ -4,7 +4,6 @@ import java.util.List;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
-import com.gtnewhorizons.modularui.api.drawable.UITexture;
 import com.gtnewhorizons.modularui.api.math.Pos2d;
 import com.gtnewhorizons.modularui.api.math.Size;
 
@@ -38,12 +37,10 @@ public class NanoScaleFoundry24PoolFrontend extends RecipeMapFrontend {
     private static final int PROGRESS_X = 116;
     private static final int PROGRESS_Y = OUTPUT_Y;
 
-    private static final UITexture MT_LOGO = UITexture.fullImage("messtech", "gui/picture/mt_logo");
-
     public NanoScaleFoundry24PoolFrontend(BasicUIPropertiesBuilder uiPropertiesBuilder,
         NEIRecipePropertiesBuilder neiPropertiesBuilder) {
         super(
-            uiPropertiesBuilder.logo(MT_LOGO)
+            uiPropertiesBuilder.logo(MTRecipeMaps.MT_LOGO)
                 .logoPos(new Pos2d(152, 8))
                 .progressBarPos(new Pos2d(PROGRESS_X, PROGRESS_Y)),
             neiPropertiesBuilder);

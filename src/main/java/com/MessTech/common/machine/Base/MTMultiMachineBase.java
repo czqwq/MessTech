@@ -28,6 +28,7 @@ import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
+import com.MessTech.common.gui.base.MTMultiMachineBaseGui;
 import com.MessTech.init.Config;
 import com.gtnewhorizon.structurelib.alignment.constructable.IConstructable;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
@@ -59,6 +60,7 @@ import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.threads.RunnableSound;
 import gregtech.api.util.GTUtility;
 import gregtech.client.GTSoundLoop;
+import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 import gregtech.common.tileentities.machines.IDualInputHatch;
 import gregtech.common.tileentities.machines.IDualInputInventory;
 import gregtech.common.tileentities.machines.MTEHatchInputBusME;
@@ -67,7 +69,7 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 
 public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extends MTEExtendedPowerMultiBlockBase<T>
-    implements IConstructable, ISurvivalConstructable {
+    implements IConstructable, ISurvivalConstructable, IHatchWatcher {
 
     protected boolean doPeriodicChecks = false;
 
@@ -78,6 +80,15 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
 
     public MTMultiMachineBase(String aName) {
         super(aName);
+    }
+
+    /**
+     * All MessTech machines share the MT logo in their controller GUI. Machines with a specialised GUI subclass
+     * override this or the GUI's logo widget; space modules use their own picture and are not affected.
+     */
+    @Override
+    protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
+        return new MTMultiMachineBaseGui<>(this);
     }
 
     // endregion
@@ -749,9 +760,23 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     public void addIfSmartInput(IMetaTileEntity mte) {
         if (mte instanceof ISmartInputHatch hatch) {
             mSmartInputHatches.add((gregtech.common.tileentities.machines.ISmartInputHatch) hatch);
-            hatch.addWatcher((IHatchWatcher) this);
+            hatch.addWatcher(this);
             doPeriodicChecks |= hatch.needsPeriodicChecks();
         }
+    }
+
+    /**
+     * The hatches registered through {@link #addIfSmartInput} call this when their contents changed, so the machine
+     * checks for a recipe on the next tick instead of waiting for its periodic poll.
+     * <p>
+     * The GT5U of this GTNH line has no event-driven recipe check: {@code MTEMultiBlockBase#onPostTick} only knows the
+     * {@code mUpdated} flag. Both {@link RecipeCheckReason}s therefore land there - the throttling of
+     * {@link RecipeCheckReason#THROTTLED} belongs to the newer line's post-failure cooldown, which defaults to 0
+     * (i.e. runs immediately) anyway.
+     */
+    @Override
+    public void scheduleRecipeCheck(RecipeCheckReason reason) {
+        mUpdated = true;
     }
 
     @Override

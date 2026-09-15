@@ -9,9 +9,9 @@ import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.world.World;
 
-import com.MessTech.common.item.ItemMessFood;
-import com.MessTech.common.item.MTItems;
-import com.MessTech.common.item.MessFoodHelper;
+import com.MessTech.common.items.ItemMessFood;
+import com.MessTech.common.items.MTItems;
+import com.MessTech.common.items.MessFoodHelper;
 
 /**
  * Shapeless "throw any 2-9 foods into a crafting grid" recipe that produces a {@link ItemMessFood}.

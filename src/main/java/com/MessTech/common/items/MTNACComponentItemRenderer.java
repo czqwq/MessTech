@@ -1,4 +1,4 @@
-package com.MessTech.common.item;
+package com.MessTech.common.items;
 
 import static gregtech.loaders.ExtraIcons.circuitComponentOverlay;
 import static net.minecraftforge.client.IItemRenderer.ItemRenderType.INVENTORY;

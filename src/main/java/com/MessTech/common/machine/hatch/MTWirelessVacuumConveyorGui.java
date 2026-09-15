@@ -2,9 +2,11 @@ package com.MessTech.common.machine.hatch;
 
 import static net.minecraft.util.StatCollector.translateToLocal;
 
+import com.MessTech.common.gui.MTGuiTextures;
 import com.cleanroommc.modularui.api.IPanelHandler;
 import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.drawable.DynamicDrawable;
+import com.cleanroommc.modularui.drawable.UITexture;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.value.sync.BooleanSyncValue;
@@ -122,5 +124,11 @@ public class MTWirelessVacuumConveyorGui extends MTEHatchVacuumConveyorGui {
 
         panel.child(column);
         return panel;
+    }
+
+    /** MessTech logo instead of the default GregTech logo. */
+    @Override
+    protected UITexture getLogoTexture() {
+        return MTGuiTextures.PICTURE_MT_LOGO;
     }
 }

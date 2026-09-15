@@ -293,14 +293,113 @@ machine.dbbfurnace.tooltip.1=模式1：砖高炉模式；模式2：冶金模式�
 machine.dbbfurnace.tooltip.2=吸取空气中的CO2,将其转化为冶炼所需的材料.
 machine.dbbfurnace.tooltip.3=好吧,等一等是骗你的,机器将始终以1tick处理配方
 
-# --- 玻色-爱因斯坦凝聚态物质聚合阵列 ---
-machine.bosescraftingarray.name=玻色-爱因斯坦凝聚态物质聚合阵列
-machine.bosescraftingarray.machinetype=玻色-爱因斯坦凝聚态物质聚合阵列
-machine.bosescraftingarray.tooltip.0=§l生成,收容,观测,聚合§r
-machine.bosescraftingarray.tooltip.1=使用奇点纳米收容总线识别纳米蜂群，纳米蜂群不会被消耗
-machine.bosescraftingarray.tooltip.2=机器读取所有总线中的最高纳米蜂群等级；每个纳米蜂群提供 0.5 基础速度
-machine.bosescraftingarray.tooltip.3=配方的纳米蜂群等级分步机制与原版 BEC 相同
-machine.bosescraftingarray.need_nanite_bus=至少需要 1 个奇点纳米蜂群总线
-machine.bosescraftingarray.poc=启用无损超频
+# --- 核反应堆 ---
+machine.mtreactor.name=核反应堆
+machine.mtreactor.machinetype=核反应堆
+machine.mtreactor.tooltip.0=移植自 IC2 的核反应堆热力与发电机制
+machine.mtreactor.tooltip.1=反应堆组件放入核反应堆访问仓（EV..UIV）；每页 9x6 槽位都是一座独立运行、互相隔离的反应堆
+machine.mtreactor.tooltip.2=每 20 tick 进行一次热力循环，热量累积与爆炸判定均按页独立计算，上限由热量控制仓决定
+machine.mtreactor.tooltip.3=发电量 = 堆芯输出 × 5 EU/t，通过动力仓输出
+machine.mtreactor.tooltip.4=堆芯过热（100%）会引发核爆并摧毁整台机器
+machine.mtreactor.tooltip.5=必须安装且只能安装一个核反应堆热量控制仓（EV..UIV），其等级决定热量上限
+machine.mtreactor.structure.error.missing_access_hatch=缺少核反应堆访问仓
+machine.mtreactor.structure.error.missing_heat_hatch=缺少核反应堆热量控制仓
+machine.mtreactor.structure.error.too_many_heat_hatch=核反应堆热量控制仓只能安装一个
+machine.mtreactor.waila.access_hatches=控制仓数量: %s
+machine.mtreactor.waila.components=组件数量: %s
+machine.mtreactor.waila.incomplete=结构不完整
+machine.mtreactor.waila.heat=热量: %s / %s
+machine.mtreactor.waila.heat_percent=堆温百分比: %s%%
+machine.mtreactor.waila.stable=稳定: %s
+machine.mtreactor.waila.stable.yes=是
+machine.mtreactor.waila.stable.no=否(轻而易举啊!)
+machine.mtreactor.waila.output=发电: %s EU/t
+machine.mtreactor.gui.access_hatches=控制仓数量: %s
+machine.mtreactor.gui.components=组件数量: %s
+machine.mtreactor.gui.heat=热量: %s / %s
+machine.mtreactor.gui.heat_percent=堆温百分比: %s%%
+machine.mtreactor.gui.stable=稳定: %s
+machine.mtreactor.gui.stable.tooltip=实时模拟下一个 IC2 热力循环，假设反应堆正在运行。
+machine.mtreactor.gui.stable.yes=是
+machine.mtreactor.gui.stable.no=否
+machine.mtreactor.gui.auto_match=自动输入/输出匹配目标
+machine.mtreactor.gui.auto_match.on=已启用
+machine.mtreactor.gui.auto_match.off=已禁用
+machine.mtreactor.gui.auto_match.tooltip=将完成输出的组件送出，并从同类总线补充锁定槽位
+machine.mtreactor.slot.panel.title=槽位 %s
+machine.mtreactor.slot.empty=空槽位
+machine.mtreactor.slot.fuel_durability=燃料棒剩余耐久: %s%%
+machine.mtreactor.slot.coolant_heat=冷却单元热值: %s / %s (%s%%)
+machine.mtreactor.slot.threshold=自动输出百分比:
+machine.mtreactor.slot.threshold.short=已锁定，耐久 ≤ %s%% 时自动输出
+machine.mtreactor.slot.percent=%
+machine.mtreactor.slot.hint=Shift+右键: 锁定同类物品（全部页）/解锁单个槽位；Alt+Shift+右键: 解除同类物品的全部锁定；中键: 打开设置
+machine.mtreactor.structure.error.missing_locked_component=锁定槽位缺少对应组件
+machine.mtreactor.structure.error.missing_input_bus=自动模式需要输入总线
+machine.mtreactor.structure.error.missing_output_bus=自动模式需要输出总线
+machine.mtreactor.gui.component_low=锁定槽位组件耐久已达到/低于阈值
+GT5U.gui.text.shutdown_reason.reactor_component_missing=§4已停机：锁定槽位缺少反应堆组件
+GT5U.gui.text.shutdown_reason.reactor_component_low=§4已停机：锁定槽位的反应堆组件耐久已达到/低于阈值
+machine.mtreactor.gui.page=第 %s / %s 页
+machine.mtreactor.gui.previous=上一页
+machine.mtreactor.gui.next=下一页
+machine.mtreactor.accesshatch.name=核反应堆访问仓
+machine.mtreactor.accesshatch.desc.0=容纳 %s 页相互独立的 9x6 反应堆网格，共 %s 个组件槽
+machine.mtreactor.accesshatch.desc.1=每页与 IC2 反应堆网格完全一致
+machine.mtreactor.accesshatch.desc.2=仅可放入 IC2 反应堆组件
+machine.mtreactor.accesshatch.desc.3=物流/OC 槽位索引: 页*54 + y*9 + x（页 0..N-1，y 0..5，x 0..8）
+machine.mtreactor.heathatch.name=核反应堆热量控制仓
+machine.mtreactor.heathatch.desc.0=热量上限: %s
+machine.mtreactor.heathatch.desc.1=每台核反应堆必须且只能安装一个热量控制仓
+machine.mtreactor.heathatch.desc.2=控制仓的等级决定整座反应堆的热量上限
 
-GT5U.gui.text.recipe_result.nanite_stalled=§c纳米蜂群等级不足或没有纳米蜂群
+# --- 超时空金属燃料棒 ---
+gt.rodTranscendentMetal.name=超时空金属燃料棒
+gt.rodTranscendentMetal2.name=超时空金属双联燃料棒
+gt.rodTranscendentMetal4.name=超时空金属四联燃料棒
+gt.rodTranscendentMetalDepleted.name=枯竭超时空金属燃料棒
+gt.rodTranscendentMetalDepleted2.name=枯竭超时空金属双联燃料棒
+gt.rodTranscendentMetalDepleted4.name=枯竭超时空金属四联燃料棒
+death.attack.damage.messtech.reactorExplode=%1$s 被 MessTech 反应堆熔毁气化了
+
+# --- 一只猪猪 ---
+item.messtech.piggy.plain.name=一只猪猪
+item.messtech.piggy.transcendentMetal.name=一只猪猪（超时空金属）
+item.messtech.piggy.infinity.name=一只猪猪（无尽）
+item.messtech.piggy.magMatter.name=一只猪猪（磁流体物质）
+item.messtech.piggy.eternity.name=一只猪猪（永恒）
+item.messtech.piggy.universium.name=一只猪猪（宇宙素）
+item.messtech.piggy.sixPhasedCopper.name=一只猪猪（六相铜）
+messtech.piggy.effect=材质
+messtech.piggy.tooltip=右键投掷（不会消耗），潜行 + 右键循环切换外观
+messtech.piggy.hat=可以戴在头上：放进头盔槽，它就会站在你头顶
+messtech.piggy.switched=材质已切换为 %s
+messtech.piggy.kill.failed=这只猪猪也啃不动 %s
+# 玩家被猪猪砸死时的死亡提示词（MTTrueKill.PiggyDamageSource 的 DEATH_MESSAGE_KEY）。%1$s 是玩家的名字。
+# 死亡提示词由客户端翻译，所以这条中文在 zh_CN，英文文本在同名的 en_US 键里。
+death.attack.messtech.piggy=%1$s被猪猪创飞了
+messtech.itemEffect.plain=普通
+messtech.itemEffect.transcendentMetal=超时空金属
+messtech.itemEffect.infinity=无尽
+messtech.itemEffect.magMatter=磁流体物质
+messtech.itemEffect.eternity=永恒
+messtech.itemEffect.universium=宇宙素
+messtech.itemEffect.sixPhasedCopper=六相铜
+# “PigTech” 动画（MTPigTechText）作用的字符串，改这里动画会跟着改。它显示在
+# messTech.addBy 那条静态的“添加模组:”之后，前缀本身不参与动画。
+messtech.pigTech=PigTech
+
+# ---化学扭曲者---
+machine.largechemicaltwister.name=大型化学扭曲者
+mt.recipe.chemicaltwister=化学扭曲
+machine.chemicaltwister.machinetype=化学扭曲者 | 概率毁灭者
+mt.recipe.chemicaltwister.structure_level=需要结构等级
+mt.recipe.qft_probability_destroyer=概率毁灭者(QFT)
+machine.largechemicaltwister.mode.chemical_twister=化学扭曲
+machine.largechemicaltwister.mode.probability_destroyer=概率毁灭者
+machine.largechemicaltwister.cannot_switch_active=机器运行时无法切换模式!
+machine.largechemicaltwister.tooltip.modes=螺丝刀切换模式: 化学扭曲 / 概率毁灭者(QFT)
+machine.largechemicaltwister.tooltip.qft=概率毁灭者: QFT配方, 所有产出概率100%, 固定12601K
+mt.machine.tooltip.twisted=§6§l望着这个机器,脑海中突然有一道声音传出§r...§m§0§l扭曲§r
+machine.chemicaltwister.poc=启用无损超频
+machine.chemicaltwister.structureinfo.1=§l§9一道低沉的声音在身边回响:§r 部分§k配方§r来自§kT§rS§kT§r
