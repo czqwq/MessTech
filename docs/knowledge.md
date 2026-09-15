@@ -133,8 +133,6 @@ MTMultiMachineBase<T>
   `Casings.AssemblerMachineCasing`. Only the overlay is taken from the other machine: the base layer is unchanged, the
   neutron activator would otherwise bring a casing texture of its own (`getCasingTextureForId(49)`) along. The art is a
   12x12 panel inside a two pixel transparent border, so that border is where the casing shows through.
-- `tmp/reactorface/verify_reactor_face.py` checks that wiring (the icon names against the donor class, the three layer
-  face, the untouched base) and writes the previews of the art into `tmp/reactorface/`.
 
 ### MTChemicalTwister
 - Structure: `A` containment field machine casing, `B` fusion coil block, `C` **heating coils**, `D` chemically inert
@@ -162,8 +160,8 @@ MTMultiMachineBase<T>
   StructureLib binds one element map to the whole structure definition, and level 1 already means other casings with
   A-E, so a collision would make both pieces accept each other's blocks (and let hatches be placed anywhere).
   Mapping: F `BulkProductionFrame`, G `QuantumForceTransformerCoilCasing`, **H `SpaceTimeContinuumRipper` + the hatches
-  of that piece**, I `SpaceTimeBendingCore`, J `ForceFieldGlass` (`tmp/chemicaltwister/remap_tier2_letters.py` did the
-  letter move, the geometry is untouched). The piece has **no heating coil ring**, so level 1 keeps the EBF heat
+  of that piece**, I `SpaceTimeBendingCore`, J `ForceFieldGlass` (only the letters were moved, the geometry is
+  untouched). The piece has **no heating coil ring**, so level 1 keeps the EBF heat
   formula and the coil error, while level 2 runs at the fixed `MTRecipeMaps.QFT_PROBABILITY_DESTROYER_HEAT = 12601`
   (Hypogen) and needs no coil. `checkMachine` checks level 2 first, speculatively (`null` error list).
 - Machine modes: `totalMachineMode() = 2` (mode 0 化学扭曲, mode 1 概率毁灭者); the base class then enables the GUI
@@ -203,9 +201,6 @@ MTMultiMachineBase<T>
   heat, so it is set explicitly), the QFT catalyst turned into a **non-consumed input** (stackSize 0: GT requires it in
   the bus but does not consume it) and the QFT metadata kept for NEI. Page: `maxIO(9, 9, 9, 9)`, `LargeNEIFrontend`,
   height 166, MessTech logo.
-- `tmp/chemicaltwister/verify_tier2_qft.py` checks all of the above against the GT sources (shape integrity, letters,
-  hatch host, mode wiring, fixed heat, pool copy semantics, and in section X the level-dependent face/casing plus the
-  client sync and the icon-load timing it depends on).
 - Recipes ask for a level with `MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL` (a `RecipeMetadataKey<Integer>` whose
   `drawInfo` draws "Required Structure Level: N" on the NEI page; a recipe without it needs
   `MTRecipeMaps.DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL = 1`). The processing logic checks the level *before* the
@@ -239,18 +234,17 @@ MTMultiMachineBase<T>
   y=62 while `UIHelper.getItemInputPositions` grows the item grid downward from y=6, so with a big `maxIO` (the old
   `18, 18, 12, 12`) the item slots and the fluid row are drawn on top of each other. `maxIO` is display-only ("does not
   actually restrict the number of items that can be used in recipes"), but it does size that phantom grid, so it has to
-  be raised together with any recipe that outgrows it. `tmp/chemicaltwister/verify_nei_layout.py` re-implements both
-  layouts from the GT sources and checks the geometry (old config overlaps, new one does not, everything fits the
-  background and the text area, maxIO is the requested 3 x 5 grid, the logo is ours);
-  `make_layout_preview.py` renders the before/after mock.
+  be raised together with any recipe that outgrows it. The geometry was checked against both layouts as the GT
+  sources build them: the old config overlaps, the new one does not, everything fits the background and the text
+  area, maxIO is the requested 3 x 5 grid, and the logo is ours.
 - Recipe classes: the pool's recipes live in `com.MessTech.common.recipe.MTChemicalTwisterRecipes`
   (`addChemicalTwisterRecipes()`, called once from `GTRecipes.loadRecipes()` at FMLLoadComplete) plus
   `loadRecipePostInit()` (called once from `CommonProxy.postInit()`) for recipes that have to wait for other mods (the
   H2O2 one). Every builder grabs the pool as `RecipeMap<RecipeMapBackend> MT = MTRecipeMaps.MTChemicalTwisterRecipes;`
-  and ends with `.addTo(MT)`. `tmp/chemicaltwister/verify_recipe_pool.py` audits the whole pool: exactly one call site
-  (no double registration), all builders added to `MT`, duration/EU/t/heat/structure-level present on every recipe, no
-  >64 stack clamped by the stack factories, no >64 stack inside a plain `itemInputs`, every recipe fits the NEI grid
-  and no two recipes share the same input signature.
+  and ends with `.addTo(MT)`. The whole pool was audited: exactly one call site (no double registration), all builders
+  added to `MT`, duration/EU/t/heat/structure-level present on every recipe, no >64 stack clamped by the stack
+  factories, no >64 stack inside a plain `itemInputs`, every recipe fits the NEI grid and no two recipes share the
+  same input signature.
 - One-step platinum-group-metal recipe in that pool (the first builder of `addChemicalTwisterRecipes()`): 45
   `WerkstoffLoader.PTMetallicPowder` + NaOH/saltpeter/zinc/calcium + 81 potassium disulfate dust (the chain burns
   11579 mB of the molten form; 1 dust == 144 mB, so it is fed as dust to keep the fluid list short) + ammonia/HCl/HNO3/
@@ -270,11 +264,10 @@ MTMultiMachineBase<T>
   form matched identically, but NEI draws one slot per recipe input entry, i.e. it showed two slots; a single unsafe
   stack keeps every ingredient on one NEI slot (NaOH 124, K2S2O7 81, sodium nitrate 172, zinc sulfate 69).
 - That recipe is the *net* stoichiometry of the whole GT5U platinum line (`bartworks` `PlatinumSludgeRecipes`), not a
-  guess: every recipe of the line is transcribed as a stoichiometric vector in `tmp/platinum/solve_pgm.py`, all cyclic
-  intermediates are balanced exactly, everything the line produces but never eats again is dropped, and the remaining
-  free directions were fixed by requiring a physically realisable steady state (no negative recipe runs).
-  `tmp/platinum/derive_platinum_recipe.py` prints the derivation, `tmp/platinum/verify_platinum_recipe.py` re-derives
-  the numbers from the chain and cross-checks the Java recipe, the pool registration and the heat semantics.
+  guess: every recipe of the line was transcribed as a stoichiometric vector, all cyclic intermediates are balanced
+  exactly, everything the line produces but never eats again is dropped, and the remaining free directions were fixed
+  by requiring a physically realisable steady state (no negative recipe runs). The numbers were re-derived from the
+  chain and cross-checked against the Java recipe, the pool registration and the heat semantics.
 - Notes on the derivation: Platinum Metallic Powder is the only metal feed - the Pt line's "palladium enriched
   ammonia" byproduct carries the palladium, so no Palladium Metallic Powder (palladium ore) is needed. The Pd line's
   circuit-2 recipe (`PDAmmonia` -> `PDSalt`) is deliberately excluded: it turns the loop into a palladium printer
@@ -285,8 +278,6 @@ MTMultiMachineBase<T>
 - Heat: the recipe asks for 2701 K (Kanthal), and at IV energy the machine reaches 3001 K, so a Kanthal ring is the
   minimum coil; a cupronickel ring at IV only reaches 2101 K and is refused. The IV EU/t of the recipe itself needs an
   IV energy hatch (the recipe search only returns recipes the machine's voltage can pay for).
-- `tmp/chemicaltwister/verify_chemical_twister.py` checks the machine side (coil wiring, heat formula, formula table)
-  against the EBF sources and prints the heat table of every coil level on every energy tier.
 
 ### MTComputingCenter
 - 3 modes, screwdriver switches, blocked while active or heat present.
@@ -368,7 +359,7 @@ MTMultiMachineBase<T>
   Board Processor fluid inputs are removed (machine-internal/NEI display only); other module fluids and
   Assembly Matrix fluids are kept; duplicate item/fluid inputs are merged and recipes are deduplicated.
 - Measured max IO: 47 distinct item inputs / 18 distinct fluid inputs (PlanckCircuit); the map is
-  declared as `maxIO(48, 1, 18, 0)` and analyzed by `tools/analyze_nanoscale_io.py`.
+  declared as `maxIO(48, 1, 18, 0)`.
 - 24 pool duration/EUt are informational only until the actual 24 machine mode is implemented.
 
 ### Blocks
@@ -419,7 +410,7 @@ MTMultiMachineBase<T>
    `blockCasings2Misc:12`, and `GregtechMetaCasingBlocks2` skips meta 12, so
    `getCasingTextureForId(TAE.getIndexFromPage(1, 12))` would return null). For those, copy the block with
    `TextureFactory.of(casing.getBlock(), casing.getBlockMeta())` instead of looking up an id - that is what the level 2
-   controller casing does. `tmp/chemicaltwister/verify_tier2_qft.py` (T12-T18, X4-X7) guards this for the whole repo.
+   controller casing does.
 9. An `IIconContainer` created lazily is never stitched: `TexturesGtBlock.CustomIcon` adds itself to
    `GregTechAPI.sGTBlockIconload` in its constructor and GT only walks that list in `BlockMachines#registerBlockIcons`
    during the icon load phase. Reading such a field inside `getTexture(...)` (i.e. on the first frame) therefore leaves
@@ -588,13 +579,58 @@ MTMultiMachineBase<T>
     `bgColor = (0.10, 0.225 +- 0.075, 0.30 +- 0.05)`, and the pig's near black eye (luma 0.17) is exactly as
     bright, so a bare dark dot disappears into it. The 2x2 pupils are kept and the 12 pixels around each get a
     pale rim (`#cfe4f2` at alpha 190), which reads whether a star or the plain background sits behind it.
-    Contrast is checked at several points of the background's pulse by `tmp/piggen/verify_universium_face.py`,
-    which also fails if any plain skin pixel ever creeps back into the overlay.
+    Contrast holds at every point of the background's pulse, and no plain skin pixel ever creeps back into the
+    overlay.
   - GT5U's accessibility switches are honoured: `Client.render.renderTransMetalFancy`,
     `renderInfinityFancy`, `renderUniversiumFancy`, `renderGlitchFancy` fall back to the plain icon.
 - Shift + right click cycles the effect. The damage value is written on both sides, the oink is played
   server side (so it is heard once) and the chat line is sent client side (so it uses the client language).
-- Textures: `assets/messtech/textures/items/pigs/pig*.png`, built by `tmp/piggen/generate.py` from the
+- Right click throws the piggy and does not consume it - the stack comes back untouched - which is why the item
+  stacks to **one**: it is a pet and a hat, not ammunition. The projectile itself is unchanged
+  (`MTEntityPiggy`, effect in the damage value of the thrown stack).
+- The piggy fits into the **helmet slot**: `MTItemPiggy#isValidArmor` answers true for armor type `0`, i.e. the hook
+  vanilla's `ContainerPlayer.SlotArmor#isItemValid` asks (`Item#isValidArmor` numbers the slots 0 helmet, 1 chest,
+  2 legs, 3 boots - *not* the numbering of `InventoryPlayer#armorItemInSlot`, where the helmet is 3). Without that
+  override the slot only takes armour, pumpkins and skulls.
+- Wearing it is drawn by `common/entity/MTPiggyHatRenderer` (client only, registered from `ClientProxy.preInit`):
+  1.7.10 has no renderer for a plain item on the head - `RenderPlayer#renderEquippedItems` only knows `ItemBlock`
+  blocks (the pumpkin) and skulls - so the handler watches `RenderPlayerEvent.Specials.Post`, which is posted at the
+  end of exactly that method, i.e. **inside the model of the player**, in the same space vanilla draws the pumpkin
+  and the skull in. It reads `inventory.armorItemInSlot(3)` and, if that stack is a piggy, puts the model on the
+  head: `event.renderer.modelBipedMain.bipedHead.postRender(0.0625F)` - the head part carries the whole pose of the
+  head, its angles are the head's own yaw and pitch - then 8 px (half a block, the height of the head box) up onto
+  the top of the head, and finally scales by `SCALE / 0.9375` so the pig is `SCALE = 0.5` blocks tall in the world.
+  Because the pose comes from the head part itself, yaw, pitch, the crouch (whose head pivot drops a pixel), riding,
+  the death pose and the `0.125` a sneaking player that is not the camera is dropped by all come along by
+  themselves; sleeping, dead and invisible players are skipped.
+- The three facts that space is made of (all of them read out of the decompiled Minecraft sources, not guessed):
+  `RendererLivingEntity#doRender` flips the model (`glScalef(-1, -1, 1)`) before it hands it to the renderer, so
+  **`-Y` is up in the world, the face of the wearer points along `-Z` and one unit is a sixteenth of the model**
+  (`postRender` takes its `0.0625`); `RenderPlayer#preRenderCallback` scales everything by `0.9375`, which the
+  pig divides back out so `SCALE` keeps meaning blocks; and the rotation point of `bipedHead` is the **neck**, not
+  the top of the head - the head box grows 8 px up from it. With the half block of `HEAD_HEIGHT` added, the feet of
+  the pig end up exactly where the pumpkin and the skull are built around and where the old billboard put them,
+  `(24 + 8) / 16 * 0.9375 + 0.9375 / 128 = 1.8823` blocks above the feet (one pixel lower when crouching).
+- What stands on the head is `MTDynamicItemHelper#renderOnHead(wearer, stack)`: the sprite of
+  `Item#getIcon(stack, 0)` drawn standing on the origin of the matrix the hat renderer set up, facing `-Z`, so a
+  player in front of the wearer sees the pig's face. Neither the mirrored X of the model space nor the turn into the
+  facing direction flips it - the two cancel out - so the texture is not mirrored. The style of the stack's effect is
+  drawn on top of that sprite, which is what makes the hat the item and not a still picture:
+  - `TUMBLE` (Transcendent Metal) tumbles exactly like the item does: 3.5 degrees per client tick from
+    `GTMod.clientProxy().getAnimationRenderTicks()` about the oblique axis `(0.3, -0.5, -0.2)` - the mirrored copy
+    of GT5U's `(0.3, 0.5, 0.2)`, because the model space has Y and Z flipped, which keeps the tumble turning the way
+    it does in the hand - about the centre of the sprite.
+  - `UNIVERSIUM` runs its three passes again: the sprite, then gtnhlib's cosmic shader over the same geometry with
+    the depth function at `GL_EQUAL` (so the stars land on the sprite and not on the head behind it) and finally the
+    stack's overlay (`pigUniversiumFace`) in front of the finished sky.
+  - `HALO_PULSE` and `GLITCH` stay the plain sprite on the head: GT5U draws the halo, the pulse and the glitch
+    ghosts in the inventory only, and the animated strips of Infinity/MagMatter/Eternity animate by themselves. GT5U's
+    fancy switches are honoured on the head as well (`isFancyEnabled` falls back to the plain sprite).
+  - The items atlas is bound by the helper (no vanilla item pass did that for this draw) and culling is off for the
+    single quad, with `GL_ENABLE_BIT` pushed and popped around the whole thing.
+- The thrown piggy is unchanged by all of this: it stays the camera facing billboard of
+  `MTRenderPiggy`, scaled to 0.6 and spinning around the view axis.
+- Textures: `assets/messtech/textures/items/pigs/pig*.png`, built from the
   GT5U material icons (`assets/gregtech/textures/items/materialicons/...`): the material icon is
   in-painted to full coverage, tinted with the material colour and multiplied by the pig's own shading
   plus a fake top/bottom bevel.
@@ -608,20 +644,20 @@ MTMultiMachineBase<T>
   - MagMatter is the one material whose look *is* its grain, so its icon is not averaged 2x2 and blown up like the
     others: `pattern_tile = 2` walks the 16x16 icon across the 32x32 pig 1:1 and mirrored (the second copy runs
     backwards, so no seam shows). That roughly doubles the speckle density - mean neighbour difference 12.4 -> 22.3,
-    "edges" 27% -> 47% (checked by `tmp/piggen/magmatter_grain.py`) - while the face stays legible and the sprite is
+    "edges" 27% -> 47% - while the face stays legible and the sprite is
     about 5% darker from the sharper grain. Every other mode still uses tile 1 with smoothing and their PNGs are
     byte identical to before the change.
-  - `pig.png` itself was recovered from the hero render `tmp/pig_hero.png` by `tmp/piggen/rebuild_v3.py`
+  - `pig.png` itself was recovered from the hero render `tmp/pig_hero.png`
     (grid snapped, eyes to 2x2 and both nostrils to 1x2 blocks so the face is symmetric).
   - `pigUniversiumFace.png` is the one icon that is not a material build: it is the plain pig's face (both
     eyes, the snout, the nostrils - copied, not re-tinted) inside a feathered superellipse that the shader is
     not allowed to paint over, and it is what keeps the Universium pig from being a faceless hole into space.
     The patch is a superellipse rather than an ellipse because the eyes sit in the upper right and the snout in
     the lower left of the face, i.e. in two opposite corners; its edge fades over 2 px with a smoothstep so the
-    skin dissolves into the stars. `tmp/piggen/verify_universium_face.py` asserts that the patch covers every
-    eye/nostril/snout pixel at full alpha, that it stays on the pig's silhouette, that it is feathered, and that
-    the eyes stay readable against the face (it also writes `tmp/piggen/universium_face_preview.png`, a
-    before/after composite with an approximated star field, since the real shader needs the GPU).
+    skin dissolves into the stars. The patch covers every eye/nostril/snout pixel at full alpha, stays on the pig's
+    silhouette and is feathered, and the eyes stay readable against the face (see
+    `tmp/piggen/universium_face_preview.png`, a before/after composite with an approximated star field, since the
+    real shader needs the GPU).
 - Any other item can reuse the same look by calling `registerIcons` + `registerItemRenderer` and adding
   its own `item.<unlocalized>.<effect>.name` and `messtech.itemEffect.<effect>` language entries.
 - The renderers are copies, so the same GL state leaks GT5U has are kept on purpose: the halo layer
@@ -737,10 +773,7 @@ MTMultiMachineBase<T>
     sentence, the English one, the fallback of an untranslated key and the fact that `death.attack.infinity` stays
     untranslated. Run it with
     `javac -d tmp/mtkill/out -sourcepath tmp/mtkill/stubs src/main/java/com/MessTech/common/util/MTTrueKill.java tmp/mtkill/*.java`
-    and `java -cp tmp/mtkill/out MTKillHarness`. `python tmp/mtkill/verify_mutations.py` is the mutation test of that
-    harness: it copies the sources into `tmp/mtkill/mutation`, drops one piece of the behaviour at a time (the tracker
-    call of the forced death path, the message key, the Chinese text, the language key itself) and asserts the exact
-    set of checks that then fail, plus a control mutation that has to fail nothing.
+    and `java -cp tmp/mtkill/out MTKillHarness`.
 
 ## The "PigTech" text animation (`MTPigTechText` / `MTPigTech`)
 
@@ -784,6 +817,5 @@ MTMultiMachineBase<T>
   palette divides 20, so the colours also line up when the loop restarts.
 - `MTPigTechText` deliberately has no Minecraft imports: `tmp/pigtext/PigTechFrames.java` compiles it on its own with
   `javac` and checks the single line, the static prefix, the loop, the constant layout, the reserved margins, the
-  travel limit and every phase against the real strings (22866 checks, no game needed); it dumps the frames that
-  `tmp/pigtext/render_preview.py` draws with the game's own font glyphs.
+  travel limit and every phase against the real strings (22866 checks, no game needed).
 

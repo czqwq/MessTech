@@ -5,6 +5,7 @@ import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.oredict.OreDictionary;
 
 import com.MessTech.common.entity.MTEntityPiggy;
+import com.MessTech.common.entity.MTPiggyHatRenderer;
 import com.MessTech.common.entity.MTRenderPiggy;
 import com.MessTech.common.items.MTFuelRodItemRenderer;
 import com.MessTech.common.items.MTItems;
@@ -27,6 +28,9 @@ public class ClientProxy extends CommonProxy {
         MTDynamicItemHelper.registerItemRenderer(MTItems.piggy);
         // The thrown piggy: billboarded icon of the stack it was thrown with.
         RenderingRegistry.registerEntityRenderingHandler(MTEntityPiggy.class, new MTRenderPiggy());
+        // The worn piggy: vanilla cannot draw a plain item on the head (only blocks and skulls), so the helmet slot
+        // is watched and the pig is drawn on top of the head, from inside the model of the player.
+        MTPiggyHatRenderer.init();
         // PigRegisterOn: the animated "PigTech" line on the piggy's tooltip (wildcard damage = every variant), behind
         // the same static "Add by:" prefix the MessTech line uses. No author line, unlike AuthorDynamic.registerOn.
         MTPigTech.pigRegisterOn(new ItemStack(MTItems.piggy, 1, OreDictionary.WILDCARD_VALUE));

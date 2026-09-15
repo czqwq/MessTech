@@ -96,6 +96,14 @@ public final class MTDynamicItemHelper {
     private static double glitchOffsetRed;
     private static double glitchOffsetCyan;
 
+    /**
+     * The oblique axis {@link Style#TUMBLE} turns about and how far one client tick of the game turns it - the two
+     * numbers of GT5U's {@code TranscendentMetalRenderer}, shared by the item renderer and the sprite an item wears
+     * on a head.
+     */
+    private static final float TUMBLE_AXIS_X = 0.3F, TUMBLE_AXIS_Y = 0.5F, TUMBLE_AXIS_Z = 0.2F;
+    private static final float TUMBLE_DEGREES_PER_TICK = 3.5F;
+
     private MTDynamicItemHelper() {}
 
     /** How an {@link Effect} is drawn. */
@@ -268,6 +276,31 @@ public final class MTDynamicItemHelper {
     }
 
     /**
+     * Draws the look of the given stack standing on the head of the given wearer: the same sprite the item renderer
+     * draws, in the space a player model is drawn in - the one {@code RenderPlayerEvent.Specials} hands out and
+     * vanilla puts the pumpkin and the skull in. {@code MTPiggyHatRenderer} sets that space up.
+     * <p>
+     * The sprite stands on the origin of the current matrix (its feet there, its top one unit above) and faces the
+     * way the wearer does, so whoever stands in front of the wearer sees the pig's face. The effect decides the rest:
+     * <ul>
+     * <li>{@link Style#TUMBLE} tumbles - the same 3.5 degrees per client tick about the same oblique axis the item
+     * renderer uses - so the Transcendent Metal pig animates on the head instead of being a still picture.</li>
+     * <li>{@link Style#UNIVERSIUM} brings its cosmic shader along: the sky is drawn over the sprite in the same
+     * three passes the item renderer uses in the world, the stack's overlay last.</li>
+     * <li>Everything else is the sprite on its own, which is already the whole look outside of a GUI: GT5U draws the
+     * halo and the pulse of {@link Style#HALO_PULSE} and the ghosts of {@link Style#GLITCH} in the inventory only,
+     * and the animated material strips of the other effects animate by themselves.</li>
+     * </ul>
+     *
+     * @param wearer the entity the head belongs to; its position is what lights the cosmic shader
+     * @param stack  the worn stack
+     */
+    @SideOnly(Side.CLIENT)
+    public static void renderOnHead(Entity wearer, ItemStack stack) {
+        EffectRenderer.renderOnHead(wearer, stack);
+    }
+
+    /**
      * Honours GT5U's "fancy" accessibility switches: when a player turned an effect off there, the plain icon is drawn
      * instead, exactly like GT5U itself falls back to {@code GeneratedMaterialRenderer}.
      */
@@ -326,6 +359,115 @@ public final class MTDynamicItemHelper {
                 case GLITCH -> renderGlitch(type, icon);
                 default -> renderPlain(type, icon);
             }
+        }
+
+        /**
+         * Draws the stack's look standing on a head; the outer {@link MTDynamicItemHelper#renderOnHead} describes what
+         * the caller has to have set up. The sprite is the one {@link Item#getIcon(ItemStack, int)} hands out, i.e.
+         * the very sprite the inventory shows, so the look on the head is the look the stack carries everywhere else.
+         */
+        private static void renderOnHead(Entity wearer, ItemStack stack) {
+            if (stack == null || stack.getItem() == null) return;
+            IIcon icon = stack.getItem()
+                .getIcon(stack, 0);
+            if (icon == null) return;
+
+            Style style = getEffect(stack).style;
+            if (!isFancyEnabled(style)) style = Style.PLAIN;
+
+            Minecraft.getMinecraft()
+                .getTextureManager()
+                .bindTexture(TextureMap.locationItemsTexture);
+            GL11.glColor4f(1F, 1F, 1F, 1F);
+
+            switch (style) {
+                case TUMBLE -> {
+                    GL11.glPushMatrix();
+                    applyHeadTumbleTransform();
+                    drawStandingSprite(icon);
+                    GL11.glPopMatrix();
+                }
+                case UNIVERSIUM -> renderHeadUniversium(wearer, stack, icon);
+                default -> drawStandingSprite(icon);
+            }
+        }
+
+        /**
+         * Copy of the animation {@link #applyTumbleTransform} gives an item, on a sprite that stands on a head: the
+         * same axis and the same 3.5 degrees per client tick, only about the centre of the sprite, which is half a
+         * unit up in the space {@link #drawStandingSprite} draws in.
+         * The axis is mirrored along Y and Z because that space is the mirrored one of a player model (its Y points
+         * down), which is what keeps the tumble turning the way it does in the inventory and in the hand.
+         */
+        private static void applyHeadTumbleTransform() {
+            GL11.glTranslatef(0.0F, -0.5F, 0.0F);
+            GL11.glRotatef(
+                (GTMod.clientProxy()
+                    .getAnimationRenderTicks() * TUMBLE_DEGREES_PER_TICK) % 360F,
+                TUMBLE_AXIS_X,
+                -TUMBLE_AXIS_Y,
+                -TUMBLE_AXIS_Z);
+            GL11.glTranslatef(0.0F, 0.5F, 0.0F);
+        }
+
+        /**
+         * Copy of the in-world half of {@link #renderUniversium} for a sprite standing on a head: the sprite is drawn
+         * once, then gtnhlib's cosmic star shader draws the star field over exactly the same geometry with the depth
+         * function at {@link GL11#GL_EQUAL}, so the stars land on the sprite and not on the head behind it, and
+         * finally the stack's overlay brings the details the shader painted away back in front of the finished sky.
+         */
+        private static void renderHeadUniversium(Entity wearer, ItemStack stack, IIcon icon) {
+            UniversiumShader shader = UniversiumShader.getInstance();
+            processLightLevel(shader, wearer);
+
+            drawStandingSprite(icon);
+
+            int program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+
+            GL11.glDisable(GL11.GL_ALPHA_TEST);
+            GL11.glDepthFunc(GL11.GL_EQUAL);
+            shader.use();
+
+            // RENDER COSMIC OVERLAY
+            drawStandingSprite(icon);
+
+            UniversiumShader.unbind();
+            GL20.glUseProgram(program);
+
+            GL11.glDepthFunc(GL11.GL_LEQUAL);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
+
+            // The overlay is the sprite's own geometry, so GL_EQUAL still refers to the pixels the sprite pass wrote
+            // and the sky pass kept.
+            IIcon overlay = UNIVERSIUM_OVERLAYS.get(stack.getItem());
+            if (overlay == null) return;
+
+            GL11.glColor4f(1F, 1F, 1F, 1F);
+            drawStandingSprite(overlay);
+        }
+
+        /**
+         * Draws the given sprite standing on the origin of the current matrix: its feet stay on {@code y = 0}, it
+         * reaches up to {@code y = -1} and it is as wide as the sprite is (square for every pig icon, but the aspect
+         * is kept either way). For characters that stand in their picture - the pig does - that is the whole trick.
+         * <p>
+         * Two things are mirrored compared to an item in the hand, because the model space of a player is: the sprite
+         * grows towards {@code -Y} (up is down in there) and it faces {@code -Z}, which is where the face of the
+         * wearer is. Its left-to-right order is the usual one either way - the mirrored X of the model space and the
+         * turn into the facing direction of the wearer cancel out - so the texture is not flipped.
+         */
+        private static void drawStandingSprite(IIcon icon) {
+            double halfWidth = 0.5D * icon.getIconWidth() / icon.getIconHeight();
+            float minU = icon.getMinU(), maxU = icon.getMaxU(), minV = icon.getMinV(), maxV = icon.getMaxV();
+
+            Tessellator tessellator = Tessellator.instance;
+            tessellator.startDrawingQuads();
+            tessellator.setNormal(0.0F, 0.0F, -1.0F);
+            tessellator.addVertexWithUV(-halfWidth, 0.0D, 0.0D, minU, maxV);
+            tessellator.addVertexWithUV(halfWidth, 0.0D, 0.0D, maxU, maxV);
+            tessellator.addVertexWithUV(halfWidth, -1.0D, 0.0D, maxU, minV);
+            tessellator.addVertexWithUV(-halfWidth, -1.0D, 0.0D, minU, minV);
+            tessellator.draw();
         }
 
         /** Plain material look: the icon on its own. */
@@ -409,10 +551,10 @@ public final class MTDynamicItemHelper {
 
             GL11.glRotatef(
                 (GTMod.clientProxy()
-                    .getAnimationRenderTicks() * 3.5F) % 360F,
-                0.3F,
-                0.5F,
-                0.2F);
+                    .getAnimationRenderTicks() * TUMBLE_DEGREES_PER_TICK) % 360F,
+                TUMBLE_AXIS_X,
+                TUMBLE_AXIS_Y,
+                TUMBLE_AXIS_Z);
 
             GL11.glRotatef(180F, 0.5F, 0.0F, 0.0F);
 

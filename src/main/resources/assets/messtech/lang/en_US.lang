@@ -379,7 +379,8 @@ item.messtech.piggy.eternity.name=A Piggy (Eternity)
 item.messtech.piggy.universium.name=A Piggy (Universium)
 item.messtech.piggy.sixPhasedCopper.name=A Piggy (Six-Phased Copper)
 messtech.piggy.effect=Material
-messtech.piggy.tooltip=Right click throws it, shift + right click cycles the look
+messtech.piggy.tooltip=Right click throws it (not used up), shift + right click cycles the look
+messtech.piggy.hat=Wears on the head: put it in the helmet slot and it stands on top of you
 messtech.piggy.switched=Material switched to %s
 messtech.piggy.kill.failed=Even the piggy cannot chew through %s
 # The death message of a player the piggy kills (DEATH_MESSAGE_KEY of MTTrueKill.PiggyDamageSource). %1$s is the name

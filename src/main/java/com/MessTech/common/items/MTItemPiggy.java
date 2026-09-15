@@ -4,6 +4,7 @@ import java.util.List;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.creativetab.CreativeTabs;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -29,8 +30,20 @@ import gregtech.api.util.GTUtility;
  * its own renderer, both supplied by {@link MTDynamicItemHelper}. Universium brings one icon more, the face the
  * cosmic shader would otherwise paint its stars over (<code>items/pigs/pigUniversiumFace.png</code>); the item
  * registers it and the renderer draws it last, which is all the item has to do for it.
+ * <p>
+ * Right click throws it (the projectile is not consumed, one piggy lasts forever) and it can be worn in the helmet
+ * slot, where {@code MTPiggyHatRenderer} draws the same look standing on the player's head - effect and animation
+ * included.
  */
 public class MTItemPiggy extends Item {
+
+    /**
+     * Helmet slot as {@link Item#isValidArmor} numbers them (0 helmet, 1 chest, 2 legs, 3 boots) - the vanilla head
+     * slot, i.e. the one the pumpkin and skulls use. Note that this is not the same numbering as
+     * {@code InventoryPlayer#armorItemInSlot}, where the helmet is slot 3; {@code MTPiggyHatRenderer} reads the
+     * worn stack with that second numbering.
+     */
+    public static final int HELMET_ARMOR_SLOT = 0;
 
     /**
      * Icon path of the plain look, without the per-effect suffix the helper appends.
@@ -46,7 +59,9 @@ public class MTItemPiggy extends Item {
 
     public MTItemPiggy() {
         setUnlocalizedName("messtech.piggy");
-        setMaxStackSize(64);
+        // One piggy is a pet, not a consumable: throwing it does not use it up (see
+        // onItemRightClick), so there is never a reason to carry a stack of them.
+        setMaxStackSize(1);
         // The damage value is the effect index, not a durability, so every effect is a separate variant.
         setHasSubtypes(true);
         setCreativeTab(CreativeTabs.tabMisc);
@@ -100,9 +115,26 @@ public class MTItemPiggy extends Item {
     }
 
     /**
+     * Makes the piggy wearable on the head.
+     * <p>
+     * Vanilla only allows armour, pumpkins and skulls in the helmet slot, and it asks the item itself
+     * ({@code ContainerPlayer.SlotArmor#isItemValid} calls {@link Item#isValidArmor}); the hook's slot numbering
+     * starts at the helmet, so {@code 0} is the head and nothing else. That is the same hook the pumpkin uses, so
+     * the piggy behaves exactly like a decorative hat: no armour points, no durability, just the look.
+     * <p>
+     * What is drawn up there is {@link MTPiggyHatRenderer}, which reads the stack back out of the helmet slot and
+     * hands it to {@link MTDynamicItemHelper#renderOnHead}, so the hat is the item's own effect, animation and all.
+     */
+    @Override
+    public boolean isValidArmor(ItemStack stack, int armorType, Entity entity) {
+        return armorType == HELMET_ARMOR_SLOT;
+    }
+
+    /**
      * A plain right click throws the piggy at whatever the player is looking at, shift + right click walks through
-     * the looks instead. The damage value (i.e. the effect) of the thrown stack travels with the projectile, so the
-     * piggy in the air looks exactly like the one that was held.
+     * the looks instead. The thrown piggy is not used up: one piggy lasts forever, which is also why it stacks to
+     * one (see the constructor). The damage value (i.e. the effect) of the thrown stack travels with the
+     * projectile, so the piggy in the air looks exactly like the one that was held.
      * <p>
      * The effect is written on both sides for the cycle, so the server stays authoritative and the change survives a
      * relog; only the server plays the oink, so it is heard once.
@@ -123,12 +155,12 @@ public class MTItemPiggy extends Item {
             return stack;
         }
 
-        // Vanilla throw style: the sound plays on both sides, the entity is only spawned by the server.
+        // Vanilla throw style: the sound plays on both sides, the entity is only spawned by the server. The stack
+        // itself is returned untouched - the piggy comes back to the owner by never leaving the inventory.
         world.playSoundAtEntity(player, "random.bow", 0.5F, 0.4F / (itemRand.nextFloat() * 0.4F + 0.8F));
         if (!world.isRemote) {
             world.spawnEntityInWorld(new MTEntityPiggy(world, player, stack.getItemDamage()));
         }
-        if (!player.capabilities.isCreativeMode) --stack.stackSize;
         return stack;
     }
 
@@ -142,5 +174,6 @@ public class MTItemPiggy extends Item {
                 + MTDynamicItemHelper.getEffect(stack)
                     .getDisplayName());
         tooltip.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal("messtech.piggy.tooltip"));
+        tooltip.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal("messtech.piggy.hat"));
     }
 }

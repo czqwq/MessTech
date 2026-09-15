@@ -383,7 +383,8 @@ item.messtech.piggy.eternity.name=一只猪猪（永恒）
 item.messtech.piggy.universium.name=一只猪猪（宇宙素）
 item.messtech.piggy.sixPhasedCopper.name=一只猪猪（六相铜）
 messtech.piggy.effect=材质
-messtech.piggy.tooltip=右键投掷，潜行 + 右键循环切换外观
+messtech.piggy.tooltip=右键投掷（不会消耗），潜行 + 右键循环切换外观
+messtech.piggy.hat=可以戴在头上：放进头盔槽，它就会站在你头顶
 messtech.piggy.switched=材质已切换为 %s
 messtech.piggy.kill.failed=这只猪猪也啃不动 %s
 # 玩家被猪猪砸死时的死亡提示词（MTTrueKill.PiggyDamageSource 的 DEATH_MESSAGE_KEY）。%1$s 是玩家的名字。
