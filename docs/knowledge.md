@@ -133,6 +133,11 @@ MTMultiMachineBase<T>
   `Casings.AssemblerMachineCasing`. Only the overlay is taken from the other machine: the base layer is unchanged, the
   neutron activator would otherwise bring a casing texture of its own (`getCasingTextureForId(49)`) along. The art is a
   12x12 panel inside a two pixel transparent border, so that border is where the casing shows through.
+- Tooltip: `machine.mtreactor.tooltip.*`, laid out the way TST writes its machine tooltips - a `desc` line plus a
+  flavour line, then the `§6` group headings 结构 / 堆芯 / 发电 / 细节, with `addSeparator()` between the groups. The
+  colour emphasis lives in the lang text itself (`§b` for values, `§c` for the danger thresholds, `§e` for the hatch
+  tiers), so the Java side is one `addInfo(translate(key))` per line, and the structure block/`toolTipFinisher` follow
+  unchanged. Reuse this layout (and key naming) for the other machines.
 
 ### MTChemicalTwister
 - Structure: `A` containment field machine casing, `B` fusion coil block, `C` **heating coils**, `D` chemically inert
@@ -422,6 +427,12 @@ MTMultiMachineBase<T>
    custom packet: GT compares that byte every tick (`handleUpdateDataChangeServer`), sends `CHANGE_CUSTOM_DATA` when it
    changes and writes it into the tile data packet, so it survives a chunk reload for free. Values are masked with
    `0x7F`, and multiblock structure checks never run on the client - the client has to be told.
+11. Verify what changed, not everything: running the whole `tools/**/verify_*.py` sweep after every edit is unnecessary.
+    Pick the harnesses by the class or file that was touched (e.g. `Get-ChildItem tools -Recurse -Filter *.py |
+    Select-String -Pattern MTPiggyHatRenderer`) and run only those, on top of `gradlew spotlessApply spotlessCheck
+    checkstyleMain compileJava processResources`. Harnesses outside the touched area do not have to be green, and one
+    inside it that fails for an unrelated reason (the `tmp/` -> `tools/` move left some of them writing into hard coded
+    `tmp/...` paths) is worth a two line fix rather than a full sweep.
 
 ## Known pending / open items
 

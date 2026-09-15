@@ -308,12 +308,19 @@ GT5U.gui.text.recipe_result.nanite_stalled=§c纳米蜂群等级不足或没有�
 # --- 核反应堆 ---
 machine.mtreactor.name=核反应堆
 machine.mtreactor.machinetype=核反应堆
-machine.mtreactor.tooltip.0=移植自 IC2 的核反应堆热力与发电机制
-machine.mtreactor.tooltip.1=反应堆组件放入核反应堆访问仓（EV..UIV）；每页 9x6 槽位都是一座独立运行、互相隔离的反应堆
-machine.mtreactor.tooltip.2=每 20 tick 进行一次热力循环，热量累积与爆炸判定均按页独立计算，上限由热量控制仓决定
-machine.mtreactor.tooltip.3=发电量 = 堆芯输出 × 5 EU/t，通过动力仓输出
-machine.mtreactor.tooltip.4=堆芯过热（100%）会引发核爆并摧毁整台机器
-machine.mtreactor.tooltip.5=必须安装且只能安装一个核反应堆热量控制仓（EV..UIV），其等级决定热量上限
+machine.mtreactor.tooltip.desc=§7一座核反应堆：组件、热量、爆炸，一个不少
+machine.mtreactor.tooltip.flavour=§7堆芯是你自己摆的，账单也是你自己付的
+machine.mtreactor.tooltip.structure.header=§6结构：
+machine.mtreactor.tooltip.structure.access=§7· 反应堆访问仓 §e(EV..UIV)§7 提供组件槽位，每页 §b9x6§7 都是一座独立反应堆
+machine.mtreactor.tooltip.structure.pages=§7· 页数由访问仓等级决定：§eEV§7 1 页，每升一级 §b+1§7 页，§eUIV§7 8 页
+machine.mtreactor.tooltip.structure.heat=§7· 热量控制仓必须且只能装 §b1§7 个 §e(EV..UIV)§7，其等级决定整堆热量上限（§b10,000§7 ~ §b2,147,483,647§7）
+machine.mtreactor.tooltip.core.header=§6堆芯：
+machine.mtreactor.tooltip.core.cycle=§7· 每 §b20§7 tick 结算一次 IC2 循环：先热力后发电，热量按页独立累积
+machine.mtreactor.tooltip.core.heat=§7· 堆温 §c≥70%§7 辐照周围实体，§c≥85%§7 有概率点燃周围方块，§c100%§7 §c核爆§7并炸毁整台机器
+machine.mtreactor.tooltip.power.header=§6发电：
+machine.mtreactor.tooltip.power.output=§7· 发电量 = §b堆芯输出 × 5 EU/t§7，由动力仓输出
+machine.mtreactor.tooltip.details=§d细节：§7槽位可锁定同类组件，耐久 §b≤§7 阈值时自动输出并从总线补货（需要输入/输出总线）
+machine.mtreactor.tooltip.details.hint=§7· Shift+右键锁定同类物品，Alt+Shift+右键全部解锁，中键打开设置
 machine.mtreactor.structure.error.missing_access_hatch=缺少核反应堆访问仓
 machine.mtreactor.structure.error.missing_heat_hatch=缺少核反应堆热量控制仓
 machine.mtreactor.structure.error.too_many_heat_hatch=核反应堆热量控制仓只能安装一个

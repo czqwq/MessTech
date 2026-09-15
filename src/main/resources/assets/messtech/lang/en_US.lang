@@ -281,6 +281,7 @@ mt.recipe.nanoscale.biologicalcoordinator=Nano-Scale Foundry: Biological Coordin
 mt.recipe.nanoscale.pool24=Nano-Scale Foundry: Precision Circuit Aggregation
 
 # --- Dimensionally Brick Furnace ---
+machine.dbbfurnace.name=Dimensionally Brick Furnace
 machine.dbbfurnace.machinetype=Dimensionally Brick Furnace
 machine.dbbfurnace.mode.1=Brick Blast Furnace Mode
 machine.dbbfurnace.mode.2=Metallurgy Mode
@@ -288,6 +289,7 @@ machine.dbbfurnace.tooltip.0=No energy required and energy hatches are not accep
 machine.dbbfurnace.tooltip.1=Mode 1: Brick Blast Furnace; Mode 2: Metallurgy (switch with screwdriver).
 machine.dbbfurnace.tooltip.2=Drain CO2 from the air and convert it into materials required for smelting.
 machine.dbbfurnace.tooltip.3=Machine always process recipes in 1 tick
+mt.recipe.steel_brick=Dimensionally Brick Furnace: Metallurgy Mode
 
 # --- Boses Crafting Array ---
 machine.bosescraftingarray.name=Bose-Einstein Condensate Crafting Array
@@ -304,12 +306,19 @@ GT5U.gui.text.recipe_result.nanite_stalled=§cNanite tier too low or no nanites
 # --- Nuclear Reactor ---
 machine.mtreactor.name=Nuclear Reactor
 machine.mtreactor.machinetype=Nuclear Reactor
-machine.mtreactor.tooltip.0=Ports IC2's nuclear reactor heat and generation mechanics.
-machine.mtreactor.tooltip.1=Reactor components go into a Reactor Access Hatch (EV..UIV); every 9x6 page is an independent, isolated reactor.
-machine.mtreactor.tooltip.2=One heat cycle every 20 ticks; heat and explosion checks are calculated per page, with the ceiling set by the heat control hatch.
-machine.mtreactor.tooltip.3=Generation is core output * 5 EU/t, emitted through dynamo hatches.
-machine.mtreactor.tooltip.4=Overheating (100%) causes a nuclear explosion and destroys the machine.
-machine.mtreactor.tooltip.5=Requires exactly one Reactor Heat Control Hatch (EV..UIV); its tier sets the heat ceiling.
+machine.mtreactor.tooltip.desc=§7A nuclear reactor: components, heat and explosions, all included
+machine.mtreactor.tooltip.flavour=§7You stack the core, you pay the bill
+machine.mtreactor.tooltip.structure.header=§6Structure:
+machine.mtreactor.tooltip.structure.access=§7· Reactor Access Hatches §e(EV..UIV)§7 hold the components; every §b9x6§7 page is an independent reactor
+machine.mtreactor.tooltip.structure.pages=§7· Hatch tier sets the page count: §eEV§7 1 page, §b+1§7 per tier, §eUIV§7 8 pages
+machine.mtreactor.tooltip.structure.heat=§7· Needs exactly §b1§7 Reactor Heat Control Hatch §e(EV..UIV)§7; its tier sets the heat ceiling (§b10,000§7 to §b2,147,483,647§7)
+machine.mtreactor.tooltip.core.header=§6Core:
+machine.mtreactor.tooltip.core.cycle=§7· One IC2 cycle every §b20§7 ticks: heat first, then generation, accumulated per page
+machine.mtreactor.tooltip.core.heat=§7· From §c70%§7 heat nearby entities are irradiated, from §c85%§7 the surroundings can ignite, at §c100%§7 it §cnukes§7 and destroys the machine
+machine.mtreactor.tooltip.power.header=§6Power:
+machine.mtreactor.tooltip.power.output=§7· Generation = §bcore output × 5 EU/t§7, emitted through dynamo hatches
+machine.mtreactor.tooltip.details=§dDetails:§7 slots can lock a component type and auto output/restock at their §bthreshold§7 (needs an input and an output bus)
+machine.mtreactor.tooltip.details.hint=§7· Shift+Right click locks a type, Alt+Shift+Right click unlocks all, middle click opens the settings
 machine.mtreactor.structure.error.missing_access_hatch=Missing Reactor Access Hatch
 machine.mtreactor.structure.error.missing_heat_hatch=Missing Reactor Heat Control Hatch
 machine.mtreactor.structure.error.too_many_heat_hatch=Only one Reactor Heat Control Hatch is allowed
