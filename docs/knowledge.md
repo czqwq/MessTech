@@ -993,6 +993,17 @@ MTMultiMachineBase<T>
   server too - and `MTTextRenderer` is the **client** half, the drawing. `registerRenderer(animation, renderer)`
   pairs them client-side; `init()` (called from `ClientProxy.preInit`) registers the built-in pair and the event
   handler. An animation without a renderer is a pure formatting animation, which is what `MTPigTechText` is.
+- **The client half must not live in the class's static initializer.** `SideTransformer`
+  (`cpw.mods.fml.common.asm.transformers.SideTransformer#transform`, the field loop at lines 53-65 and the method
+  loop at 66-78) deletes every `@SideOnly(Side.CLIENT)` **field and method** from the class on a dedicated server,
+  but it never touches `<clinit>`, which carries no annotation. A client-only field *with an initializer* keeps its
+  `putstatic` in the initializer of a class that common code loads, and the server then dies on the
+  POSTINITIALIZATION -> AVAILABLE transition with `NoSuchFieldError: RENDERERS` in
+  `MTAnimatedTooltipHandler.<clinit>`. That is why the renderer map and the tooltip box are built by
+  `renderers()` / `background()` on first use; the nested `Background` class would be loaded by `<clinit>`
+  as well and then rejected by the side check (`Attempted to load class ... for invalid side`). Client-only state
+  built lazily inside client-only methods is safe: the two entry points common code uses, `addItemTooltip` and
+  `addAnimatedText`, never touch it.
 - Drawing: when a tooltip of a stack with a *rendered* animation is about to be drawn, the handler takes the
   tooltip over through gtnhlib's `RenderTooltipEvent#alternativeRenderer`, redraws the vanilla box (the nine
   `drawGradientRect`s, then `font.drawStringWithShadow` per line) and calls the renderer of every line that wears

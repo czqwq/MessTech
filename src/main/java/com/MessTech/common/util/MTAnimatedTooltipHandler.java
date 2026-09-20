@@ -57,7 +57,22 @@ public final class MTAnimatedTooltipHandler {
 
     /** The renderer of an animation, client side only: the animations themselves are common code. */
     @SideOnly(Side.CLIENT)
-    private static final Map<MTTextAnimation, MTTextRenderer> RENDERERS = new IdentityHashMap<>();
+    private static Map<MTTextAnimation, MTTextRenderer> renderers;
+
+    /**
+     * The renderer map, built on first use rather than in the static initializer.
+     * <p>
+     * FML's {@code SideTransformer} deletes a {@code @SideOnly(Side.CLIENT)} field from the class on a dedicated
+     * server, but it only removes fields and methods - never the {@code <clinit>} that assigns them. A client-only
+     * field with an initializer therefore kills the server in {@code <clinit>} with
+     * {@code NoSuchFieldError: RENDERERS}. {@link #background()} is lazy for the same reason: the nested class it
+     * creates would be loaded by {@code <clinit>} too.
+     */
+    @SideOnly(Side.CLIENT)
+    private static Map<MTTextAnimation, MTTextRenderer> renderers() {
+        if (renderers == null) renderers = new IdentityHashMap<>();
+        return renderers;
+    }
 
     /** Whether {@link #init()} has already run. */
     @SideOnly(Side.CLIENT)
@@ -160,8 +175,8 @@ public final class MTAnimatedTooltipHandler {
     @SideOnly(Side.CLIENT)
     public static void registerRenderer(MTTextAnimation animation, MTTextRenderer renderer) {
         if (animation == null) return;
-        if (renderer == null) RENDERERS.remove(animation);
-        else RENDERERS.put(animation, renderer);
+        if (renderer == null) renderers().remove(animation);
+        else renderers().put(animation, renderer);
     }
 
     /** Appends the registered lines of the hovered stack, the same way gtnhlib's handler does. */
@@ -201,7 +216,7 @@ public final class MTAnimatedTooltipHandler {
         if (entries == null) return false;
 
         for (Entry entry : entries) {
-            if (entry.animation != null && RENDERERS.containsKey(entry.animation)) return true;
+            if (entry.animation != null && renderers().containsKey(entry.animation)) return true;
         }
         return false;
     }
@@ -235,7 +250,7 @@ public final class MTAnimatedTooltipHandler {
             y = event.gui.height - height - 6;
         }
 
-        BACKGROUND.draw(x, y, width, height, event);
+        background().draw(x, y, width, height, event);
 
         long millis = System.currentTimeMillis();
         for (int i = 0; i < lines.size(); i++) {
@@ -269,7 +284,7 @@ public final class MTAnimatedTooltipHandler {
         for (Entry entry : entries) {
             if (entry.animation == null) continue;
 
-            MTTextRenderer renderer = RENDERERS.get(entry.animation);
+            MTTextRenderer renderer = renderers().get(entry.animation);
             if (renderer == null) continue;
 
             String frame = entry.line.get();
@@ -312,7 +327,14 @@ public final class MTAnimatedTooltipHandler {
         }
     }
 
-    /** The one box every tooltip of this handler is drawn with. */
+    /** The one box every tooltip of this handler is drawn with, {@code null} until {@link #background()}. */
     @SideOnly(Side.CLIENT)
-    private static final Background BACKGROUND = new Background();
+    private static Background background;
+
+    /** @return the shared tooltip box, built on first use - see {@link #renderers()} for why it is not a constant. */
+    @SideOnly(Side.CLIENT)
+    private static Background background() {
+        if (background == null) background = new Background();
+        return background;
+    }
 }
