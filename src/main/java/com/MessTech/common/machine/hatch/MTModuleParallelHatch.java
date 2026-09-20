@@ -114,8 +114,7 @@ public class MTModuleParallelHatch extends MTModuleHatchBase {
 
     @Override
     public String[] getDescription() {
-        return new String[] {
-            StatCollector.translateToLocalFormatted("machine.module.parallel.desc.0", maxParallel),
+        return new String[] { StatCollector.translateToLocalFormatted("machine.module.parallel.desc.0", maxParallel),
             StatCollector.translateToLocal("machine.module.parallel.desc.1"),
             StatCollector.translateToLocal("machine.module.desc.install") };
     }

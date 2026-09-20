@@ -48,8 +48,9 @@ public class MTModuleSpeedHatch extends MTModuleHatchBase {
 
     @Override
     public String[] getDescription() {
-        return new String[] { StatCollector.translateToLocalFormatted(
-            "machine.module.speed.desc.0",
-            MTModuleValues.speedBonusText(mTier)), StatCollector.translateToLocal("machine.module.desc.install") };
+        return new String[] {
+            StatCollector
+                .translateToLocalFormatted("machine.module.speed.desc.0", MTModuleValues.speedBonusText(mTier)),
+            StatCollector.translateToLocal("machine.module.desc.install") };
     }
 }

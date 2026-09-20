@@ -29,8 +29,7 @@ public final class MTModuleValues {
      * Recipe duration multiplier per module tier, IV..MAX: the fraction of the original duration that is left, so
      * the module is 5% faster at IV and 100x faster at MAX. MessTech's own fixed table.
      */
-    private static final float[] SPEED_BONUS = { 0.95F, 0.85F, 0.75F, 0.70F, 0.65F, 0.40F, 0.35F, 0.20F, 0.10F,
-        0.01F };
+    private static final float[] SPEED_BONUS = { 0.95F, 0.85F, 0.75F, 0.70F, 0.65F, 0.40F, 0.35F, 0.20F, 0.10F, 0.01F };
 
     /**
      * EU/t multiplier per module tier, IV..MAX. TST's {@code PowerConsumptionMultiplierOfPowerConsumptionController}

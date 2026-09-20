@@ -55,8 +55,8 @@ public class MTModuleEuHatch extends MTModuleHatchBase {
 
     @Override
     public String[] getDescription() {
-        return new String[] { StatCollector.translateToLocalFormatted(
-            "machine.module.eu.desc.0",
-            MTModuleValues.euDiscountText(mTier)), StatCollector.translateToLocal("machine.module.desc.install") };
+        return new String[] {
+            StatCollector.translateToLocalFormatted("machine.module.eu.desc.0", MTModuleValues.euDiscountText(mTier)),
+            StatCollector.translateToLocal("machine.module.desc.install") };
     }
 }
