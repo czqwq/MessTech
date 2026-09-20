@@ -1433,79 +1433,29 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(StatCollector.translateToLocal("machine.nanoscale.machinetype"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.desc"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.flavour"))
             .addSeparator()
-            .addInfo(EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.nanoscale.tooltip.0"))
-            .addInfo(EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.nanoscale.tooltip.1"))
-            .addInfo(EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.nanoscale.tooltip.2"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.selection.header"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.selection.circuit"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.selection.multimode"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.selection.pool"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.selection.modes1"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.selection.modes2"))
             .addSeparator()
-            .addInfo(
-                EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.nanoscale.special.header"))
-            .addInfo(
-                EnumChatFormatting.DARK_PURPLE + StatCollector.translateToLocal("machine.nanoscale.special.conversion"))
-            .addInfo(EnumChatFormatting.DARK_GREEN + StatCollector.translateToLocal("machine.nanoscale.special.board"))
-            .addInfo(EnumChatFormatting.DARK_AQUA + StatCollector.translateToLocal("machine.nanoscale.special.optical"))
-            .addInfo(EnumChatFormatting.DARK_RED + StatCollector.translateToLocal("machine.nanoscale.special.etching"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.special.header"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.special.conversion"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.special.board"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.special.optical"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.special.etching"))
             .addSeparator()
-            .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.nanoscale.mode.conversion"))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "2",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.assemblymatrix")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "3",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.smd")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "4",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.board")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "5",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.etching")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "6",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.cutting")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "7",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.wiretracer")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "8",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.superconductor")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "9",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.optical")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "10",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.encasement")))
-            .addInfo(
-                EnumChatFormatting.GOLD + StatCollector.translateToLocalFormatted(
-                    "machine.nanoscale.mode.line",
-                    "11",
-                    StatCollector.translateToLocal("machine.nanoscale.mode.biological")))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.header"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.enable"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.wirecutter"))
             .addSeparator()
-            .addStructureInfo(EnumChatFormatting.YELLOW + StatCollector.translateToLocal("machine.nanoscale.tooltip.3"))
-            .addSeparator()
-            .addInfo(
-                EnumChatFormatting.LIGHT_PURPLE
-                    + StatCollector.translateToLocal("machine.nanoscale.tooltip.astral_enable"))
-            .addInfo(
-                EnumChatFormatting.DARK_PURPLE
-                    + StatCollector.translateToLocal("machine.nanoscale.tooltip.astral_wirecutter"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.details.hint"))
+            .addStructureInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.3"))
             .toolTipFinisher();
         return tt;
     }

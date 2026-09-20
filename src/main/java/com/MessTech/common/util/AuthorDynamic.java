@@ -9,7 +9,6 @@ import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.GREEN;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.LIGHT_PURPLE;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.RED;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.YELLOW;
-import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.addItemTooltip;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.animatedText;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.chain;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.text;
@@ -32,13 +31,30 @@ import gregtech.api.enums.GTAuthors;
  * <li>extended with a ping-pong (left-right wobble) offset so the rainbow band slides back and
  * forth instead of only scrolling one way.</li>
  * </ul>
- * Use {@link #author()} anywhere a {@code Supplier<String>} author is expected, and
+ * Use {@link #author_czqwq()} anywhere a {@code Supplier<String>} author is expected, and
  * {@link #registerOn(ItemStack)} to append it at the end of a machine's tooltip.
+ * <p>
+ * {@link #register(MTTextAnimation, Supplier, ItemStack)} is the general form: instead of the built-in rainbow it
+ * animates the author name with a caller supplied {@link MTTextAnimation}, which may also bring a
+ * {@link MTTextRenderer} - a renderer drawn over the finished line, not just colour codes inside it.
+ * {@link #TRANSCENDENT_METAL} is the built-in one: GT5U's Transcendent Metal animation worn by the whole line, see
+ * {@link MTTranscendentMetalText} and {@link MTTranscendentMetalTextRenderer}.
  */
 public final class AuthorDynamic {
 
     /** The author field. */
     public static final String AUTHOR_CZQWQ = "czqwq";
+
+    /**
+     * GT5U's Transcendent Metal look, worn by a whole line of text: the metal band of
+     * {@link MTTranscendentMetalText} plus the tumbler {@link MTTranscendentMetalTextRenderer} draws over the
+     * finished font. Hand it to {@link #register(MTTextAnimation, Supplier, ItemStack)}.
+     * <p>
+     * The animations are registered through {@link MTAnimatedTooltipHandler}, which owns the registry and the
+     * client side renderer, because a rendering animation has to draw over the font and gtnhlib's
+     * {@code AnimatedTooltipHandler} can only add strings.
+     */
+    public static final MTTextAnimation TRANSCENDENT_METAL = MTTranscendentMetalText.INSTANCE;
 
     /** Rainbow ramp (bold), used as the cycling / wobbling palette. */
     private static final String[] RAINBOW_BOLD = { RED + BOLD, GOLD + BOLD, YELLOW + BOLD, GREEN + BOLD, AQUA + BOLD,
@@ -77,9 +93,58 @@ public final class AuthorDynamic {
      * @param machineStack the machine's {@link ItemStack}
      */
     public static void registerOn(Supplier<String> author, ItemStack machineStack) {
+        addAuthorLine(author, machineStack, null);
+    }
+
+    /**
+     * Register the author line + animated MessTech add-on line, with the author name animated by the given
+     * animation instead of the built-in rainbow.
+     * <p>
+     * The visible text of {@code author} is what gets animated: a supplier that brings its own colour codes
+     * (such as {@link #author_czqwq()}) is fine, its codes are dropped and the animation's own ones are used
+     * instead. The same call shape the built-in look uses, with one extra argument - the animation to wear:
+     *
+     * <pre>
+     * AuthorDynamic.register(AuthorDynamic.TRANSCENDENT_METAL, AuthorDynamic.author_czqwq(), machineStack);
+     * </pre>
+     *
+     * @param animation    the look the author name wears, e.g. {@link #TRANSCENDENT_METAL}
+     * @param author       the author text to animate, see {@link MTTextAnimation#visibleText}
+     * @param machineStack the machine's {@link ItemStack}
+     */
+    public static void register(MTTextAnimation animation, Supplier<String> author, ItemStack machineStack) {
+        if (animation == null) return;
+
+        addAuthorLine(
+            () -> animation
+                .frame(MTTextAnimation.visibleText(author == null ? null : author.get()), System.currentTimeMillis()),
+            machineStack,
+            animation);
+    }
+
+    /**
+     * {@link #register(MTTextAnimation, Supplier, ItemStack)} for the default author name, {@link #AUTHOR_CZQWQ}.
+     *
+     * @param animation    the look the author name wears, e.g. {@link #TRANSCENDENT_METAL}
+     * @param machineStack the machine's {@link ItemStack}
+     */
+    public static void register(MTTextAnimation animation, ItemStack machineStack) {
+        register(animation, text(AUTHOR_CZQWQ), machineStack);
+    }
+
+    /**
+     * Adds the author line - and the animated MessTech line that follows it - to a stack.
+     *
+     * @param author       the author text, already the way it should be drawn
+     * @param machineStack the stack to decorate
+     * @param animation    the animation the author line wears, {@code null} for a plain line
+     */
+    private static void addAuthorLine(Supplier<String> author, ItemStack machineStack, MTTextAnimation animation) {
         if (author == null || machineStack == null) return;
-        addItemTooltip(machineStack, GTAuthors.buildAuthorsWithFormatSupplier(author));
-        addItemTooltip(
+
+        MTAnimatedTooltipHandler
+            .addItemTooltip(machineStack, GTAuthors.buildAuthorsWithFormatSupplier(author), animation);
+        MTAnimatedTooltipHandler.addItemTooltip(
             machineStack,
             chain(text(StatCollector.translateToLocal("messTech.addBy") + " "), messTechAnimated()));
     }

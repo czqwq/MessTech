@@ -7,7 +7,6 @@ import java.util.List;
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
 
@@ -248,18 +247,28 @@ public class SpaceModuleAssemblerInfinity extends SpaceModuleInfinityBase<SpaceM
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(StatCollector.translateToLocal(getMachineTypeKey()))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.desc"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.flavour"))
             .addSeparator()
-            .addInfo(
-                EnumChatFormatting.LIGHT_PURPLE.toString() + EnumChatFormatting.BOLD.toString()
-                    + StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.meme"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.need_t5"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.wireless"))
-            .addInfo(
-                EnumChatFormatting.GOLD
-                    + StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.parallel"))
-            .addInfo(
-                EnumChatFormatting.GREEN
-                    + StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.crossrecipe"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.recipe.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.recipe.pool"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.recipe.parallel"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.recipe.cross"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.recipe.tier"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.recipe.project"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.power.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.power.wireless"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.power.nooverclock"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.power.billing"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.structure.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.structure.elevator"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.structure.controller"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.structure.io"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleassembler.tooltip.details.hint"))
             .beginStructureBlock(1, 5, 2, false)
             .addController(StatCollector.translateToLocal("gt.mbtt.structure.front_center_4th_layer"))
             .addCasing("0-8", StatCollector.translateToLocal("gt.blockcasings.ig.0.name"), false)

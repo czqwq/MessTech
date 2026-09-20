@@ -10,6 +10,7 @@ import com.MessTech.common.entity.MTRenderPiggy;
 import com.MessTech.common.items.MTFuelRodItemRenderer;
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.items.MTNACComponentItemRenderer;
+import com.MessTech.common.util.MTAnimatedTooltipHandler;
 import com.MessTech.common.util.MTDynamicItemHelper;
 import com.MessTech.common.util.MTPigTech;
 
@@ -34,6 +35,9 @@ public class ClientProxy extends CommonProxy {
         // PigRegisterOn: the animated "PigTech" line on the piggy's tooltip (wildcard damage = every variant), behind
         // the same static "Add by:" prefix the MessTech line uses. No author line, unlike AuthorDynamic.registerOn.
         MTPigTech.pigRegisterOn(new ItemStack(MTItems.piggy, 1, OreDictionary.WILDCARD_VALUE));
+        // MessTech's own animated tooltip handler: the registry AuthorDynamic writes its author lines into, plus the
+        // tooltip renderer that draws an animation's renderer (e.g. TRANSCENDENT_METAL) over the finished font.
+        MTAnimatedTooltipHandler.init();
     }
 
 }

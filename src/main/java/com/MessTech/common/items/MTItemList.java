@@ -26,6 +26,9 @@ public enum MTItemList {
     MTInventoryInputHatchME,
     MTWirelessVacuumConveyorInput,
     MTWirelessVacuumConveyorOutput,
+    MTWirelessBeamlineInput,
+    MTWirelessBeamlineOutput,
+    MTWirelessBeamlineAdvancedOutput,
     MTNanoScaleFoundry,
     MTDBBFurnace,
     BosesCraftingArray,
@@ -46,7 +49,37 @@ public enum MTItemList {
     MTReactorHeatHatch_UHV,
     MTReactorHeatHatch_UEV,
     MTReactorHeatHatch_UIV,
-    MTChemicalTwister;
+    MTChemicalTwister,
+    MTModuleSpeed_IV,
+    MTModuleSpeed_LuV,
+    MTModuleSpeed_ZPM,
+    MTModuleSpeed_UV,
+    MTModuleSpeed_UHV,
+    MTModuleSpeed_UEV,
+    MTModuleSpeed_UIV,
+    MTModuleSpeed_UMV,
+    MTModuleSpeed_UXV,
+    MTModuleSpeed_MAX,
+    MTModuleEu_IV,
+    MTModuleEu_LuV,
+    MTModuleEu_ZPM,
+    MTModuleEu_UV,
+    MTModuleEu_UHV,
+    MTModuleEu_UEV,
+    MTModuleEu_UIV,
+    MTModuleEu_UMV,
+    MTModuleEu_UXV,
+    MTModuleEu_MAX,
+    MTModuleParallel_IV,
+    MTModuleParallel_LuV,
+    MTModuleParallel_ZPM,
+    MTModuleParallel_UV,
+    MTModuleParallel_UHV,
+    MTModuleParallel_UEV,
+    MTModuleParallel_UIV,
+    MTModuleParallel_UMV,
+    MTModuleParallel_UXV,
+    MTModuleParallel_MAX;
 
     /** Reactor access hatches ordered EV..UIV (index {@code tier - MTReactorAccessHatch.MIN_TIER}). */
     public static final MTItemList[] REACTOR_ACCESS_HATCHES = { MTReactorAccessHatch_EV, MTReactorAccessHatch_IV,
@@ -57,6 +90,20 @@ public enum MTItemList {
     public static final MTItemList[] REACTOR_HEAT_HATCHES = { MTReactorHeatHatch_EV, MTReactorHeatHatch_IV,
         MTReactorHeatHatch_LuV, MTReactorHeatHatch_ZPM, MTReactorHeatHatch_UV, MTReactorHeatHatch_UHV,
         MTReactorHeatHatch_UEV, MTReactorHeatHatch_UIV };
+
+    /** Speed modules ordered IV..MAX (index {@code tier - IMTModule.MIN_TIER}). */
+    public static final MTItemList[] SPEED_MODULES = { MTModuleSpeed_IV, MTModuleSpeed_LuV, MTModuleSpeed_ZPM,
+        MTModuleSpeed_UV, MTModuleSpeed_UHV, MTModuleSpeed_UEV, MTModuleSpeed_UIV, MTModuleSpeed_UMV, MTModuleSpeed_UXV,
+        MTModuleSpeed_MAX };
+
+    /** EU discount modules ordered IV..MAX (index {@code tier - IMTModule.MIN_TIER}). */
+    public static final MTItemList[] EU_MODULES = { MTModuleEu_IV, MTModuleEu_LuV, MTModuleEu_ZPM, MTModuleEu_UV,
+        MTModuleEu_UHV, MTModuleEu_UEV, MTModuleEu_UIV, MTModuleEu_UMV, MTModuleEu_UXV, MTModuleEu_MAX };
+
+    /** Parallel control modules ordered IV..MAX (index {@code tier - IMTModule.MIN_TIER}). */
+    public static final MTItemList[] PARALLEL_MODULES = { MTModuleParallel_IV, MTModuleParallel_LuV,
+        MTModuleParallel_ZPM, MTModuleParallel_UV, MTModuleParallel_UHV, MTModuleParallel_UEV, MTModuleParallel_UIV,
+        MTModuleParallel_UMV, MTModuleParallel_UXV, MTModuleParallel_MAX };
 
     private boolean mHasNotBeenSet;
     private boolean mDeprecated;

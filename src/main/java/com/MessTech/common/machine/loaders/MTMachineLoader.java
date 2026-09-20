@@ -2,9 +2,14 @@ package com.MessTech.common.machine.loaders;
 
 import static net.minecraft.util.StatCollector.translateToLocal;
 
+import net.minecraft.item.ItemStack;
+import net.minecraftforge.oredict.OreDictionary;
+
 import com.MessTech.common.block.AdvAssMatrixBlock;
 import com.MessTech.common.block.AssMatrixBlock;
 import com.MessTech.common.items.MTItemList;
+import com.MessTech.common.items.MTItems;
+import com.MessTech.common.machine.Base.IMTModule;
 import com.MessTech.common.machine.BosesCraftingArray;
 import com.MessTech.common.machine.MTAssFactory;
 import com.MessTech.common.machine.MTChemicalTwister;
@@ -17,8 +22,14 @@ import com.MessTech.common.machine.MTReactor;
 import com.MessTech.common.machine.hatch.MTHatchRack;
 import com.MessTech.common.machine.hatch.MTInventoryInputBusME;
 import com.MessTech.common.machine.hatch.MTInventoryInputHatchME;
+import com.MessTech.common.machine.hatch.MTModuleEuHatch;
+import com.MessTech.common.machine.hatch.MTModuleParallelHatch;
+import com.MessTech.common.machine.hatch.MTModuleSpeedHatch;
 import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
 import com.MessTech.common.machine.hatch.MTReactorHeatHatch;
+import com.MessTech.common.machine.hatch.MTWirelessBeamlineAdvancedOutput;
+import com.MessTech.common.machine.hatch.MTWirelessBeamlineInput;
+import com.MessTech.common.machine.hatch.MTWirelessBeamlineOutput;
 import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorInput;
 import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorOutput;
 import com.MessTech.common.machine.module.SpaceModuleAssemblerInfinity;
@@ -26,6 +37,7 @@ import com.MessTech.common.machine.module.SpaceModuleMinerInfinity;
 import com.MessTech.common.machine.module.SpaceModulePumpInfinity;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.util.AuthorDynamic;
+import com.MessTech.common.util.MTAnimatedTooltipHandler;
 
 import gregtech.api.enums.GTValues;
 import tectech.thing.metaTileEntity.hatch.MTEHatchRack;
@@ -116,6 +128,27 @@ public class MTMachineLoader {
                 translateToLocal("machine.wirelessvacuum.output.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTWirelessVacuumConveyorOutput.get(1));
 
+        // Wireless particle beam hatches: dye colour is the channel, 1:1 (one output + one input per colour),
+        // no beamline pipes. The filtered variant keeps GT5U's particle blacklist GUI.
+        MTItemList.MTWirelessBeamlineInput.set(
+            new MTWirelessBeamlineInput(
+                MT_ID + 70,
+                "MTWirelessBeamlineInput",
+                translateToLocal("machine.wirelessbeamline.input.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTWirelessBeamlineInput.get(1));
+        MTItemList.MTWirelessBeamlineOutput.set(
+            new MTWirelessBeamlineOutput(
+                MT_ID + 71,
+                "MTWirelessBeamlineOutput",
+                translateToLocal("machine.wirelessbeamline.output.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTWirelessBeamlineOutput.get(1));
+        MTItemList.MTWirelessBeamlineAdvancedOutput.set(
+            new MTWirelessBeamlineAdvancedOutput(
+                MT_ID + 72,
+                "MTWirelessBeamlineAdvancedOutput",
+                translateToLocal("machine.wirelessbeamline.advanced.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTWirelessBeamlineAdvancedOutput.get(1));
+
         MTItemList.MTNanoScaleFoundry.set(
             new MTNanoScaleFoundry(MT_ID + 11, "Nano-Scale Foundry", translateToLocal("machine.nanoscale.name"))
                 .getStackForm(1L));
@@ -172,6 +205,65 @@ public class MTMachineLoader {
                 "Large Chemical Twister",
                 translateToLocal("machine.largechemicaltwister.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTChemicalTwister.get(1));
+
+        // Module hatches: speed, EU discount and parallel control, one variant per tier IV..MAX.
+        // IDs are handed out per family so a tier can be added without shifting the other families.
+        for (int i = 0; i < MTItemList.SPEED_MODULES.length; i++) {
+            int tier = IMTModule.MIN_TIER + i;
+            String tierName = GTValues.VN[tier];
+            MTItemList item = MTItemList.SPEED_MODULES[i];
+            item.set(
+                new MTModuleSpeedHatch(
+                    MT_ID + 40 + i,
+                    "MTModuleSpeedHatch_" + tierName,
+                    translateToLocal("machine.module.speed.name") + " (" + tierName + ")",
+                    tier).getStackForm(1L));
+            AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
+        }
+
+        for (int i = 0; i < MTItemList.EU_MODULES.length; i++) {
+            int tier = IMTModule.MIN_TIER + i;
+            String tierName = GTValues.VN[tier];
+            MTItemList item = MTItemList.EU_MODULES[i];
+            item.set(
+                new MTModuleEuHatch(
+                    MT_ID + 50 + i,
+                    "MTModuleEuHatch_" + tierName,
+                    translateToLocal("machine.module.eu.name") + " (" + tierName + ")",
+                    tier).getStackForm(1L));
+            AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
+        }
+
+        for (int i = 0; i < MTItemList.PARALLEL_MODULES.length; i++) {
+            int tier = IMTModule.MIN_TIER + i;
+            String tierName = GTValues.VN[tier];
+            MTItemList item = MTItemList.PARALLEL_MODULES[i];
+            item.set(
+                new MTModuleParallelHatch(
+                    MT_ID + 60 + i,
+                    "MTModuleParallelHatch_" + tierName,
+                    translateToLocal("machine.module.parallel.name") + " (" + tierName + ")",
+                    tier).getStackForm(1L));
+            AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
+        }
+
+        // Transcendent Metal fuel rods: GT items rather than MessTech machines, and their damage value is the fuel
+        // state (0..99), so every state has to match - hence the wildcard damage, exactly like the piggy. Their line
+        // is the "Add by:" brand line with no author name, and the word wears the tooltip animation that matches
+        // their sprite: MTFuelRodItemRenderer tumbles the icon the same way the animation tumbles the letters.
+        for (ItemStack rod : new ItemStack[] {
+            new ItemStack(MTItems.rodTranscendentMetal, 1, OreDictionary.WILDCARD_VALUE),
+            new ItemStack(MTItems.rodTranscendentMetal2, 1, OreDictionary.WILDCARD_VALUE),
+            new ItemStack(MTItems.rodTranscendentMetal4, 1, OreDictionary.WILDCARD_VALUE),
+            new ItemStack(MTItems.rodTranscendentMetalDepleted, 1, OreDictionary.WILDCARD_VALUE),
+            new ItemStack(MTItems.rodTranscendentMetalDepleted2, 1, OreDictionary.WILDCARD_VALUE),
+            new ItemStack(MTItems.rodTranscendentMetalDepleted4, 1, OreDictionary.WILDCARD_VALUE) }) {
+            MTAnimatedTooltipHandler.addAnimatedText(
+                rod,
+                () -> translateToLocal("messTech.addBy"),
+                () -> translateToLocal("messtech.nuclearTech"),
+                AuthorDynamic.TRANSCENDENT_METAL);
+        }
 
         // Populate after the machine item list is set so the NEI handler can reference the catalyst.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();

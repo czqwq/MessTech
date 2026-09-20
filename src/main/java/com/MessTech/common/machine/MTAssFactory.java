@@ -467,14 +467,26 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(StatCollector.translateToLocal("machine.assfactory.machinetype"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.desc"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.flavour"))
             .addSeparator()
-            .addInfo(EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.assfactory.tooltip.0"))
-            .addInfo(EnumChatFormatting.YELLOW + StatCollector.translateToLocal("machine.assfactory.tooltip.1"))
-            .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.assfactory.tooltip.2"))
-            .addInfo(EnumChatFormatting.DARK_AQUA + StatCollector.translateToLocal("machine.assfactory.tooltip.5"))
-            .addInfo(EnumChatFormatting.WHITE + StatCollector.translateToLocal("machine.assfactory.tooltip.3"))
-            .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.assfactory.poc"))
-            .addStructureInfo(EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.assfactory.tooltip.4"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.modes.header"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.modes.component"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.modes.assemblyline"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.modes.switch"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.parallel.header"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.parallel.tier1"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.parallel.tier2"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.parallel.poc"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.data.header"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.data.access"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.data.stick"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.details.hint"))
+            .addStructureInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.4"))
             .toolTipFinisher();
         return tt;
     }

@@ -877,18 +877,31 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     @Override
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
-        tt.addMachineType("Nano Computing Center")
+        tt.addMachineType(StatCollector.translateToLocal("machine.computingcenter.machinetype"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.desc"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.flavour"))
             .addSeparator()
-            .addInfo(EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.computingcenter.tooltip.0"))
-            .addInfo(EnumChatFormatting.RED + StatCollector.translateToLocal("machine.computingcenter.tooltip.1"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.modes.header"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.modes.computing"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.modes.research"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.modes.scanner"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.modes.switch"))
             .addSeparator()
-            .addInfo(EnumChatFormatting.GREEN + StatCollector.translateToLocal("machine.computingcenter.tooltip.2"))
-            .addInfo(EnumChatFormatting.RED + StatCollector.translateToLocal("machine.computingcenter.tooltip.3"))
-            .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.computingcenter.tooltip.4"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.heat.header"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.heat.limit"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.heat.cooling"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.heat.lock"))
             .addSeparator()
-            .addInfo(EnumChatFormatting.YELLOW + StatCollector.translateToLocal("machine.computingcenter.tooltip.5"))
-            .addStructureInfo(
-                EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.computingcenter.tooltip.6"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.power.header"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.power.computing"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.power.research"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.power.scanner"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.power.overclock"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.details.hint"))
+            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.details.hatch"))
+            .addStructureInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.6"))
             .toolTipFinisher();
         return tt;
     }

@@ -21,6 +21,7 @@ compressed/removed. See also `repo-readme.md` (own-code notes) and `GT5U-NOTES.m
 ```
 MTMultiMachineBase<T>
 ├── MTGeneratorMultiBase<T>
+├── MTModuleMultiMachineBase<T>
 ├── MTWirelessMultiMachineBase<T>
 │   └── ParallelismAcrossMultiMachineBase<T>
 └── CalculateMultiMachineBase<T>
@@ -31,6 +32,69 @@ MTMultiMachineBase<T>
 - Generic multi-block base extends GT `MTEExtendedPowerMultiBlockBase`.
 - Provides standard `ProcessingLogic` setup, machine-mode switching, Waila NBT/body.
 - No wireless code anymore (moved to `MTWirelessMultiMachineBase`).
+
+### MTModuleMultiMachineBase (module system)
+- `common/machine/Base`: `MTModuleMultiMachineBase<T>`, `IMTModule`, `MTModuleType`, `MTModuleValues`,
+  `MTModuleHatchElement`. The hatches live in `common/machine/hatch`: `MTModuleHatchBase` (plain `MTEHatch`, no
+  inventory, GT data access overlay), `MTModuleSpeedHatch`, `MTModuleEuHatch`, `MTModuleParallelHatch` +
+  `MTModuleParallelHatchGui`.
+- A module is whatever the machine links into its module slot (here: a hatch). The module reports what it
+  provides, the machine aggregates - the numbers live in the concrete module.
+- `MTModuleType`: `EU_DISCOUNT`, `SPEED_BONUS`, `PARALLEL_CONTROL`, `CROSS_RECIPE_PARALLEL`, `WIRELESS` (working
+  titles). The first three are the standard set (`MTModuleType.defaultSupported()`); the other two only work after
+  a machine opted in by overriding `getSupportedModuleTypes()`, because not every machine can use them.
+- A module returns a **set** of types, so a composite module (e.g. speed + parallel in one module) needs no type of
+  its own. `acceptsModule()` takes a module only when the machine supports every type it provides and the tier is
+  in range.
+- Module tier is the GT tier index: `IMTModule.MIN_TIER` = 5 (IV) .. `MAX_TIER` = 14 (MAX), `isValidTier()` rejects
+  everything outside.
+- Folding: the EU and speed modules **multiply** onto `getBaseEuModifier()` / `getBaseSpeedBonus()`, the parallel
+  module **supplies**: `getMaxParallelRecipes()` returns `getModuleParallel()` (the highest `IMTModule#getParallel`
+  of the linked parallel control modules) and falls back to `getBaseMaxParallelRecipes()` only when there is none.
+  The module's number **is** the parallel the machine runs at (`baseParallel = module.getParallel()`), so 64
+  parallel at IV stay 64 instead of becoming 68 on a machine that had 4. Only **one** parallel control module is
+  taken (`addModule`), the way TST's `checkSingleModularHatch` treats a second controller as a structure error.
+  Those three methods are **final**; subclasses implement the `getBase*` hooks (defaults 1 / 1 / 1), so a machine
+  cannot lose its module values by accident.
+- `checkMachine` is final and runs `clearModules()` before delegating to the subclass'
+  `checkMachineStructure(...)`: the module list is rebuilt by every structure check, so pulling a module hatch
+  removes its bonus at the next check. (TST solves the same problem with `resetModularHatchCollections()`.)
+- Linking: `addModuleHatchToMachineList(te, casingIndex)` is the adder behind `MTModuleHatchElement.Module`
+  (`IHatchElement<MTModuleMultiMachineBase<?>>`); a machine opts in with one line,
+  `buildHatchAdder(MyMachine.class).casingIndex(casing).hint(1).atLeast(MTModuleHatchElement.Module).build()`.
+  `IMTModule#onLinkedToMachine(casingIndex)` is the hook that lets a hatch take the casing texture, so the base
+  class never has to reference the hatch types. No machine uses this yet.
+- Values (`MTModuleValues`, tier IV..MAX):
+  - speed module: TST's `SpeedMultiplierOfSpeedController` `{2,4,...,256}` moved down to IV..MAX with the tail
+    continuing TST's own ×2 law → `{2,4,8,16,32,64,128,256,512,1024}`, `getSpeedBonus() = 1 / multiplier`;
+  - EU module: TST's `PowerConsumptionMultiplierOfPowerConsumptionController` `{0.95,0.9,0.85,0.8,0.75,0.7,0.5,0.25}`
+    with the tail halving → `{...,0.125,0.0625}` (5% saved at IV up to 93.75% at MAX);
+  - parallel module: `1 << (2 * (tier - 2))` = 64 at IV up to 16,777,216 at MAX, player-lowerable in the GUI
+    (1..ceiling, clamped by `setParallelFromGui`, saved as NBT `parallel`).
+  - TST registers its controllers on ZPM..MAX (its T1..T8). Our modules run IV..MAX, so TST's T1 sits on IV and the
+    UXV/MAX entries are the only extrapolated numbers.
+- Items/IDs: `MT_ID + 40..49` speed, `+50..59` EU, `+60..69` parallel - one per tier IV..MAX, registered by looping
+  over `MTItemList.SPEED_MODULES` / `EU_MODULES` / `PARALLEL_MODULES` in `MTMachineLoader`. Lang keys
+  `machine.module.*` in both languages (`speed.name`, `speed.desc.0`, `eu.name`, `eu.desc.0`, `parallel.name`,
+  `parallel.desc.0/1`, `parallel.label`, `desc.install`).
+- The two optional types are only *reported*, the logic stays in the machine: `hasModule(type)`,
+  `getModules(type)`, `getModuleCycleNum()` (highest `IMTModule#getCycleNum`) and `hasWirelessModule()`. A machine
+  that needs the real loops uses the existing wireless (`MTWirelessMultiMachineBase`) or cross recipe
+  (`TickableParallelismAcrossMultiMachineBase` / `ParallelismAcrossMultiMachineBase`) bases - Java cannot extend
+  both chains, so a machine that needs modules *and* wireless means lifting the registry into a shared helper
+  (composition). No such machine exists yet.
+- Design references: TST `ModularizedMachineBase` / `ModularizedMachineSupportAllModuleBase` (modules as hatches,
+  static/dynamic controllers push into machine accumulators, `MultiExecutionCoreMachineBase` for the cross recipe
+  execution core); the speed, EU and parallel numbers come from TST's controllers and the parallel ceiling formula
+  above.
+- Harness: `tools/modulebase/verify_module_base.py` (97 source checks plus `ModuleBaseHarness` with 102 runtime
+  checks compiled against `tools/modulebase/stubs`). It cross-checks the speed and EU tables against TST's
+  `Config.java`, the parallel table against the `1 << (2 * (tier - 2))` ceiling and the tier names against
+  `GTValues.VN`. Mutation tested: a wrong speed tail, a wrong EU tail, the additive parallel of the older design, a
+  dropped single-parallel rule, a skipped `clearModules()` and a false `isOptional()` are all caught.
+- Next steps: wire `MTModuleHatchElement.Module` into a real machine structure, add the composite module (one hatch
+  that provides two types - the API already allows it), and decide the numbers of the optional cross recipe and
+  wireless modules.
 
 ### MTWirelessMultiMachineBase
 - State: `ownerUUID`, `EnableWirelessFunc`, `EnableWireless`, `wirelessParallel`,
@@ -138,6 +202,31 @@ MTMultiMachineBase<T>
   colour emphasis lives in the lang text itself (`§b` for values, `§c` for the danger thresholds, `§e` for the hatch
   tiers), so the Java side is one `addInfo(translate(key))` per line, and the structure block/`toolTipFinisher` follow
   unchanged. Reuse this layout (and key naming) for the other machines.
+
+### Machine tooltips (house style)
+- Every machine controller tooltip is one `addInfo(translate(key))` per line with the keys
+  `<namespace>.tooltip.desc` / `.flavour`, then two or more `.<group>.header` + `.<group>.<bullet>`
+  groups with `addSeparator()` between them, then `.details` / `.details.hint`. The whole look lives in
+  the lang text: `§6` heading ending in a colon, `§7· ` bullets (the space is part of the style),
+  `§b` values, `§e` tiers/hatches/coils, `§c` dangers, `§a` buffs, `§d` details. No colour code and no
+  concatenation on the Java side, no `§r`, no passing one tooltip key's text into another key as an
+  argument. The structure block calls stay byte-identical; a machine type that used to be a hardcoded
+  English string moves into `<namespace>.machinetype`.
+- Tooling in `tools/mttooltip` (gitignored, like every harness): `machines.py` lists the refactored
+  machines with their key namespaces and frozen `beginStructureBlock` arguments, `verify_tooltips.py`
+  enforces the style above (Java layout, lang text of every line, placeholder/`%` handling, frozen
+  structure block, no orphan tooltip key), `merge_fragments.py` splices a machine's pending
+  `tmp/mttooltip/frag_<id>.{zh,en}.lang` fragment into both lang files and deletes the old keys that no
+  Java file references any more.
+- Chinese terminology: proper nouns - blocks, casings, hatches, buses, coils, fluids, items - have to be
+  copied verbatim from the GTNH Chinese localisation that ships under `tmp/ZH-CN`: `GregTech_zh_CN.lang`
+  plus the per-mod overrides in `config/txloader/forceload/<Mod>[<id>]/lang/zh_CN.lang`
+  (`GregTech[gregtech]`, `GregTech[tectech]`, `GregTech[goodgenerator]`, `GregTech[gtnhlanth]`, ...).
+  `python tools/mttooltip/zh_terms.py lookup <regex>` searches that library, `... check` fails on a wrong
+  variant of a canonical name and on a raw code identifier leaking into the text - it caught
+  相干性保持 -> 相干性维持等离子导管, 电磁隔离外壳 -> 电磁隔离机械方块, 和平执行外壳 -> 和平执行机械方块,
+  凝聚态转化线圈 -> 凝聚态物质转换线圈, 极寒凛冰 -> 极寒之凛冰, 数据棒 -> 闪存, 纯化水 -> 净化水,
+  奇点纳米收容总线 -> 奇点纳米蜂群收容总线, 消音仓 -> 消声仓.
 
 ### MTChemicalTwister
 - Structure: `A` containment field machine casing, `B` fusion coil block, `C` **heating coils**, `D` chemically inert
@@ -338,6 +427,52 @@ MTMultiMachineBase<T>
   transfer reliably.
 - Same GUI as the GT5U vacuum hatch plus frequency/popup and private toggle controls.
 
+### MTWirelessBeamlineInput / MTWirelessBeamlineOutput / MTWirelessBeamlineAdvancedOutput
+- Registered as `32470` (input), `32471` (output) and `32472` (filtered output). They extend GT5U's
+  `MTEHatchInputBeamline` / `MTEHatchOutputBeamline` / `MTEHatchAdvancedOutputBeamline`, so every beam machine
+  (LHC, beam splitter, beam crafter, target chamber, LINAC, source chamber, synchrotron, beam mirror, beam
+  stabilizer) accepts them unchanged: the structure adders and `BeamHatchElement` only test `instanceof` /
+  `mteClasses()`, so a subclass is accepted. Caveat: the machines that build their slots with
+  `buildBeamline*Hatch(...)`/`hatchId(...)` (LHC, beam splitter, beam crafter, LINAC, beam mirror,
+  stabilizer) filter the *hologram* by MTE id, so a correctly placed wireless hatch is flagged by the
+  "show errors" channel and autoplace can only pull the wired hatch from inventory. The structure itself
+  still validates and the machine runs; place these hatches by hand.
+- The pairing key is **only the hatch dye colour** (`getBaseMetaTileEntity().getColorization()`, where `-1` means
+  unpainted and never links; the value is re-read live, so repainting re-pairs immediately).
+  `WirelessBeamlineUtil` keeps a dedicated registry, because two isolated hatches have no beamline pipe edge
+  that could carry the connection; pairing therefore works across machines and dimensions **as long as both
+  chunks are loaded** - a chunk unload unregisters the hatch (`onUnload`), so an unloaded counterpart counts as
+  "no counterpart" and the beam is dropped instead of being pushed into an unloaded tile entity.
+- 1:1 is enforced at push time instead of being assumed: the colour channel must contain **exactly one output and
+  exactly one input**, otherwise the packet is dropped and never handed to an arbitrary hatch. `moveBeam()`
+  replaces the wired hatch's pipe walk and is invoked from the same `MOVE_AT` hook (`tick % 20 == 4`), so the
+  transfer cadence is identical to a wired beamline.
+- `canConnect()` is false on both sides, so beamline pipes neither connect to nor render a connection for them.
+  The wired output hatch does not consult `canConnect` when it walks its line of sight, so the wireless input
+  additionally overrides `setContents()` and only accepts the packet its own 
+  `WirelessBeamlineUtil.moveBeam()` is handing over at that moment: a wired hatch parked in front of the
+  wireless input cannot inject a beam that bypasses the colour channel.
+- The input keeps GT's inherited expiry logic: a beam that is not refreshed within one move tick is dropped, so
+  repainting a hatch or breaking the pair stops the machine instead of caching a stale particle stream.
+- The filtered variant inherits the LHC/beam splitter particle blacklist: the machine writes `acceptedInputMap`
+  and `dataPacket`, and GT5U's ModularUI edits the map. Nothing about the filter was changed, only the transport.
+- Scanner info (`getInfoData()`) gains two lines and stays inside the eight documented by
+  `IGregTechDeviceInformation`: the colour name (GT5U's `GT5U.infinite_spray_can.color.*` key with a `Dyes` name
+  fallback) and the live link state (unpainted / no counterpart / conflict / linked). They are emitted through
+  `IGregTechDeviceInformation.encode(...)` / `translatable(...)` - or as a bare lang key - so the client
+  translates them in its own language, and the registry state itself stays server-side only.
+- Lang lives in `machine.wirelessbeamline.*`. The hatches carry `@IMetaTileEntity.SkipGenerateDescription`
+  because their description is handed straight to the tooltip: without the annotation GT5U dumps one instance's
+  description into `GregTech.lang` at client setup, which is why the older `MTWirelessVacuumConveyor*` tooltips
+  show a frozen frequency line.
+- Crafting recipes live in `GTRecipes.loadRecipes()`, one assembler recipe per hatch, each built on its wired
+  counterpart (`LanthItemList.LUV_BEAMLINE_INPUT_HATCH` / `LUV_BEAMLINE_OUTPUT_HATCH`, filtered variant on
+  `ItemList.AdvancedBeamlineOutputHatch`) and reusing the wireless vacuum conveyor kit verbatim: AE2
+  `item.ItemMultiMaterial` 8:47 x8, `ItemList.WormholeGenerator`, UIV sensor (input) or emitter (output) x4,
+  UIV circuit x4, `wireGt16` SuperconductorUIV x64 and the advanced redstone receiver (input) / transmitter
+  (output) cover, on `MUTATED_LIVING_SOLDER` (input) or `Lubricant` (output), UIV, 2 minutes. The kit is not
+  retiered to the hatch's own LuV/UV tier, so the wireless upgrade is priced as a UIV build.
+
 ### MTNanoScaleFoundry and the 24 pool
 - Registered as `32411`, extends `TickableParallelismAcrossMultiMachineBase`, 3x3x3 structure.
 - 11 normal threads/circuits 1-11 map to the 11 normal NAC pools; 24 pool is intentionally not a
@@ -427,15 +562,19 @@ MTMultiMachineBase<T>
    custom packet: GT compares that byte every tick (`handleUpdateDataChangeServer`), sends `CHANGE_CUSTOM_DATA` when it
    changes and writes it into the tile data packet, so it survives a chunk reload for free. Values are masked with
    `0x7F`, and multiblock structure checks never run on the client - the client has to be told.
-11. Verify what changed, not everything: running the whole `tools/**/verify_*.py` sweep after every edit is unnecessary.
-    Pick the harnesses by the class or file that was touched (e.g. `Get-ChildItem tools -Recurse -Filter *.py |
-    Select-String -Pattern MTPiggyHatRenderer`) and run only those, on top of `gradlew spotlessApply spotlessCheck
-    checkstyleMain compileJava processResources`. Harnesses outside the touched area do not have to be green, and one
-    inside it that fails for an unrelated reason (the `tmp/` -> `tools/` move left some of them writing into hard coded
-    `tmp/...` paths) is worth a two line fix rather than a full sweep.
+11. Verify with the build, not with harnesses: `gradlew compileJava` is the check for a change, and the user does
+    not want harness work for it - do not add new `tools/**` verifiers (or extend the existing ones) unless asked,
+    and do not run the `tools/**` sweep. The wider `gradlew spotlessApply spotlessCheck checkstyleMain
+    processResources` is for when a full build is asked for or when the work is being handed over as finished. The
+    existing harnesses stay in `tools/**` and are only run on request - their results are not part of the normal
+    loop any more. (This supersedes the earlier "pick the harnesses by the file that was touched" rule; see also
+    `AGENTS.md`.)
 
 ## Known pending / open items
 
+- The module system (`MTModuleMultiMachineBase`) has its three standard hatches with TST's values and a
+  `IHatchElement`, but no machine uses it yet: the module slot still has to be wired into a real structure, and the
+  composite plus the optional cross recipe / wireless modules are still open, see its section above.
 - Overclock GUI / button sizing may still need visual verification.
 - `ParallelismAcrossMultiMachineBase` currently has a trivial `getMaxParallelRecipes()` fallback;
   subclasses should override.
@@ -829,4 +968,64 @@ MTMultiMachineBase<T>
 - `MTPigTechText` deliberately has no Minecraft imports: `tmp/pigtext/PigTechFrames.java` compiles it on its own with
   `javac` and checks the single line, the static prefix, the loop, the constant layout, the reserved margins, the
   travel limit and every phase against the real strings (22866 checks, no game needed).
+
+## Animated tooltips with a renderer (`MTAnimatedTooltipHandler` / `MTTextAnimation`)
+
+- gtnhlib's `AnimatedTooltipHandler` can only add **strings** to a tooltip: its registry is
+  `ItemStack -> Supplier<String>` and the animation *is* the string. An effect that has to touch the letters
+  themselves - rotate them, darken them, blend them - has nowhere to run there, so MessTech has its own
+  `MTAnimatedTooltipHandler` (`common/util`). It keeps the same registration shape (`addItemTooltip(stack, line)`,
+  re-evaluated once per frame, split on `'\n'`), remembers an animation per line, and is the handler
+  `AuthorDynamic` writes through. `MTPigTech` still uses gtnhlib's handler; both add their lines in
+  `ItemTooltipEvent`, so they coexist.
+- The split that makes this work on both sides: `MTTextAnimation` is the **common** half - it only answers "what
+  does the line look like this frame", so the machine loader can register animated lines while running on the
+  server too - and `MTTextRenderer` is the **client** half, the drawing. `registerRenderer(animation, renderer)`
+  pairs them client-side; `init()` (called from `ClientProxy.preInit`) registers the built-in pair and the event
+  handler. An animation without a renderer is a pure formatting animation, which is what `MTPigTechText` is.
+- Drawing: when a tooltip of a stack with a *rendered* animation is about to be drawn, the handler takes the
+  tooltip over through gtnhlib's `RenderTooltipEvent#alternativeRenderer`, redraws the vanilla box (the nine
+  `drawGradientRect`s, then `font.drawStringWithShadow` per line) and calls the renderer of every line that wears
+  one. A renderer with `replacesText()` draws the line itself and the plain font copy is skipped for it, so an
+  effect can turn the letters instead of drawing a second copy over them; everything else stays a normal line.
+  The same event is posted by NEI (`RenderTooltipEventHelper`, NEI 2.7.8-GTNH and newer), so it works in the
+  inventory and in the NEI panels. A stack whose lines carry no renderer is left completely alone (the vanilla
+  tooltip is not touched), an already set `alternativeRenderer` is never fought over, and NEI's paging for
+  taller-than-screen tooltips is not reproduced (vanilla layout instead).
+- Which line gets which renderer is decided by **visible text**, not by index: NEI inserts its second display
+  name at index 1, so positions move. `MTTextAnimation.visibleText` strips the `§x` pairs and the entry whose
+  frame has the same visible text wins, which also makes the animation immune to whatever colour codes a supplier
+  such as `author_czqwq()` brings along.
+- `AuthorDynamic.register(animation, author, stack)` is the new entry point (arg order: animation, author text,
+  stack), with `register(animation, stack)` for the default name: it animates the *visible* text of the author
+  supplier with `animation.frame(...)` and adds the line - plus the usual animated "Add by: MessTech" line - to
+  the stack. `registerOn(...)` is unchanged behaviourally: it now goes through the same handler with no animation.
+- `TRANSCENDENT_METAL` is the built-in rendered animation, GT5U's Transcendent Metal look worn by a whole line:
+  - `MTTranscendentMetalText.frame` recolours every character with a dark grey / grey / white / grey band that
+    advances one character per 90 ms, so the letters read as polished metal before anything moves.
+  - `MTTranscendentMetalTextRenderer` **replaces** the line (`replacesText()`): it draws it itself, turned about
+    its own centre by GT5U's own transform, verbatim - `glRotatef(angle, 0.3, 0.5, 0.2)` with
+    `angle = getAnimationRenderTicks() * 3.5 % 360` - so the word turns exactly like a Transcendent Metal item
+    lying next to it. The turning copy is the only copy: a still line with a turning one over it shows both at
+    once. The metal itself is the frame's own band with the font's shadow, plus the same glyphs one pixel along
+    with additive blending, which is the glint of the turned plate.
+  - The turn is one way round, continuously: no folding, no bounce and no reset at a quarter turn. The plate is
+    edge-on (invisible) once per revolution, exactly like the item. The line swings with it - a long word tips
+    diagonally out of its own tooltip row at times, the way the item's quad leaves its slot - because the motion
+    is the item's and nothing is tamed down.
+  - `MTTranscendentMetalText.showsBack` drives the one thing a flat plate needs and an item quad gets from its
+    back face: while the plate faces away, the letters are mirrored back (`glScalef(-1, 1, 1)`) so they read the
+    same way round on both sides. With the oblique axis the z part of the plate normal is
+    `cos(a) + z^2 / (x^2 + y^2 + z^2) * (1 - cos(a))`, so the switch lands where that is zero - the edge-on pose,
+    where the plate has no visible area and the flip cannot be seen.
+- Verification: by the repository rule this is `gradlew compileJava`, and `tools/textanim` (the source+behaviour
+  harness of the first, folding version) is stale since that version was replaced - do not run it as is; refresh
+  it only if a check of the turning text is wanted again.
+- The bigger version of this idea, which this repo deliberately does not take: render the effect at the **font**
+  level - an inline marker in the string, a `FontRenderer` mixin that parses it, glyph masks and GLSL, with the
+  marker stripped again wherever the text is measured, wrapped or typed (chat, text fields, NEI search fields,
+  Angelica-style batched font renderers). That is what makes an effect show up in chat, item names and search
+  fields as well, but it needs a mixin into every font consumer, which is only worth it for effects that must
+  appear outside tooltips. This repo uses the smaller shape instead: an effect is a registered renderer, and the
+  animation data stays common while the drawing stays client-only.
 

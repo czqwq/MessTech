@@ -66,6 +66,7 @@ import gtPlusPlus.core.material.MaterialsAlloy;
 import gtPlusPlus.core.material.MaterialsElements;
 import gtPlusPlus.xmod.gregtech.api.enums.GregtechItemList;
 import gtPlusPlus.xmod.thermalfoundation.fluid.TFFluids;
+import gtnhlanth.common.register.LanthItemList;
 import ic2.core.Ic2Items;
 import tectech.recipe.TTRecipeAdder;
 import tectech.recipe.TecTechRecipeMaps;
@@ -339,6 +340,47 @@ public class GTRecipes {
             .fluidInputs(Materials.Lubricant.getFluid(9216))
             .itemOutputs(MTItemList.MTWirelessVacuumConveyorOutput.get(1))
             .eut(RECIPE_UIV)
+            .duration(MINUTES * 2)
+            .addTo(assemblerRecipes);
+
+        // Wireless particle beam hatches: the same wireless kit as the vacuum conveyor hatches above, with the
+        // matching wired beam hatch as the base part. Input takes the receiver half, outputs the transmitter half.
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                LanthItemList.LUV_BEAMLINE_INPUT_HATCH,
+                GTModHandler.getModItem(Mods.AppliedEnergistics2.getID(), "item.ItemMultiMaterial", 8, 47),
+                ItemList.Sensor_ZPM.get(4),
+                new Object[] { OrePrefixes.circuit.get(Materials.ZPM), 4 },
+                ItemList.Cover_AdvancedRedstoneReceiver.get(1))
+            .fluidInputs(MaterialMisc.MUTATED_LIVING_SOLDER.getFluidStack(9216))
+            .itemOutputs(MTItemList.MTWirelessBeamlineInput.get(1))
+            .eut(RECIPE_ZPM)
+            .duration(MINUTES * 2)
+            .addTo(assemblerRecipes);
+
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                LanthItemList.LUV_BEAMLINE_OUTPUT_HATCH,
+                GTModHandler.getModItem(Mods.AppliedEnergistics2.getID(), "item.ItemMultiMaterial", 8, 47),
+                ItemList.Emitter_ZPM.get(4),
+                new Object[] { OrePrefixes.circuit.get(Materials.ZPM), 4 },
+                ItemList.Cover_AdvancedRedstoneTransmitter.get(1))
+            .fluidInputs(Materials.Lubricant.getFluid(9216))
+            .itemOutputs(MTItemList.MTWirelessBeamlineOutput.get(1))
+            .eut(RECIPE_ZPM)
+            .duration(MINUTES * 2)
+            .addTo(assemblerRecipes);
+
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.AdvancedBeamlineOutputHatch.get(1),
+                GTModHandler.getModItem(Mods.AppliedEnergistics2.getID(), "item.ItemMultiMaterial", 8, 47),
+                ItemList.Emitter_UV.get(4),
+                new Object[] { OrePrefixes.circuit.get(Materials.UHV), 4 },
+                ItemList.Cover_AdvancedRedstoneTransmitter.get(1))
+            .fluidInputs(Materials.Lubricant.getFluid(9216))
+            .itemOutputs(MTItemList.MTWirelessBeamlineAdvancedOutput.get(1))
+            .eut(RECIPE_ZPM)
             .duration(MINUTES * 2)
             .addTo(assemblerRecipes);
 

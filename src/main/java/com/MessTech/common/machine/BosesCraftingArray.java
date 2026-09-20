@@ -9,7 +9,6 @@ import java.util.List;
 
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import org.jetbrains.annotations.NotNull;
@@ -390,12 +389,28 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(translateToLocal("machine.bosescraftingarray.machinetype"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.desc"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.flavour"))
             .addSeparator()
-            .addInfo(EnumChatFormatting.LIGHT_PURPLE + translateToLocal("machine.bosescraftingarray.tooltip.0"))
-            .addInfo(EnumChatFormatting.GRAY + translateToLocal("machine.bosescraftingarray.tooltip.1"))
-            .addInfo(EnumChatFormatting.GREEN + translateToLocal("machine.bosescraftingarray.tooltip.2"))
-            .addInfo(EnumChatFormatting.YELLOW + translateToLocal("machine.bosescraftingarray.tooltip.3"))
-            .addInfo(EnumChatFormatting.GOLD + translateToLocal("machine.bosescraftingarray.poc"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.header"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.frame"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.casings"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.hatches"))
+            .addSeparator()
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.header"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.bus"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.tier"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.speed"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.steps"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.stall"))
+            .addSeparator()
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.header"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.energy"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.parallel"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.overclock"))
+            .addSeparator()
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.details"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.details.hint"))
             .toolTipFinisher();
         return tt;
     }

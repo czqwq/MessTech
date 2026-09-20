@@ -259,11 +259,26 @@ public class MTDBBFurnace extends MTMultiMachineBase<MTDBBFurnace>
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(translateToLocal("machine.dbbfurnace.machinetype"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.desc"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.flavour"))
             .addSeparator()
-            .addInfo(EnumChatFormatting.AQUA + translateToLocal("machine.dbbfurnace.tooltip.0"))
-            .addInfo(EnumChatFormatting.GRAY + translateToLocal("machine.dbbfurnace.tooltip.1"))
-            .addInfo(EnumChatFormatting.LIGHT_PURPLE + translateToLocal("machine.dbbfurnace.tooltip.2"))
-            .addInfo(EnumChatFormatting.GOLD + translateToLocal("machine.dbbfurnace.tooltip.3"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.structure.header"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.structure.buses"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.structure.materials"))
+            .addSeparator()
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.mode.header"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.mode.switch"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.mode.blast"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.mode.metallurgy"))
+            .addSeparator()
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.header"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.free"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.tier"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.one_tick"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.parallel"))
+            .addSeparator()
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.details"))
+            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.details.hint"))
             .toolTipFinisher();
         return tt;
     }

@@ -745,33 +745,31 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
     @Override
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
-        tt.addMachineType(StatCollector.translateToLocal("machine.nqdafreactor.name"))
+        tt.addMachineType(StatCollector.translateToLocal("machine.nqdafreactor.machinetype"))
             .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.desc"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.flavour"))
             .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.eff.ramp"))
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.eff.burn"))
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.eff.decay"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.operation.header"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.operation.efficiency"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.operation.decay"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.operation.output"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.operation.wireless"))
             .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.liquid_air"))
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.fuel_input"))
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.coil"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.coolant.header"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.coolant.tachyon"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.coolant.cryotheum"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.coolant.supercoolant"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.coolant.ic2"))
             .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.coolant_header"))
-            .addInfo(getCoolantTextFormatted("machine.nqdafreactor.fluid.ic2coolant", "1000", 105))
-            .addInfo(getCoolantTextFormatted("machine.nqdafreactor.fluid.supercoolant", "1000", 150))
-            .addInfo(getCoolantTextFormatted("machine.nqdafreactor.fluid.cryotheum", "1000", 275))
-            .addInfo(getCoolantTextFormatted("machine.nqdafreactor.fluid.tachyon", "20", 500))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.excited.header"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.excited.space"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.excited.atomic"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.excited.naquadah"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.excited.uranium235"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.excited.caesium"))
             .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.excited_header"))
-            .addInfo(getExcitedTextFormatted("machine.nqdafreactor.fluid.caesium", "180", 2))
-            .addInfo(getExcitedTextFormatted("machine.nqdafreactor.fluid.uranium235", "180", 3))
-            .addInfo(getExcitedTextFormatted("machine.nqdafreactor.fluid.naquadah", "20", 4))
-            .addInfo(getExcitedTextFormatted("machine.nqdafreactor.fluid.atomic", "20", 16))
-            .addInfo(getExcitedTextFormatted("machine.nqdafreactor.fluid.space", "20", 64))
-            .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.spacetime"))
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.spacetime_growth"))
-            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.no_dynamo"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.details.hint"))
             .addSupportAny()
             .beginStructureBlock(31, 32, 32, false)
             .addController(StatCollector.translateToLocal("machine.nqdafreactor.tooltip.structure.controller"))
@@ -786,22 +784,6 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
             .addOutputHatch("1+", StatCollector.translateToLocal("machine.nqdafreactor.tooltip.output"), 1)
             .toolTipFinisher();
         return tt;
-    }
-
-    private static String getCoolantTextFormatted(String fluidNameKey, String litersConsumed, int effBoost) {
-        return StatCollector.translateToLocalFormatted(
-            "machine.nqdafreactor.tooltip.coolant_line",
-            litersConsumed,
-            effBoost,
-            StatCollector.translateToLocal(fluidNameKey));
-    }
-
-    private static String getExcitedTextFormatted(String fluidNameKey, String litersConsumed, int multiplier) {
-        return StatCollector.translateToLocalFormatted(
-            "machine.nqdafreactor.tooltip.excited_line",
-            litersConsumed,
-            multiplier,
-            StatCollector.translateToLocal(fluidNameKey));
     }
 
     @Override

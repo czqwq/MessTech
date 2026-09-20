@@ -9,7 +9,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
@@ -243,13 +242,27 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
         tt.addMachineType(StatCollector.translateToLocal(getMachineTypeKey()))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.desc"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.flavour"))
             .addSeparator()
-            .addInfo(
-                EnumChatFormatting.LIGHT_PURPLE.toString() + EnumChatFormatting.BOLD.toString()
-                    + StatCollector.translateToLocal("machine.spacemodulepump.tooltip.meme"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.need_t5"))
-            .addInfo(EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.spacemodule.tooltip.0"))
-            .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.spacemodule.tooltip.1"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.structure.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.structure.elevator"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.structure.module"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.structure.hatch"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.selection.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.selection.slots"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.selection.rules"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.selection.batch"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.power.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.power.base"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.power.parallel"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.power.wireless"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.details.slots"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemodulepump.tooltip.details.output"))
             .beginStructureBlock(1, 5, 2, false)
             .addController(StatCollector.translateToLocal("gt.mbtt.structure.front_center_4th_layer"))
             .addCasing("0-8", StatCollector.translateToLocal("gt.blockcasings.ig.0.name"), false)

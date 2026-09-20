@@ -16,7 +16,6 @@ import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
@@ -713,18 +712,30 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     @Override
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
-        tt.addMachineType(StatCollector.translateToLocal(getMachineTypeKey()))
+        tt.addMachineType(StatCollector.translateToLocal("machine.spacemoduleminer.machinetype"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.desc"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.flavour"))
             .addSeparator()
-            .addInfo(
-                EnumChatFormatting.LIGHT_PURPLE.toString() + EnumChatFormatting.BOLD.toString()
-                    + StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.meme"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.need_t5"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.plasma"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.computation"))
-            .addInfo(EnumChatFormatting.LIGHT_PURPLE + StatCollector.translateToLocal("machine.spacemodule.tooltip.0"))
-            .addInfo(EnumChatFormatting.GOLD + StatCollector.translateToLocal("machine.spacemodule.tooltip.1"))
-            .addInfo(
-                EnumChatFormatting.GREEN + StatCollector.translateToLocal("machine.spacemodule.tooltip.crossparallel"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.rail"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.frame"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.hatches"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.distance"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.asteroid"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.size"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.plasma"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.supplies"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.power.header"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.power.wireless"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.power.parallel"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.power.crossrecipe"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.power.computation"))
+            .addSeparator()
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.details.hint"))
             .beginStructureBlock(1, 5, 2, false)
             .addController(StatCollector.translateToLocal("gt.mbtt.structure.front_center_4th_layer"))
             .addCasing("0-8", StatCollector.translateToLocal("gt.blockcasings.ig.0.name"), false)

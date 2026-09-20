@@ -630,3 +630,45 @@ GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
   amount again at 50 %, Naquadria dustSmall 4/8/16 (50 %), NaquadahEnriched dustTiny 8/16/32 (25 %),
   TungstenSteel dust 16/32/64 and Platinum dust 2/4/8.
 
+## 17. Beamline / particle hatch API (GT5U 5.09.54.133)
+
+Used as the reference for MessTech's wireless beamline hatches (`docs/knowledge.md`).
+
+* Classes: `gtnhlanth.common.hatch.MTEHatchBeamlineConnector` (abstract, extends `MTEHatch`, holds the public
+  `BeamLinePacket dataPacket`, ticks `moveAround` at `tectech.util.CommonValues.MOVE_AT` = `tick % 20 == 4`,
+  reports the beam through `getInfoData()`), `MTEHatchInputBeamline` (`setContents(BeamLinePacket)`, impl.
+  `ISmartInputHatch`, `newMetaEntity` returns **`MetaTileEntity`**, `getDescription()` returns `null`) and
+  `MTEHatchOutputBeamline` (`moveAround` walks up to 128 beamline pipes in a straight line and calls
+  `setContents` on the first input hatch, then clears its packet; `newMetaEntity` returns `IMetaTileEntity`).
+* Filtered variant: `gregtech.common.tileentities.machines.multi.beamcrafting.MTEHatchAdvancedOutputBeamline`
+  extends the output hatch, is `@IMetaTileEntity.SkipGenerateDescription`, tier 8, and keeps
+  `Map<Particle, Boolean> acceptedInputMap` (+ `getParticleList()`/`getParticleMap()`/`setAcceptedInputMap`).
+  The LHC/beam splitter fill it via `MTEBeamMultiBase.addAdvancedBeamlineOutputHatch(...)` (which calls
+  `setInitialParticleList(LHCModule.<force>.acceptedParticles)`) and read it back before pushing a packet.
+  Its ModularUI (`gregtech.common.gui.modularui.hatch.MTEHatchAdvancedOutputBeamlineGui`) edits the map through
+  GenericMap/List sync handlers, so a subclass only needs to inherit `buildUI`.
+* Data: `BeamInformation` (`float energy` keV, `int rate` = flux, `int particleId`, `float focus`) and
+  `BeamLinePacket extends tectech.mechanics.dataTransport.DataPacket<BeamInformation>` (NBT round-trip ready).
+  `BeamInformation` validates the particle id; `Particle.VALUES[id]` is the enum table.
+* Machines push the beam by assigning `hatch.dataPacket = new BeamLinePacket(...)` (e.g. `MTESourceChamber`,
+  `MTESynchrotron`, `MTELINAC`, `MTEBeamStabilizer`, `MTEBeamSplitter`, `MTELargeHadronCollider`) and read inputs
+  with `mInputBeamline.get(n).dataPacket`. `MTEBeamMultiBase` keeps `mInputBeamline` / `mOutputBeamline` /
+  `mAdvancedOutputBeamline` and clears them in `clearHatches()`.
+* Hatch slots are `instanceof` based (`addBeamLineInputHatch` / `addBeamLineOutputHatch` /
+  `addAdvancedBeamlineOutputHatch`), and `BeamHatchElement.BeamlineInput/Output` match on `mteClasses()`, so a
+  subclass is accepted by every beam structure without touching GT5U. `.hatchId(<MetaTileEntityIDs id>)` feeds
+  `couldBeValid` and the autoplace item filter (both item-damage based), so it does *not* affect the structure
+  check but it does make the hologram flag a placed add-on hatch as an error and prevents auto-placing it.
+* The wired output hatch's `moveAround` walks its straight line and calls `setContents` on any
+  `MTEHatchInputBeamline` it meets **without checking `canConnect`** (`MTEHatchOutputBeamline.java:97-99`), so an
+  add-on input hatch has to reject foreign packets itself if it wants to stay channel-pure.
+* The wired output hatch overwrites `canConnect` per side (`isOutputFacing`); the input hatch allows pipes only on
+  its input face. Both are tier 6 (LuV) hatches, registered as `HATCH_BEAMLINE_INPUT/OUTPUT` and
+  `HATCH_ADVANCED_BEAMLINE_OUTPUT` in `MetaTileEntityIDs`; names come from `gt.blockmachines.hatch.beamlineinput`
+  (束流输入仓), `...beamlineoutput` (束流输出仓) and `...hatch.advancedbeamlineoutput` (过滤式束流输出仓).
+* `MTEHatchBeamlineConnector.getDescription()` contains an "Must be painted to work" line, but colour is only
+  used for the texture modulation (`Dyes.getModulation`) - the wired pipe path ignores it entirely. Colour is
+  therefore free to be used as a channel key by addons (which is what MessTech does).
+* `IMetaTileEntity.SkipGenerateDescription` (not inherited by subclasses, `ItemMachines.addDescription` /
+  `registerDescription`): without it, `getDescription()` is dumped once into `GregTech.lang` at client setup and
+  read back from there, so per-instance text ends up frozen.
