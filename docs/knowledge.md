@@ -65,18 +65,26 @@ MTMultiMachineBase<T>
   `IMTModule#onLinkedToMachine(casingIndex)` is the hook that lets a hatch take the casing texture, so the base
   class never has to reference the hatch types. No machine uses this yet.
 - Values (`MTModuleValues`, tier IV..MAX):
-  - speed module: TST's `SpeedMultiplierOfSpeedController` `{2,4,...,256}` moved down to IV..MAX with the tail
-    continuing TST's own ×2 law → `{2,4,8,16,32,64,128,256,512,1024}`, `getSpeedBonus() = 1 / multiplier`;
+  - speed module: MessTech's own fixed duration table → `{0.95,0.85,0.75,0.70,0.65,0.40,0.35,0.20,0.10,0.01}`, i.e.
+    5% faster at IV up to 100x at MAX. `getSpeedBonus()` **is** the table entry, the fraction of the original
+    duration that is left; the module no longer follows TST's `SpeedMultiplierOfSpeedController` ×2 law;
   - EU module: TST's `PowerConsumptionMultiplierOfPowerConsumptionController` `{0.95,0.9,0.85,0.8,0.75,0.7,0.5,0.25}`
     with the tail halving → `{...,0.125,0.0625}` (5% saved at IV up to 93.75% at MAX);
   - parallel module: `1 << (2 * (tier - 2))` = 64 at IV up to 16,777,216 at MAX, player-lowerable in the GUI
     (1..ceiling, clamped by `setParallelFromGui`, saved as NBT `parallel`).
   - TST registers its controllers on ZPM..MAX (its T1..T8). Our modules run IV..MAX, so TST's T1 sits on IV and the
-    UXV/MAX entries are the only extrapolated numbers.
+    UXV/MAX EU entries are the only extrapolated TST numbers (the speed table is ours now).
 - Items/IDs: `MT_ID + 40..49` speed, `+50..59` EU, `+60..69` parallel - one per tier IV..MAX, registered by looping
   over `MTItemList.SPEED_MODULES` / `EU_MODULES` / `PARALLEL_MODULES` in `MTMachineLoader`. Lang keys
   `machine.module.*` in both languages (`speed.name`, `speed.desc.0`, `eu.name`, `eu.desc.0`, `parallel.name`,
-  `parallel.desc.0/1`, `parallel.label`, `desc.install`).
+  `parallel.desc.0/1`, `parallel.label`, `desc.install`). A tooltip states the *discount* the module grants: the
+  speed module prints the recipe duration reduction, i.e. the fraction of the old duration that is left
+  (`MTModuleValues#speedBonusText`, `0.95` at IV up to `0.01` at MAX - printed with two decimals, the way the
+  table is written, which also keeps the float entries from leaking noise: `0.95F` is `0.949999988079071`), the EU
+  module the discount in percent
+  (`MTModuleValues#euDiscountText`, 5% at IV up to 93.75% at MAX), and the parallel module only its ceiling plus
+  "configurable in the GUI" - the `1..ceiling` range is what the GUI field enforces, not tooltip text. Every module
+  closes with `desc.install` = 可用于模块化机器 / usable in a modular machine.
 - The two optional types are only *reported*, the logic stays in the machine: `hasModule(type)`,
   `getModules(type)`, `getModuleCycleNum()` (highest `IMTModule#getCycleNum`) and `hasWirelessModule()`. A machine
   that needs the real loops uses the existing wireless (`MTWirelessMultiMachineBase`) or cross recipe
@@ -85,13 +93,15 @@ MTMultiMachineBase<T>
   (composition). No such machine exists yet.
 - Design references: TST `ModularizedMachineBase` / `ModularizedMachineSupportAllModuleBase` (modules as hatches,
   static/dynamic controllers push into machine accumulators, `MultiExecutionCoreMachineBase` for the cross recipe
-  execution core); the speed, EU and parallel numbers come from TST's controllers and the parallel ceiling formula
-  above.
+  execution core); the EU and parallel numbers come from TST's controllers and the parallel ceiling formula above
+  and the speed table is MessTech's own.
 - Harness: `tools/modulebase/verify_module_base.py` (97 source checks plus `ModuleBaseHarness` with 102 runtime
-  checks compiled against `tools/modulebase/stubs`). It cross-checks the speed and EU tables against TST's
-  `Config.java`, the parallel table against the `1 << (2 * (tier - 2))` ceiling and the tier names against
-  `GTValues.VN`. Mutation tested: a wrong speed tail, a wrong EU tail, the additive parallel of the older design, a
-  dropped single-parallel rule, a skipped `clearModules()` and a false `isOptional()` are all caught.
+  checks compiled against `tools/modulebase/stubs`). It cross-checks the EU table against TST's `Config.java`, the
+  parallel table against the `1 << (2 * (tier - 2))` ceiling and the tier names against `GTValues.VN`. Mutation
+  tested: a wrong EU tail, the additive parallel of the older design, a dropped single-parallel rule, a skipped
+  `clearModules()` and a false `isOptional()` are all caught. Its speed checks (`SPEED_MULTIPLIER`, the TST ×2
+  law, `speedMultiplier`) still encode the old TST table and are stale since the speed module got its own fixed
+  table; the harness is only run on request and was left untouched.
 - Next steps: wire `MTModuleHatchElement.Module` into a real machine structure, add the composite module (one hatch
   that provides two types - the API already allows it), and decide the numbers of the optional cross recipe and
   wireless modules.

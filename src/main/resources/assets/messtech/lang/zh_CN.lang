@@ -545,12 +545,12 @@ machine.chemicaltwister.tooltip.details.hint=§7· 等级不足会返回§c结�
 machine.chemicaltwister.structureinfo.1=§l§9一道低沉的声音在身边回响:§r 部分§k配方§r来自§kT§rS§kT§r
 
 # --- 模块化机器模块 (MTModuleMultiMachineBase) ---
-machine.module.desc.install=§7装进§b模块化机器§7后生效
+machine.module.desc.install=§7可用于§b模块化机器
 machine.module.speed.name=速度模块
-machine.module.speed.desc.0=§7配方速度 §b%s×§7
+machine.module.speed.desc.0=§7机器配方用时减免: §b%s
 machine.module.eu.name=耗电减免模块
-machine.module.eu.desc.0=§7耗电乘以 §b%s§7，省下 §a%s
+machine.module.eu.desc.0=§7耗电减免: §b%s
 machine.module.parallel.name=并行控制模块
-machine.module.parallel.desc.0=§7提供 §b%s§7 并行，可在 GUI 里下调到 §b1..%s
+machine.module.parallel.desc.0=§7提供 §b%s§7 并行，可在 GUI 里配置
 machine.module.parallel.desc.1=§7同一台机器只能装 §b1§7 个并行模块
 machine.module.parallel.label=并行

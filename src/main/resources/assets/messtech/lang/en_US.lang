@@ -544,12 +544,12 @@ machine.chemicaltwister.tooltip.details.hint=§7· An insufficient level reports
 machine.chemicaltwister.structureinfo.1=§l§9A deep voice echoes nearby:§r Some §krecipes§r come from §kT§rS§kT§r
 
 # --- Modular machine modules (MTModuleMultiMachineBase) ---
-machine.module.desc.install=§7Install it in a §bmodular machine§7 to apply the bonus
+machine.module.desc.install=§7Usable in a §bmodular machine
 machine.module.speed.name=Speed Module
-machine.module.speed.desc.0=§7Recipes run §b%s×§7 faster
+machine.module.speed.desc.0=§7Recipe duration reduction: §b%s
 machine.module.eu.name=EU Discount Module
-machine.module.eu.desc.0=§7EU/t is multiplied by §b%s§7, saving §a%s
+machine.module.eu.desc.0=§7EU discount: §b%s
 machine.module.parallel.name=Parallel Control Module
-machine.module.parallel.desc.0=§7Supplies §b%s§7 parallel, lowered in the GUI to §b1..%s
+machine.module.parallel.desc.0=§7Supplies §b%s§7 parallel, configurable in the GUI
 machine.module.parallel.desc.1=§7A machine takes §bone§7 parallel module only
 machine.module.parallel.label=Parallel

@@ -1,18 +1,22 @@
 package com.MessTech.common.machine.Base;
 
+import java.util.Locale;
+
 /**
  * The per tier values of the module hatches.
  * <p>
- * The numbers are taken from TST's modular machine controllers:
+ * The EU discount and the parallel module use TST's modular machine controllers:
  * <ul>
- * <li>the speed module and the EU discount module use TST's {@code SpeedMultiplierOfSpeedController} and
- * {@code PowerConsumptionMultiplierOfPowerConsumptionController};</li>
+ * <li>the EU discount module uses TST's {@code PowerConsumptionMultiplierOfPowerConsumptionController};</li>
  * <li>the parallel module uses the {@code 1 << (2 * (tier - 2))} ceiling.</li>
  * </ul>
+ * The speed module has a fixed duration table of its own ({@code 0.95, 0.85, ..., 0.01}) and does not follow TST's
+ * {@code SpeedMultiplierOfSpeedController} x2 law any more.
+ * <p>
  * TST registers its controllers on ZPM..MAX (tier 7..14, T1..T8), our modules run from IV (tier 5) to MAX (tier 14),
- * so TST's T1 sits on IV here and the two remaining tiers continue TST's own progression: the speed multiplier keeps
- * doubling (512, 1024) and the EU multiplier keeps the halving of TST's last step (0.125, 0.0625). Those last two
- * tiers are the only values in this class that are not literally from TST.
+ * so TST's T1 sits on IV here and the two remaining tiers continue TST's own progression: the EU multiplier keeps
+ * the halving of TST's last step (0.125, 0.0625). Those last two tiers are the only values in this class that are
+ * not literally from TST.
  * <p>
  * TST keeps its tables in a config file; the numbers live here as constants instead, so they are in one readable
  * place and a harness can check them.
@@ -22,10 +26,11 @@ public final class MTModuleValues {
     private MTModuleValues() {}
 
     /**
-     * Speed multiplier per module tier, IV..MAX. TST's {@code SpeedMultiplierOfSpeedController} is
-     * {@code {2, 4, 8, 16, 32, 64, 128, 256}}, which is 2^(T+1) for its T1..T8; the tail continues that law.
+     * Recipe duration multiplier per module tier, IV..MAX: the fraction of the original duration that is left, so
+     * the module is 5% faster at IV and 100x faster at MAX. MessTech's own fixed table.
      */
-    private static final int[] SPEED_MULTIPLIER = { 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
+    private static final float[] SPEED_BONUS = { 0.95F, 0.85F, 0.75F, 0.70F, 0.65F, 0.40F, 0.35F, 0.20F, 0.10F,
+        0.01F };
 
     /**
      * EU/t multiplier per module tier, IV..MAX. TST's {@code PowerConsumptionMultiplierOfPowerConsumptionController}
@@ -38,24 +43,29 @@ public final class MTModuleValues {
     private static int index(int aTier) {
         int index = aTier - IMTModule.MIN_TIER;
         if (index < 0) return 0;
-        if (index >= SPEED_MULTIPLIER.length) return SPEED_MULTIPLIER.length - 1;
+        if (index >= SPEED_BONUS.length) return SPEED_BONUS.length - 1;
         return index;
     }
 
     /**
      * @param aTier The GT tier index, IV .. MAX.
-     * @return How much faster recipes run at that tier, 2 at IV up to 1024 at MAX.
+     * @return The duration multiplier of that tier: 0.95 at IV (5% faster) down to 0.01 at MAX (100x faster).
      */
-    public static int speedMultiplier(int aTier) {
-        return SPEED_MULTIPLIER[index(aTier)];
+    public static float speedBonus(int aTier) {
+        return SPEED_BONUS[index(aTier)];
     }
 
     /**
+     * The recipe duration reduction of that tier as display text: the fraction of the original duration that is left,
+     * so {@code "0.95"} means a recipe takes 95% of the time it would without the module. Always two decimals, the way
+     * the table above is written, and that also keeps the float entries from leaking noise ({@code 0.95F} is
+     * {@code 0.949999988079071}).
+     *
      * @param aTier The GT tier index, IV .. MAX.
-     * @return The duration multiplier of that tier, {@code 1 / speedMultiplier(aTier)}.
+     * @return The reduction as display text, e.g. {@code "0.95"}, {@code "0.70"} or {@code "0.01"}.
      */
-    public static float speedBonus(int aTier) {
-        return 1.0F / speedMultiplier(aTier);
+    public static String speedBonusText(int aTier) {
+        return String.format(Locale.ROOT, "%.2f", speedBonus(aTier));
     }
 
     /**

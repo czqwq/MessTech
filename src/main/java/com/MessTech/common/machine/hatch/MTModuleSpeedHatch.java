@@ -16,8 +16,8 @@ import gregtech.api.metatileentity.MetaTileEntity;
 /**
  * Speed module: multiplies the duration of the recipes of the machine it is built into.
  * <p>
- * The values are TST's {@code SpeedMultiplierOfSpeedController}: IV runs recipes 2x as fast, MAX 1024x, see
- * {@link MTModuleValues#speedMultiplier(int)}.
+ * The values are MessTech's own fixed table, see {@link MTModuleValues#speedBonus(int)}: IV runs recipes at 0.95x
+ * the duration and MAX at 0.01x, i.e. 100x as fast.
  */
 public class MTModuleSpeedHatch extends MTModuleHatchBase {
 
@@ -41,13 +41,6 @@ public class MTModuleSpeedHatch extends MTModuleHatchBase {
         return TYPES;
     }
 
-    /**
-     * @return How much faster recipes run with this module, 2 at IV up to 1024 at MAX.
-     */
-    public int getSpeedMultiplier() {
-        return MTModuleValues.speedMultiplier(mTier);
-    }
-
     @Override
     public float getSpeedBonus() {
         return MTModuleValues.speedBonus(mTier);
@@ -55,8 +48,8 @@ public class MTModuleSpeedHatch extends MTModuleHatchBase {
 
     @Override
     public String[] getDescription() {
-        return new String[] {
-            StatCollector.translateToLocalFormatted("machine.module.speed.desc.0", getSpeedMultiplier()),
-            StatCollector.translateToLocal("machine.module.desc.install") };
+        return new String[] { StatCollector.translateToLocalFormatted(
+            "machine.module.speed.desc.0",
+            MTModuleValues.speedBonusText(mTier)), StatCollector.translateToLocal("machine.module.desc.install") };
     }
 }
