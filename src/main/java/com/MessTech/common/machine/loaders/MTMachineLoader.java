@@ -16,6 +16,7 @@ import com.MessTech.common.machine.MTChemicalTwister;
 import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDBBFurnace;
 import com.MessTech.common.machine.MTDTPF;
+import com.MessTech.common.machine.MTHugeChemicalReactor;
 import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.MTNanoScaleFoundry;
 import com.MessTech.common.machine.MTReactor;
@@ -206,8 +207,17 @@ public class MTMachineLoader {
                 translateToLocal("machine.largechemicaltwister.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTChemicalTwister.get(1));
 
+        MTItemList.MTHugeChemicalReactor.set(
+            new MTHugeChemicalReactor(
+                MT_ID + 34,
+                "MTHugeChemicalReactor",
+                translateToLocal("machine.hugechemicalreactor.name")).getStackForm(1L));
+        // Its brand line carries the modular look instead of an author name, see MTModuleProjectText.
+        brandAsModuleProject(MTItemList.MTHugeChemicalReactor);
+
         // Module hatches: speed, EU discount and parallel control, one variant per tier IV..MAX.
         // IDs are handed out per family so a tier can be added without shifting the other families.
+        // These carry no author name either: their brand line is the modular look, see brandAsModuleProject.
         for (int i = 0; i < MTItemList.SPEED_MODULES.length; i++) {
             int tier = IMTModule.MIN_TIER + i;
             String tierName = GTValues.VN[tier];
@@ -218,7 +228,7 @@ public class MTMachineLoader {
                     "MTModuleSpeedHatch_" + tierName,
                     translateToLocal("machine.module.speed.name") + " (" + tierName + ")",
                     tier).getStackForm(1L));
-            AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
+            brandAsModuleProject(item);
         }
 
         for (int i = 0; i < MTItemList.EU_MODULES.length; i++) {
@@ -231,7 +241,7 @@ public class MTMachineLoader {
                     "MTModuleEuHatch_" + tierName,
                     translateToLocal("machine.module.eu.name") + " (" + tierName + ")",
                     tier).getStackForm(1L));
-            AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
+            brandAsModuleProject(item);
         }
 
         for (int i = 0; i < MTItemList.PARALLEL_MODULES.length; i++) {
@@ -244,7 +254,7 @@ public class MTMachineLoader {
                     "MTModuleParallelHatch_" + tierName,
                     translateToLocal("machine.module.parallel.name") + " (" + tierName + ")",
                     tier).getStackForm(1L));
-            AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
+            brandAsModuleProject(item);
         }
 
         // Transcendent Metal fuel rods: GT items rather than MessTech machines, and their damage value is the fuel
@@ -268,5 +278,20 @@ public class MTMachineLoader {
         // Populate after the machine item list is set so the NEI handler can reference the catalyst.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();
         MTRecipeMaps.populateNanoScaleFoundry24PoolRecipes();
+    }
+
+    /**
+     * Gives a registered machine the modular brand line, {@code Add by: ModuleProject}, in the look of
+     * {@link com.MessTech.common.util.MTModuleProjectText}: a rack of modules powered up one by one, with the chip row
+     * of {@code MTModuleProjectTextRenderer} under the letters.
+     * <p>
+     * It stands where the author line of such a machine would otherwise be - {@link AuthorDynamic#registerOn} - so a
+     * machine that is itself modular goes without an author name and names the rack instead.
+     *
+     * @param item a machine whose stack has already been set
+     */
+    private static void brandAsModuleProject(MTItemList item) {
+        AuthorDynamic
+            .registerAddon(AuthorDynamic.MODULE_PROJECT, () -> translateToLocal("messtech.moduleProject"), item.get(1));
     }
 }

@@ -1,8 +1,10 @@
 package com.MessTech.common.entity;
 
+import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.client.event.RenderPlayerEvent;
+import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.common.MinecraftForge;
 
 import org.lwjgl.opengl.GL11;
@@ -10,15 +12,18 @@ import org.lwjgl.opengl.GL12;
 
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.util.MTDynamicItemHelper;
+import com.MessTech.init.Config;
 
+import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * Draws the piggy a player wears in the helmet slot standing on their head.
+ * What a piggy in the helmet slot does to the player who wears it: it is drawn standing on their head, and a
+ * Transcendent Metal one tumbles the whole model along with itself.
  * <p>
- * 1.7.10 has no renderer for an arbitrary item on the head: vanillas own hat code
+ * <b>The hat.</b> 1.7.10 has no renderer for an arbitrary item on the head: vanillas own hat code
  * ({@code RenderPlayer#renderEquippedItems}) only handles {@code ItemBlock} blocks (the pumpkin) and skulls, so a
  * plain item like the piggy is accepted by the slot but never drawn. This handler fills that gap from the outside, in
  * exactly the space vanilla draws those two in.
@@ -34,6 +39,18 @@ import cpw.mods.fml.relauncher.SideOnly;
  * <p>
  * What is drawn there is {@link MTDynamicItemHelper#renderOnHead}: the look of the worn stack, in its own effect and
  * with its own animation, so the pig on the head is the pig in the inventory.
+ * <p>
+ * <b>The tumble.</b> A Transcendent Metal pig is not a still picture - {@link MTDynamicItemHelper.Style#TUMBLE} turns
+ * it about the oblique axis (0.3, 0.5, 0.2) by 3.5 degrees per client tick - and while such a pig is on the head the
+ * same turn is put on the whole player model, so the wearer tumbles with it. That transform has to wrap the render,
+ * which is what {@link RenderPlayerEvent.Pre} and {@link RenderPlayerEvent.Post} are for: the first one pushes it
+ * and the second one pops it. The two are a pair because {@code Post} is only posted for a {@code Pre} that was not
+ * cancelled; {@link #onRenderWorldLast} is the net under the one case that breaks that - another mod cancelling
+ * {@code Pre} after this handler ran - so a matrix can never leak.
+ * <p>
+ * Note that the pig keeps its own tumble as well, so on the head the two add up. Pinning the pig to the head instead
+ * (dropping its own transform while the player tumbles) is a one line change in
+ * {@link MTDynamicItemHelper#renderOnHead} if the pair is wanted rigid.
  */
 @SideOnly(Side.CLIENT)
 public final class MTPiggyHatRenderer {
@@ -65,6 +82,18 @@ public final class MTPiggyHatRenderer {
      */
     private static final float PLAYER_MODEL_SCALE = 0.9375F;
 
+    /**
+     * How far above the feet of the model the tumble of the player turns: half of the 1.8 blocks a player is tall, so
+     * the model turns about the middle of its own body - the same thing the pig does about the middle of the sprite.
+     */
+    private static final double TUMBLE_PIVOT_Y = 0.9D;
+
+    /**
+     * The player whose render currently carries the tumble transform, i.e. the one between a
+     * {@link RenderPlayerEvent.Pre} and its {@link RenderPlayerEvent.Post}. Null while no player is tumbled.
+     */
+    private EntityPlayer tumbled;
+
     private MTPiggyHatRenderer() {}
 
     /** Registers the handler; called by the client proxy during preInit. */
@@ -72,15 +101,24 @@ public final class MTPiggyHatRenderer {
         MinecraftForge.EVENT_BUS.register(new MTPiggyHatRenderer());
     }
 
+    /**
+     * @return the piggy the player wears in the helmet slot, or null when they wear none or are not drawn at all.
+     */
+    private static ItemStack wornPiggy(EntityPlayer player) {
+        if (player.isPlayerSleeping() || player.isDead || player.isInvisible()) return null;
+
+        ItemStack helmet = player.inventory.armorItemInSlot(HELMET_ARMOR_ITEM_SLOT);
+        return helmet != null && helmet.getItem() == MTItems.piggy ? helmet : null;
+    }
+
+    // region Hat
+
     @SubscribeEvent
     public void onRenderPlayerSpecialsPost(RenderPlayerEvent.Specials.Post event) {
-        EntityPlayer player = event.entityPlayer;
-        if (player.isPlayerSleeping() || player.isDead || player.isInvisible()) return;
-
         // Nothing to draw unless the hat slot holds a piggy; the effect of that very stack decides the look, so the
         // one on the head looks like the one in the inventory.
-        ItemStack helmet = player.inventory.armorItemInSlot(HELMET_ARMOR_ITEM_SLOT);
-        if (helmet == null || helmet.getItem() != MTItems.piggy) return;
+        ItemStack helmet = wornPiggy(event.entityPlayer);
+        if (helmet == null) return;
 
         GL11.glPushMatrix();
         // Culling and blending are whatever the player renderer left behind, so save and restore all of it.
@@ -100,9 +138,72 @@ public final class MTPiggyHatRenderer {
         GL11.glColor4f(1F, 1F, 1F, 1F);
         GL11.glScalef(SCALE / PLAYER_MODEL_SCALE, SCALE / PLAYER_MODEL_SCALE, SCALE / PLAYER_MODEL_SCALE);
 
-        MTDynamicItemHelper.renderOnHead(player, helmet);
+        MTDynamicItemHelper.renderOnHead(event.entityPlayer, helmet);
 
         GL11.glPopAttrib();
         GL11.glPopMatrix();
     }
+
+    // endregion
+
+    // region Tumble
+
+    /**
+     * Turns the model of the wearer about its own middle, by the very angle the pig on its head is turned by.
+     * <p>
+     * LOWEST priority for a reason: it is the last handler to run, so a {@code Pre} another handler cancels is
+     * already cancelled here and no matrix is pushed for a render that will not happen.
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onRenderPlayerPre(RenderPlayerEvent.Pre event) {
+        if (!Config.PIGGY_TUMBLES_WEARER || event.isCanceled()) return;
+
+        EntityPlayer player = event.entityPlayer;
+        ItemStack helmet = wornPiggy(player);
+        if (helmet == null || !MTDynamicItemHelper.isTumbling(helmet)) return;
+
+        // The event is posted before RenderPlayer#doRender puts the model anywhere, so the matrix is still the one
+        // the camera left behind: its origin is the eye and the model is about to be placed at the interpolated
+        // entity position minus the view position. Those are the numbers the renderer gets, and the pivot is that
+        // point lifted to the middle of the body (TUMBLE_PIVOT_Y).
+        float partialTicks = event.partialRenderTick;
+        double x = player.lastTickPosX + (player.posX - player.lastTickPosX) * partialTicks - RenderManager.renderPosX;
+        double y = player.lastTickPosY + (player.posY - player.lastTickPosY) * partialTicks
+            - RenderManager.renderPosY
+            - player.yOffset
+            + TUMBLE_PIVOT_Y;
+        double z = player.lastTickPosZ + (player.posZ - player.lastTickPosZ) * partialTicks - RenderManager.renderPosZ;
+
+        GL11.glPushMatrix();
+        GL11.glTranslated(x, y, z);
+        GL11.glRotatef(
+            MTDynamicItemHelper.tumbleAngle(),
+            MTDynamicItemHelper.TUMBLE_AXIS_X,
+            MTDynamicItemHelper.TUMBLE_AXIS_Y,
+            MTDynamicItemHelper.TUMBLE_AXIS_Z);
+        GL11.glTranslated(-x, -y, -z);
+        tumbled = player;
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onRenderPlayerPost(RenderPlayerEvent.Post event) {
+        if (tumbled == null) return;
+        GL11.glPopMatrix();
+        tumbled = null;
+    }
+
+    /**
+     * The net under the one way the pair above can break: another mod cancelling {@link RenderPlayerEvent.Pre} after
+     * this handler already pushed. {@code Post} is not posted for a cancelled {@code Pre}, so the transform would
+     * stay on the matrix stack for the rest of the frame and one more would leak every frame after that. At the end
+     * of the world render that leaked push is still the top of the stack, which is what makes undoing it here exact.
+     */
+    @SubscribeEvent
+    public void onRenderWorldLast(RenderWorldLastEvent event) {
+        if (tumbled == null) return;
+        GL11.glPopMatrix();
+        tumbled = null;
+    }
+
+    // endregion
 }

@@ -50,6 +50,7 @@ public enum MTItemList {
     MTReactorHeatHatch_UEV,
     MTReactorHeatHatch_UIV,
     MTChemicalTwister,
+    MTHugeChemicalReactor,
     MTModuleSpeed_IV,
     MTModuleSpeed_LuV,
     MTModuleSpeed_ZPM,

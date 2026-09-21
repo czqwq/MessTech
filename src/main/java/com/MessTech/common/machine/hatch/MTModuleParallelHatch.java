@@ -24,14 +24,19 @@ import gregtech.api.metatileentity.MetaTileEntity;
  * The values are {@code 1 << (2 * (tier - 2))}, i.e. 64 parallel at IV up to 16,777,216 at MAX, see
  * {@link MTModuleValues#maxParallel(int)}.
  * <p>
- * The value is a ceiling, not a fixed number: the player sets the parallel the machine may actually use in the GUI,
- * between 1 and {@link #getMaxParallel()}. A machine runs on that number instead of its own parallel, and it only
- * takes one parallel module at a time.
+ * The value is a ceiling, not a fixed number: the player sets the parallel the machine may actually use, between 1
+ * and {@link #getMaxParallel()}. A machine runs on that number instead of its own parallel, and it only takes one
+ * parallel module at a time. The field that sets it is in the MUI2 GUI of this hatch and - for a machine that
+ * takes modules - in the GUI of the machine controller as well ({@code MTModuleMultiMachineBaseGui}); both write
+ * through {@link #setParallelFromGui(int)}.
  */
 public class MTModuleParallelHatch extends MTModuleHatchBase {
 
     private static final Set<MTModuleType> TYPES = Collections
         .unmodifiableSet(EnumSet.of(MTModuleType.PARALLEL_CONTROL));
+
+    /** Decal of this module, {@code assets/messtech/textures/blocks/ModuleHatch/OVERLAY_ParallelController.png}. */
+    private static final String OVERLAY_PATH = "ModuleHatch/OVERLAY_ParallelController";
 
     private final int maxParallel;
     private int parallel;
@@ -58,9 +63,15 @@ public class MTModuleParallelHatch extends MTModuleHatchBase {
         return TYPES;
     }
 
+    @Override
+    protected String getOverlayPath() {
+        return OVERLAY_PATH;
+    }
+
     /**
      * @return The highest parallel this module can supply, 64 at IV up to 16,777,216 at MAX.
      */
+    @Override
     public int getMaxParallel() {
         return maxParallel;
     }
@@ -74,10 +85,11 @@ public class MTModuleParallelHatch extends MTModuleHatchBase {
     }
 
     /**
-     * Set the parallel from the GUI, clamped to 1..{@link #getMaxParallel()}.
+     * Set the parallel from the machine GUI, clamped to 1..{@link #getMaxParallel()}.
      *
      * @param value The requested parallel.
      */
+    @Override
     public void setParallelFromGui(int value) {
         this.parallel = Math.max(1, Math.min(maxParallel, value));
     }
@@ -100,6 +112,10 @@ public class MTModuleParallelHatch extends MTModuleHatchBase {
 
     // region GUI
 
+    /**
+     * The hatch keeps its MUI2 GUI: the field is also in the machine GUI, but a hatch that had no MUI2 GUI at all
+     * would fall back to GT's MUI1 hatch GUI ({@code MTEHatch#useMui2()} is false by default).
+     */
     @Override
     protected boolean useMui2() {
         return true;

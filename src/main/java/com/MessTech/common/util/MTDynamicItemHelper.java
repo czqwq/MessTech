@@ -97,14 +97,36 @@ public final class MTDynamicItemHelper {
     private static double glitchOffsetCyan;
 
     /**
-     * The oblique axis {@link Style#TUMBLE} turns about and how far one client tick of the game turns it - the two
-     * numbers of GT5U's {@code TranscendentMetalRenderer}, shared by the item renderer and the sprite an item wears
-     * on a head.
+     * The oblique axis {@link Style#TUMBLE} turns about, as {@code GL11.glRotatef} takes it - the axis of GT5U's
+     * {@code TranscendentMetalRenderer}. Public because the player model that wears such an item tumbles about it as
+     * well ({@code MTPiggyHatRenderer}).
      */
-    private static final float TUMBLE_AXIS_X = 0.3F, TUMBLE_AXIS_Y = 0.5F, TUMBLE_AXIS_Z = 0.2F;
+    public static final float TUMBLE_AXIS_X = 0.3F, TUMBLE_AXIS_Y = 0.5F, TUMBLE_AXIS_Z = 0.2F;
+
+    /** How far one client tick of the game turns a {@link Style#TUMBLE} - the number of GT5U's renderer. */
     private static final float TUMBLE_DEGREES_PER_TICK = 3.5F;
 
     private MTDynamicItemHelper() {}
+
+    /**
+     * The angle the {@link Style#TUMBLE} animation is at right now, in degrees. Every tumble reads this one clock -
+     * the item in the inventory, the pig on a head and the player model wearing it - so the three cannot drift
+     * apart. The clock is {@link GTMod#clientProxy()}'s, so the animation stops together with the game.
+     */
+    @SideOnly(Side.CLIENT)
+    public static float tumbleAngle() {
+        return (GTMod.clientProxy()
+            .getAnimationRenderTicks() * TUMBLE_DEGREES_PER_TICK) % 360F;
+    }
+
+    /**
+     * @return whether the stack wears the Transcendent Metal tumble right now, GT5U's fancy-graphics switch for that
+     *         animation included. A player who wears such a stack in the helmet slot tumbles with it.
+     */
+    @SideOnly(Side.CLIENT)
+    public static boolean isTumbling(ItemStack stack) {
+        return stack != null && getEffect(stack).style == Style.TUMBLE && isFancyEnabled(Style.TUMBLE);
+    }
 
     /** How an {@link Effect} is drawn. */
     public enum Style {
@@ -401,12 +423,7 @@ public final class MTDynamicItemHelper {
          */
         private static void applyHeadTumbleTransform() {
             GL11.glTranslatef(0.0F, -0.5F, 0.0F);
-            GL11.glRotatef(
-                (GTMod.clientProxy()
-                    .getAnimationRenderTicks() * TUMBLE_DEGREES_PER_TICK) % 360F,
-                TUMBLE_AXIS_X,
-                -TUMBLE_AXIS_Y,
-                -TUMBLE_AXIS_Z);
+            GL11.glRotatef(tumbleAngle(), TUMBLE_AXIS_X, -TUMBLE_AXIS_Y, -TUMBLE_AXIS_Z);
             GL11.glTranslatef(0.0F, 0.5F, 0.0F);
         }
 
@@ -549,12 +566,7 @@ public final class MTDynamicItemHelper {
                 GL11.glTranslatef(0.5F, 0.5F, 0.0F);
             }
 
-            GL11.glRotatef(
-                (GTMod.clientProxy()
-                    .getAnimationRenderTicks() * TUMBLE_DEGREES_PER_TICK) % 360F,
-                TUMBLE_AXIS_X,
-                TUMBLE_AXIS_Y,
-                TUMBLE_AXIS_Z);
+            GL11.glRotatef(tumbleAngle(), TUMBLE_AXIS_X, TUMBLE_AXIS_Y, TUMBLE_AXIS_Z);
 
             GL11.glRotatef(180F, 0.5F, 0.0F, 0.0F);
 

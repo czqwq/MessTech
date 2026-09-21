@@ -23,6 +23,9 @@ public class MTModuleSpeedHatch extends MTModuleHatchBase {
 
     private static final Set<MTModuleType> TYPES = Collections.unmodifiableSet(EnumSet.of(MTModuleType.SPEED_BONUS));
 
+    /** Decal of this module, {@code assets/messtech/textures/blocks/ModuleHatch/OVERLAY_SpeedController.png}. */
+    private static final String OVERLAY_PATH = "ModuleHatch/OVERLAY_SpeedController";
+
     public MTModuleSpeedHatch(int aID, String aName, String aNameRegional, int aTier) {
         super(aID, aName, aNameRegional, aTier);
     }
@@ -39,6 +42,11 @@ public class MTModuleSpeedHatch extends MTModuleHatchBase {
     @Override
     public Set<MTModuleType> getModuleTypes() {
         return TYPES;
+    }
+
+    @Override
+    protected String getOverlayPath() {
+        return OVERLAY_PATH;
     }
 
     @Override

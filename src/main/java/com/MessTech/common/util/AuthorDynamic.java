@@ -56,6 +56,13 @@ public final class AuthorDynamic {
      */
     public static final MTTextAnimation TRANSCENDENT_METAL = MTTranscendentMetalText.INSTANCE;
 
+    /**
+     * The modular machine look of the {@code ModuleProject} brand line: the rack of {@link MTModuleProjectText},
+     * powered up module by module, with the chip row of {@link MTModuleProjectTextRenderer} under the letters. Hand
+     * it to {@link #registerAddon(MTTextAnimation, Supplier, ItemStack)}.
+     */
+    public static final MTTextAnimation MODULE_PROJECT = MTModuleProjectText.INSTANCE;
+
     /** Rainbow ramp (bold), used as the cycling / wobbling palette. */
     private static final String[] RAINBOW_BOLD = { RED + BOLD, GOLD + BOLD, YELLOW + BOLD, GREEN + BOLD, AQUA + BOLD,
         BLUE + BOLD, LIGHT_PURPLE + BOLD };
@@ -130,6 +137,29 @@ public final class AuthorDynamic {
      */
     public static void register(MTTextAnimation animation, ItemStack machineStack) {
         register(animation, text(AUTHOR_CZQWQ), machineStack);
+    }
+
+    /**
+     * Register only the animated brand line of a machine, {@code Add by: <word>}, with no author line.
+     * <p>
+     * The line has the shape the fuel rods already use: {@code AuthorDynamic} puts the static prefix
+     * ({@code messTech.addBy}) and one space in front, and the word after it wears the animation. A machine that
+     * should not name an author - or whose tooltip is already long - can carry an animated brand word this way:
+     *
+     * <pre>
+     * AuthorDynamic
+     *     .registerAddon(AuthorDynamic.MODULE_PROJECT, () -&gt; translateToLocal("messtech.moduleProject"), machineStack);
+     * </pre>
+     *
+     * @param animation    the look the word wears, e.g. {@link #MODULE_PROJECT}
+     * @param word         the word to animate, normally a {@code Supplier} of a language key
+     * @param machineStack the machine's {@link ItemStack}
+     */
+    public static void registerAddon(MTTextAnimation animation, Supplier<String> word, ItemStack machineStack) {
+        if (animation == null || word == null || machineStack == null) return;
+
+        MTAnimatedTooltipHandler
+            .addAnimatedText(machineStack, () -> StatCollector.translateToLocal("messTech.addBy"), word, animation);
     }
 
     /**

@@ -13,6 +13,12 @@ public class Config {
     public static final String DEBUG = "Debug";
     public static boolean DEFAULT_BATCH_MODE = true;
     /**
+     * Client-side look only: while a Transcendent Metal piggy is worn in the helmet slot, the whole player model
+     * tumbles with it (see {@code MTPiggyHatRenderer}). Purely visual, so the value that counts is the one in the
+     * config of the client doing the rendering.
+     */
+    public static boolean PIGGY_TUMBLES_WEARER = true;
+    /**
      * Upper bound of the MTReactor meltdown in Draconic Evolution explosion power units (see
      * {@code MTExplosionDE}) - Draconic Evolution's own reactor explodes with 2..20 and this port keeps twice the
      * original value. One power unit is roughly ten blocks of radius, so 40 vaporises everything within 400 blocks.
@@ -29,6 +35,13 @@ public class Config {
             GENERAL,
             DEFAULT_BATCH_MODE,
             "Default Batch mode state of machine when placed. True is auto enable Batch mode.");
+
+        PIGGY_TUMBLES_WEARER = configuration.getBoolean(
+            "PIGGY_TUMBLES_WEARER",
+            GENERAL,
+            PIGGY_TUMBLES_WEARER,
+            "Client-side look only: while a Transcendent Metal piggy is worn in the helmet slot, the player model"
+                + " tumbles with it.");
 
         REACTOR_EXPLOSION_DE_POWER_LIMIT = configuration.getFloat(
             "REACTOR_EXPLOSION_DE_POWER_LIMIT",

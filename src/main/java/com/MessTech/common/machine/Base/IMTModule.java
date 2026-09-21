@@ -82,6 +82,23 @@ public interface IMTModule {
     }
 
     /**
+     * @return The highest parallel this module may supply, at least 1. Only read for a module that provides
+     *         {@link MTModuleType#PARALLEL_CONTROL}: it is the ceiling of the parallel field in the machine GUI.
+     */
+    default int getMaxParallel() {
+        return 1;
+    }
+
+    /**
+     * Sets the parallel this module supplies, clamped to 1..{@link #getMaxParallel()}. Called by the GUI of the
+     * machine the module is built into; the default does nothing, because a module without
+     * {@link MTModuleType#PARALLEL_CONTROL} supplies no parallel to set.
+     *
+     * @param value The requested parallel.
+     */
+    default void setParallelFromGui(int value) {}
+
+    /**
      * @return How many recipes this module may run at the same time. Only read by a machine that supports
      *         {@link MTModuleType#CROSS_RECIPE_PARALLEL}.
      */

@@ -5,11 +5,24 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.StatCollector;
+import net.minecraft.world.World;
+
+import org.jetbrains.annotations.NotNull;
+
+import com.MessTech.common.gui.base.MTModuleMultiMachineBaseGui;
+import com.gtnewhorizon.gtnhlib.util.numberformatting.NumberFormatUtil;
 
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.structure.error.StructureError;
+import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
+import mcp.mobius.waila.api.IWailaConfigHandler;
+import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
  * Base class for multiblocks that take {@link IMTModule modules}.
@@ -37,6 +50,15 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
 
     public MTModuleMultiMachineBase(String aName) {
         super(aName);
+    }
+
+    /**
+     * The module-aware GUI of {@link MTModuleMultiMachineBaseGui}: it adds the parallel field of the linked parallel
+     * control module to the terminal.
+     */
+    @Override
+    protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
+        return new MTModuleMultiMachineBaseGui(this);
     }
 
     // region Module registry
@@ -251,6 +273,110 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
      */
     protected int getBaseMaxParallelRecipes() {
         return 1;
+    }
+
+    // endregion
+
+    // region Module GUI
+
+    /**
+     * The linked parallel control module, {@code null} when the machine has none. {@link #addModule} takes only one,
+     * so this is the module that supplies the parallel of the machine.
+     *
+     * @return The module that supplies the parallel, {@code null} when there is none.
+     */
+    private IMTModule parallelModule() {
+        for (IMTModule module : modules) {
+            if (module.provides(MTModuleType.PARALLEL_CONTROL)) return module;
+        }
+        return null;
+    }
+
+    /**
+     * The parallel the machine GUI shows: the parallel of the linked parallel control module, which is the parallel
+     * the machine runs on ({@link #getMaxParallelRecipes()}). Client safe, so the GUI can ask for it on both sides;
+     * it reads 1 on a client that has not received the module values yet.
+     *
+     * @return The parallel of the parallel control module, 1 when the machine has none.
+     */
+    public int getParallelForGui() {
+        IMTModule module = parallelModule();
+        return module == null ? 1 : Math.max(1, module.getParallel());
+    }
+
+    /**
+     * @return The ceiling of the parallel field in the machine GUI, 1 when the machine has no parallel control
+     *         module.
+     */
+    public int getParallelCeilingForGui() {
+        IMTModule module = parallelModule();
+        return module == null ? 1 : Math.max(1, module.getMaxParallel());
+    }
+
+    /**
+     * Sets the parallel of the linked parallel control module from the machine GUI, clamped by the module. Does
+     * nothing when the machine has no parallel control module.
+     *
+     * @param value The requested parallel.
+     */
+    public void setParallelForGui(int value) {
+        IMTModule module = parallelModule();
+        if (module != null) module.setParallelFromGui(value);
+    }
+
+    // endregion
+
+    // region Waila
+
+    /**
+     * Writes the module values into the Waila tag. The modules are linked by the structure scan, which only runs on
+     * the server, so the client can only read them out of the tag.
+     */
+    @Override
+    public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
+        int z) {
+        super.getWailaNBTData(player, tile, tag, world, x, y, z);
+        tag.setBoolean("hasSpeedModule", hasModule(MTModuleType.SPEED_BONUS));
+        tag.setBoolean("hasEuModule", hasModule(MTModuleType.EU_DISCOUNT));
+        tag.setBoolean("hasParallelModule", hasModule(MTModuleType.PARALLEL_CONTROL));
+        tag.setFloat("moduleSpeedBonus", getModuleSpeedBonus());
+        tag.setFloat("moduleEuModifier", getModuleEuModifier());
+        tag.setInteger("moduleParallel", getMaxParallelRecipes());
+    }
+
+    /**
+     * The module lines of the Waila body, below everything the bases above put there and in the order of the module
+     * tooltips: the recipe duration reduction, the EU discount and then the parallel. A line only appears while a
+     * module of that kind is linked.
+     * <p>
+     * The numbers are written the way the module tooltips write them ({@code MTModuleValues}: the duration reduction
+     * and the EU discount as the factor of the machine, the parallel as a grouped number), and the colour codes live
+     * in the language files like every other MessTech display.
+     */
+    @Override
+    public void getWailaBody(ItemStack itemStack, List<String> currentTip, IWailaDataAccessor accessor,
+        IWailaConfigHandler config) {
+        super.getWailaBody(itemStack, currentTip, accessor, config);
+        NBTTagCompound tag = accessor.getNBTData();
+
+        if (tag.getBoolean("hasSpeedModule")) {
+            currentTip.add(
+                StatCollector.translateToLocalFormatted(
+                    "machine.module.waila.speed",
+                    MTModuleValues.speedBonusText(tag.getFloat("moduleSpeedBonus"))));
+        }
+        if (tag.getBoolean("hasEuModule")) {
+            currentTip.add(
+                StatCollector.translateToLocalFormatted(
+                    "machine.module.waila.eu",
+                    MTModuleValues.euModifierText(tag.getFloat("moduleEuModifier"))));
+        }
+        if (tag.getBoolean("hasParallelModule")) {
+            currentTip.add(
+                StatCollector.translateToLocalFormatted(
+                    "machine.module.waila.parallel",
+                    NumberFormatUtil.formatNumber(tag.getInteger("moduleParallel"))));
+        }
     }
 
     // endregion

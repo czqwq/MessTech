@@ -512,6 +512,9 @@ messtech.itemEffect.sixPhasedCopper=Six-Phased Copper
 # the static "Add by:" prefix of messTech.addBy, which is not animated.
 messtech.pigTech=PigTech
 messtech.nuclearTech=NuclearTech
+# The string the "ModuleProject" animation (MTModuleProjectText) animates; it is the brand line of a machine that
+# carries no author name (the Huge Chemical Reactor and the speed / EU / parallel module hatches).
+messtech.moduleProject=ModuleProject
 
 # ---ChemicalTwister---
 machine.largechemicaltwister.name=Large Chemical Twister
@@ -543,6 +546,25 @@ machine.chemicaltwister.tooltip.details=§dDetails:§7 structure level and heat 
 machine.chemicaltwister.tooltip.details.hint=§7· An insufficient level reports §cinsufficient machine tier§7, insufficient heat reports §cinsufficient heat§7; the hologram picks the structure by stack size: §b1§7 projects level 1, §b≥2§7 projects level 2
 machine.chemicaltwister.structureinfo.1=§l§9A deep voice echoes nearby:§r Some §krecipes§r come from §kT§rS§kT§r
 
+# --- Huge Chemical Reactor (MTHugeChemicalReactor) ---
+machine.hugechemicalreactor.name=Huge Chemical Reactor
+machine.hugechemicalreactor.machinetype=Huge Chemical Reactor | Chemical Reactor
+machine.hugechemicalreactor.tooltip.desc=§7A huge reactor that runs the §bChemical Reactor§7 recipe pool; its shell takes the modules of a modular machine
+machine.hugechemicalreactor.tooltip.flavour=§7Big is good, good is big
+machine.hugechemicalreactor.tooltip.recipe.header=§6Recipes:
+machine.hugechemicalreactor.tooltip.recipe.pool=§7· Runs the §bChemical Reactor§7 recipe pool; items and fluids go in and out like the Large Chemical Reactor
+machine.hugechemicalreactor.tooltip.recipe.overclock=§7· §aPerfect overclock§7 is enabled: each overclock is §bEU/t ×4§7 and §bduration ÷4§7, so the total energy per craft stays the same
+machine.hugechemicalreactor.tooltip.modules.header=§6Modules:
+machine.hugechemicalreactor.tooltip.modules.types=§7· The shell takes §bSpeed Modules§7, §bEU Discount Modules§7 and §b1§7 §bParallel Control Module§7; they apply once the structure is formed
+machine.hugechemicalreactor.tooltip.modules.values=§7· The machine itself has no speed, EU or parallel bonus (§b×1§7); all three come from the modules
+machine.hugechemicalreactor.tooltip.structure.header=§6Structure:
+machine.hugechemicalreactor.tooltip.structure.shell=§7· A §b5×5×5§7 shell of §eChemically Inert Machine Casing§7, controller in the middle of the front face
+machine.hugechemicalreactor.tooltip.structure.coil=§7· The back face holds §b8§7 §eHeating Coils§7 of any tier (the §bcoil§7 sub channel switches the preview tier)
+machine.hugechemicalreactor.tooltip.structure.pipe=§7· A cross of §ePTFE Pipe Casing§7 in the middle of the chamber
+machine.hugechemicalreactor.tooltip.structure.hatches=§7· The shell needs at least §b1§7 input, §b1§7 output and §b1§7 energy hatch (multi-amp energy or laser target hatches will do)
+machine.hugechemicalreactor.tooltip.details=§dDetails:§7 the modules apply while the structure check passes, so pulling the module hatch invalidates them at the next check
+machine.hugechemicalreactor.tooltip.details.hint=§7· Without a parallel control module the machine runs on its own parallel of §b1§7
+
 # --- Modular machine modules (MTModuleMultiMachineBase) ---
 machine.module.desc.install=§7Usable in a §bmodular machine
 machine.module.speed.name=Speed Module
@@ -553,3 +575,9 @@ machine.module.parallel.name=Parallel Control Module
 machine.module.parallel.desc.0=§7Supplies §b%s§7 parallel, configurable in the GUI
 machine.module.parallel.desc.1=§7A machine takes §bone§7 parallel module only
 machine.module.parallel.label=Parallel
+# --- Waila lines of a modular machine (MTModuleMultiMachineBase#getWailaBody). Same format as the module tooltips:
+# the duration reduction and the EU discount are the factors the machine multiplies with, the parallel is the
+# parallel it actually runs on; a line is left out while the matching module is missing.
+machine.module.waila.speed=§7Duration reduction: §b%s
+machine.module.waila.eu=§7EU discount: §a%s
+machine.module.waila.parallel=§7Parallel: §e%s

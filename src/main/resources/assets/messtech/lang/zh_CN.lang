@@ -513,6 +513,9 @@ messtech.itemEffect.sixPhasedCopper=六相铜
 # messTech.addBy 那条静态的“添加模组:”之后，前缀本身不参与动画。
 messtech.pigTech=PigTech
 messtech.nuclearTech=NuclearTech
+# “ModuleProject” 动画（MTModuleProjectText）作用的字符串，用于不写作者名的机器品牌行（巨型化学反应釜，以及
+# speed / EU / parallel 三种模组仓）。
+messtech.moduleProject=ModuleProject
 
 # ---化学扭曲者---
 machine.largechemicaltwister.name=大型化学扭曲者
@@ -544,6 +547,25 @@ machine.chemicaltwister.tooltip.details=§d细节：§7结构等级与热量是�
 machine.chemicaltwister.tooltip.details.hint=§7· 等级不足会返回§c结构等级不足§7，热量不足会返回§c热量不足§7；
 machine.chemicaltwister.structureinfo.1=§l§9一道低沉的声音在身边回响:§r 部分§k配方§r来自§kT§rS§kT§r
 
+# --- 巨型化学反应釜 (MTHugeChemicalReactor) ---
+machine.hugechemicalreactor.name=巨型化学反应釜
+machine.hugechemicalreactor.machinetype=巨型化学反应釜 | 化学反应釜
+machine.hugechemicalreactor.tooltip.desc=§7一台运行§b化学反应釜§7配方池的巨型反应釜，外壳可以装入模块化机器的模块
+machine.hugechemicalreactor.tooltip.flavour=§7大就是好，好就是大
+machine.hugechemicalreactor.tooltip.recipe.header=§6配方：
+machine.hugechemicalreactor.tooltip.recipe.pool=§7· 运行 §b化学反应釜§7 配方池，物品与流体的输入输出与大型化学反应釜一致
+machine.hugechemicalreactor.tooltip.recipe.overclock=§7· 启用§a无损超频§7：每级超频 §bEU/t ×4§7、§b耗时 ÷4§7，单次配方总耗能不变
+machine.hugechemicalreactor.tooltip.modules.header=§6模块：
+machine.hugechemicalreactor.tooltip.modules.types=§7· 外壳上可装§b速度模块§7、§b耗电减免模块§7 与 §b1§7 个§b并行控制模块§7，结构成形后生效
+machine.hugechemicalreactor.tooltip.modules.values=§7· 机器自身没有速度、耗电或并行加成（§b×1§7），三者全部由模块提供
+machine.hugechemicalreactor.tooltip.structure.header=§6结构：
+machine.hugechemicalreactor.tooltip.structure.shell=§7· §b5×5×5§7 的§e化学惰性机械方块§7外壳，控制器位于正面中央
+machine.hugechemicalreactor.tooltip.structure.coil=§7· 背面嵌有 §b8§7 块§e加热线圈§7，等级不限（子信道 §bcoil§7 用于切换预览等级）
+machine.hugechemicalreactor.tooltip.structure.pipe=§7· 腔体正中用§e聚四氟乙烯管道方块§7搭成十字骨架
+machine.hugechemicalreactor.tooltip.structure.hatches=§7· 外壳上要求至少 §b1§7 个输入、§b1§7 个输出与 §b1§7 个能源仓（可放多安能源仓或激光靶仓）
+machine.hugechemicalreactor.tooltip.details=§d细节：§7模块只在结构检查通过时生效，拆掉模块仓会在下一次结构检查时失效
+machine.hugechemicalreactor.tooltip.details.hint=§7· 没有并行控制模块时，机器按自身的 §b1§7 并行运行
+
 # --- 模块化机器模块 (MTModuleMultiMachineBase) ---
 machine.module.desc.install=§7可用于§b模块化机器
 machine.module.speed.name=速度模块
@@ -554,3 +576,8 @@ machine.module.parallel.name=并行控制模块
 machine.module.parallel.desc.0=§7提供 §b%s§7 并行，可在 GUI 里配置
 machine.module.parallel.desc.1=§7同一台机器只能装 §b1§7 个并行模块
 machine.module.parallel.label=并行
+# --- 模块化机器的 Waila 行 (MTModuleMultiMachineBase#getWailaBody)。数值与模块 tooltip 同一套格式：
+# 耗时减免与耗电减免是机器乘上的系数，并行是机器实际运行的并行数；没有对应模块时整行不显示。
+machine.module.waila.speed=§7耗时减免: §b%s
+machine.module.waila.eu=§7耗电减免: §a%s
+machine.module.waila.parallel=§7并行: §e%s

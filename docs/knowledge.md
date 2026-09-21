@@ -36,8 +36,15 @@ MTMultiMachineBase<T>
 ### MTModuleMultiMachineBase (module system)
 - `common/machine/Base`: `MTModuleMultiMachineBase<T>`, `IMTModule`, `MTModuleType`, `MTModuleValues`,
   `MTModuleHatchElement`. The hatches live in `common/machine/hatch`: `MTModuleHatchBase` (plain `MTEHatch`, no
-  inventory, GT data access overlay), `MTModuleSpeedHatch`, `MTModuleEuHatch`, `MTModuleParallelHatch` +
-  `MTModuleParallelHatchGui`.
+  inventory, one decal per module), `MTModuleSpeedHatch`, `MTModuleEuHatch`, `MTModuleParallelHatch` +
+  `MTModuleParallelHatchGui`; the machine side is `common/gui/base/MTModuleMultiMachineBaseGui`.
+- Decal: each module names its own face art in `getOverlayPath()`, an icon path relative to `textures/blocks`
+  (`ModuleHatch/OVERLAY_PowerController`, `..._SpeedController`, `..._ParallelController`). The base resolves it
+  once per class in `registerIcons` and layers it over the casing on the front face, active and inactive alike -
+  the same shape as `MTReactorAccessHatch`/`MTReactorHeatHatch`. GT's `BlockMachines#registerBlockIcons` calls
+  every meta tile entity's `registerIcons` *before* it runs the `sGTBlockIconload` phase, which is what makes a
+  `Textures.BlockIcons.custom` container resolved there usable. The three textures are 40-frame `.mcmeta`
+  animations (`frametime` 2, one 4 s loop), so the decals are animated in the world.
 - A module is whatever the machine links into its module slot (here: a hatch). The module reports what it
   provides, the machine aggregates - the numbers live in the concrete module.
 - `MTModuleType`: `EU_DISCOUNT`, `SPEED_BONUS`, `PARALLEL_CONTROL`, `CROSS_RECIPE_PARALLEL`, `WIRELESS` (working
@@ -77,14 +84,49 @@ MTMultiMachineBase<T>
 - Items/IDs: `MT_ID + 40..49` speed, `+50..59` EU, `+60..69` parallel - one per tier IV..MAX, registered by looping
   over `MTItemList.SPEED_MODULES` / `EU_MODULES` / `PARALLEL_MODULES` in `MTMachineLoader`. Lang keys
   `machine.module.*` in both languages (`speed.name`, `speed.desc.0`, `eu.name`, `eu.desc.0`, `parallel.name`,
-  `parallel.desc.0/1`, `parallel.label`, `desc.install`). A tooltip states the *discount* the module grants: the
-  speed module prints the recipe duration reduction, i.e. the fraction of the old duration that is left
-  (`MTModuleValues#speedBonusText`, `0.95` at IV up to `0.01` at MAX - printed with two decimals, the way the
-  table is written, which also keeps the float entries from leaking noise: `0.95F` is `0.949999988079071`), the EU
-  module the discount in percent
-  (`MTModuleValues#euDiscountText`, 5% at IV up to 93.75% at MAX), and the parallel module only its ceiling plus
-  "configurable in the GUI" - the `1..ceiling` range is what the GUI field enforces, not tooltip text. Every module
-  closes with `desc.install` = 可用于模块化机器 / usable in a modular machine.
+  `parallel.desc.0/1`, `parallel.label`, `desc.install`). A tooltip states the *factor* the module grants, in the
+  decimal form of the tables above: the speed module prints the recipe duration reduction, i.e. the fraction of the
+  old duration that is left (`MTModuleValues#speedBonusText`, `0.95` at IV up to `0.01` at MAX, always two
+  decimals - which also keeps the float entries from leaking noise, `0.95F` is `0.949999988079071`), the EU module
+  the EU/t modifier (`MTModuleValues#euModifierText`, `0.95` at IV down to `0.0625` at MAX, rounded to four
+  decimals and without trailing zeros, because the last two table entries need those decimals; the percent form
+  `euDiscountText` - 5% at IV up to 93.75% at MAX - is kept for the harness), and the parallel module only its
+  ceiling plus "configurable in the GUI" - the `1..ceiling` range is what the GUI field enforces, not tooltip text.
+  Every module closes with `desc.install` = 可用于模块化机器 / usable in a modular machine. The modules carry **no
+  author line**: `MTMachineLoader#brandAsModuleProject` gives every one of them the animated `Add by: ModuleProject`
+  brand line (`AuthorDynamic.MODULE_PROJECT` / `MTModuleProjectText`, the same look the Huge Chemical Reactor wears)
+  in place of the author + MessTech pair `AuthorDynamic#registerOn` would add.
+- Recipes (`GTRecipes#addModuleRecipes`): 30 **assembler** recipes, one per family per tier. The shape is TST's
+  controller recipes (`ModularHatchesRecipes`) crossed with GTNL's parallel controller hatch - 4 `TIER_HULLS[tier]`,
+  a flat 16 of that tier's components, 16 of that tier's circuit (`TIER_CIRCUIT_MATERIALS[tier]`) and 16 plates of
+  `MODULE_MATERIALS[i]`, plus `144 * 16` L of the same material as melt. Counts stay flat on purpose: a tier is
+  paid for in *which* material and which `TIER_RECIPE_EU[tier]` it is made at, the way both of those mods do it, so
+  the recipe reads the same at IV and at MAX. Duration is `MINUTES * (i + 1)`, i.e. 1 minute at IV to 10 at MAX.
+  The three families differ only in the components they spend (TST's own split): speed is 3x field generator + motor
+  + piston, parallel is field generator + robot arm + conveyor, EU is 2x field generator + emitter. Integrated
+  circuits 4 / 5 / 6 mark the speed / parallel / EU family in NEI, the same idea as the `4` GTNL puts on its
+  controller hatch.
+  - `TIER_HULLS` is indexed by GT tier and the two names that break the pattern are GT's own: `Hull_MAX` is the
+    **UHV** hull (MAX was the top tier when it was added) and the MAX tier uses `Hull_MAXV` - TST's controller array
+    reads `Hull_ZPM, Hull_UV, Hull_MAX, Hull_UEV, ...` for ZPM..MAX and agrees.
+  - `MODULE_MATERIALS` is indexed by module index (IV..MAX): tungstensteel, enderium, naquadah alloy, neutronium -
+    the materials GT5U itself builds those tiers' muffler hatches from - then TST's chain cosmic neutronium,
+    infinity, transcendent metal, space time, MHDCSM, magmatter.
+- Waila (`MTModuleMultiMachineBase#getWailaBody`, keys `machine.module.waila.*` in both languages): the three
+  module lines, below everything the bases above put into the body and in the order of the module tooltips -
+  耗时减免 / Duration reduction, 耗电减免 / EU discount, then 并行 / Parallel. The values are the ones the tooltips print
+  (`MTModuleValues#speedBonusText` / `#euModifierText`, the parallel through `NumberFormatUtil#formatNumber`), the
+  colour codes live in the lang text (`§7` label, `§b` / `§a` / `§e` values), and a line is only added while the
+  matching module is linked. The flags and numbers travel through `getWailaNBTData`, because the module list only
+  exists on the server: the structure scan does not run on a client.
+- Parallel field in the machine GUI: `common/gui/base/MTModuleMultiMachineBaseGui` (returned by the base's
+  `getGui()`) adds the label plus text field of the linked parallel control module to the terminal, next to the
+  machine's own data. It reads `getParallelForGui()` / `getParallelCeilingForGui()`, writes through
+  `setParallelForGui()` -> `IMTModule#setParallelFromGui` (new interface defaults, together with
+  `IMTModule#getMaxParallel`), and syncs both values with `IntSyncValue`s (`allowC2S`), because only the server
+  knows the module. The hatch keeps its own MUI2 GUI (`MTModuleParallelHatchGui`) - `useMui2()` must stay
+  overridden there: `MTEHatch#useMui2()` is `false` by default, so a hatch without it falls back to GT's MUI1 GUI,
+  while `MTEMultiBlockBase#useMui2()` (and therefore any machine) is MUI2 already.
 - The two optional types are only *reported*, the logic stays in the machine: `hasModule(type)`,
   `getModules(type)`, `getModuleCycleNum()` (highest `IMTModule#getCycleNum`) and `hasWirelessModule()`. A machine
   that needs the real loops uses the existing wireless (`MTWirelessMultiMachineBase`) or cross recipe
@@ -382,6 +424,48 @@ MTMultiMachineBase<T>
 - Heat: the recipe asks for 2701 K (Kanthal), and at IV energy the machine reaches 3001 K, so a Kanthal ring is the
   minimum coil; a cupronickel ring at IV only reaches 2101 K and is refused. The IV EU/t of the recipe itself needs an
   IV energy hatch (the recipe search only returns recipes the machine's voltage can pay for).
+
+### MTHugeChemicalReactor (巨型化学反应釜)
+
+- The first machine on the module base: it runs the **Large Chemical Reactor's pool**
+  (`RecipeMaps.chemicalReactorRecipes`) and enables **perfect overclock** (`isEnablePerfectOverclock()` returns
+  `true`, so `MTMultiMachineBase#createProcessingLogic` calls `setOverclock(4, 4)` - EU/t x4 and duration /4 per
+  overclock, which leaves the total energy of a craft untouched).
+- It has no bonus of its own: the `getBase*` hooks of `MTModuleMultiMachineBase` stay at 1, so `getSpeedBonus()`,
+  `getEuModifier()` and `getMaxParallelRecipes()` are exactly what the linked modules supply (the speed and EU
+  modules multiply, the parallel module replaces). At most one parallel control module is taken (`addModule`), any
+  number of speed and EU modules.
+- The module slot is element `'B'` of the structure: its `HatchElementBuilder.atLeast(...)` list ends with
+  `MTModuleHatchElement.Module`, whose adder is `MTModuleMultiMachineBase#addModuleHatchToMachineList`, so the
+  structure scan links the hatch and refuses a module the machine does not take (or a second parallel module).
+- `checkMachineStructure` (the base's hook - `checkMachine` itself is final) forgets the coil level first and then
+  checks the piece plus `checkHasAnyInput/Output/Energy`; the base clears the module list before the call, so both the
+  coil and the modules are properties of the current structure.
+- The coil band (element `'A'`) is
+  `GTStructureChannels.HEATING_COIL.use(activeCoils(ofCoil(this::setCoilLevel, this::getCoilLevel)))`: a heating
+  coil of **any** tier is accepted, the level is kept in `mCoilLevel` (`getCoilLevel()`) and published as the coil
+  sub channel - that channel is what gives the hologram preview and BlockRenderer6343 the coil slider. No recipe of
+  the chemical reactor pool asks for the level, so the band is a structure requirement, not a heat source.
+- Tooltip: house style, every line one `addInfo(translate(key))` with the text and colours in the lang files
+  (`machine.hugechemicalreactor.machinetype`, `machine.hugechemicalreactor.tooltip.*`: 配方 / 模块 / 结构 groups plus
+  the `details` pair). The structure it describes is the written 5x5x5 shape: a shell of chemically inert machine
+  casing that hosts the hatches, a cross of PTFE pipe casing in the middle of the chamber and 8 heating coils on the
+  face opposite the controller.
+- Face: the controller wears the Large Chemical Reactor's face (idle and running, each with its glow layer,
+  `Textures.BlockIcons#createTextureWithCasing` + `ICasingTextureProvider#getCasingTexture` =
+  `Casings.ChemicallyInertMachineCasing.getCasingTexture()`), so it looks like the reactor it runs, on the casing of
+  its own shell - the same face the Chemical Twister's level 1 uses.
+- Crafted in the **assembler** (`RecipeMaps.assemblerRecipes`, in `GTRecipes#loadRecipes`, right after the Chemical
+  Twister): 64 `Machine_Multi_LargeChemicalReactor`, 4 `Machine_IV_ChemicalReactor`, 4
+  `Casing_Pipe_Polytetrafluoroethylene`, 8 `Casing_Coil_Cupronickel` (the level 1 coil), 16 IV circuits
+  (`new Object[] { OrePrefixes.circuit.get(Materials.IV), 16 }`, the form GT5U itself uses for a tier's circuit) and
+  18432 L molten PTFE (`Materials.Polytetrafluoroethylene.getMolten(144 * 128)`), integrated circuit 17,
+  `eut(RECIPE_IV)`, `duration(MINUTES * 2)`, one Huge Chemical Reactor out. The PTFE pipes and the coils are the two
+  ingredients its own structure is built from.
+- Registered as `MTItemList.MTHugeChemicalReactor` by `MTMachineLoader` under `MT_ID + 34` with the lang key
+  `machine.hugechemicalreactor.name`. Its brand line names no author:
+  `AuthorDynamic.registerAddon(AuthorDynamic.MODULE_PROJECT, () -> translateToLocal("messtech.moduleProject"), ...)`
+  prints `添加模组: ModuleProject` with the word wearing the modular animation, see `MTModuleProjectText`.
 
 ### MTComputingCenter
 - 3 modes, screwdriver switches, blocked while active or heat present.
@@ -788,6 +872,22 @@ MTMultiMachineBase<T>
     fancy switches are honoured on the head as well (`isFancyEnabled` falls back to the plain sprite).
   - The items atlas is bound by the helper (no vanilla item pass did that for this draw) and culling is off for the
     single quad, with `GL_ENABLE_BIT` pushed and popped around the whole thing.
+- **A Transcendent Metal pig tumbles the wearer with it.** `MTPiggyHatRenderer` also watches
+  `RenderPlayerEvent.Pre`/`Post`, which wrap the whole `RenderPlayer#doRender`, and turns the player model by the
+  same `MTDynamicItemHelper#tumbleAngle()` about the same oblique axis `(0.3, 0.5, 0.2)`. The pivot is the middle
+  of the body: at `Pre` the matrix is still the one the camera left, so the model's own origin is the interpolated
+  entity position the renderer is handed (`lastTickPos + (pos - lastTickPos) * partialTicks` minus
+  `RenderManager.renderPosX/Y/Z`, and minus `Entity.yOffset` the way `RenderPlayer#doRender` drops it), lifted by
+  `TUMBLE_PIVOT_Y = 0.9` - half of the 1.8 blocks a player is tall, the same thing the pig does about the middle of
+  its sprite.
+  - The push and the pop have to be a pair, and `RenderPlayerEvent.Pre` is `@Cancelable` while its `Post` is only
+    posted for a `Pre` that was not cancelled. `Pre` is therefore registered at `EventPriority.LOWEST` - every
+    other handler has run, so a cancel is already visible - and `onRenderWorldLast` is the net under the remaining
+    case (a cancel from a handler that runs after this one): it pops the leftover push at the end of the world
+    render, where that push is still the top of the stack, so the matrix stack cannot leak.
+  - The pig keeps its own tumble as well, so on the head the two compose; pinning the pig to the head instead would
+    mean dropping the transform in `MTDynamicItemHelper#renderOnHead` for the wearer case. The whole thing is the
+    client-side look switch `Config.PIGGY_TUMBLES_WEARER` (default on).
 - The thrown piggy is unchanged by all of this: it stays the camera facing billboard of
   `MTRenderPiggy`, scaled to 0.6 and spinning around the view axis.
 - Textures: `assets/messtech/textures/items/pigs/pig*.png`, built from the
@@ -978,6 +1078,37 @@ MTMultiMachineBase<T>
 - `MTPigTechText` deliberately has no Minecraft imports: `tmp/pigtext/PigTechFrames.java` compiles it on its own with
   `javac` and checks the single line, the static prefix, the loop, the constant layout, the reserved margins, the
   travel limit and every phase against the real strings (22866 checks, no game needed).
+
+### The "ModuleProject" tooltip animation (`MTModuleProjectText` / `MTModuleProjectTextRenderer`)
+
+- The modular machine look: the word is read as a rack of modules of `MODULE_SIZE` (3) characters ("Mod|ule|Pro|jec|t")
+  and one 1.6 s loop powers it up - the scan walks the rack module by module (`POWER_UP_MS` 900 ms), the rack flashes
+  white twice at full load (`FLASH_MS` 250 ms), is held (`HOLD_MS` 150 ms) and then goes dark again, left to right
+  (`POWER_DOWN_MS` 300 ms). A dark module is `§8§l`, a loaded one `§3§l` with a data flicker up to `§b§l`, the module
+  under the scan is `§b§l` and the flash is `§f§l`; bold and colour codes never move the advance, so the line width
+  is constant.
+- Nothing is stored: `lit(millis)` (the fraction of the rack that is powered), `head(millis, modules)` (the module
+  being loaded, -1 while the scan is parked) and `flashing(millis)` are pure functions of the clock, which is what
+  lets the renderer compute the exact phase of the frame the tooltip was drawn with - the chips and the letters can
+  never drift apart.
+- `MTModuleProjectTextRenderer` (client only, the renderer is registered in `MTAnimatedTooltipHandler#init`) draws the
+  hardware around the letters, it does not replace them (`replacesText()` stays false): a chip row two pixels below
+  the glyphs, one chip per module, lit in step with the letters with a brighter packet on the module being loaded; a
+  scan line with a trailing tail above it; and a bracket at either end of the word. `Gui#drawRect` is protected, so
+  the rects go through a small `Gui` subclass, the same trick `MTAnimatedTooltipHandler`'s tooltip box uses.
+- Only the word is decorated: the line is `添加模组: <word>`, so the renderer measures the translated
+  `messTech.addBy` prefix plus `MTPigTechText.PREFIX_SEPARATOR` with the font and starts its chips at the first glyph
+  of the word. A line without that prefix is decorated whole.
+- **Every width comes from the font, never from a hand sum of `getCharWidth`.** A bold character advances one pixel
+  further than its glyph width (`FontRenderer#renderStringAtPos` adds the bold copy to the advance, `++f`, and
+  `#getStringWidth` does the same with `if (flag && k > 0) ++i`), and the animation draws *every* character bold, so
+  a hand summed word comes out one pixel per character short - with 13 characters the right bracket landed two glyphs
+  inside the word, exactly at the `e` of `Project`, which is how this was found. `moduleEdges` therefore measures
+  drawn substrings (formatting codes included, which is what makes the font count the bold advance) and `rawIndex`
+  maps a visible index onto the drawn line, so the chips and the brackets share the glyphs' own geometry.
+- It is the brand line of `MTHugeChemicalReactor`, registered with
+  `AuthorDynamic.registerAddon(MODULE_PROJECT, ...)` - the add-on line with no author line - and the word comes from
+  the lang key `messtech.moduleProject`, so a resource pack can rename it.
 
 ## Animated tooltips with a renderer (`MTAnimatedTooltipHandler` / `MTTextAnimation`)
 

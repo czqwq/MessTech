@@ -43,6 +43,7 @@ import net.minecraftforge.fluids.FluidStack;
 import com.MessTech.common.items.MTItemList;
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.items.MTNACComponentItems;
+import com.MessTech.common.machine.Base.IMTModule;
 import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
 
 import goodgenerator.items.GGMaterial;
@@ -478,6 +479,23 @@ public class GTRecipes {
             .duration(MINUTES * 16)
             .addTo(assemblerRecipes);
 
+        // The Huge Chemical Reactor is built from the reactor it runs: a stack of the Large Chemical Reactor
+        // multiblocks, the IV reactor to copy the pool of, and the PTFE pipes and cupronickel coils its own 5x5x5
+        // shell is made of (the coil band accepts any tier, this is the level 1 it is pictured with).
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.Machine_Multi_LargeChemicalReactor.get(64),
+                ItemList.Machine_IV_ChemicalReactor.get(4),
+                ItemList.Casing_Pipe_Polytetrafluoroethylene.get(4),
+                ItemList.Casing_Coil_Cupronickel.get(8),
+                new Object[] { OrePrefixes.circuit.get(Materials.IV), 16 })
+            .fluidInputs(Materials.Polytetrafluoroethylene.getMolten(144 * 128))
+            .circuit(17)
+            .itemOutputs(MTItemList.MTHugeChemicalReactor.get(1))
+            .eut(RECIPE_IV)
+            .duration(MINUTES * 2)
+            .addTo(assemblerRecipes);
+
         addBec(
             MTItemList.BosesCraftingArray.get(1),
             new ItemStack[] { CustomItemList.Machine_Multi_BECAssembler.get(8),
@@ -502,7 +520,108 @@ public class GTRecipes {
 
         addReactorRecipes();
         addChemicalTwisterRecipes();
+        addModuleRecipes();
         // chemical recipe has been moved to MTChemicalTwisterRecipes
+    }
+
+    /**
+     * The 30 module hatch recipes: the speed, EU discount and parallel control modules of {@code MTModuleValues}, one
+     * assembler recipe per family per tier IV..MAX.
+     * <p>
+     * The shape follows TST's controller recipes ({@code ModularHatchesRecipes}) and GTNL's parallel controller hatch:
+     * anchored on the hull of the tier, a flat handful of that tier's components, circuits and plates, and the tier's
+     * own material as plates and as melt. The counts stay flat on purpose - it is the material and the recipe voltage
+     * that carry the price of a tier, the way both of those mods do it, so the recipe still reads the same at IV and
+     * at MAX. The three families differ only in the components they spend, TST's own split of them: a speed module is
+     * field generators, motors and pistons, a parallel module a field generator, robot arms and conveyors, an EU
+     * module field generators and emitters.
+     * <p>
+     * The integrated circuit numbers are this mod's own family markers - the same idea as the {@code 4} GTNL puts on
+     * its parallel controller hatch - and are what tells the three families apart in NEI at a glance.
+     */
+    private static void addModuleRecipes() {
+        // Flat counts: a tier is paid for in the material and the voltage below, not in stacks of components.
+        final int HULLS = 4;
+        final int COUNT = 16;
+        final int SPEED_CIRCUIT = 4;
+        final int PARALLEL_CIRCUIT = 5;
+        final int EU_CIRCUIT = 6;
+
+        // One entry per module tier IV..MAX, aligned with MTItemList.SPEED_MODULES and friends.
+        ItemList[] fieldGenerators = { ItemList.Field_Generator_IV, ItemList.Field_Generator_LuV,
+            ItemList.Field_Generator_ZPM, ItemList.Field_Generator_UV, ItemList.Field_Generator_UHV,
+            ItemList.Field_Generator_UEV, ItemList.Field_Generator_UIV, ItemList.Field_Generator_UMV,
+            ItemList.Field_Generator_UXV, ItemList.Field_Generator_MAX };
+        ItemList[] motors = { ItemList.Electric_Motor_IV, ItemList.Electric_Motor_LuV, ItemList.Electric_Motor_ZPM,
+            ItemList.Electric_Motor_UV, ItemList.Electric_Motor_UHV, ItemList.Electric_Motor_UEV,
+            ItemList.Electric_Motor_UIV, ItemList.Electric_Motor_UMV, ItemList.Electric_Motor_UXV,
+            ItemList.Electric_Motor_MAX };
+        ItemList[] pistons = { ItemList.Electric_Piston_IV, ItemList.Electric_Piston_LuV, ItemList.Electric_Piston_ZPM,
+            ItemList.Electric_Piston_UV, ItemList.Electric_Piston_UHV, ItemList.Electric_Piston_UEV,
+            ItemList.Electric_Piston_UIV, ItemList.Electric_Piston_UMV, ItemList.Electric_Piston_UXV,
+            ItemList.Electric_Piston_MAX };
+        ItemList[] robotArms = { ItemList.Robot_Arm_IV, ItemList.Robot_Arm_LuV, ItemList.Robot_Arm_ZPM,
+            ItemList.Robot_Arm_UV, ItemList.Robot_Arm_UHV, ItemList.Robot_Arm_UEV, ItemList.Robot_Arm_UIV,
+            ItemList.Robot_Arm_UMV, ItemList.Robot_Arm_UXV, ItemList.Robot_Arm_MAX };
+        ItemList[] conveyors = { ItemList.Conveyor_Module_IV, ItemList.Conveyor_Module_LuV,
+            ItemList.Conveyor_Module_ZPM, ItemList.Conveyor_Module_UV, ItemList.Conveyor_Module_UHV,
+            ItemList.Conveyor_Module_UEV, ItemList.Conveyor_Module_UIV, ItemList.Conveyor_Module_UMV,
+            ItemList.Conveyor_Module_UXV, ItemList.Conveyor_Module_MAX };
+        ItemList[] emitters = { ItemList.Emitter_IV, ItemList.Emitter_LuV, ItemList.Emitter_ZPM, ItemList.Emitter_UV,
+            ItemList.Emitter_UHV, ItemList.Emitter_UEV, ItemList.Emitter_UIV, ItemList.Emitter_UMV,
+            ItemList.Emitter_UXV, ItemList.Emitter_MAX };
+
+        for (int i = 0; i < MTItemList.SPEED_MODULES.length; i++) {
+            int tier = IMTModule.MIN_TIER + i;
+            Materials material = MODULE_MATERIALS[i];
+
+            GTValues.RA.stdBuilder()
+                .itemInputs(
+                    TIER_HULLS[tier].get(HULLS),
+                    fieldGenerators[i].get(COUNT),
+                    fieldGenerators[i].get(COUNT),
+                    fieldGenerators[i].get(COUNT),
+                    motors[i].get(COUNT),
+                    pistons[i].get(COUNT),
+                    new Object[] { OrePrefixes.circuit.get(TIER_CIRCUIT_MATERIALS[tier]), COUNT },
+                    GTOreDictUnificator.get(OrePrefixes.plate, material, COUNT))
+                .fluidInputs(material.getMolten(144 * COUNT))
+                .circuit(SPEED_CIRCUIT)
+                .itemOutputs(MTItemList.SPEED_MODULES[i].get(1))
+                .eut(TIER_RECIPE_EU[tier])
+                .duration(MINUTES * (i + 1))
+                .addTo(assemblerRecipes);
+
+            GTValues.RA.stdBuilder()
+                .itemInputs(
+                    TIER_HULLS[tier].get(HULLS),
+                    fieldGenerators[i].get(COUNT),
+                    robotArms[i].get(COUNT),
+                    conveyors[i].get(COUNT),
+                    new Object[] { OrePrefixes.circuit.get(TIER_CIRCUIT_MATERIALS[tier]), COUNT },
+                    GTOreDictUnificator.get(OrePrefixes.plate, material, COUNT))
+                .fluidInputs(material.getMolten(144 * COUNT))
+                .circuit(PARALLEL_CIRCUIT)
+                .itemOutputs(MTItemList.PARALLEL_MODULES[i].get(1))
+                .eut(TIER_RECIPE_EU[tier])
+                .duration(MINUTES * (i + 1))
+                .addTo(assemblerRecipes);
+
+            GTValues.RA.stdBuilder()
+                .itemInputs(
+                    TIER_HULLS[tier].get(HULLS),
+                    fieldGenerators[i].get(COUNT),
+                    fieldGenerators[i].get(COUNT),
+                    emitters[i].get(COUNT),
+                    new Object[] { OrePrefixes.circuit.get(TIER_CIRCUIT_MATERIALS[tier]), COUNT },
+                    GTOreDictUnificator.get(OrePrefixes.plate, material, COUNT))
+                .fluidInputs(material.getMolten(144 * COUNT))
+                .circuit(EU_CIRCUIT)
+                .itemOutputs(MTItemList.EU_MODULES[i].get(1))
+                .eut(TIER_RECIPE_EU[tier])
+                .duration(MINUTES * (i + 1))
+                .addTo(assemblerRecipes);
+        }
     }
 
     /**
@@ -678,5 +797,26 @@ public class GTRecipes {
     private static final Materials[] TIER_CIRCUIT_MATERIALS = { Materials.ULV, Materials.LV, Materials.MV, Materials.HV,
         Materials.EV, Materials.IV, Materials.LuV, Materials.ZPM, Materials.UV, Materials.UHV, Materials.UEV,
         Materials.UIV, Materials.UMV, Materials.UXV, Materials.MAX };
+
+    /**
+     * Hull of every voltage tier, indexed by GT tier. The two names that break the pattern are GT's own:
+     * {@code Hull_MAX} is the UHV hull (MAX was the top tier when it was added, UHV came with the later rename) and
+     * the MAX tier uses {@code Hull_MAXV}. TST reads it the same way - its controller array runs
+     * {@code Hull_ZPM, Hull_UV, Hull_MAX, Hull_UEV, ...} for ZPM..MAX.
+     */
+    private static final ItemList[] TIER_HULLS = { ItemList.Hull_ULV, ItemList.Hull_LV, ItemList.Hull_MV,
+        ItemList.Hull_HV, ItemList.Hull_EV, ItemList.Hull_IV, ItemList.Hull_LuV, ItemList.Hull_ZPM, ItemList.Hull_UV,
+        ItemList.Hull_MAX, ItemList.Hull_UEV, ItemList.Hull_UIV, ItemList.Hull_UMV, ItemList.Hull_UXV,
+        ItemList.Hull_MAXV };
+
+    /**
+     * The material a module is paid in, one entry per module tier IV..MAX (aligned with
+     * {@code MTItemList.SPEED_MODULES} and the other two families). The first four are the materials GT5U itself
+     * builds that tier's hatches from - the muffler hatches of {@code AssemblerRecipes} - and above that it is TST's
+     * controller chain, see its {@code ModularHatchesRecipes}.
+     */
+    private static final Materials[] MODULE_MATERIALS = { Materials.TungstenSteel, Materials.Enderium,
+        Materials.NaquadahAlloy, Materials.Neutronium, Materials.CosmicNeutronium, Materials.Infinity,
+        Materials.TranscendentMetal, Materials.SpaceTime, Materials.MHDCSM, Materials.MagMatter };
 
 }

@@ -23,6 +23,9 @@ public class MTModuleEuHatch extends MTModuleHatchBase {
 
     private static final Set<MTModuleType> TYPES = Collections.unmodifiableSet(EnumSet.of(MTModuleType.EU_DISCOUNT));
 
+    /** Decal of this module, {@code assets/messtech/textures/blocks/ModuleHatch/OVERLAY_PowerController.png}. */
+    private static final String OVERLAY_PATH = "ModuleHatch/OVERLAY_PowerController";
+
     public MTModuleEuHatch(int aID, String aName, String aNameRegional, int aTier) {
         super(aID, aName, aNameRegional, aTier);
     }
@@ -41,6 +44,11 @@ public class MTModuleEuHatch extends MTModuleHatchBase {
         return TYPES;
     }
 
+    @Override
+    protected String getOverlayPath() {
+        return OVERLAY_PATH;
+    }
+
     /**
      * @return The EU/t multiplier of this module, 0.95 at IV down to 0.0625 at MAX.
      */
@@ -56,7 +64,7 @@ public class MTModuleEuHatch extends MTModuleHatchBase {
     @Override
     public String[] getDescription() {
         return new String[] {
-            StatCollector.translateToLocalFormatted("machine.module.eu.desc.0", MTModuleValues.euDiscountText(mTier)),
+            StatCollector.translateToLocalFormatted("machine.module.eu.desc.0", MTModuleValues.euModifierText(mTier)),
             StatCollector.translateToLocal("machine.module.desc.install") };
     }
 }

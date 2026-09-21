@@ -1,5 +1,6 @@
 package com.MessTech.common.machine.Base;
 
+import java.math.BigDecimal;
 import java.util.Locale;
 
 /**
@@ -64,7 +65,18 @@ public final class MTModuleValues {
      * @return The reduction as display text, e.g. {@code "0.95"}, {@code "0.70"} or {@code "0.01"}.
      */
     public static String speedBonusText(int aTier) {
-        return String.format(Locale.ROOT, "%.2f", speedBonus(aTier));
+        return speedBonusText(speedBonus(aTier));
+    }
+
+    /**
+     * The duration reduction of a speed bonus as display text, see {@link #speedBonusText(int)}. Used for the folded
+     * bonus of a machine, which is not a table entry any more.
+     *
+     * @param aBonus The duration multiplier, 1 when the machine has no speed module.
+     * @return The reduction as display text, two decimals.
+     */
+    public static String speedBonusText(float aBonus) {
+        return String.format(Locale.ROOT, "%.2f", aBonus);
     }
 
     /**
@@ -73,6 +85,32 @@ public final class MTModuleValues {
      */
     public static float euModifier(int aTier) {
         return EU_MULTIPLIER[index(aTier)];
+    }
+
+    /**
+     * The EU/t multiplier of that tier as display text: the factor the EU/t of the machine is multiplied with, so
+     * {@code "0.95"} means 5% is saved. Written the way the EU table above is written - no trailing zeros - and
+     * rounded to four decimals so the float entries cannot leak noise ({@code 0.95F} is
+     * {@code 0.949999988079071}); four decimals because the last two tiers are 0.125 and 0.0625.
+     *
+     * @param aTier The GT tier index, IV .. MAX.
+     * @return The modifier as display text, e.g. {@code "0.95"}, {@code "0.7"} or {@code "0.0625"}.
+     */
+    public static String euModifierText(int aTier) {
+        return euModifierText(euModifier(aTier));
+    }
+
+    /**
+     * The EU/t modifier as display text, see {@link #euModifierText(int)}. Used for the folded modifier of a
+     * machine, which is not a table entry any more.
+     *
+     * @param aModifier The EU/t multiplier, 1 when the machine has no EU discount module.
+     * @return The modifier as display text, at most four decimals.
+     */
+    public static String euModifierText(float aModifier) {
+        return BigDecimal.valueOf(Math.round(aModifier * 10000.0) / 10000.0)
+            .stripTrailingZeros()
+            .toPlainString();
     }
 
     /**

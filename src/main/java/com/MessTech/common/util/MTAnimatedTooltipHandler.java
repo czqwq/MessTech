@@ -89,6 +89,7 @@ public final class MTAnimatedTooltipHandler {
         initialised = true;
 
         registerRenderer(AuthorDynamic.TRANSCENDENT_METAL, new MTTranscendentMetalTextRenderer());
+        registerRenderer(AuthorDynamic.MODULE_PROJECT, new MTModuleProjectTextRenderer());
         MinecraftForge.EVENT_BUS.register(new MTAnimatedTooltipHandler());
     }
 
