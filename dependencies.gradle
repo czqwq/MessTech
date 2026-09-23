@@ -11,6 +11,9 @@ dependencies {
     //implementation("com.github.GTNewHorizons:NewHorizonsCoreMod:2.9.49:dev")
     implementation(gtnhDev("GT5-Unofficial"))
     implementation(gtnhDev("NewHorizonsCoreMod"))
+    // The space apiary modules talk to Forestry's bee API (forestry.api.apiculture). Forestry used to
+    // reach the compile classpath only transitively through Binnie; pin it explicitly.
+    implementation(gtnhDev("ForestryMC"))
     implementation(gtnhDev("Mobs-Info"))
     implementation(gtnhDev("Infernal-Mobs"))
     implementation(gtnhDev("Galaxy-Space-GTNH"))
@@ -43,7 +46,6 @@ dependencies {
     runtimeOnlyNonPublishable(gtnhDev("ThaumicEnergistics"))
     runtimeOnlyNonPublishable(gtnhDev("Universal-Singularities"))
     runtimeOnlyNonPublishable(rfg.deobf("curse.maven:BiomesOPlenty-220318:2499612"))
-    runtimeOnlyNonPublishable(gtnhDev("ForestryMC"))
     runtimeOnlyNonPublishable(gtnhDev("MagicBees"))
     runtimeOnlyNonPublishable("thaumcraft:Thaumcraft:1.7.10-4.2.3.5:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:Chisel:2.17.5-GTNH:dev")

@@ -74,5 +74,8 @@ public class CommonProxy {
         MTRecipeMaps.populateBosesCraftingArrayRecipes();
         // The QFT pool is filled while the GT recipe loaders run, i.e. possibly after our postInit.
         MTRecipeMaps.populateQftProbabilityDestroyerRecipes();
+        // Same for the Assembly Factory's Assembly Line pool: it is built from GT's Assembly Line definitions, which
+        // other mods (TST's circuit lines, for one) only finish registering during their own postInit.
+        MTRecipeMaps.populateAssFactoryAssemblyLineRecipes();
     }
 }

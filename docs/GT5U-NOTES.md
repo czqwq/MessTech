@@ -404,9 +404,25 @@ MessTech's computation multiblock, based on `CalculateMultiMachineBase`.
   * `F` accepts the usual buses/hatches/energy plus **Data Access hatches**.
   * `I` = tiered Assembly Matrix Blocks (Tier 1 / Tier 2), derived into `LevelTier`.
 * GUI: `MTAssFactoryGui` (standard multi-block GUI; mode button comes from the base machine-mode stack).
-* Independent Assembly Line recipe/NEI pool: `MTRecipeMaps.assFactoryAssemblyLineRecipes`, populated
-  as **real recipes** (not fake) from `RecipeMaps.assemblylineVisualRecipes` and re-tagged to its own
-  default `RecipeCategory`, so it can be used by `ProcessingLogic` as well as NEI.
+* Independent Assembly Line recipe/NEI pool: `MTRecipeMaps.assFactoryAssemblyLineRecipes`, built in
+  `MTRecipeMaps.populateAssFactoryAssemblyLineRecipes()` from `GTRecipe.RecipeAssemblyLine.sAssemblylineRecipes`
+  (the authoritative list a data stick / Data Access hatch resolves against), split the way GT splits
+  `assemblylineVisualRecipes` from `sAssemblylineRecipes`:
+  * one **fake** recipe per definition, keeping the per-slot alternatives, is what NEI draws (one page per
+    Assembly Line recipe). `RecipeMapBackend#filterFindRecipe` rejects fake recipes, so the machine never matches one.
+    Its special slot carries the definition's flash drive (`displayDataStick`), the same data stick GT puts into every
+    `assemblylineVisualRecipes` entry, so the page shows the "reads research result" stick. GT fills its own sticks from
+    `RecipeAssemblyLine#reInit()`, which runs at postInit (ore dictionary activation) - before this pool is built at
+    `serverStarted` - and only again on an item remap, so the NBT is written when the stick is made. The sticks are
+    cached in `DISPLAY_DATA_STICKS` per definition because `newDataStickForNEI` appends to the strongly held
+    `RecipeAssemblyLine.dataSticksForNEI` and a populate happens on every world load.
+  * one **real, hidden** recipe per concrete input combination is what the machine matches; `GTNEIDefaultHandler`
+    filters `mHidden`, and recipe lookup never reads it, so the expansion stays out of NEI.
+  * The expansion is load-bearing: `GTRecipe_WithAlt#buildItemInputCache` passes `mOreDictAlt` to
+    `RecipeItemInput` only for ore-dictionary slots (`mOreDictIds[i] >= 0`). A slot written as a plain
+    `ItemStack[]` gets `new RecipeItemInput(mInputs[i], nbtSensitive)`, which has no alternatives, so a single
+    recipe keeping them matches through its first alternative only. Circuit slots collapse to
+    `GTOreDictUnificator.get(false, stack, true)` instead of expanding (TST's `transToWildCircuit`).
 * Assembly Line mode requires at least one Data Access hatch; `checkMachine` reports
   `machine.assfactory.error.need_data_access` / `need_tier2`.
 * Assembly Line mode is **unordered**: input matching uses the normal GT `ProcessingLogic` item/fluid

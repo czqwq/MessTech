@@ -13,6 +13,7 @@ import static gregtech.api.enums.TierEU.RECIPE_MV;
 import static gregtech.api.enums.TierEU.RECIPE_UEV;
 import static gregtech.api.enums.TierEU.RECIPE_UHV;
 import static gregtech.api.enums.TierEU.RECIPE_UIV;
+import static gregtech.api.enums.TierEU.RECIPE_UMV;
 import static gregtech.api.enums.TierEU.RECIPE_UV;
 import static gregtech.api.enums.TierEU.RECIPE_ZPM;
 import static gregtech.api.recipe.RecipeMaps.assemblerRecipes;
@@ -67,6 +68,7 @@ import gtPlusPlus.core.material.MaterialsAlloy;
 import gtPlusPlus.core.material.MaterialsElements;
 import gtPlusPlus.xmod.gregtech.api.enums.GregtechItemList;
 import gtPlusPlus.xmod.thermalfoundation.fluid.TFFluids;
+import gtnhintergalactic.recipe.IGRecipeMaps;
 import gtnhlanth.common.register.LanthItemList;
 import ic2.core.Ic2Items;
 import tectech.recipe.TTRecipeAdder;
@@ -521,6 +523,7 @@ public class GTRecipes {
         addReactorRecipes();
         addChemicalTwisterRecipes();
         addModuleRecipes();
+        addSpaceApiaryRecipes();
         // chemical recipe has been moved to MTChemicalTwisterRecipes
     }
 
@@ -621,6 +624,76 @@ public class GTRecipes {
                 .eut(TIER_RECIPE_EU[tier])
                 .duration(MINUTES * (i + 1))
                 .addTo(assemblerRecipes);
+        }
+    }
+
+    /**
+     * The four space apiary modules, one Space Assembler recipe each - the same bench and the same shape TST gives
+     * its {@code TST_SpaceApiary} in {@code GTCMMachineRecipes}. Every tier spends 4 stacks of 64 Industrial Apiaries
+     * and 4 stacks of 64 fully upgraded acceleration upgrades, i.e. the apiary it replaces four hundred times over,
+     * plus 16 of that tier's machine parts and 64 circuits, and pays in a solder fluid and honey. The tier of the
+     * parts and the doubling volumes are TST's as well.
+     * <p>
+     * The recipe is added to {@code IGRecipeMaps.spaceAssemblerRecipes}, which TST fills too, so the two mods have to
+     * stay distinguishable by their inputs. MK-III and MK-IV already are: their circuit differs from TST's (ours
+     * UXV/MAX, TST's UMV/UXV). MK-I and MK-II used to spend exactly what TST's T1/T2 spend - same parts, same
+     * circuit, same UU-Matter and honey, same EU/t and duration - and differed only in the output, which recipe
+     * matching cannot tell apart: a Space Assembler holding those components matched both and took whichever recipe it
+     * looked at first, leaving one of the two mods' modules unobtainable. They now pay in Mutated Living Solder
+     * instead of UU-Matter, which makes the two recipes mutually exclusive.
+     * <p>
+     * {@code specialValue} is inert here: the assembler's tier gate reads the {@code MODULE_TIER} metadata
+     * ({@code TileEntityModuleAssembler#createProcessingLogic}), which neither mod sets, so every one of these counts
+     * as module tier 1 whatever {@code specialValue} says.
+     */
+    private static void addSpaceApiaryRecipes() {
+        ItemStack[][] parts = {
+            { ItemList.Field_Generator_UHV.get(16), ItemList.Conveyor_Module_UHV.get(16),
+                ItemList.Robot_Arm_UHV.get(16), ItemList.Electric_Pump_UHV.get(16) },
+            { ItemList.Field_Generator_UEV.get(16), ItemList.Conveyor_Module_UEV.get(16),
+                ItemList.Robot_Arm_UEV.get(16), ItemList.Electric_Pump_UEV.get(16) },
+            { ItemList.Field_Generator_UIV.get(16), ItemList.Conveyor_Module_UIV.get(16),
+                ItemList.Robot_Arm_UIV.get(16), ItemList.Electric_Pump_UIV.get(16) },
+            { ItemList.Field_Generator_UMV.get(16), ItemList.Conveyor_Module_UMV.get(16),
+                ItemList.Robot_Arm_UMV.get(16), ItemList.Electric_Pump_UMV.get(16) } };
+        Materials[] circuits = { Materials.UEV, Materials.UIV, Materials.UXV, Materials.MAX };
+        long[] voltages = { RECIPE_UHV, RECIPE_UEV, RECIPE_UIV, RECIPE_UMV };
+        ItemStack[] outputs = { MTItemList.SpaceModuleApiaryMK1.get(1), MTItemList.SpaceModuleApiaryMK2.get(1),
+            MTItemList.SpaceModuleApiaryMK3.get(1), MTItemList.SpaceModuleApiaryMK4.get(1) };
+
+        for (int i = 0; i < outputs.length; i++) {
+            long scale = 1L << i;
+            // MK-I and MK-II pay in Mutated Living Solder where MK-III and MK-IV keep paying in UU-Matter. That is not
+            // a cost tweak: those two recipes spend exactly what TST's T1/T2 spend, and replacing one of the *required*
+            // fluids is the only thing that makes the two mutually exclusive - merely adding an item or a fluid would
+            // leave TST's recipe matching, since a recipe matches as soon as its inputs are present in the machine.
+            // 16 ingots doubling per tier follows the pool's own module ladder (Space Elevator Pump Module MK-I 9
+            // ingots, MK-II 32, MK-III 1 stack, MachineRecipes:279/297/332), and GT++'s solder chemistry puts out
+            // 4 stacks + 24 ingots per batch (RecipeLoaderGenericChem:163), so one module costs a fraction of a batch.
+            FluidStack firstFluid = i < 2
+                ? MaterialMisc.MUTATED_LIVING_SOLDER.getFluidStack((int) (16 * INGOTS * scale))
+                : Materials.UUMatter.getFluid(1000L * 128 * scale);
+            GTValues.RA.stdBuilder()
+                .itemInputs(
+                    ItemList.Machine_IndustrialApiary.get(64),
+                    ItemList.Machine_IndustrialApiary.get(64),
+                    ItemList.Machine_IndustrialApiary.get(64),
+                    ItemList.Machine_IndustrialApiary.get(64),
+                    ItemList.IndustrialApiary_Upgrade_Acceleration_8_Upgraded.get(64),
+                    ItemList.IndustrialApiary_Upgrade_Acceleration_8_Upgraded.get(64),
+                    ItemList.IndustrialApiary_Upgrade_Acceleration_8_Upgraded.get(64),
+                    ItemList.IndustrialApiary_Upgrade_Acceleration_8_Upgraded.get(64),
+                    parts[i][0],
+                    parts[i][1],
+                    parts[i][2],
+                    parts[i][3],
+                    new Object[] { OrePrefixes.circuit.get(circuits[i]), 64 })
+                .fluidInputs(firstFluid, Materials.Honey.getFluid(1000L * 256 * scale))
+                .itemOutputs(outputs[i])
+                .specialValue(1)
+                .eut(voltages[i])
+                .duration(20 * 300 * scale)
+                .addTo(IGRecipeMaps.spaceAssemblerRecipes);
         }
     }
 

@@ -2,8 +2,10 @@ package com.MessTech.common.recipe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,11 +21,14 @@ import net.minecraftforge.fluids.FluidStack;
 import com.MessTech.common.items.MTItemList;
 import com.MessTech.common.items.MTNACComponentItem;
 import com.MessTech.common.items.MTNACComponentItems;
+import com.MessTech.init.MessTech;
 import com.gtnewhorizons.modularui.api.drawable.UITexture;
 
 import gregtech.api.enums.CondensateType;
+import gregtech.api.enums.GTValues;
 import gregtech.api.enums.ItemList;
 import gregtech.api.enums.NaniteTier;
+import gregtech.api.enums.OrePrefixes;
 import gregtech.api.gui.modularui.GTUITextures;
 import gregtech.api.items.CircuitComponentFakeItem;
 import gregtech.api.modularui2.GTGuiTextures;
@@ -37,6 +42,8 @@ import gregtech.api.recipe.maps.AssemblyLineFrontend;
 import gregtech.api.recipe.maps.LargeNEIFrontend;
 import gregtech.api.recipe.maps.QuantumComputerFrontend;
 import gregtech.api.recipe.metadata.SimpleRecipeMetadataKey;
+import gregtech.api.util.AssemblyLineUtils;
+import gregtech.api.util.GTOreDictUnificator;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTRecipeBuilder;
 import gregtech.api.util.GTRecipeConstants;
@@ -148,18 +155,217 @@ public final class MTRecipeMaps {
         .build();
 
     /**
-     * Populates the Assembly Factory's own Assembly Line recipe map from GT's visual recipe pool so
-     * it shows an independent NEI tab. Must be called after the base visual recipes exist.
+     * The NEI flash drive of every Assembly Line definition, one per definition, kept across populate calls.
+     * <p>
+     * GT registers one such stick next to every {@code RecipeAssemblyLine} it turns into an
+     * {@code assemblylineVisualRecipes} entry, and the machine relies on the very same stick a player writes. Creating
+     * a new one on every populate would pile another full set onto
+     * {@code RecipeAssemblyLine.dataSticksForNEI} - a list GT holds strongly on purpose - on every world load, so the
+     * sticks are made once per definition and reused afterwards.
+     */
+    private static final Map<GTRecipe.RecipeAssemblyLine, ItemStack> DISPLAY_DATA_STICKS = new IdentityHashMap<>();
+
+    /**
+     * Builds the Assembly Factory's Assembly Line map from GT's authoritative Assembly Line definitions.
+     * <p>
+     * The source is {@code GTRecipe.RecipeAssemblyLine.sAssemblylineRecipes} - the same list a flash drive and a Data
+     * Access hatch resolve against, and the only place where a recipe's per-slot alternatives are recorded - and not
+     * the {@code assemblylineVisualRecipes} pool, whose entries are <em>fake</em> display recipes. This follows TST's
+     * {@code AssemblyLineWithoutResearchRecipePool}, which is what makes the recipes the machine runs the real ones.
+     * <p>
+     * Every definition is registered twice, splitting "what NEI shows" from "what the machine runs" exactly the way GT
+     * splits {@code assemblylineVisualRecipes} from {@code sAssemblylineRecipes}:
+     * <ul>
+     * <li>one <b>fake</b> recipe per definition, keeping that definition's per-slot alternatives - see
+     * {@link #addAssemblyLineDisplayRecipe}. Fake recipes are rejected by {@code RecipeMapBackend#filterFindRecipe},
+     * so the machine can never match one; they exist only to give NEI one page per Assembly Line recipe.</li>
+     * <li>one <b>real</b>, <b>hidden</b> recipe per concrete input combination - see {@link #materialiseInputs}. These
+     * are what the machine matches ({@code mHidden} is read by NEI alone, never by recipe lookup). Registering the
+     * definition itself instead is not an option: a slot's alternatives are only honoured at match time for ore
+     * dictionary slots, so a single recipe keeping them is found through its first alternative only, and a machine
+     * stocked with any other one reports no recipe at all.</li>
+     * </ul>
+     * Re-runnable: the map is cleared first, and the call is repeated from {@code CommonProxy#serverStarted} because
+     * the Assembly Line registry keeps growing until the last recipe loader has run.
      */
     public static void populateAssFactoryAssemblyLineRecipes() {
-        RecipeCategory defaultCategory = assFactoryAssemblyLineRecipes.getDefaultRecipeCategory();
-        for (GTRecipe recipe : RecipeMaps.assemblylineVisualRecipes.getAllRecipes()) {
-            GTRecipe copy = recipe.copy();
-            copy.setRecipeCategory(defaultCategory);
-            // Real recipes, not fake: the Assembly Factory uses this map for normal ProcessingLogic
-            // lookups (findRecipeQuery does not search fake recipes).
-            assFactoryAssemblyLineRecipes.addRecipe(copy, false, false, false);
+        assFactoryAssemblyLineRecipes.getBackend()
+            .clearRecipes();
+
+        int definitions = 0;
+        int displayed = 0;
+        int registered = 0;
+        for (GTRecipe.RecipeAssemblyLine recipe : GTRecipe.RecipeAssemblyLine.sAssemblylineRecipes) {
+            definitions++;
+            if (recipe == null || recipe.mOutput == null || recipe.mInputs == null || recipe.mInputs.length == 0) {
+                continue;
+            }
+            if (addAssemblyLineDisplayRecipe(recipe)) {
+                displayed++;
+            }
+            List<ItemStack[]> combinations = materialiseInputs(recipe);
+            if (combinations.size() > 64) {
+                // TST logs the same thing ("inputCombine.size {}") for its wildcard definitions. A definition that
+                // expands this far is what fills the registry: the Wetware Mainframe's five ASMD/XSMD slots and its
+                // six superconductor wires are 192 combinations before its rubber-foil slot is even counted
+                // (ResearchStationAssemblyLine:428-446), so this line names the handful responsible for the total.
+                MessTech.MT_LOG
+                    .info("[AssFactory] {} expands to {} input combinations", recipe.mOutput, combinations.size());
+            }
+            for (ItemStack[] inputs : combinations) {
+                Collection<GTRecipe> added = GTValues.RA.stdBuilder()
+                    .itemInputs(inputs)
+                    .itemOutputs(recipe.mOutput)
+                    .fluidInputs(recipe.mFluidInputs)
+                    .eut(recipe.mEUt)
+                    .duration(recipe.mDuration)
+                    .hidden()
+                    .addTo(assFactoryAssemblyLineRecipes);
+                if (added.isEmpty()) {
+                    MessTech.MT_LOG.warn(
+                        "[AssFactory] Assembly Line recipe for {} was refused by assFactoryAssemblyLineRecipes",
+                        recipe.mOutput);
+                    continue;
+                }
+                registered += added.size();
+            }
         }
+        MessTech.MT_LOG.info(
+            "[AssFactory] Assembly Line pool: {} runnable recipes ({} NEI pages) built from {} Assembly Line definitions",
+            registered,
+            displayed,
+            definitions);
+    }
+
+    /**
+     * Registers the single NEI page of one Assembly Line definition into {@link #assFactoryAssemblyLineRecipes},
+     * mirroring the fake {@code assemblylineVisualRecipes} entry GT creates next to every {@code RecipeAssemblyLine}.
+     * <p>
+     * The recipe is fake, so recipe lookup skips it ({@code RecipeMapBackend#filterFindRecipe} requires
+     * {@code !mFakeRecipe}) and it never takes part in matching; keeping the alternatives per slot is what makes NEI
+     * cycle through them inside one input slot instead of showing only the first. Collision checking is off because
+     * this recipe's inputs are exactly the first combination registered as a runnable recipe below, which the check
+     * would otherwise report as a duplicate and drop.
+     * <p>
+     * Its special slot carries the flash drive of the definition - see {@link #displayDataStick} - so the page looks
+     * like the one GT draws for the same recipe in {@code assemblylineVisualRecipes}.
+     *
+     * @return whether the page was registered.
+     */
+    private static boolean addAssemblyLineDisplayRecipe(GTRecipe.RecipeAssemblyLine recipe) {
+        Collection<GTRecipe> added = GTValues.RA.stdBuilder()
+            .itemInputs(displayInputSpec(recipe.mInputs, recipe.mOreDictAlt))
+            .itemOutputs(recipe.mOutput)
+            .fluidInputs(recipe.mFluidInputs)
+            .special(displayDataStick(recipe))
+            .eut(recipe.mEUt)
+            .duration(recipe.mDuration)
+            .fake()
+            .ignoreCollision()
+            .addTo(assFactoryAssemblyLineRecipes);
+        if (added.isEmpty()) {
+            MessTech.MT_LOG.warn(
+                "[AssFactory] Assembly Line NEI page for {} was refused by assFactoryAssemblyLineRecipes",
+                recipe.mOutput);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * The flash drive the NEI page of one definition shows in its special slot: a data stick carrying that recipe's
+     * data, so NEI draws the same "this stick holds recipe X" item the original Assembly Line page shows, exactly what
+     * GT puts next to every {@code RecipeAssemblyLine} in {@code assemblylineVisualRecipes}.
+     * <p>
+     * GT fills its own display sticks from {@code RecipeAssemblyLine#reInit()}, which runs while GT activates the ore
+     * dictionary during postInit - before this pool is built in {@code CommonProxy#serverStarted} - and it is only
+     * called again when items were remapped, so the data has to be written here instead of waited for. The stick is
+     * registered with the definition as well ({@code newDataStickForNEI}), which is what lets a later {@code reInit()}
+     * refresh it after a remap.
+     */
+    private static ItemStack displayDataStick(GTRecipe.RecipeAssemblyLine recipe) {
+        return DISPLAY_DATA_STICKS.computeIfAbsent(recipe, definition -> {
+            ItemStack stick = definition.newDataStickForNEI("Reads Research result", 0);
+            AssemblyLineUtils.setAssemblyLineRecipeOnDataStick(stick, definition, false);
+            return stick;
+        });
+    }
+
+    /**
+     * The per-slot input spec {@code GTRecipeBuilder#itemInputs(Object...)} expects for {@link
+     * #addAssemblyLineDisplayRecipe}: a slot that lists alternatives is passed as its whole {@code ItemStack[]} (so the
+     * builder records it in {@code mOreDictAlt} and NEI offers every choice), a slot without them as the plain stack.
+     */
+    private static Object[] displayInputSpec(ItemStack[] inputs, ItemStack[][] alternatives) {
+        Object[] spec = new Object[inputs.length];
+        for (int i = 0; i < inputs.length; i++) {
+            ItemStack[] slot = alternatives != null && i < alternatives.length ? alternatives[i] : null;
+            spec[i] = slot != null && slot.length > 0 ? slot : inputs[i];
+        }
+        return spec;
+    }
+
+    /**
+     * Every concrete input array one Assembly Line definition stands for: the cartesian product of its per-slot
+     * alternatives, ported from TST's {@code AssemblyLineWithoutResearchRecipePool#generateAllItemInput}.
+     * <p>
+     * Expanding is not a convenience here, it is what makes these recipes matchable at all. GT's lookup does index a
+     * slot's alternatives, but the match check does not use them: {@code GTRecipe_WithAlt#buildItemInputCache} passes
+     * {@code mOreDictAlt} to {@code RecipeItemInput} only for ore dictionary slots ({@code mOreDictIds[i] >= 0}) and
+     * falls back to a plain {@code RecipeItemInput(mInputs[i], nbtSensitive)} otherwise. So one recipe per definition
+     * is found by the lookup yet rejected whenever the machine offers any alternative but the first - a recipe written
+     * as "16 advanced SMD or 4 optical SMD" is invisible to a machine stocked with the optical ones, and the machine
+     * reports no recipe at all. Registering one plain recipe per combination takes the alternatives out of the
+     * equation.
+     * <p>
+     * A slot whose alternatives are circuits collapses to TST's any-circuit wildcard rather than expanding, because
+     * such a slot lists every circuit item of its ore dictionary and expanding it would register dozens of equivalent
+     * variants for one slot.
+     */
+    private static List<ItemStack[]> materialiseInputs(GTRecipe.RecipeAssemblyLine recipe) {
+        ItemStack[] base = recipe.mInputs.clone();
+        ItemStack[][] wildcards = new ItemStack[base.length][];
+
+        if (recipe.mOreDictAlt != null) {
+            for (int i = 0; i < recipe.mOreDictAlt.length && i < base.length; i++) {
+                ItemStack[] alternatives = recipe.mOreDictAlt[i];
+                if (alternatives == null || alternatives.length == 0) continue;
+
+                ItemStack wildcardCircuit = toWildcardCircuit(alternatives[0]);
+                if (wildcardCircuit != null) {
+                    // A circuit slot: one stack that stands for any circuit of that tier, so it adds no combinations.
+                    base[i] = wildcardCircuit;
+                } else {
+                    base[i] = alternatives[0];
+                    wildcards[i] = alternatives;
+                }
+            }
+        }
+
+        List<ItemStack[]> combinations = new ArrayList<>();
+        combinations.add(GTUtility.copyItemArray(base));
+        for (int i = 0; i < base.length; i++) {
+            if (wildcards[i] == null) continue;
+            for (int j = 1; j < wildcards[i].length; j++) {
+                if (wildcards[i][j] == null) continue;
+                ItemStack variation = wildcards[i][j].copy();
+                int size = combinations.size();
+                for (int k = 0; k < size; k++) {
+                    ItemStack[] combined = GTUtility.copyItemArray(combinations.get(k));
+                    combined[i] = variation;
+                    combinations.add(combined);
+                }
+            }
+        }
+        return combinations;
+    }
+
+    /** TST's {@code transToWildCircuit}: the any-circuit stack when the given stack is a circuit, null otherwise. */
+    private static ItemStack toWildcardCircuit(ItemStack stack) {
+        var association = GTOreDictUnificator.getAssociation(stack);
+        if (association == null || !association.hasValidPrefixMaterialData()) return null;
+        if (association.mPrefix != OrePrefixes.circuit) return null;
+        return GTOreDictUnificator.get(false, stack, true);
     }
 
     // --- Nano-Scale Foundry separate NEI pools (one per original NAC pool) ---
@@ -821,6 +1027,15 @@ public final class MTRecipeMaps {
         private long maxEUt = 0;
     }
 
+    /**
+     * Copies one of GT5U's nanochip pools into MessTech's own copy of it, once.
+     * <p>
+     * Known sharp edge, left as it is on purpose: the guard makes every call after the first a no-op, so a call made
+     * from {@code CommonProxy#serverStarted} only helps when the first copy found nothing at all. If a source pool is
+     * still being filled when the first copy runs, whatever is registered later never reaches the copy. That is not
+     * what breaks the Wetware Mainframe (its recipe is an Assembly Line one, see
+     * {@code populateAssFactoryAssemblyLineRecipes}), so this stays the behaviour it always had.
+     */
     private static void copyPoolIfEmpty(RecipeMap<?> source, RecipeMap<RecipeMapBackend> target) {
         if (!target.getAllRecipes()
             .isEmpty()) {

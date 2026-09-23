@@ -104,6 +104,31 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         setWirelessParallel(1);
     }
 
+    /**
+     * The same module, on a tier of its own. The Infinity modules are all a single MAX tier (14, 5, 5); a family
+     * that comes in several tiers - the space apiary modules - passes its own instead. Note that
+     * {@code TileEntityModuleBase} indexes {@code GTValues.V[tTier]} and shifts the EU buffer by {@code tTier - 7}, so
+     * the tier has to be a real entry of the voltage table (0..15) and at least 7.
+     *
+     * @param aTier         voltage tier of this module, see {@code TileEntityModuleBase#getTier()}
+     * @param aModuleTier   module tier, i.e. how far up the elevator's own ladder it sits
+     * @param aMinMotorTier motor tier of the Space Elevator needed to run it, 1..5
+     */
+    protected SpaceModuleInfinityBase(int aID, String aName, String aNameRegional, int aTier, int aModuleTier,
+        int aMinMotorTier) {
+        super(aID, aName, aNameRegional, aTier, aModuleTier, aMinMotorTier);
+        setEnableWirelessFunc(true);
+        setEnableWireless(true);
+        setWirelessParallel(1);
+    }
+
+    protected SpaceModuleInfinityBase(String aName, int aTier, int aModuleTier, int aMinMotorTier) {
+        super(aName, aTier, aModuleTier, aMinMotorTier);
+        setEnableWirelessFunc(true);
+        setEnableWireless(true);
+        setWirelessParallel(1);
+    }
+
     public void setCrossRecipeParallel(int value) {
         this.crossRecipeParallel = Math.clamp(value, 1, 64);
     }

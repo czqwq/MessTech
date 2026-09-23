@@ -18,7 +18,7 @@ public class MTProcessingLogic extends ProcessingLogic {
     @NotNull
     @Override
     protected ParallelHelper createParallelHelper(@Nonnull GTRecipe recipe) {
-        return new ParallelHelper().setRecipe(recipe)
+        return new MTParallelHelper().setRecipe(recipe)
             .setItemInputs(inputItems)
             .setFluidInputs(inputFluids)
             .setAvailableEUt(availableVoltage * availableAmperage)

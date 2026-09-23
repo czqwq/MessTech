@@ -93,7 +93,7 @@ MTMultiMachineBase<T>
   `euDiscountText` - 5% at IV up to 93.75% at MAX - is kept for the harness), and the parallel module only its
   ceiling plus "configurable in the GUI" - the `1..ceiling` range is what the GUI field enforces, not tooltip text.
   Every module closes with `desc.install` = 可用于模块化机器 / usable in a modular machine. The modules carry **no
-  author line**: `MTMachineLoader#brandAsModuleProject` gives every one of them the animated `Add by: ModuleProject`
+  author line**: `MTMachineLoader#brandAsModuleProject` gives every one of them the animated `Add by: ModularProject`
   brand line (`AuthorDynamic.MODULE_PROJECT` / `MTModuleProjectText`, the same look the Huge Chemical Reactor wears)
   in place of the author + MessTech pair `AuthorDynamic#registerOn` would add.
 - Recipes (`GTRecipes#addModuleRecipes`): 30 **assembler** recipes, one per family per tier. The shape is TST's
@@ -465,7 +465,7 @@ MTMultiMachineBase<T>
 - Registered as `MTItemList.MTHugeChemicalReactor` by `MTMachineLoader` under `MT_ID + 34` with the lang key
   `machine.hugechemicalreactor.name`. Its brand line names no author:
   `AuthorDynamic.registerAddon(AuthorDynamic.MODULE_PROJECT, () -> translateToLocal("messtech.moduleProject"), ...)`
-  prints `添加模组: ModuleProject` with the word wearing the modular animation, see `MTModuleProjectText`.
+  prints `添加模组: ModularProject` with the word wearing the modular animation, see `MTModuleProjectText`.
 
 ### MTComputingCenter
 - 3 modes, screwdriver switches, blocked while active or heat present.
@@ -485,8 +485,9 @@ MTMultiMachineBase<T>
   - 1 = Assembly Line: data-stick / Data Access; LevelTier 2 required; unordered input matching via
     standard `ProcessingLogic` (not original ordered AL).
 - Structure `F` accepts Data Access hatch.
-- Independent Assembly Line recipe map: `MTRecipeMaps.assFactoryAssemblyLineRecipes` populated as
-  **real recipes** (not fake) and re-tagged to own default `RecipeCategory`.
+- Independent Assembly Line recipe map `MTRecipeMaps.assFactoryAssemblyLineRecipes`: one **fake** recipe per
+  `RecipeAssemblyLine` definition for NEI (alternatives kept, so NEI cycles them in one slot) plus one **real,
+  hidden** recipe per input combination for actual matching. See `docs/GT5U-NOTES.md` § 11.6.
 - Front texture: Advanced Molecular Casing base + Quantum Force Transformer face overlay.
 - Tooltips mention modes, data access, energy tier limit.
 
@@ -742,6 +743,74 @@ MTMultiMachineBase<T>
 - NBT saves/loads distance, overdrive, cycle/range/step, cycleDistance, whitelist flag, and filter inventory.
 - Remaining relative to original: full asteroid info/calculator panels and 64-slot filter grid (GUI
   currently uses a compact 8-slot filter).
+
+### Space apiary modules (太空蜂箱, latest)
+- `SpaceModuleApiary` + inner `MK1`..`MK4`, registered as `MT_ID + 73..76` (`MTItemList.SpaceModuleApiaryMK1..4`).
+- Four tiers, each one class, re-seated on this GT5U's 16-entry `GTValues.V` (TST asks for tiers 18/25, which do
+  not exist here): MK-I UEV (tier 10) 256 parallel / 16 slots / motor tier 1; MK-II UIV (12) 4096 / 32 / 2;
+  MK-III MAX (14) 32768 / 64 / 3; MK-IV tier 15 `Integer.MAX_VALUE` / 128 / 4.
+- Structure: the usual space-module frame (`main` shape 2 wide x 5 tall, one optional casing plus
+  input bus / output bus / input hatch). `checkMachine` needs a connected `TileEntitySpaceElevator` whose motor tier
+  is at least `getNeededMotorTier()`, otherwise `machine.spacemoduleapiary.need_elevator_t{1..4}`.
+- `checkProcessing_EM()` runs one 100-tick cycle (`CYCLE_TICKS`): queens are pulled from the input bus into the free
+  bee slots by `takeBeesFromInputs()` and are **never consumed**; every occupied slot runs once through
+  `MTBeeSimulator.simulate(queen, world, t)` with `t = MTBeeSimulator.voltageTierExact(getTier())`, and the drops are
+  multiplied by `getMaxParallelRecipes()` (wireless parallel capped by the module's own ceiling).
+- Power is wireless only: `GTValues.V[tier] * CYCLE_TICKS * parallel` EU is taken from the player's global energy map
+  in one lump via `addEUToGlobalEnergyMap`, then `lEUt = 0` so the machine does not also drain its own hatches.
+  `validateWirelessPowerForRecipe` runs first; no energy hatch and no liquid DNA are involved.
+- No recipe map: `getRecipeMapImpl()` returns `null` (the same as TST's `TST_SpaceApiary`), the module produces from
+  the bee slots and not from a pool.
+- Bee slots live in the machine (`ItemStack[] beeSlots`, NBT key `beeSlots`, size 1 each) so they survive a reload.
+- Structure hooks: `construct(...)` -> `buildPiece("main", stackSize, hintsOnly, 0, 1, 0)` **and**
+  `survivalConstruct(stackSize, elementBudget, ISurvivalBuildEnvironment)` ->
+  `survivalBuildPiece("main", stackSize, 0, 1, 0, elementBudget, env, false, true)`, the same pair the miner and the
+  pump use. The `ISurvivalBuildEnvironment` variant must build for real: BlockRenderer6343 (the NEI structure preview)
+  places the machine in a dummy world and calls it with a **fake player**, and neither `TileEntityModuleBase` nor
+  GT's multiblock bases override that variant - delegating to `super` therefore lands in StructureLib's interface
+  default, which answers `-2` ("not supported") for a fake player and leaves the preview with nothing but the
+  controller.
+- Recipes: four Space Assembler recipes (`GTRecipes.addSpaceApiaryRecipes()`), one per tier, `specialValue(1)`
+  (inert: the assembler's tier gate reads the `MODULE_TIER` metadata, which neither mod sets, so all four count as
+  module tier 1). Each spends 4 stacks of 64 Industrial Apiaries + 4 stacks of 64 upgraded acceleration upgrades, 16 of
+  that tier's Field Generator / Conveyor / Robot Arm / Electric Pump, 64 tier circuits, a solder fluid and Honey
+  (doubling per tier), at RECIPE_UHV/UEV/UIV/UMV and 20*300*scale ticks.
+  - MK-III/MK-IV pay **UU-Matter** (1000*128*scale) and MK-I/MK-II pay **Mutated Living Solder** (16 ingots * scale,
+    i.e. 2304 / 4608 mB). TST fills the same pool (`IGRecipeMaps.spaceAssemblerRecipes`) with its `SpaceApiaryT1..T4`,
+    and MK-I/MK-II originally spent exactly what TST's T1/T2 spend (same parts, circuit, UU-Matter, honey, EU/t and
+    duration, only the output different) - so a Space Assembler holding those components matched both and took
+    whichever recipe the lookup yielded first, leaving one mod's module unobtainable. MK-III/MK-IV never collided
+    because their circuit differs from TST's (ours UXV/MAX, TST's UMV/UXV). The solder is what makes MK-I/MK-II
+    mutually exclusive with TST's - **adding** an item or fluid would not, since a recipe matches as soon as its
+    inputs are present. 16 ingots doubling follows the pool's own module ladder (Pump Module MK-I 9 ingots, MK-II 32,
+    MK-III 1 stack, `MachineRecipes:279/297/332`) and is a fraction of one GT++ solder batch
+    (`RecipeLoaderGenericChem:163` yields 4 stacks + 24 ingots).
+- GUI: `SpaceModuleApiaryGui extends SpaceModuleInfinityGui`. The terminal area toggles between the standard status
+  text and a scrollable grid of `SlotLikeButtonWidget`s (10 per row); the toggle is the button the GUI adds to the
+  right of the panel gap.
+  - The grid shows the bee slots the way the Mega Industrial Apiary does: queens sharing a species, secondary species
+    and speed allele collapse into **one** button carrying their number (`MTBeeSimulator.speciesKey`, drawn with
+    `GuiDraw.drawStandardSlotAmountText`), and the remaining capacity is the single empty button at the end. Buttons
+    for entries that do not exist are disabled; a disabled button collapses in its row and an empty row collapses in
+    the `ListWidget`, so the grid needs no rebuilding.
+  - The apiary has one parallel knob and one bee cycle, so `shouldShowCrossRecipeParallelField()` is `false` and the
+    cross-recipe parallel field is hidden.
+  - `createButtonColumn` is overridden to drop the controller slot the shared space-module GUI adds. That slot takes
+    anything and nothing in this machine reads it, and it was the only shift-click target - so a shift-clicked queen
+    landed there instead of in a bee slot.
+  - Shift-click is instead served by an invisible one-item **queen buffer** slot (`ItemSlotSH` over a 1-slot
+    `ItemStackHandler`, `singletonSlotGroup(SlotGroup.STORAGE_SLOT_PRIO)`, filter = queen and a free bee slot). MUI2
+    finds transfer targets through the slot group, so the buffer needs no widget; its change listener moves what it
+    receives straight into the first free bee slot.
+  - Slot contents are one `GenericListSyncHandler<ItemStack>` over the machine's array (null-safe item serialization,
+    change listener invalidating the aggregation) and every edit travels as a single encoded integer
+    (`apiaryBeeClick`, `allowC2S`) handled on the server. The encoding is `((slot + 2) << 4) | button | shift`, where
+    `slot = -1` means the empty entry and the server resolves it to its first free slot. Click takes the queen to the
+    cursor, shift-click sends it to the player inventory, a held queen swaps, right-click inserts a single queen and
+    filling continues into the following empty slots, middle-click is the creative pick.
+- Liquid DNA is intentionally not used, unlike TST's optional `SpaceApiaryCycleTime` addition.
+- Forestry is a hard dependency (`implementation(gtnhDev("ForestryMC"))` in `dependencies.gradle`); simulations go
+  through `forestry.api.apiculture.BeeManager`.
 
 ## Mess Food (混乱大杂烩)
 
@@ -1081,8 +1150,8 @@ MTMultiMachineBase<T>
 
 ### The "ModuleProject" tooltip animation (`MTModuleProjectText` / `MTModuleProjectTextRenderer`)
 
-- The modular machine look: the word is read as a rack of modules of `MODULE_SIZE` (3) characters ("Mod|ule|Pro|jec|t")
-  and one 1.6 s loop powers it up - the scan walks the rack module by module (`POWER_UP_MS` 900 ms), the rack flashes
+- The modular machine look: the word is read as a rack of modules of `MODULE_SIZE` (3) characters
+  ("Mod|ula|rPr|ojc|et"). One 1.6 s loop powers it up - the scan walks the rack module by module (`POWER_UP_MS` 900 ms), the rack flashes
   white twice at full load (`FLASH_MS` 250 ms), is held (`HOLD_MS` 150 ms) and then goes dark again, left to right
   (`POWER_DOWN_MS` 300 ms). A dark module is `§8§l`, a loaded one `§3§l` with a data flicker up to `§b§l`, the module
   under the scan is `§b§l` and the flash is `§f§l`; bold and colour codes never move the advance, so the line width
@@ -1102,8 +1171,8 @@ MTMultiMachineBase<T>
 - **Every width comes from the font, never from a hand sum of `getCharWidth`.** A bold character advances one pixel
   further than its glyph width (`FontRenderer#renderStringAtPos` adds the bold copy to the advance, `++f`, and
   `#getStringWidth` does the same with `if (flag && k > 0) ++i`), and the animation draws *every* character bold, so
-  a hand summed word comes out one pixel per character short - with 13 characters the right bracket landed two glyphs
-  inside the word, exactly at the `e` of `Project`, which is how this was found. `moduleEdges` therefore measures
+  a hand summed word comes out one pixel per character short - on a 13 character word the right bracket landed two
+  glyphs inside it, exactly at the `e` of `Project`, which is how this was found. `moduleEdges` therefore measures
   drawn substrings (formatting codes included, which is what makes the font count the bold advance) and `rawIndex`
   maps a visible index onto the drawn line, so the chips and the brackets share the glyphs' own geometry.
 - It is the brand line of `MTHugeChemicalReactor`, registered with

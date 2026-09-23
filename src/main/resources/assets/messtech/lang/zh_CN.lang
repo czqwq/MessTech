@@ -221,6 +221,34 @@ machine.spacemodulepump.tooltip.details.output=§7· 输出仓需要留出容量
 machine.spacemoduleassembler.name=无限太空组装模块
 machine.spacemoduleassembler.machinetype=太空组装模块
 machine.spacemodule.need_elevator_t5=需要在搭载了加速轨道 MK-V的太空电梯上才能工作
+
+# --- 太空蜂箱模块 ---
+machine.spacemoduleapiary1.name=太空蜂箱模块 MK-I
+machine.spacemoduleapiary2.name=太空蜂箱模块 MK-II
+machine.spacemoduleapiary3.name=太空蜂箱模块 MK-III
+machine.spacemoduleapiary4.name=太空蜂箱模块 MK-IV
+machine.spacemoduleapiary1.machinetype=太空蜂箱模块 MK-I
+machine.spacemoduleapiary2.machinetype=太空蜂箱模块 MK-II
+machine.spacemoduleapiary3.machinetype=太空蜂箱模块 MK-III
+machine.spacemoduleapiary4.machinetype=太空蜂箱模块 MK-IV
+machine.spacemoduleapiary.tooltip.desc=§7在太空电梯中运行蜜蜂，不需要蜂箱
+machine.spacemoduleapiary.tooltip.bees=§7蜂后不会被消耗，产物由蜂种与模块等级决定
+machine.spacemoduleapiary.tooltip.parallel=§7最大并行：§b%s
+machine.spacemoduleapiary.tooltip.slots=§7蜂槽容量：§b%s
+machine.spacemoduleapiary.tooltip.power=§7从无线电网取电，每并行每次运行消耗本等级 1A
+machine.spacemoduleapiary.tooltip.details=§d细节：
+machine.spacemoduleapiary.need_elevator_t1=需要在搭载了加速轨道 MK-I的太空电梯上才能工作
+machine.spacemoduleapiary.need_elevator_t2=需要在搭载了加速轨道 MK-II的太空电梯上才能工作
+machine.spacemoduleapiary.need_elevator_t3=需要在搭载了加速轨道 MK-III的太空电梯上才能工作
+machine.spacemoduleapiary.need_elevator_t4=需要在搭载了加速轨道 MK-IV的太空电梯上才能工作
+machine.spacemoduleapiary.gui.empty=§7空蜂槽
+machine.spacemoduleapiary.gui.empty_hint=§7手持蜂后点击即可放入
+machine.spacemoduleapiary.gui.extract_hint=§7点击取出蜂后
+machine.spacemoduleapiary.gui.shift_hint=§7Shift 点击送入背包
+machine.spacemoduleapiary.gui.show_status=§7切换到机器状态
+machine.spacemoduleapiary.gui.show_slots=§7切换到蜂槽
+machine.spacemoduleapiary.gui.identical=§7同种蜂后：§b%s 只
+machine.spacemoduleapiary.gui.free=§7空余蜂槽：§b%s
 GT5U.gui.text.recipe_result.insufficient_computation=算力不足
 
 # --- 硅岩湮灭场发电机 ---
@@ -515,7 +543,7 @@ messtech.pigTech=PigTech
 messtech.nuclearTech=NuclearTech
 # “ModuleProject” 动画（MTModuleProjectText）作用的字符串，用于不写作者名的机器品牌行（巨型化学反应釜，以及
 # speed / EU / parallel 三种模组仓）。
-messtech.moduleProject=ModuleProject
+messtech.moduleProject=ModularProject
 
 # ---化学扭曲者---
 machine.largechemicaltwister.name=大型化学扭曲者

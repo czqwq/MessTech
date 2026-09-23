@@ -64,7 +64,7 @@ Cross-recipe parallelism design (inspired by external mod reference).
   - 0 = Component Assembly Line (generic `ProcessingLogic`, energy hatch tier limits recipe casing tier)
   - 1 = Assembly Line (data-stick / Data Access, LevelTier 2 required, unordered input matching via standard `ProcessingLogic`)
 - Structure `F` accepts Data Access hatch.
-- Independent Assembly Line recipe map (`MTRecipeMaps.assFactoryAssemblyLineRecipes`) is populated with **real recipes** (not fake) and re-tagged to its own `RecipeCategory` for NEI.
+- Independent Assembly Line recipe map (`MTRecipeMaps.assFactoryAssemblyLineRecipes`): fake display recipe per definition for NEI, real hidden recipe per input combination for matching.
 
 ## Own-code conventions / lessons
 

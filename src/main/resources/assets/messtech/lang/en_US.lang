@@ -221,6 +221,34 @@ machine.spacemodulepump.tooltip.details.output=§7· Output hatches need free ca
 machine.spacemoduleassembler.name=Infinite Space Assembler Module
 machine.spacemoduleassembler.machinetype=Space Assembler Module
 machine.spacemodule.need_elevator_t5=Requires a Space Elevator at Orbital Tier V
+
+# --- Space apiary modules ---
+machine.spacemoduleapiary1.name=Space Apiary Module MK-I
+machine.spacemoduleapiary2.name=Space Apiary Module MK-II
+machine.spacemoduleapiary3.name=Space Apiary Module MK-III
+machine.spacemoduleapiary4.name=Space Apiary Module MK-IV
+machine.spacemoduleapiary1.machinetype=Space Apiary Module MK-I
+machine.spacemoduleapiary2.machinetype=Space Apiary Module MK-II
+machine.spacemoduleapiary3.machinetype=Space Apiary Module MK-III
+machine.spacemoduleapiary4.machinetype=Space Apiary Module MK-IV
+machine.spacemoduleapiary.tooltip.desc=§7Runs bees inside a Space Elevator, no apiary needed
+machine.spacemoduleapiary.tooltip.bees=§7Queens are not consumed; the output follows the species and the module tier
+machine.spacemoduleapiary.tooltip.parallel=§7Max parallels: §b%s
+machine.spacemoduleapiary.tooltip.slots=§7Bee slots: §b%s
+machine.spacemoduleapiary.tooltip.power=§7Draws from the §bwireless network§7, 1A of its own tier per parallel per run
+machine.spacemoduleapiary.tooltip.details=§dDetails:§7 no energy hatches, no liquid DNA; the bee slots are edited in the GUI
+machine.spacemoduleapiary.need_elevator_t1=Requires a Space Elevator at Orbital Tier I
+machine.spacemoduleapiary.need_elevator_t2=Requires a Space Elevator at Orbital Tier II
+machine.spacemoduleapiary.need_elevator_t3=Requires a Space Elevator at Orbital Tier III
+machine.spacemoduleapiary.need_elevator_t4=Requires a Space Elevator at Orbital Tier IV
+machine.spacemoduleapiary.gui.empty=§7Empty bee slot
+machine.spacemoduleapiary.gui.empty_hint=§7Click with a queen to put it in
+machine.spacemoduleapiary.gui.extract_hint=§7Click to take the queen out
+machine.spacemoduleapiary.gui.shift_hint=§7Shift-click to send it to your inventory
+machine.spacemoduleapiary.gui.show_status=§7Show the machine status
+machine.spacemoduleapiary.gui.show_slots=§7Show the bee slots
+machine.spacemoduleapiary.gui.identical=§7Identical queens: §b%s
+machine.spacemoduleapiary.gui.free=§7Free bee slots: §b%s
 GT5U.gui.text.recipe_result.insufficient_computation=Not enough computation
 
 # --- Large NQD Annihilation Field Reactor ---
@@ -514,7 +542,7 @@ messtech.pigTech=PigTech
 messtech.nuclearTech=NuclearTech
 # The string the "ModuleProject" animation (MTModuleProjectText) animates; it is the brand line of a machine that
 # carries no author name (the Huge Chemical Reactor and the speed / EU / parallel module hatches).
-messtech.moduleProject=ModuleProject
+messtech.moduleProject=ModularProject
 
 # ---ChemicalTwister---
 machine.largechemicaltwister.name=Large Chemical Twister

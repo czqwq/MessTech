@@ -57,7 +57,7 @@ public final class AuthorDynamic {
     public static final MTTextAnimation TRANSCENDENT_METAL = MTTranscendentMetalText.INSTANCE;
 
     /**
-     * The modular machine look of the {@code ModuleProject} brand line: the rack of {@link MTModuleProjectText},
+     * The modular machine look of the {@code ModularProject} brand line: the rack of {@link MTModuleProjectText},
      * powered up module by module, with the chip row of {@link MTModuleProjectTextRenderer} under the letters. Hand
      * it to {@link #registerAddon(MTTextAnimation, Supplier, ItemStack)}.
      */

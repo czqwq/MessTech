@@ -33,6 +33,7 @@ import com.MessTech.common.machine.hatch.MTWirelessBeamlineInput;
 import com.MessTech.common.machine.hatch.MTWirelessBeamlineOutput;
 import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorInput;
 import com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorOutput;
+import com.MessTech.common.machine.module.SpaceModuleApiary;
 import com.MessTech.common.machine.module.SpaceModuleAssemblerInfinity;
 import com.MessTech.common.machine.module.SpaceModuleMinerInfinity;
 import com.MessTech.common.machine.module.SpaceModulePumpInfinity;
@@ -96,6 +97,32 @@ public class MTMachineLoader {
                 "Space Module Assembler Infinity",
                 translateToLocal("machine.spacemoduleassembler.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleAssemblerInfinity.get(1));
+        // Space apiary modules: four tiers, one class each (see SpaceModuleApiary). They sit on tiers 10/12/14/15, i.e.
+        // UEV/UIV/MAX/top, because GTValues.V only has 16 entries - TST's own tier 18 and 25 cannot be used here.
+        MTItemList.SpaceModuleApiaryMK1.set(
+            new SpaceModuleApiary.MK1(
+                MT_ID + 73,
+                "Space Module Apiary MK-I",
+                translateToLocal("machine.spacemoduleapiary1.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleApiaryMK1.get(1));
+        MTItemList.SpaceModuleApiaryMK2.set(
+            new SpaceModuleApiary.MK2(
+                MT_ID + 74,
+                "Space Module Apiary MK-II",
+                translateToLocal("machine.spacemoduleapiary2.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleApiaryMK2.get(1));
+        MTItemList.SpaceModuleApiaryMK3.set(
+            new SpaceModuleApiary.MK3(
+                MT_ID + 75,
+                "Space Module Apiary MK-III",
+                translateToLocal("machine.spacemoduleapiary3.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleApiaryMK3.get(1));
+        MTItemList.SpaceModuleApiaryMK4.set(
+            new SpaceModuleApiary.MK4(
+                MT_ID + 76,
+                "Space Module Apiary MK-IV",
+                translateToLocal("machine.spacemoduleapiary4.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleApiaryMK4.get(1));
         MTItemList.MTNQDAFReactor.set(
             new MTNQDAFReactor(
                 MT_ID + 6,
@@ -281,7 +308,7 @@ public class MTMachineLoader {
     }
 
     /**
-     * Gives a registered machine the modular brand line, {@code Add by: ModuleProject}, in the look of
+     * Gives a registered machine the modular brand line, {@code Add by: ModularProject}, in the look of
      * {@link com.MessTech.common.util.MTModuleProjectText}: a rack of modules powered up one by one, with the chip row
      * of {@code MTModuleProjectTextRenderer} under the letters.
      * <p>
