@@ -251,13 +251,6 @@ machine.spacemoduleapiary.gui.identical=§7同种蜂后：§b%s 只
 machine.spacemoduleapiary.gui.free=§7空余蜂槽：§b%s
 GT5U.gui.text.recipe_result.insufficient_computation=算力不足
 
-# --- 硅岩湮灭场发电机 ---
-misc.structure_tooltip.coil=力场约束线圈方块
-misc.structure_error.no_coil=需要力场约束线圈
-machine.nqdafreactor.name=大型硅岩湮灭场发电机
-machine.nqdafreactor.efficiency=工作效率
-machine.nqdafreactor.decay_freeze=衰减冻结
-machine.nqdafreactor.parallel=并行
 machine.meinventory.inputbus.name=库存输入总线(ME)
 machine.meinventory.inputbus.desc.0=库存输入总线(ME)
 machine.meinventory.inputbus.desc.1=配方检查时从ME网络中拉取全部物品类型。
@@ -272,6 +265,14 @@ item.messtech.meCreativeOreDisk.name=ME创造矿物磁盘
 item.messtech.messFood.name=混乱大杂烩
 item.messtech.messFood.display=%s(%s)
 item.messtech.messFood.tooltip.ingredients=合成材料:
+
+# --- 硅岩湮灭场发电机 ---
+misc.structure_tooltip.coil=力场约束线圈方块
+misc.structure_error.no_coil=需要力场约束线圈
+machine.nqdafreactor.name=大型硅岩湮灭场发电机
+machine.nqdafreactor.efficiency=工作效率
+machine.nqdafreactor.decay_freeze=衰减冻结
+machine.nqdafreactor.parallel=并行
 machine.nqdafreactor.machinetype=大型硅岩湮灭场发电机
 machine.nqdafreactor.tooltip.desc=§7一台以液态核燃料或液态硅岩燃料驱动的大型硅岩湮灭场发电机。
 machine.nqdafreactor.tooltip.flavour=§7把燃料丢进湮灭场，剩下的交给时间。
