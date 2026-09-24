@@ -71,6 +71,8 @@ import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 import ic2.api.reactor.IReactor;
 import ic2.api.reactor.IReactorComponent;
 import ic2.core.IC2DamageSource;
+import ic2.core.init.MainConfig;
+import ic2.core.util.ConfigUtil;
 import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 
@@ -86,15 +88,33 @@ import mcp.mobius.waila.api.IWailaDataAccessor;
  * single {@link MTReactorHeatHatch} of the structure and not by the reactor components.</li>
  * <li>At 85% heat the core can ignite its surroundings, at 70% it irradiates entities, and at 100% the page
  * explodes. The explosion power is computed from the reactor components' {@code influenceExplosion}.</li>
- * <li>The generated energy ({@code output * 5} EU/t, the IC2 conversion) is emitted through dynamo hatches.</li>
+ * <li>The generated energy ({@code output * 5 EU/t * balance/energy/generator/nuclear}, the IC2 conversion, see
+ * {@link #getEuPerOutput()}) is emitted through dynamo hatches.</li>
  * </ul>
  */
 public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvivalConstructable {
 
     /** IC2 reactor tick rate: components are processed once every 20 ticks. */
     public static final int CYCLE_TICKS = 20;
-    /** IC2 EU/t conversion of the accumulated reactor output. */
-    public static final float EU_PER_OUTPUT = 5.0F;
+    /**
+     * IC2's own EU/t conversion of the accumulated reactor output, before the pack's balance factor:
+     * {@code TileEntityNuclearReactorElectric#getOfferedEnergy()} returns
+     * {@code output * 5.0F * balance/energy/generator/nuclear}.
+     */
+    private static final float IC2_EU_PER_OUTPUT = 5.0F;
+
+    /**
+     * EU/t per accumulated reactor output point, computed exactly like IC2's own reactor does:
+     * {@code 5 EU/t * balance/energy/generator/nuclear}. GTNH ships that factor as 5.0, so one output point is
+     * worth 25 EU/t there - the same number GT5U prints in its NEI nuclear fake recipe. Reading IC2's config
+     * instead of hardcoding 5 keeps the multiblock at the output of the single block reactor instead of a fifth
+     * of it.
+     */
+    public static float getEuPerOutput() {
+        if (MainConfig.get() == null) return IC2_EU_PER_OUTPUT;
+        return IC2_EU_PER_OUTPUT * ConfigUtil.getFloat(MainConfig.get(), "balance/energy/generator/nuclear");
+    }
+
     /**
      * What IC2 clamps a reactor explosion to ({@code protection/reactorExplosionPowerLimit} in IC2's general.ini).
      * The MTReactor does not read IC2's config: it computes the identical IC2 number itself and uses it to scale the
@@ -693,7 +713,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             }
         }
 
-        mReactorEUPerTick = (long) (totalOutput * EU_PER_OUTPUT);
+        mReactorEUPerTick = (long) (totalOutput * getEuPerOutput());
         mReactorStable = simulateNextCycleStability();
         markDirty();
         return false;
@@ -1318,7 +1338,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
         @Override
         public double getReactorEUEnergyOutput() {
-            return pageOutput * EU_PER_OUTPUT;
+            return pageOutput * getEuPerOutput();
         }
 
         @Override

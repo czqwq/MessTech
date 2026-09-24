@@ -452,7 +452,7 @@ machine.mtreactor.tooltip.core.header=§6堆芯：
 machine.mtreactor.tooltip.core.cycle=§7· 每 §b20§7 tick 结算一次 IC2 循环：先热力后发电，热量按页独立累积
 machine.mtreactor.tooltip.core.heat=§7· 堆温 §c≥70%§7 辐照周围实体，§c≥85%§7 有概率点燃周围方块，§c100%§7 §c核爆§7并炸毁整台机器
 machine.mtreactor.tooltip.power.header=§6发电：
-machine.mtreactor.tooltip.power.output=§7· 发电量 = §b堆芯输出 × 5 EU/t§7，由动力仓输出
+machine.mtreactor.tooltip.power.output=§7· 发电量 = §b堆芯输出 × 5 EU/t × IC2 §b核能倍率§7（GTNH 为 §b25 EU/t§7），由动力仓输出
 machine.mtreactor.tooltip.details=§d细节：§7槽位可锁定同类组件，耐久 §b≤§7 阈值时自动输出并从总线补货（需要输入/输出总线）
 machine.mtreactor.tooltip.details.hint=§7· Shift+右键锁定同类物品，Alt+Shift+右键全部解锁，中键打开设置
 machine.mtreactor.structure.error.missing_access_hatch=缺少核反应堆访问仓

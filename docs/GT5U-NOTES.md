@@ -543,10 +543,13 @@ GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
   `gt.rodTranscendentMetal.name` (and `...2` / `...4` / `...Depleted...`).
 * Current stats (`MTItems`): `maxDamage 250_000`, `radiation 32`, `MOX=true`, `heatBonus=2`,
   **`heat 4_096`** and one energy per size — `ENERGY_SINGLE 9_000_000`, `ENERGY_DUAL 4_500_000`,
-  `ENERGY_QUAD 3_000_000`. MTReactor formulas: `output += pulses * sEnergy`, `EU/t = output * 5`;
+  `ENERGY_QUAD 3_000_000`. MTReactor formulas: `output += pulses * sEnergy`, `EU/t = output * 5 *
+  balance/energy/generator/nuclear` (`MTReactor#getEuPerOutput()`; GTNH's `config/IC2.ini` ships that factor as
+  5.0, so one output point is 25 EU/t there - the same number `TileEntityNuclearReactorElectric#getOfferedEnergy()`
+  and GT5U's NEI nuclear fake recipe build with);
   a lone rod adds `1 + cells / 2` pulses on each of its `cells` passes, so
-  `EU/t = sEnergy * cells * (1 + cells / 2) * 5` → **single 45,000,000 / dual 90,000,000 / quad 180,000,000 EU/t**
-  (exact 1x/2x/4x scaling, the single rod is 1.34A UIV). The same formula is what the NEI nuclear fake recipe
+  `EU/t = sEnergy * cells * (1 + cells / 2) * 25` → **single 225,000,000 / dual 450,000,000 / quad 900,000,000
+  EU/t** (exact 1x/2x/4x scaling, the single rod is 6.7A UIV). The same formula is what the NEI nuclear fake recipe
   prints, so the tooltip numbers match the real output.
   Heat per cycle is `cells * triangular(1 + cells / 2) * sHeat` → 4,096 / 24,576 / 98,304 HU/s bare, which a
   single `ItemList.neutroniumHeatCapacitor` (1G Neutronium Heat Capacitor, 1,000,000,000 HU) buffers for ~2.8 h.

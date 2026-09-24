@@ -243,6 +243,10 @@ MTMultiMachineBase<T>
 - No dynamo hatch in `checkMachine` -> auto enables wireless output mode (`MTGeneratorMultiBase`).
 
 ### MTReactor (nuclear reactor)
+- Generation: `EU/t = core output × 5 × IC2's balance/energy/generator/nuclear` (`MTReactor#getEuPerOutput()`).
+  GTNH's `config/IC2.ini` sets `nuclear = 5.0`, so one output point is worth 25 EU/t there - the factor IC2's own
+  `TileEntityNuclearReactorElectric#getOfferedEnergy()` and GT5U's NEI nuclear fake recipe use, and what makes a
+  GT quad uranium rod (12 pulses × `sEnergy` 2 = 24 output) generate 600 EU/t like the single block reactor.
 - Controller face: the face art of GoodGenerator's neutron activator - `icons/NeutronActivator_Off` / `_On` and their
   two optional glow layers from the gregtech assets (five animated 16x16 frames each, `frametime: 8`) - over the casing
   that was already under the face (`Casings.AssemblyLineCasing`); the other five faces stay
