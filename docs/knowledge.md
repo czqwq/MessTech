@@ -484,14 +484,21 @@ MTMultiMachineBase<T>
 ### MTAssFactory
 - Extends `MTMultiMachineBase` (not wireless).
 - Modes:
-  - 0 = Component Assembly Line: generic `ProcessingLogic`; recipe casing tier (`mSpecialValue`) limited
-    by energy hatch tier (`getInputVoltageTier()`).
-  - 1 = Assembly Line: data-stick / Data Access; LevelTier 2 required; unordered input matching via
-    standard `ProcessingLogic` (not original ordered AL).
+  - 0 = Component Assembly Line: generic `ProcessingLogic` recipe map lookup; recipe casing tier
+    (`mSpecialValue`) limited by energy hatch tier (`getInputVoltageTier()`).
+  - 1 = Assembly Line: data-stick / Data Access; LevelTier 2 required; unordered input matching by
+    `MTAssemblyLineMatcher` instead of a recipe map lookup (not the original ordered AL), and no
+    single-recipe locking (`supportsSingleRecipeLocking()` is false there, like GT's own Assembly Line).
 - Structure `F` accepts Data Access hatch.
-- Independent Assembly Line recipe map `MTRecipeMaps.assFactoryAssemblyLineRecipes`: one **fake** recipe per
-  `RecipeAssemblyLine` definition for NEI (alternatives kept, so NEI cycles them in one slot) plus one **real,
-  hidden** recipe per input combination for actual matching. See `docs/GT5U-NOTES.md` § 11.6.
+- Independent Assembly Line recipe map `MTRecipeMaps.assFactoryAssemblyLineRecipes` holds **only fake NEI
+  pages**, one per `RecipeAssemblyLine` definition (alternatives kept, so NEI cycles them in one slot); it has
+  no runnable recipes on purpose. See `docs/GT5U-NOTES.md` § 11.6.
+- `MTAssemblyLineMatcher` resolves an authorised definition against the current input buses on every recipe
+  check: every bus is read as one unordered pool (wildcard-damage alias included, NBT ignored), and each slot
+  takes the alternative that leaves the most parallels, so the ingredients may sit in any bus in any order and
+  a slot written as "A or B" is satisfied by whichever is there. The resulting concrete ingredient list goes
+  through the normal `ProcessingLogic` pipeline, so parallels, perfect overclock, void protection, debug/ME
+  buses and the consumption itself stay the shared code.
 - Front texture: Advanced Molecular Casing base + Quantum Force Transformer face overlay.
 - Tooltips mention modes, data access, energy tier limit.
 

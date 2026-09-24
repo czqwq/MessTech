@@ -30,6 +30,7 @@ import com.MessTech.common.block.MTBlocks;
 import com.MessTech.common.gui.MTAssFactoryGui;
 import com.MessTech.common.machine.Base.MTMultiMachineBase;
 import com.MessTech.common.machine.Base.MTProcessingLogic;
+import com.MessTech.common.recipe.MTAssemblyLineMatcher;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
@@ -55,7 +56,6 @@ import gregtech.api.structure.error.StructureError;
 import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.AssemblyLineUtils;
 import gregtech.api.util.GTRecipe;
-import gregtech.api.util.GTUtility;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.IGTHatchAdder;
 import gregtech.api.util.MultiblockTooltipBuilder;
@@ -332,6 +332,15 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
             MTRecipeMaps.assFactoryAssemblyLineRecipes);
     }
 
+    /**
+     * Assembly Line mode has no recipe locking, like GT's own Assembly Line: the mode does not match recipes out of a
+     * recipe map, so there is no map recipe for a lock to be built from. Mode 0 keeps the usual lock.
+     */
+    @Override
+    public boolean supportsSingleRecipeLocking() {
+        return machineMode == 0;
+    }
+
     @Override
     public @Nonnull CheckRecipeResult checkProcessing() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
@@ -372,9 +381,17 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
     }
 
     /**
-     * Uses the standard ProcessingLogic (same input handling as every other GT machine, including
-     * debug/phantom and ME buses) against {@link MTRecipeMaps#assFactoryAssemblyLineRecipes}, but
-     * restricts matches to the recipes authorised by the flash drives / Data Access hatches.
+     * Mode 0 goes through the shared recipe map lookup; mode 1 does not, because the runnable form of an Assembly Line
+     * definition cannot be pre-computed.
+     * <p>
+     * Assembly Line mode is <b>unordered</b>: the definition is matched against everything the input buses hold as one
+     * pool, so the ingredients may sit in any bus in any order, and a slot that accepts several alternatives
+     * ({@code mOreDictAlt}) is satisfied by whichever of them the machine has. Doing that through
+     * {@link MTRecipeMaps#assFactoryAssemblyLineRecipes} would need one recipe per alternative combination, which is
+     * the cartesian product of a definition's slots - six digits for a single definition - and used to exhaust the heap
+     * at world load. {@link MTAssemblyLineMatcher} resolves the authorised definitions against the current buses
+     * instead, and hands the winning definition to the same pipeline as every other recipe, so parallels, overclock,
+     * void protection, debug/phantom and ME buses and the input consumption itself stay the shared code.
      */
     @Override
     protected ProcessingLogic createProcessingLogic() {
@@ -382,7 +399,8 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
 
             @Override
             protected @NotNull Stream<GTRecipe> findRecipeMatches(@Nullable RecipeMap<?> map) {
-                return super.findRecipeMatches(map).filter(MTAssFactory.this::isAssemblyRecipeAllowed);
+                if (machineMode != 1) return super.findRecipeMatches(map);
+                return MTAssemblyLineMatcher.matches(allowedAssemblyRecipes, inputItems);
             }
 
             @Override
@@ -403,21 +421,12 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
                 setEuModifier(getEuModifier());
                 setSpeedBonus(getSpeedBonus());
                 setOverclock(isEnablePerfectOverclock() ? 4 : 2, 4);
+                // Assembly Line mode resolves its recipes itself, so a single-recipe lock built in Component mode (and
+                // still stored on the machine after a mode switch) must not be applied to it.
+                if (machineMode == 1) setRecipeLocking(MTAssFactory.this, false);
                 return super.process();
             }
         }.setMaxParallelSupplier(this::getLimitedMaxParallel);
-    }
-
-    private boolean isAssemblyRecipeAllowed(@Nullable GTRecipe recipe) {
-        // Component Assembly Line mode must not be filtered by Assembly Line data sticks.
-        if (machineMode != 1) return true;
-        if (recipe == null || allowedAssemblyRecipes.isEmpty()) return false;
-        if (recipe.mOutputs == null || recipe.mOutputs.length == 0) return false;
-        ItemStack output = recipe.mOutputs[0];
-        for (GTRecipe.RecipeAssemblyLine allowed : allowedAssemblyRecipes) {
-            if (GTUtility.areStacksEqual(allowed.mOutput, output, true)) return true;
-        }
-        return false;
     }
     // endregion Assembly Line processing
 

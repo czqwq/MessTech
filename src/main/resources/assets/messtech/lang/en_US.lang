@@ -450,7 +450,7 @@ machine.mtreactor.tooltip.core.header=§6Core:
 machine.mtreactor.tooltip.core.cycle=§7· One IC2 cycle every §b20§7 ticks: heat first, then generation, accumulated per page
 machine.mtreactor.tooltip.core.heat=§7· From §c70%§7 heat nearby entities are irradiated, from §c85%§7 the surroundings can ignite, at §c100%§7 it §cnukes§7 and destroys the machine
 machine.mtreactor.tooltip.power.header=§6Power:
-machine.mtreactor.tooltip.power.output=§7· Generation = §bcore output × 5 EU/t × IC2's §bnuclear§7 balance factor (§b25 EU/t§7 in GTNH), emitted through dynamo hatches
+machine.mtreactor.tooltip.power.output=§7· Generation = §bcore output × 5 × IC2's §bconfig multiplier * 2§7, emitted through dynamo hatches
 machine.mtreactor.tooltip.details=§dDetails:§7 slots can lock a component type and auto output/restock at their §bthreshold§7 (needs an input and an output bus)
 machine.mtreactor.tooltip.details.hint=§7· Shift+Right click locks a type, Alt+Shift+Right click unlocks all, middle click opens the settings
 machine.mtreactor.structure.error.missing_access_hatch=Missing Reactor Access Hatch

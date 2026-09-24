@@ -61,10 +61,10 @@ Cross-recipe parallelism design (inspired by external mod reference).
 
 ### MTAssFactory
 - Modes:
-  - 0 = Component Assembly Line (generic `ProcessingLogic`, energy hatch tier limits recipe casing tier)
-  - 1 = Assembly Line (data-stick / Data Access, LevelTier 2 required, unordered input matching via standard `ProcessingLogic`)
+  - 0 = Component Assembly Line (generic `ProcessingLogic` recipe map lookup, energy hatch tier limits recipe casing tier)
+  - 1 = Assembly Line (data-stick / Data Access, LevelTier 2 required, unordered input matching by `MTAssemblyLineMatcher`, no single-recipe locking)
 - Structure `F` accepts Data Access hatch.
-- Independent Assembly Line recipe map (`MTRecipeMaps.assFactoryAssemblyLineRecipes`): fake display recipe per definition for NEI, real hidden recipe per input combination for matching.
+- Independent Assembly Line recipe map (`MTRecipeMaps.assFactoryAssemblyLineRecipes`): fake display recipe per definition for NEI only. Runnable recipes are resolved per check by `MTAssemblyLineMatcher` against the input buses; see `docs/GT5U-NOTES.md` § 11.6.
 
 ## Own-code conventions / lessons
 
@@ -73,7 +73,7 @@ Cross-recipe parallelism design (inspired by external mod reference).
    - Recipe finding: `ProcessingLogic` / `findRecipeQuery` / `getStoredInputs`.
    - Do **not** directly mutate `ItemStack.stackSize` / `FluidStack.amount` or call `setInventorySlotContents` on bus slots from custom processing code.
 2. **Waila mode display**: upstream GT `MTEMultiBlockBase#getWailaBody` reads `tag.getString("mode")`, so write the localized mode name as a string, not an integer.
-3. **Fake recipes are invisible to `findRecipeQuery`.** If a machine needs to process from a custom recipe pool, register real recipes (`addRecipe(..., false, false, false)`), not `addFakeRecipe`.
+3. **Fake recipes are invisible to `findRecipeQuery`.** If a machine needs to process from a custom recipe pool, register real recipes (`addRecipe(..., false, false, false)`), not `addFakeRecipe`. Exception: a recipe whose runnable form cannot be written down ahead of time (the AssFactory Assembly Line mode, whose per-slot alternatives would have to be expanded into their cartesian product) should keep only fake NEI pages and override `ProcessingLogic#findRecipeMatches` to resolve the recipe per check.
 4. **NEI category lookup** reads `getRecipesByCategory(defaultCategory)`. When copying recipes into another map, call `recipe.setRecipeCategory(targetDefaultCategory)`.
 5. **Block helpers**: `AssMatrixBlock` / `AdvAssMatrixBlock` expose `getBlock()`, `getItem()`, `getItemStack()`, `getItemStack(int)`; also registered in `MTItemList`.
 6. **Registration** stays in one path: `postInit -> MTMachineLoader.loadMachines()`.

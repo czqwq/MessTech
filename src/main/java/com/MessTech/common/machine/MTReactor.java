@@ -105,7 +105,8 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
     //Why not hardcoded?
     public static float getEuPerOutput() {
-        return IC2_EU_PER_OUTPUT * 5;
+        if (MainConfig.get() == null) return IC2_EU_PER_OUTPUT * 2 * 5;
+        return IC2_EU_PER_OUTPUT * ConfigUtil.getFloat(MainConfig.get(), "balance/energy/generator/nuclear") * 2;
     }
 
     /**
