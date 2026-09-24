@@ -103,16 +103,9 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
      */
     private static final float IC2_EU_PER_OUTPUT = 5.0F;
 
-    /**
-     * EU/t per accumulated reactor output point, computed exactly like IC2's own reactor does:
-     * {@code 5 EU/t * balance/energy/generator/nuclear}. GTNH ships that factor as 5.0, so one output point is
-     * worth 25 EU/t there - the same number GT5U prints in its NEI nuclear fake recipe. Reading IC2's config
-     * instead of hardcoding 5 keeps the multiblock at the output of the single block reactor instead of a fifth
-     * of it.
-     */
+    //Why not hardcoded?
     public static float getEuPerOutput() {
-        if (MainConfig.get() == null) return IC2_EU_PER_OUTPUT;
-        return IC2_EU_PER_OUTPUT * ConfigUtil.getFloat(MainConfig.get(), "balance/energy/generator/nuclear");
+        return IC2_EU_PER_OUTPUT * 5;
     }
 
     /**
