@@ -15,29 +15,35 @@ import gregtech.api.util.MethodsReturnNonnullByDefault;
 import gregtech.common.gui.modularui.UIHelper;
 
 /**
- * NEI frontend for the Nano-Scale Foundry "24 pool" one-step recipes.
+ * NEI frontend for the Nano-Scale Foundry's one-step circuit pool (the old "24" pool).
  * <p>
  * These recipes are recursively flattened Assembly Matrix chains and the raw material components are packed into
  * molten fluids (see {@code MTRecipeMaps#packMaterialInputs}), so a page is dominated by two wide grids. The layout
- * keeps everything inside the standard 170px recipe background: the selector, the progress bar, the single item
- * output and the logo share the header row, the item inputs take {@link #COLUMNS} columns underneath it, and the
- * fluid inputs follow directly below them.
+ * keeps everything inside the standard 170px recipe background: the progress bar, the single item output and the
+ * logo share the header row, the item inputs take {@link #COLUMNS} columns underneath it, and the fluid inputs
+ * follow directly below them.
+ * <p>
+ * The 1-6 selector circuit is a real (non-consumed) recipe input since the pool switched to
+ * {@code GTRecipeBuilder#circuit(int)}, so it is drawn like any other item input instead of in a dedicated
+ * special slot.
  */
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
-public class NanoScaleFoundry24PoolFrontend extends RecipeMapFrontend {
+public class OneStepCircuitPoolFrontend extends RecipeMapFrontend {
 
     /**
-     * Slot capacity of the pool. {@code MTRecipeMaps.nanoScaleFoundry24PoolRecipes} takes its {@code maxIO} from
+     * Slot capacity of the pool. {@code MTRecipeMaps.oneStepCircuitPoolRecipes} takes its {@code maxIO} from
      * these constants and every position below is derived from them too, so raising a limit here re-flows the whole
      * grid; edit only these values and never hardcode the numbers again.
      * <p>
      * The one measurement of the flattened recipes was 61 item inputs and 24 fluid inputs (the Planck chain), taken
-     * with packing switched off: {@code MTRecipeMaps#packMaterialInputs} turns bolts, plates, fine wires, screws and
-     * foils into molten fluids, which moves entries from the item grid into the fluid grid, so that pair no longer
-     * describes this pool and both sides are the same size instead - 54 = 9 columns x 6 rows each, which keeps the
-     * page at one height while giving the fluids the room the packing needs.
-     * {@code MTRecipeMaps#populateNanoScaleFoundry24PoolRecipes()} logs the recipe's name and both of its counts if a
+     * with packing switched off: {@code MTRecipeMaps#packMaterialInputs} turns bolts, plates, fine wires, screws,
+     * foils, casings and frame boxes into molten fluids, melts the non-superconductor wires and adds the polyethylene
+     * of every circuit wrap, which moves entries from the item grid into the fluid grid (and back, for the wraps), so
+     * that pair no longer describes this pool and both sides are the same size instead - 54 = 9 columns x 6 rows
+     * each, which keeps the page at one height while giving the fluids the room the packing needs. The circuit input
+     * takes one of the 54 item slots.
+     * {@code MTRecipeMaps#populateOneStepCircuitPoolRecipes()} logs the recipe's name and both of its counts if a
      * flattened recipe ever outgrows these limits, so that log is where the current peaks show up, not this comment.
      */
     public static final int MAX_ITEM_INPUTS = 54;
@@ -51,7 +57,6 @@ public class NanoScaleFoundry24PoolFrontend extends RecipeMapFrontend {
     private static final int BACKGROUND_WIDTH = 170;
 
     private static final int HEADER_Y = 6;
-    private static final int SPECIAL_X = 3;
     private static final int PROGRESS_X = 60;
     private static final int OUTPUT_X = 86;
     private static final int LOGO_X = 147;
@@ -63,7 +68,7 @@ public class NanoScaleFoundry24PoolFrontend extends RecipeMapFrontend {
     private static final int BLOCK_GAP = 6;
     private static final int BOTTOM_MARGIN = 6;
 
-    public NanoScaleFoundry24PoolFrontend(BasicUIPropertiesBuilder uiPropertiesBuilder,
+    public OneStepCircuitPoolFrontend(BasicUIPropertiesBuilder uiPropertiesBuilder,
         NEIRecipePropertiesBuilder neiPropertiesBuilder) {
         super(
             uiPropertiesBuilder.logo(MTRecipeMaps.MT_LOGO)
@@ -107,13 +112,13 @@ public class NanoScaleFoundry24PoolFrontend extends RecipeMapFrontend {
     @Override
     protected NEIRecipePropertiesBuilder modifyNEIProperties(NEIRecipePropertiesBuilder neiPropertiesBuilder) {
         return neiPropertiesBuilder.recipeBackgroundSize(new Size(BACKGROUND_WIDTH, backgroundHeight()))
-            .recipeComparator(NanoScaleFoundry24PoolFrontend::compareRecipes);
+            .recipeComparator(OneStepCircuitPoolFrontend::compareRecipes);
     }
 
     /**
-     * Orders the page list the way the machine's selector reads: the circuit tiers (1 Processor, 2 Assembly,
-     * 3 Supercomputer, 4 Mainframe) then the original GT ladder (5), and finally the special Pico/Quantum/Planck
-     * chains, which need no selector at all. Within one level the output name decides, so the list is stable.
+     * Orders the page list the way the machine's selector reads: the circuit ladder (1 Processor, 2 Assembly,
+     * 3 Supercomputer, 4 Mainframe, 5 the original GT ladder) and finally 6 for the special Pico/Quantum/Planck
+     * chains. Within one level the output name decides, so the list is stable.
      */
     private static int compareRecipes(GTRecipe left, GTRecipe right) {
         int byLevel = Integer.compare(selectorLevel(left), selectorLevel(right));
@@ -141,12 +146,6 @@ public class NanoScaleFoundry24PoolFrontend extends RecipeMapFrontend {
     @Override
     public List<Pos2d> getItemOutputPositions(int itemOutputCount) {
         return UIHelper.getGridPositions(itemOutputCount, OUTPUT_X, HEADER_Y, 1);
-    }
-
-    @Override
-    public Pos2d getSpecialItemPosition() {
-        // Non-consumed 1-4 selector circuit is shown as a ghost slot in the header row.
-        return new Pos2d(SPECIAL_X, HEADER_Y);
     }
 
     @Override

@@ -304,7 +304,7 @@ public class MTMachineLoader {
 
         // Populate after the machine item list is set so the NEI handler can reference the catalyst.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();
-        MTRecipeMaps.populateNanoScaleFoundry24PoolRecipes();
+        MTRecipeMaps.populateOneStepCircuitPoolRecipes();
     }
 
     /**

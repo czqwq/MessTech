@@ -71,9 +71,23 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
 
     @Override
     protected IWidget createThreadStatusWidget(PanelSyncManager syncManager) {
+        IntSyncValue machineModeSync = syncManager.findSyncHandler("machineMode", IntSyncValue.class);
+
         Flow column = Flow.column()
             .coverChildren()
             .marginTop(2);
+
+        // Mode 1 switches every thread off and runs one recipe on the machine's main thread, so the per-thread rows
+        // are hidden and this one line takes their place. The check is live, because the mode button sits right next
+        // to these rows and can be clicked while the GUI is open.
+        column.child(
+            new TextWidget<>(
+                IKey.dynamic(
+                    () -> EnumChatFormatting.GOLD
+                        + StatCollector.translateToLocal("machine.nanoscale.status.mainthread")
+                        + EnumChatFormatting.RESET)).height(10)
+                            .scale(0.7f)
+                            .setEnabledIf(w -> isMainThreadMode(machineModeSync)));
 
         int count = multiblock.getThreadCount();
         for (int i = 0; i < count; i++) {
@@ -102,10 +116,15 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
                     maxProgressTimeSync,
                     parallelSync,
                     eutSync,
-                    outputSync));
+                    outputSync).setEnabledIf(w -> !isMainThreadMode(machineModeSync)));
         }
 
         return column;
+    }
+
+    /** True while the machine runs mode 1, i.e. while its threads are all off. */
+    private static boolean isMainThreadMode(IntSyncValue machineModeSync) {
+        return machineModeSync != null && machineModeSync.getValue() == MTNanoScaleFoundry.MODE_ONE_STEP_CIRCUIT_POOL;
     }
 
     @Override
@@ -127,7 +146,7 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
             .child(createBoardTankWidget());
     }
 
-    private IWidget createThreadStatusBlock(int displayIndex, StringSyncValue nameSync, BooleanSyncValue activeSync,
+    private Flow createThreadStatusBlock(int displayIndex, StringSyncValue nameSync, BooleanSyncValue activeSync,
         IntSyncValue progressTimeSync, IntSyncValue maxProgressTimeSync, IntSyncValue parallelSync,
         LongSyncValue eutSync, StringSyncValue outputSync) {
         return Flow.column()

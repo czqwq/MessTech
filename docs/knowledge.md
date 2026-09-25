@@ -378,7 +378,7 @@ MTMultiMachineBase<T>
   outputs top right with the fluid outputs below them. With 5 item rows and 5 fluid rows the background is 170x190
   (items y = 8..80, fluids y = 98..170) and the description text is drawn below it, so the handler needs ~240.
   `MT_LOGO` is the GregTech/ModularUI flavour of the MessTech logo texture
-  (`UITexture.fullImage("messtech", "gui/picture/mt_logo")`); `NanoScaleFoundry24PoolFrontend` reuses the same
+  (`UITexture.fullImage("messtech", "gui/picture/mt_logo")`); `OneStepCircuitPoolFrontend` reuses the same
   constant. `LargeNEIFrontend` only overrides the logo *position* (80, 62), not the texture.
   The default frontend must not be used here: `UIHelper.getFluidInputPositions` pins every fluid slot to the fixed row
   y=62 while `UIHelper.getItemInputPositions` grows the item grid downward from y=6, so with a big `maxIO` (the old
@@ -579,15 +579,36 @@ MTMultiMachineBase<T>
   (output) cover, on `MUTATED_LIVING_SOLDER` (input) or `Lubricant` (output), UIV, 2 minutes. The kit is not
   retiered to the hatch's own LuV/UV tier, so the wireless upgrade is priced as a UIV build.
 
-### MTNanoScaleFoundry and the 24 pool
+### MTNanoScaleFoundry and the one-step circuit pool
 - Registered as `32411`, extends `TickableParallelismAcrossMultiMachineBase`, 3x3x3 structure.
-- 11 normal threads/circuits 1-11 map to the 11 normal NAC pools. Consuming an Astral Array from an input bus
-  (`consumeAstralArrayFromBuses()`, persisted in NBT) permanently unlocks a 12th thread
-  (`OneStepCircuitPool`, circuit 12) bound to the 24 pool, so the machine really does run those recipes
-  (`getMaxThreadCount()` = 12).
-- Binding: a controller-slot circuit (1-11) selects one active pool; with the controller slot empty,
+- 11 threads/circuits 1-11 map to the 11 normal NAC pools (`getMaxThreadCount()` = 11). The old 12th thread is gone:
+  the former "24" pool is now **machine mode 1**.
+- **Modes** (`totalMachineMode()` = 2, mode 0 is the default): consuming an Astral Array from an input bus
+  (`consumeAstralArrayFromBuses()`, persisted in NBT) unlocks mode 1, i.e. `supportsMachineModeSwitch()` returns
+  `astralArrayUnlocked`. `getGui()` only registers the MUI2 mode icons while it is true, so the mode button appears
+  and disappears with the unlock; the screwdriver (`onScrewdriverRightClick`) switches the same way. Both refuse a
+  switch while the machine is **active** (`isMachineActive()` = `IGregTechTileEntity#isActive`; GT sets that flag from
+  `mMaxProgresstime > 0` and mode 0 keeps a one-second cycle going, so a machine in mode 0 is active whenever it is
+  switched on). `setMachineMode` also refuses mode 1 without the array. Entering mode 1 **drops** whatever the
+  threads still held (`clearAllTasks()`, inputs are not refunded) instead of making the player wait for every thread
+  to finish; since a running machine never reaches that point, what gets dropped is what the threads held when the
+  machine was switched off - their tasks sit frozen there because `checkProcessing` stops ticking them. The GUI
+  refusal is silent - the icon and the `gt.interact.desc.mb.mode` / Waila running-mode lines simply keep their value -
+  while the screwdriver writes a chat line from `machine.nanoscale.*`.
+- Mode 1 disables every thread and delegates to `super.checkProcessing()`, so the machine's **main thread** runs one
+  recipe through the shared GT pipeline (`mMaxProgresstime` / `mOutputItems` / `lEUt`). `getRecipeMap()` returns the
+  one-step pool there and `canUseControllerSlotForRecipe()` is false, so the selector comes from an input bus circuit
+  slot like an independent machine. `shouldDisplayCheckRecipeResult()` is true only in mode 1.
+- GUI/Waila in mode 1: the per-thread rows and the per-thread Waila list are hidden.
+  `getWailaNBTData` writes only the `oneStepMainThread` flag, and `getWailaBody` adds one
+  `machine.nanoscale.status.mainthread` line ("机器主线程运行" / "Machine main thread running") under GT's own
+  progress bar and the "running mode" line that `MTMultiMachineBase#getWailaNBTData` writes while the mode switch is
+  supported.
+- `onWireCutterRightClick` refuses to take the Astral Array out while mode 1 is running, and a successful extraction
+  drops the machine back to mode 0 - the array is what mode 1 exists for.
+- Binding in mode 0: a controller-slot circuit (1-11) selects one active pool; with the controller slot empty,
   each input bus circuit slot can bind that bus to its own pool so several pools run simultaneously.
-- `checkProcessing()` now keeps the machine on a one-second GT cycle and calls the thread scheduler
+- `checkProcessing()` keeps mode 0 on a one-second GT cycle and calls the thread scheduler
   inside the standard `checkRecipe()` wrapper, so `startRecipeProcessing()` / `endRecipeProcessing()`
   are active for ME input buses/hatches. `lEUt` is set from running task totals so GT drains energy
   normally.
@@ -603,30 +624,50 @@ MTMultiMachineBase<T>
   tanks and `isSneaking` (the same flag AE's `WirelessDataProvider` uses for its connected-device list). Collapsed the
   body prints **one** machine-wide progress bar - the sum over the running threads through GT's
   `GTWaila.getMachineProgressString`, so it reads like any other multiblock - and sneaking expands it into the
-  per-thread lines, the board tank lines and the output item lines.
+  per-thread lines, the board tank lines and the output item lines. That whole block only exists in mode 0.
 - The 11 per-module NEI pools (`mt.recipe.nanoscale.*`, one per original NAC pool) copy GT5U's own maps 1:1,
   `maxIO` included. Four envelopes grew in GT5U 5.09.54.183 and are mirrored here: Part Processor (its ident is still
   `smdprocessor`, GT renamed the module in that version) 1/1/0/0 -> 6/4/3/0, Etching Array 2/1/2/0 -> 2/2/2/0,
   Wire Tracer 1/1/0/0 -> 2/4/0/0 and Encasement Wrapper 4/1/0/0 -> 4/1/2/0. `maxIO` is only the NEI page's envelope -
   `RecipeMapBackend#doAdd` validates the minimums, never the maximums - so a stale value mis-draws the wider recipes
-  outside the panel instead of losing them. The 24 pool flattens GT5U's own maps, not these copies, so its recipes are
-  unaffected either way.
-- `MTRecipeMaps.nanoScaleFoundry24PoolRecipes` is a separate one-step NEI pool
-  (`mt.recipe.nanoscale.pool24`, display stack = circuit 24), using the custom
-  `NanoScaleFoundry24PoolFrontend`: 9 slots per row, the 1-5 selector / progress bar / single item output / logo
-  sharing the header row, the item inputs in a 9x6 grid under it and the fluid inputs in a 9x6 grid below that.
-- `populateNanoScaleFoundry24PoolRecipes()` recursively flattens every original Assembly Matrix
+  outside the panel instead of losing them. The one-step pool flattens GT5U's own maps, not these copies, so its
+  recipes are unaffected either way.
+- `MTRecipeMaps.oneStepCircuitPoolRecipes` is the renamed one-step pool
+  (`mt.recipe.nanoscale.onestepcircuitpool`, display stack = the controller), using the custom
+  `OneStepCircuitPoolFrontend`: 9 slots per row, the progress bar / single item output / logo sharing the header row,
+  the item inputs in a 9x6 grid under it and the fluid inputs in a 9x6 grid below that. The selector circuit is a
+  normal recipe input now, so there is no special slot any more.
+- The pool's recipes are registered as **fake** recipes (`addFakeRecipe`): `RecipeMapBackend#filterFindRecipe` and
+  `GTRecipeLookupBuilder#add` both skip `mFakeRecipe`, which is what keeps pages with up to 54 item + 54 fluid inputs
+  out of `GTRecipeLookup`. Mode 1 therefore resolves its own match: `createProcessingLogic()` overrides
+  `findRecipeMatches(map)` and scans `oneStepCircuitPoolRecipes.getAllRecipes()` with
+  `GTRecipe#isRecipeInputEqual(false, false, inputFluids, inputItems)`, then hands the winner to the shared pipeline -
+  the same shape `MTAssFactory` uses for its Assembly Line definitions, so parallels, overclock, void protection, ME
+  buses and the input consumption stay GT's code. `findRecipeQuery` never sees these recipes.
+- `populateOneStepCircuitPoolRecipes()` recursively flattens every original Assembly Matrix
   recipe through Assembly Matrix + all module pools down to `CircuitComponent.realComponent` real
   inputs. It keeps the whole Crystal/Wetware/Bio/Optical line (Processor/Assembly/Supercomputer/
   Mainframe) plus the independent special circuits Pico/Quantum/Planck.
   Board Processor fluid inputs are removed (machine-internal/NEI display only); other module fluids and
   Assembly Matrix fluids are kept; duplicate item/fluid inputs are merged and recipes are deduplicated.
-- `packMaterialInputs()` then packs the raw material components: bolts, plates, fine wires, screws and foils become
-  the same material's molten fluid (a bolt, a fine wire or a screw is `M / 8` = 18 mB, a foil is `M / 4` = 36 mB, a
-  plate is `M * 1` = 144 mB, converted with `prefix.getMaterialAmount() * INGOTS / GTValues.M`), and 1x wires become
-  16x wires 16:1 with any remainder left as 1x. Both keep the material amount identical
-  (`16 x 1x wire == 1 x 16x wire`), and same-material entries merge into one fluid. No molten form means the item is
-  kept as is.
+- `packMaterialInputs()` then packs the raw material components. `MOLTEN_PREFIXES` = `bolt`, `foil`,
+  `frameGt`, `itemCasing`, `plate`, `screw`, `wireFine` become the same material's molten fluid (a bolt, a fine wire
+  or a screw is `M / 8` = 18 mB, a foil `M / 4` = 36 mB, a casing `M / 2` = 72 mB, a plate `M * 1` = 144 mB, a
+  frame box `M * 2` = 288 mB, converted with `prefix.getMaterialAmount() * INGOTS / GTValues.M`). The wire rule is
+  separate: a 1x wire only becomes a 16x wire (16:1, remainder left as 1x) when its material name starts with
+  `Superconductor` - the `CircuitComponent` entries SuperconductorLuV..UMV - and every other wire melts instead, which
+  is what the NAC chains' SpaceTime (时空) and Infinity (无尽) wires do. `packChips()` then wraps every part GT has a
+  wrap for: it walks `bartworks.system.material.CircuitGeneration.CircuitWraps#VALUES` (chip -> wrap, cached in
+  `chipWraps`), so 16 of any wrapped part - RAM/NOR/NAND chips, the CPUs, the circuit boards, the SMD parts - become
+  one wrap plus `1 * HALF_INGOTS` = 72 mB molten polyethylene, i.e. exactly what GT's own assembler recipe for a wrap
+  spends (`CircuitWraps#registerWrapRecipe`: 16 parts + circuit 16 + 1 * HALF_INGOTS molten polyethylene; the circuit
+  is that recipe's selector and the machine's own circuit slot already carries the pool selector, so it is not
+  repeated). Each pack keeps the material amount identical (`16 x 1x wire == 1 x 16x wire`, wrap = 16 parts + the
+  polyethylene), same-material entries merge into one fluid, and a remainder keeps its item form. No molten form means
+  the item is kept as is.
+  `populateOneStepCircuitPoolRecipes()` builds `chipWraps` first and defers the whole build while that table is empty
+  (GT registers the wraps during its postload), so the server-started fallback builds the pool with the wraps in place
+  instead of baking plain chips into every page.
   Material lookup goes through `GTOreDictUnificator.getAssociation()` first; GT++ materials (Rhugnor, Quantum,
   AstralTitanium, ...) are **not** GT `Materials` and their items carry no `ItemData`, so `moltenOfName()` falls
   back to parsing the ore dictionary name (`boltRhugnor`, `screwQuantum`) and resolves it through `Materials.get()`
@@ -636,24 +677,23 @@ MTMultiMachineBase<T>
   sorted by display name - so a whole part family (both RAM chips, every superconductor wire, every board) is
   adjacent instead of one chip landing in slot 1 and the next family member in slot 10 - then by ore dictionary
   signature, item and amount for determinism. Fluids sort by localized name.
-- The NEI page list is ordered by `recipeComparator`: selector levels 1-4 (Processor/Assembly/Supercomputer/
-  Mainframe), then 5, then the level-0 special Pico/Quantum/Planck chains last.
-- The selector is 1-5: `getOneStepCircuitLevel()` returns 5 for `CircuitCalibration.PRIMITIVE`, i.e. the original GT
-  circuit ladder (Nand chip / Microprocessor / IntegratedProcessor / NanoProcessor / QuantumProcessor) that the
-  primitive line makes, so it no longer collides with the "Processor" name match of level 1. The level is written as
-  a ghost integrated circuit in NEI and enforced by `MTNanoScaleFoundry.checkRecipe` (circuits 1-5 in bus slots).
+- The NEI page list is ordered by `recipeComparator`: selector levels 1-5 (Processor/Assembly/Supercomputer/
+  Mainframe, then the original GT ladder), with the level-6 special Pico/Quantum/Planck chains last.
+- The selector is 1-6, and every flattened recipe carries it as a real `GTRecipeBuilder.circuit(n)` input, so the
+  machine matches it the way any GT machine matches its circuit: the bus circuit slot satisfies the input and the bus
+  never consumes its own circuit slot. `getOneStepCircuitLevel()` returns 5 for `CircuitCalibration.PRIMITIVE` (the
+  original GT circuit ladder: Nand chip / Microprocessor / IntegratedProcessor / NanoProcessor / QuantumProcessor) and
+  `MTRecipeMaps.ONE_STEP_SPECIAL_CIRCUIT_LEVEL` (= 6) for the special independent chains.
 - Measured max IO before packing: 61 distinct item inputs / 24 distinct fluid inputs (PlanckCircuit, after the
   producer lookup learned to follow every output slot of a multi-output module recipe). Packing moves entries from
   the item grid into the fluid grid, so the map is declared as `maxIO(54, 1, 54, 0)` = 9x6 item rows + 9x6 fluid
   rows; the even split keeps the page height at 254 while both sides have room. Those 61/24 were measured with
   packing switched off and do not describe the pool any more - the post-packing peaks are nowhere recorded, which is
-  fine because only the capacity matters.
-  `NanoScaleFoundry24PoolFrontend` owns those constants - `maxIO`, every slot position, the recipe background
-  (170x254) and the NEI panel height are all derived from them - and `populateNanoScaleFoundry24PoolRecipes()` logs
+  fine because only the capacity matters. The circuit input takes one of the 54 item slots.
+  `OneStepCircuitPoolFrontend` owns those constants - `maxIO`, every slot position, the recipe background
+  (170x254) and the NEI panel height are all derived from them - and `populateOneStepCircuitPoolRecipes()` logs
   the recipe's name with both counts if a flattened recipe ever grows past the capacity, so that warning is the only
   place a current peak shows up.
-- The 24 pool runs for real once circuit 12 is unlocked: `checkRecipe` matches the flattened recipes against
-  the machine's buses and overclocks them like any other thread.
 
 ### Ultimate Pattern Terminal (终极样板编码终端)
 - An AE **cable part**, not a block: `PartUltimatePatternTerminal extends PartPatternTerminalEx` (AE's extended
@@ -665,7 +705,8 @@ MTMultiMachineBase<T>
   `DireCraftPattern` item, the mode button and the two NEI overlay entries are all gone: none of them belongs to the
   terminal this is a copy of.
 - The one deliberate difference from AE's part is the **input** grid: 4x4 x `INPUT_PAGES` (8) = 128 cells instead of
-  AE's 4x4 x 2 = 32, which is what the Nano-Scale Foundry "24" pool (up to 54 item plus 54 fluid inputs) needs. The
+  AE's 4x4 x 2 = 32, which is what the Nano-Scale Foundry one-step circuit pool (up to 54 item plus 54 fluid
+  inputs) needs. The
   **outputs** keep AE's own 4x4 x 2 = 32 cells and AE's own placement. The inverted flag and the active page are kept
   on the part instead of using AE's fields, because `PartPatternTerminalEx#setInverted` clears every input cell past
   what the inverted layout shows and this terminal has four times as many.
@@ -711,7 +752,8 @@ MTMultiMachineBase<T>
   stays
   `UltimatePatternTerminal`. An existing world loses the old block - there is no migration.
 - NEI: `NEI_MessTechConfig` makes **every GT machine recipe page** transferable into this terminal - the Nano-Scale
-  Foundry "24" pool is one of them - by walking `RecipeCategory.ALL_RECIPE_CATEGORIES` and taking the categories whose
+  Foundry one-step circuit pool is one of them - by walking `RecipeCategory.ALL_RECIPE_CATEGORIES` and taking the
+  categories whose
   frontend registers NEI pages, exactly like NotEnoughEnergistics picks the idents it serves. Each one gets both
   `API.registerGuiOverlay` (NEI draws that page over this GUI; `RecipeInfo` looks the pair up by the GUI's exact class
   and the page's unlocalized name) and `API.registerGuiOverlayHandler` (the transfer button). A page whose ident is not
@@ -729,8 +771,7 @@ MTMultiMachineBase<T>
   the terminal's pages are four cells wide while a GT page's panels are much wider, so a position-for-position copy
   would scatter a handful of ingredients over pages of empty cells. Which stacks count as ingredients is asked of GT
   itself (`PatternImportOverlayHandler#isIngredient`): every item and fluid input of a GT NEI page is a
-  `GTNEIDefaultHandler.FixedPositionedStack` built with `isInput` true, while outputs and the "24" pool's non-consumed
-  selector circuit - drawn as a ghost in that page's header row, outside both panels - are built with it false. Of the
+  `GTNEIDefaultHandler.FixedPositionedStack` built with `isInput` true, while outputs are built with it false. Of the
   inputs, `isNotConsumed()` keeps the "required but not consumed" ones out (a mold, a programming circuit ...), which
   GT itself marks with a zero size or amount: a pattern holding them would consume them. NEU makes the same choice by
   default for the AE terminals it serves.
@@ -840,7 +881,8 @@ MTMultiMachineBase<T>
     `AGENTS.md`.)
 12. An item **count** never travels in a vanilla `ItemStack` NBT tag: 1.7.10 writes `Count` as a byte and reads it
     back as one, so anything outside -128..127 comes out as a different number (1024 and 4096 both become 0). GTNH
-    recipes do use those amounts - the Nano-Scale Foundry "24" pool has 1024-count and 4096-count inputs - so any
+    recipes do use those amounts - the Nano-Scale Foundry one-step circuit pool has 1024-count and 4096-count
+    inputs - so any
     client to server transfer of stacks carries the count in its own `long` tag next to the vanilla NBT
     (`PatternImportHandler#writeCell`/`#readCell`, the same thing NotEnoughEnergistics does in
     `ItemUtils#writeItemStackToNBT`/`#loadItemStackFromNBT`). AE's own NBT is not affected: it writes the real size

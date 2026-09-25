@@ -131,7 +131,7 @@ public class CommonProxy implements IGuiHandler {
     public void serverStarted(FMLServerStartedEvent event) {
         // Fallback in case GT5U's NAC pools are only populated after MessTech postInit.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();
-        MTRecipeMaps.populateNanoScaleFoundry24PoolRecipes();
+        MTRecipeMaps.populateOneStepCircuitPoolRecipes();
         // BEC recipes are registered by GT5U's postload recipe loader.
         MTRecipeMaps.populateBosesCraftingArrayRecipes();
         // The QFT pool is filled while the GT recipe loaders run, i.e. possibly after our postInit.

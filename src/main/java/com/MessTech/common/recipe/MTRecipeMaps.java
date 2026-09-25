@@ -26,6 +26,7 @@ import com.MessTech.common.items.MTNACComponentItems;
 import com.MessTech.init.MessTech;
 import com.gtnewhorizons.modularui.api.drawable.UITexture;
 
+import bartworks.system.material.CircuitGeneration.CircuitWraps;
 import gregtech.api.enums.CondensateType;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.ItemList;
@@ -69,13 +70,21 @@ public final class MTRecipeMaps {
     private MTRecipeMaps() {}
 
     /**
-     * Optional 1-4 circuit selector for the 24 one-step pool.
+     * Selector level of one recipe in the one-step circuit pool, also used to order the NEI page list.
      * <p>
-     * 1 = Processor, 2 = Processor Cluster/Assembly, 3 = Supercomputer/Computer,
-     * 4 = Mainframe. Special independent circuits (Piko/Quantum/Planck etc.) have level 0.
+     * 1 = Processor, 2 = Processor Cluster/Assembly, 3 = Supercomputer/Computer, 4 = Mainframe,
+     * 5 = the primitive GT circuit ladder, 6 = the special independent circuits (Pico/Quantum/Planck etc.).
+     * Every flattened recipe carries its level as a real {@code GTRecipeBuilder#circuit(int)} input, so the level
+     * is both the NEI ordering key and the circuit the machine has to find in an input bus.
      */
     public static final RecipeMetadataKey<Integer> ONE_STEP_CIRCUIT_LEVEL = SimpleRecipeMetadataKey
         .create(Integer.class, "mt_onestep_circuit_level");
+
+    /**
+     * Circuit of the special independent chains (Pico/Quantum/Planck) in the one-step circuit pool. The tier ladder
+     * uses 1-5, so the chains that have no tier of their own take the next number.
+     */
+    public static final int ONE_STEP_SPECIAL_CIRCUIT_LEVEL = 6;
 
     /**
      * Minimum structure level a Chemical Twister recipe needs, as
@@ -507,28 +516,34 @@ public final class MTRecipeMaps {
     }
 
     /**
-     * Independent one-step NEI pool for the future "24" Nano-Scale Foundry mode. Not used by the
-     * multiblock yet; this map only shows the direct real-item -> real-circuit recipes that would
-     * otherwise require a chain of NAC packets/modules.
+     * Independent one-step pool of the Nano-Scale Foundry's "one-step circuit pool" machine mode (the old "24" pool).
+     * It holds the direct real-item -> real-circuit recipes that would otherwise require a chain of NAC
+     * packets/modules, and every recipe carries its selector circuit as a real input.
      * <p>
-     * The slot limits and the NEI grid come from {@link NanoScaleFoundry24PoolFrontend}, so the two can never
+     * The recipes are registered as <b>fake</b> recipes: they are NEI pages first and foremost, and a real recipe with
+     * up to 54 item plus 54 fluid inputs would make {@code GTRecipeLookup} index every input alternative of every
+     * page. {@link com.MessTech.common.machine.MTNanoScaleFoundry} therefore resolves the matching page itself in its
+     * mode 1 processing logic (the same shape {@code MTAssFactory} uses for its Assembly Line definitions) and hands
+     * the winning recipe to the shared GT pipeline, so parallels, overclock, void protection, ME buses and the input
+     * consumption stay the shared code. Since the recipes are fake, {@code findRecipeQuery} never sees them.
+     * <p>
+     * The slot limits and the NEI grid come from {@link OneStepCircuitPoolFrontend}, so the two can never
      * disagree. The Planck chain is the widest recipe: it measured 61 item inputs and 24 fluid inputs before
      * {@link #packMaterialInputs} moved the raw material parts into the fluid grid, which is why the map declares an
      * even 54 item / 54 fluid split instead of those numbers.
      */
-    public static final RecipeMap<RecipeMapBackend> nanoScaleFoundry24PoolRecipes = RecipeMapBuilder
-        .of("mt.recipe.nanoscale.pool24")
+    public static final RecipeMap<RecipeMapBackend> oneStepCircuitPoolRecipes = RecipeMapBuilder
+        .of("mt.recipe.nanoscale.onestepcircuitpool")
         .maxIO(
-            NanoScaleFoundry24PoolFrontend.MAX_ITEM_INPUTS,
-            NanoScaleFoundry24PoolFrontend.MAX_ITEM_OUTPUTS,
-            NanoScaleFoundry24PoolFrontend.MAX_FLUID_INPUTS,
-            NanoScaleFoundry24PoolFrontend.MAX_FLUID_OUTPUTS)
+            OneStepCircuitPoolFrontend.MAX_ITEM_INPUTS,
+            OneStepCircuitPoolFrontend.MAX_ITEM_OUTPUTS,
+            OneStepCircuitPoolFrontend.MAX_FLUID_INPUTS,
+            OneStepCircuitPoolFrontend.MAX_FLUID_OUTPUTS)
         .minInputs(0, 0)
-        .useSpecialSlot()
-        .frontend(NanoScaleFoundry24PoolFrontend::new)
+        .frontend(OneStepCircuitPoolFrontend::new)
         .neiHandlerInfo(
             builder -> builder.setDisplayStack(MTItemList.MTNanoScaleFoundry.get(1))
-                .setHeight(NanoScaleFoundry24PoolFrontend.handlerHeight()))
+                .setHeight(OneStepCircuitPoolFrontend.handlerHeight()))
         .build();
 
     /**
@@ -610,38 +625,48 @@ public final class MTRecipeMaps {
     }
 
     /**
-     * Populates the separate 24 pool from every original NAC Assembly Matrix recipe. Each recipe is
+     * Populates the separate one-step circuit pool from every original NAC Assembly Matrix recipe. Each recipe is
      * recursively flattened through Assembly Matrix and the module pools into a single
      * real-item-input -> real-circuit-output recipe. Board Processor immersion fluids are display-only
      * in its own NEI and are not real recipe consumption, so they are omitted here.
      * <p>
-     * Duration/EUt are intentionally only informative until the 24 machine mode is implemented:
-     * duration is the sum of expanded steps and EU/t is the maximum expanded step EU/t.
+     * Duration/EUt are the real values the machine mode runs with: duration is the sum of expanded steps and
+     * EU/t is the maximum expanded step EU/t.
      */
-    public static void populateNanoScaleFoundry24PoolRecipes() {
-        if (!nanoScaleFoundry24PoolRecipes.getAllRecipes()
+    public static void populateOneStepCircuitPoolRecipes() {
+        if (!oneStepCircuitPoolRecipes.getAllRecipes()
             .isEmpty()) {
+            return;
+        }
+        // GT registers its circuit wraps (bartworks' CircuitWraps) during its own postload, which can happen after
+        // the first call to this method. Building the pool before that would bake plain chips into every page
+        // instead of the wraps, so leave it empty and let the next call - the server-started fallback - build it.
+        chipWraps = buildChipWraps();
+        if (chipWraps.isEmpty()) {
+            MessTech.MT_LOG.info(
+                "Nano-Scale Foundry one-step circuit pool: GT circuit wraps are not registered yet, deferring the pool");
             return;
         }
 
         List<GTRecipe> generated = new ArrayList<>();
         for (GTRecipe assembly : RecipeMaps.nanochipAssemblyMatrixRecipes.getAllRecipes()) {
-            GTRecipe flat = flattenAssemblyTo24Pool(assembly);
+            GTRecipe flat = flattenAssemblyToOneStepPool(assembly);
             if (flat == null) continue;
             warnIfWiderThanPool(flat);
             generated.add(flat);
         }
 
-        RecipeCategory defaultCategory = nanoScaleFoundry24PoolRecipes.getDefaultRecipeCategory();
+        RecipeCategory defaultCategory = oneStepCircuitPoolRecipes.getDefaultRecipeCategory();
         Set<String> seen = new HashSet<>();
         for (GTRecipe recipe : generated) {
             String signature = recipeSignature(recipe);
             if (!seen.add(signature)) continue;
             recipe.setRecipeCategory(defaultCategory);
-            // This pool is currently NEI-only (the 24 machine mode is not implemented), so add it as a
-            // fake recipe. Real recipes with up to ~64 inputs would make GTRecipeLookup expand every
-            // input alternative/unification branch exponentially and hang world load.
-            nanoScaleFoundry24PoolRecipes.addFakeRecipe(false, recipe);
+            // Fake on purpose: this map is an NEI page envelope first, and GTRecipeLookup must not index
+            // recipes with up to ~54 item + 54 fluid inputs (every input alternative/unification branch of
+            // every page). MTNanoScaleFoundry resolves these pages itself in mode 1 and feeds the winner to
+            // the shared processing pipeline, so nothing here has to be findable by findRecipeQuery.
+            oneStepCircuitPoolRecipes.addFakeRecipe(false, recipe);
         }
     }
 
@@ -710,29 +735,56 @@ public final class MTRecipeMaps {
     private static void warnIfWiderThanPool(GTRecipe recipe) {
         int itemInputs = recipe.mInputs == null ? 0 : recipe.mInputs.length;
         int fluidInputs = recipe.mFluidInputs == null ? 0 : recipe.mFluidInputs.length;
-        if (itemInputs <= NanoScaleFoundry24PoolFrontend.MAX_ITEM_INPUTS
-            && fluidInputs <= NanoScaleFoundry24PoolFrontend.MAX_FLUID_INPUTS) {
+        if (itemInputs <= OneStepCircuitPoolFrontend.MAX_ITEM_INPUTS
+            && fluidInputs <= OneStepCircuitPoolFrontend.MAX_FLUID_INPUTS) {
             return;
         }
         String output = recipe.mOutputs != null && recipe.mOutputs.length > 0 && recipe.mOutputs[0] != null
             ? recipe.mOutputs[0].getDisplayName()
             : "unknown";
         MessTech.MT_LOG.warn(
-            "Nano-Scale Foundry 24 pool: the flattened recipe for {} needs {} item inputs and {} fluid inputs, "
-                + "more than the pool allows ({} / {}). Raise the MAX_* constants in NanoScaleFoundry24PoolFrontend.",
+            "Nano-Scale Foundry one-step circuit pool: the flattened recipe for {} needs {} item inputs and {} "
+                + "fluid inputs, more than the pool allows ({} / {}). Raise the MAX_* constants in "
+                + "OneStepCircuitPoolFrontend.",
             output,
             itemInputs,
             fluidInputs,
-            NanoScaleFoundry24PoolFrontend.MAX_ITEM_INPUTS,
-            NanoScaleFoundry24PoolFrontend.MAX_FLUID_INPUTS);
+            OneStepCircuitPoolFrontend.MAX_ITEM_INPUTS,
+            OneStepCircuitPoolFrontend.MAX_FLUID_INPUTS);
     }
 
-    /** Prefixes that this pool shows as molten material instead of as items. */
-    private static final List<OrePrefixes> MOLTEN_PREFIXES = Arrays
-        .asList(OrePrefixes.bolt, OrePrefixes.plate, OrePrefixes.wireFine, OrePrefixes.screw, OrePrefixes.foil);
+    /**
+     * Prefixes that this pool shows as molten material instead of as items. {@code itemCasing} and {@code frameGt} are
+     * the casings and frame boxes the NAC components ask for (see {@code CircuitComponent#CasingUEVSuperconductor}),
+     * which are raw material in every way that matters here.
+     */
+    private static final List<OrePrefixes> MOLTEN_PREFIXES = Arrays.asList(
+        OrePrefixes.bolt,
+        OrePrefixes.foil,
+        OrePrefixes.frameGt,
+        OrePrefixes.itemCasing,
+        OrePrefixes.plate,
+        OrePrefixes.screw,
+        OrePrefixes.wireFine);
 
     /** 16 x 1x wire holds the same material as 1 x 16x wire, so the two are interchangeable. */
     private static final int WIRE_PACK_SIZE = 16;
+
+    /**
+     * A 1x wire only stays an item when its material is a superconductor - the {@code CircuitComponent} entries
+     * SuperconductorLuV..UMV - because that is where the 16x form is the meaningful one. Every other wire melts into
+     * its material's fluid instead; SpaceTime (时空) and Infinity (无尽) are the two the NAC chains use.
+     */
+    private static final String SUPERCONDUCTOR_MATERIAL_PREFIX = "Superconductor";
+
+    /** 16 identical circuit chips are one GT circuit wrap, see {@link #packChips}. */
+    private static final int CHIP_PACK_SIZE = 16;
+
+    /** {@code CircuitWraps#registerWrapRecipe} spends 1 * HALF_INGOTS molten polyethylene on every wrap. */
+    private static final int CHIP_WRAP_POLYETHYLENE = GTRecipeBuilder.HALF_INGOTS;
+
+    /** Chip -> wrap table of GT's circuit wraps, filled by {@link #populateOneStepCircuitPoolRecipes()}. */
+    private static Map<GTUtility.ItemId, ItemStack> chipWraps;
 
     /** Result of {@link #packMaterialInputs}: the surviving items plus the fluids they turned into. */
     private static final class PackedInputs {
@@ -747,19 +799,24 @@ public final class MTRecipeMaps {
     }
 
     /**
-     * Packs the raw material components of a flattened recipe: bolts, plates, fine wires, screws and foils become the
-     * molten fluid of their material, and 1x wires are re-expressed as 16x wires 16:1. Both keep the material amount
-     * identical - a bolt, a fine wire or a screw is an eighth of an ingot, a foil is a quarter, a plate is one ingot,
-     * and a 16x wire is exactly sixteen 1x wires - so the recipe costs the same while the NEI page needs far fewer
-     * slots. Entries that share a material merge, because they all become the same fluid. Anything without an ore
-     * dictionary association, and anything whose material has no molten form, stays an item; a 1x wire count that is
-     * not a multiple of 16 keeps its remainder as 1x wires rather than rounding the material amount up.
+     * Packs the raw material components of a flattened recipe: bolts, plates, fine wires, screws, foils, casings and
+     * frame boxes become the molten fluid of their material, superconductor 1x wires are re-expressed as 16x wires
+     * 16:1, and circuit chips and parts become GT's circuit wrap 16:1 with the wrap's own molten polyethylene. That
+     * keeps the
+     * material amount identical - a bolt, a fine wire or a screw is an eighth of an ingot, a foil is a quarter, a
+     * casing is a half, a plate is one, a frame box is two, a 16x wire is exactly sixteen 1x wires, and a wrap is
+     * sixteen parts plus one half ingot of polyethylene - so the recipe costs the same while the NEI page needs far
+     * fewer slots. Entries that share a material merge, because they all become the same fluid.
+     * Anything without an ore dictionary association, and anything whose material has no molten form, stays an item;
+     * a count that is not a multiple of its pack size keeps its remainder as items rather than rounding the material
+     * amount up.
      */
     private static PackedInputs packMaterialInputs(ItemStack[] stacks) {
         List<ItemStack> items = new ArrayList<>(stacks.length);
         List<FluidStack> fluids = new ArrayList<>();
         for (ItemStack stack : stacks) {
             if (stack == null || stack.stackSize <= 0) continue;
+            if (packChips(stack, items, fluids)) continue;
             ItemData data = GTOreDictUnificator.getAssociation(stack);
             OrePrefixes prefix = data == null ? null : data.mPrefix;
             Materials material = data == null || data.mMaterial == null ? null : data.mMaterial.mMaterial;
@@ -781,23 +838,97 @@ public final class MTRecipeMaps {
                     fluids.add(molten);
                     continue;
                 }
-            } else if (prefix == OrePrefixes.wireGt01 && stack.stackSize >= WIRE_PACK_SIZE) {
-                ItemStack packed = GTOreDictUnificator
-                    .get(OrePrefixes.wireGt16, material, stack.stackSize / WIRE_PACK_SIZE);
-                if (packed != null && packed.stackSize > 0) {
-                    items.add(packed);
-                    int rest = stack.stackSize % WIRE_PACK_SIZE;
-                    if (rest > 0) {
-                        ItemStack leftover = stack.copy();
-                        leftover.stackSize = rest;
-                        items.add(leftover);
+            } else if (prefix == OrePrefixes.wireGt01) {
+                if (!isSuperconductor(material)) {
+                    // A non-superconductor wire (SpaceTime, Infinity) is worth less than the 16x form it would
+                    // become, so it melts into its material's fluid like the other raw parts do.
+                    FluidStack molten = material.getMolten(materialAmount(prefix, stack.stackSize));
+                    if (molten != null) {
+                        fluids.add(molten);
+                        continue;
                     }
-                    continue;
+                } else if (stack.stackSize >= WIRE_PACK_SIZE) {
+                    ItemStack packed = GTOreDictUnificator
+                        .get(OrePrefixes.wireGt16, material, stack.stackSize / WIRE_PACK_SIZE);
+                    if (packed != null && packed.stackSize > 0) {
+                        items.add(packed);
+                        int rest = stack.stackSize % WIRE_PACK_SIZE;
+                        if (rest > 0) {
+                            ItemStack leftover = stack.copy();
+                            leftover.stackSize = rest;
+                            items.add(leftover);
+                        }
+                        continue;
+                    }
                 }
             }
             items.add(stack);
         }
         return new PackedInputs(items.toArray(new ItemStack[0]), fluids.toArray(new FluidStack[0]));
+    }
+
+    /**
+     * Packs circuit chips and parts into GT's circuit wraps: 16 identical items become one wrap plus the wrap's own
+     * molten polyethylene. GT's assembler recipe for a wrap is
+     * {@code 16 parts + circuit 16 + 1 * HALF_INGOTS molten polyethylene -> 1 wrap}
+     * ({@code bartworks.system.material.CircuitGeneration.CircuitWraps#registerWrapRecipe}), so the page then costs
+     * exactly what the assembled wrap costs. The assembler's circuit 16 is a recipe selector rather than a material,
+     * and this machine's own circuit slot carries the pool selector, so it is not added here.
+     * <p>
+     * A count that is not a multiple of 16 keeps its remainder as plain items, and an item GT has no wrap for is left
+     * alone instead of being dropped.
+     *
+     * @return true when the stack was packed here.
+     */
+    private static boolean packChips(ItemStack stack, List<ItemStack> items, List<FluidStack> fluids) {
+        if (stack.stackSize < CHIP_PACK_SIZE) return false;
+        ItemStack wrap = chipWrapFor(stack);
+        if (wrap == null) return false;
+
+        int wraps = stack.stackSize / CHIP_PACK_SIZE;
+        ItemStack packed = wrap.copy();
+        packed.stackSize = wraps;
+        items.add(packed);
+        FluidStack polyethylene = Materials.Polyethylene.getMolten((long) CHIP_WRAP_POLYETHYLENE * wraps);
+        if (polyethylene != null) {
+            fluids.add(polyethylene);
+        }
+        int rest = stack.stackSize % CHIP_PACK_SIZE;
+        if (rest > 0) {
+            ItemStack leftover = stack.copy();
+            leftover.stackSize = rest;
+            items.add(leftover);
+        }
+        return true;
+    }
+
+    /**
+     * Walks GT's own wrap list - every entry of {@code CircuitWraps#VALUES}, from the RAM and NOR chips over the
+     * CPUs to the circuit boards and the SMD parts - so the pool follows GT whenever that list grows. Wraps whose
+     * source item is not registered yet are skipped by GT itself ({@code CircuitWraps#registerWrap} logs and leaves
+     * the wrap unset); the deferral in {@link #populateOneStepCircuitPoolRecipes()} makes sure this runs after GT has
+     * registered them, see {@link #chipWraps}.
+     */
+    private static Map<GTUtility.ItemId, ItemStack> buildChipWraps() {
+        Map<GTUtility.ItemId, ItemStack> wraps = new HashMap<>();
+        for (CircuitWraps wrap : CircuitWraps.VALUES) {
+            if (!wrap.itemSingle.hasBeenSet() || !wrap.itemWrap.hasBeenSet()) continue;
+            ItemStack single = wrap.itemSingle.get(1);
+            ItemStack wrapped = wrap.itemWrap.get(1);
+            if (single == null || single.getItem() == null || wrapped == null || wrapped.getItem() == null) continue;
+            wraps.put(GTUtility.ItemId.create(single), wrapped);
+        }
+        return wraps;
+    }
+
+    /** GT's wrap of the given part, or null when it has none. */
+    private static ItemStack chipWrapFor(ItemStack stack) {
+        return chipWraps == null ? null : chipWraps.get(GTUtility.ItemId.create(stack));
+    }
+
+    /** Whether the material is one of GT's superconductors, see {@link #SUPERCONDUCTOR_MATERIAL_PREFIX}. */
+    private static boolean isSuperconductor(Materials material) {
+        return material != null && material.mName != null && material.mName.startsWith(SUPERCONDUCTOR_MATERIAL_PREFIX);
     }
 
     /** Ore dictionary name of a packed prefix, split into the prefix itself and the material name behind it. */
@@ -905,7 +1036,7 @@ public final class MTRecipeMaps {
             + stack.getItemDamage();
     }
 
-    private static GTRecipe flattenAssemblyTo24Pool(GTRecipe assembly) {
+    private static GTRecipe flattenAssemblyToOneStepPool(GTRecipe assembly) {
         if (assembly == null || assembly.mOutputs == null || assembly.mOutputs.length == 0) return null;
 
         CircuitComponent outputComponent = getNACComponent(assembly.mOutputs[0]);
@@ -952,34 +1083,36 @@ public final class MTRecipeMaps {
         int duration = (int) Math.min(Integer.MAX_VALUE, Math.max(1, ctx.duration));
         int eut = (int) Math.min(Integer.MAX_VALUE, Math.max(1, ctx.maxEUt));
 
+        // The selector is a real recipe input, exactly like a normal GT machine's circuit: the machine reads it
+        // from an input bus circuit slot, and the bus never consumes its own circuit slot, so it stays there.
         GTRecipeBuilder builder = GTRecipeBuilder.builder()
             .itemInputs(itemInputs)
+            .circuit(circuitLevel)
             .itemOutputs(new ItemStack[] { output })
             .fluidInputs(fluidInputs)
             .duration(duration)
             .eut(eut)
             .metadata(ONE_STEP_CIRCUIT_LEVEL, circuitLevel);
-        // Show the required non-consumed selector as a ghost/special slot in NEI. It is not part of
-        // mInputs, so it never affects real recipe matching, parallel calculations or consumption.
-        if (circuitLevel >= 1 && circuitLevel <= 5) {
-            builder.special(GTUtility.getIntegratedCircuit(circuitLevel));
-        }
         return builder.build()
             .orElse(null);
     }
 
+    /**
+     * The circuit one flattened recipe asks for: the tier ladder 1-5, or {@link #ONE_STEP_SPECIAL_CIRCUIT_LEVEL}
+     * for the special independent chains (Pico/Quantum/Planck), which have no tier of their own.
+     */
     private static int getOneStepCircuitLevel(CircuitComponent component) {
-        if (component == null) return 0;
+        if (component == null) return ONE_STEP_SPECIAL_CIRCUIT_LEVEL;
         // The primitive line is the original GT circuit ladder (Nand chip / Microprocessor / IntegratedProcessor /
         // NanoProcessor / QuantumProcessor), so it gets the selector value 5 instead of falling into the
-        // "Processor" name match below - see MTNanoScaleFoundry's 1-5 selector.
+        // "Processor" name match below.
         if (component.circuitType == CircuitCalibration.PRIMITIVE) return 5;
         String name = component.name();
         if (name.contains("Mainframe")) return 4;
         if (name.contains("Computer")) return 3;
         if (name.contains("Assembly")) return 2;
         if (name.contains("Processor")) return 1;
-        return 0;
+        return ONE_STEP_SPECIAL_CIRCUIT_LEVEL;
     }
 
     /**
