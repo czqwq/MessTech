@@ -80,7 +80,9 @@
 | 最低液位 | 必须 ≥ `50%` |
 | 杂质范围 | 运行会逐渐增加 impurity |
 | 默认自动排出阈值 | `100%`（可在 GUI 调） |
-| 支持浸没液 | FeCl3 / Sterilized Growth Medium / Sterilized Bio Medium / Prismatic Acid |
+| 支持浸没液 | FeCl3 / Sterilized Growth Medium / Sterilized Bio Medium / Prismatic Acid / **UU-Matter**（5.09.54.183 新增，type 5） |
+| 杂质产物 | ferrous chloride / Growth Medium (Raw) / Bio Medium (Raw) / Prismatic Gas / **UU-Amplifier** |
+| 排出量 | Prismatic Gas 只排出 `1/4`，其余液体全额排出 |
 
 ### EU 倍率公式（按 impurity y，0~1）
 

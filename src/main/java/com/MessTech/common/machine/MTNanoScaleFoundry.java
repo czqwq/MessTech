@@ -859,8 +859,41 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         return thread == null ? null : boardTanks.get(thread.getName());
     }
 
+    /**
+     * The immersion fluids the Board Processor accepts, in the order GT5U's {@code BoardProcessingModuleFluidKey}
+     * numbers them: {@code MTEBoardProcessorModule#LEGAL_FLUIDS}, which gained UU-Matter as type 5 in 5.09.54.183. The
+     * machine keeps one tank per type, so it can be fed any of them without swapping what is inside.
+     */
+    private static final Materials[] BOARD_TANK_FLUIDS = { Materials.IronIIIChloride, Materials.GrowthMediumSterilized,
+        Materials.BioMediumSterilized, Materials.PrismaticAcid, Materials.UUMatter };
+
     public int getBoardTankTypeCount() {
-        return 4;
+        return BOARD_TANK_FLUIDS.length;
+    }
+
+    /** The immersion fluid a tank of {@code type} takes, or null for a type that does not exist. */
+    private static FluidStack boardTankFluid(int type) {
+        return type >= 1 && type <= BOARD_TANK_FLUIDS.length ? BOARD_TANK_FLUIDS[type - 1].getFluid(0) : null;
+    }
+
+    /** 1-based type of an immersion fluid, or -1 when the fluid is not one of them. */
+    private static int boardTankType(Fluid fluid) {
+        for (int type = 1; type <= BOARD_TANK_FLUIDS.length; type++) {
+            if (BOARD_TANK_FLUIDS[type - 1].mFluid == fluid) return type;
+        }
+        return -1;
+    }
+
+    /** The impurity the fluid of {@code type} turns into (GT5U: {@code MTEBoardProcessorModule#fillTank}). */
+    private static FluidStack boardTankImpurity(int type) {
+        return switch (type) {
+            case 1 -> GGMaterial.ferrousChloride.getFluidOrGas(0);
+            case 2 -> Materials.GrowthMediumRaw.getFluid(0);
+            case 3 -> Materials.BioMediumRaw.getFluid(0);
+            case 4 -> Materials.PrismaticGas.getFluid(0);
+            case 5 -> Materials.UUAmplifier.getFluid(0);
+            default -> null;
+        };
     }
 
     public FluidStack getBoardTankStoredFluid(int type) {
@@ -1091,7 +1124,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
                 BoardTankState tank = getBoardTank(thread);
                 if (tank != null) {
                     sb.append("Tanks ");
-                    for (int type = 1; type <= 4; type++) {
+                    for (int type = 1; type <= getBoardTankTypeCount(); type++) {
                         BoardTank chamber = tank.getTank(type);
                         if (chamber != null && chamber.fluidAmount > 0) {
                             sb.append(type)
@@ -1244,8 +1277,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             if (thread.getCircuitNumber() == 4) {
                 BoardTankState tank = getBoardTank(thread);
                 entry.setBoolean("board", true);
-                entry.setInteger("boardTankCount", 4);
-                for (int type = 1; type <= 4; type++) {
+                entry.setInteger("boardTankCount", getBoardTankTypeCount());
+                for (int type = 1; type <= getBoardTankTypeCount(); type++) {
                     BoardTank chamber = tank == null ? null : tank.getTank(type);
                     entry.setInteger("tankFluid" + type, chamber == null ? 0 : chamber.fluidAmount);
                     entry.setInteger(
@@ -1266,6 +1299,9 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             index++;
         }
         tag.setTag("threads", list);
+        // Expanding the per-thread detail is the player's choice, so the decision travels with the tooltip (the same
+        // thing AE's WirelessDataProvider does for its wireless hub's connected-device list).
+        tag.setBoolean("isSneaking", player.isSneaking());
     }
 
     @Override
@@ -1276,6 +1312,27 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         if (!tag.hasKey("threads")) return;
 
         NBTTagList list = tag.getTagList("threads", 10);
+
+        // Collapsed, the tooltip reads like an ordinary multiblock's: one progress bar for the work this machine is
+        // running (the sum over its active threads, so a dozen threads do not turn into a dozen bars). Sneaking expands
+        // it into the per-thread lines below - AE's WirelessDataProvider hides its connected-device list the same way.
+        if (!tag.getBoolean("isSneaking")) {
+            long progress = 0;
+            long max = 0;
+            for (int i = 0; i < list.tagCount(); i++) {
+                NBTTagCompound entry = list.getCompoundTagAt(i);
+                if (!entry.getBoolean("active")) continue;
+                progress += entry.getInteger("progress");
+                max += entry.getInteger("max");
+            }
+            currentTip.add(
+                GTWaila.getMachineProgressString(
+                    max > 0,
+                    (int) Math.min(Integer.MAX_VALUE, max),
+                    (int) Math.min(Integer.MAX_VALUE, progress)));
+            return;
+        }
+
         for (int i = 0; i < list.tagCount(); i++) {
             NBTTagCompound entry = list.getCompoundTagAt(i);
             int index = entry.getInteger("index");
@@ -1339,7 +1396,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         String impurityLabel = StatCollector.translateToLocal("GT5U.tooltip.nac.module.boardprocessor.impurity");
         String emptyLabel = StatCollector.translateToLocal("GT5U.tooltip.nac.module.boardprocessor.empty");
 
-        int count = entry.hasKey("boardTankCount") ? entry.getInteger("boardTankCount") : 4;
+        int count = entry.hasKey("boardTankCount") ? entry.getInteger("boardTankCount") : BOARD_TANK_FLUIDS.length;
         boolean any = false;
         for (int type = 1; type <= count; type++) {
             int amount = entry.getInteger("tankFluid" + type);
@@ -1534,7 +1591,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         private int autoFlushPercentage = 100;
 
         BoardTankState() {
-            for (int type = 1; type <= 4; type++) {
+            for (int type = 1; type <= getBoardTankTypeCount(); type++) {
                 tanks.put(type, new BoardTank(type));
             }
         }
@@ -1574,35 +1631,10 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             if (hatches.isEmpty()) return;
 
             for (FluidStack fluid : machine.getBoardFluidStacks(thread)) {
-                if (fluid == null || !isLegalFluid(fluid.getFluid())) continue;
-                BoardTank tank = getTank(fluidType(fluid.getFluid()));
+                if (fluid == null) continue;
+                BoardTank tank = getTank(boardTankType(fluid.getFluid()));
                 if (tank != null) tank.fill(hatches);
             }
-        }
-
-        private int fluidType(Fluid fluid) {
-            if (fluid == Materials.IronIIIChloride.mFluid) return 1;
-            if (fluid == Materials.GrowthMediumSterilized.mFluid) return 2;
-            if (fluid == Materials.BioMediumSterilized.mFluid) return 3;
-            if (fluid == Materials.PrismaticAcid.mFluid) return 4;
-            return -1;
-        }
-
-        private boolean isLegalFluid(Fluid fluid) {
-            return fluid != null
-                && (fluid == Materials.IronIIIChloride.mFluid || fluid == Materials.GrowthMediumSterilized.mFluid
-                    || fluid == Materials.BioMediumSterilized.mFluid
-                    || fluid == Materials.PrismaticAcid.mFluid);
-        }
-
-        private FluidStack requiredFluid(int type) {
-            return switch (type) {
-                case 1 -> Materials.IronIIIChloride.getFluid(0);
-                case 2 -> Materials.GrowthMediumSterilized.getFluid(0);
-                case 3 -> Materials.BioMediumSterilized.getFluid(0);
-                case 4 -> Materials.PrismaticAcid.getFluid(0);
-                default -> null;
-            };
         }
 
         void writeToNBT(NBTTagCompound tag) {
@@ -1662,7 +1694,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             if (storedFluid == null || fluidAmount <= 0) return false;
             if (getFillPercentage() < 0.5) return false;
             if (getImpurityPercentage() >= 1.0) return false;
-            FluidStack required = requiredFluid(type);
+            FluidStack required = boardTankFluid(type);
             return required != null && storedFluid.isFluidEqual(required);
         }
 
@@ -1700,10 +1732,12 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         }
 
         void fill(ArrayList<MTEHatchInput> hatches) {
+            final FluidStack required = boardTankFluid(type);
+            if (required == null) return;
             if (storedFluid == null) {
-                int drained = drain(hatches, new FluidStack(requiredFluid(type), BoardTankState.CAPACITY), false);
+                int drained = drain(hatches, new FluidStack(required, BoardTankState.CAPACITY), false);
                 if (drained > 0) {
-                    storedFluid = new FluidStack(requiredFluid(type), drained);
+                    storedFluid = new FluidStack(required, drained);
                     fluidAmount = drained;
                     updateImpurityFluid();
                 }
@@ -1748,27 +1782,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         }
 
         private void updateImpurityFluid() {
-            if (storedFluid == null) return;
-            if (storedFluid.isFluidEqual(Materials.IronIIIChloride.getFluid(0))) {
-                impurityFluid = GGMaterial.ferrousChloride.getFluidOrGas(0);
-            } else if (storedFluid.isFluidEqual(Materials.GrowthMediumSterilized.getFluid(0))) {
-                impurityFluid = Materials.GrowthMediumRaw.getFluid(0);
-            } else if (storedFluid.isFluidEqual(Materials.BioMediumSterilized.getFluid(0))) {
-                impurityFluid = Materials.BioMediumRaw.getFluid(0);
-            } else if (storedFluid.isFluidEqual(Materials.PrismaticAcid.getFluid(0))) {
-                impurityFluid = Materials.PrismaticGas.getFluid(0);
-            }
+            impurityFluid = boardTankImpurity(type);
             if (impurityFluid != null) impurityFluid.amount = impurityAmount;
-        }
-
-        private FluidStack requiredFluid(int type) {
-            return switch (type) {
-                case 1 -> Materials.IronIIIChloride.getFluid(0);
-                case 2 -> Materials.GrowthMediumSterilized.getFluid(0);
-                case 3 -> Materials.BioMediumSterilized.getFluid(0);
-                case 4 -> Materials.PrismaticAcid.getFluid(0);
-                default -> null;
-            };
         }
     }
 }

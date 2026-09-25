@@ -1,5 +1,8 @@
 package com.MessTech.common.gui;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 
@@ -29,7 +32,8 @@ import gregtech.api.modularui2.GTWidgetThemes;
  */
 public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGui<MTNanoScaleFoundry> {
 
-    private final FluidSlotSyncHandler[] boardTankSyncHandlers = new FluidSlotSyncHandler[5];
+    /** The Board Processor immersion tanks' slots, keyed by the 1-based tank type the machine numbers them with. */
+    private final Map<Integer, FluidSlotSyncHandler> boardTankSyncHandlers = new HashMap<>();
 
     public MTNanoScaleFoundryGui(MTNanoScaleFoundry multiblock) {
         super(multiblock);
@@ -48,7 +52,7 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
             FluidSlotSyncHandler handler = new FluidSlotSyncHandler(tank).canFillSlot(false)
                 .controlsAmount(false);
             syncManager.syncValue("boardTank" + tankType, handler);
-            boardTankSyncHandlers[tankType] = handler;
+            boardTankSyncHandlers.put(tankType, handler);
         }
 
         int count = multiblock.getMaxThreadCount();
@@ -106,8 +110,8 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
 
     @Override
     protected ParentWidget<?> createTerminalParentWidget(ModularPanel panel, PanelSyncManager syncManager) {
-        // Keep the original GT terminal text layout on the left, and put the four Board immersion
-        // tanks to the right (outside the text ListWidget so they are not clipped).
+        // Keep the original GT terminal text layout on the left, and put the Board immersion tanks to the right
+        // (outside the text ListWidget so they are not clipped).
         return Flow.row()
             .size(getTerminalWidgetWidth(), getTerminalWidgetHeight())
             .paddingTop(4)
@@ -178,19 +182,26 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
     }
 
     private IWidget createBoardTankWidget() {
+        // Two slots per row, as many rows as the machine has immersion fluids (five since GT5U added UU-Matter), with
+        // the slot height shrunk so the whole grid keeps the 72px footprint four tanks used to need.
+        final int count = multiblock.getBoardTankTypeCount();
+        final int rows = (count + 1) / 2;
+        final int slotHeight = Math.max(18, 72 / Math.max(rows, 1));
+
         Flow grid = Flow.column()
             .coverChildren()
             .marginLeft(4);
-        for (int row = 0; row < 2; row++) {
+        for (int row = 0; row < rows; row++) {
             Flow line = Flow.row()
                 .coverChildren();
             for (int col = 0; col < 2; col++) {
                 int type = row * 2 + col + 1;
-                FluidSlotSyncHandler handler = boardTankSyncHandlers[type];
+                if (type > count) break;
+                FluidSlotSyncHandler handler = boardTankSyncHandlers.get(type);
                 if (handler == null) continue;
                 FluidSlot fluidSlot = new FluidSlot().syncHandler(handler)
                     .alwaysShowFull(false)
-                    .size(18, 36)
+                    .size(18, slotHeight)
                     .background(IDrawable.EMPTY)
                     .tooltipBuilder(t -> {
                         t.clearText();

@@ -594,10 +594,16 @@ MTMultiMachineBase<T>
 - Input-bus circuit numbers are snapshotted in `onPostTick` before GT recipe processing starts,
   because ME buses move their circuit to a virtual offset during recipe processing.
 - Each thread currently runs one active recipe at a time.
-- Board Processor uses per-thread internal immersion tanks (`BoardTankState`), not direct recipe fluid
-  depletion.
-- Waila now sends per-thread name/index/active/progress/EU/parallel plus first-task output item
-  names/counts; body prints progress bar then output item lines.
+- Board Processor uses per-thread internal immersion tanks (`BoardTankState`), not direct recipe fluid depletion: one
+  tank per legal immersion fluid, **five** since GT5U 5.09.54.183 added UU-Matter (`MTEBoardProcessorModule#LEGAL_FLUIDS`
+  is the source; UU-Matter's impurity is UU-Amplifier). The type list, the fluid each type takes and the impurity it
+  turns into all live in `MTNanoScaleFoundry`'s `BOARD_TANK_FLUIDS` / `boardTankFluid` / `boardTankImpurity`, and the
+  GUI's tank grid and Waila both read `getBoardTankTypeCount()`, so the next fluid is one table entry plus its GUI row.
+- Waila sends per-thread name/index/active/progress/EU/parallel, the first task's output item names/counts, the board
+  tanks and `isSneaking` (the same flag AE's `WirelessDataProvider` uses for its connected-device list). Collapsed the
+  body prints **one** machine-wide progress bar - the sum over the running threads through GT's
+  `GTWaila.getMachineProgressString`, so it reads like any other multiblock - and sneaking expands it into the
+  per-thread lines, the board tank lines and the output item lines.
 - The 11 per-module NEI pools (`mt.recipe.nanoscale.*`, one per original NAC pool) copy GT5U's own maps 1:1,
   `maxIO` included. Four envelopes grew in GT5U 5.09.54.183 and are mirrored here: Part Processor (its ident is still
   `smdprocessor`, GT renamed the module in that version) 1/1/0/0 -> 6/4/3/0, Etching Array 2/1/2/0 -> 2/2/2/0,
