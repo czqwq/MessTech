@@ -6,6 +6,7 @@ package com.MessTech.common.mixin;
 @SuppressWarnings("unused")
 public enum TargetMod {
 
+    APPLIED_ENERGISTICS2("Applied Energistics 2", "appliedenergistics2"),
     GTNH_INTERGALACTIC("GTNH Intergalactic", "gtnhintergalactic"),
     SPICE_OF_LIFE("The Spice of Life - Carrot Edition", "SpiceOfLife");
 

@@ -1,19 +1,26 @@
 package com.MessTech.init;
 
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.world.World;
 import net.minecraftforge.client.MinecraftForgeClient;
+import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.oredict.OreDictionary;
 
 import com.MessTech.common.entity.MTEntityPiggy;
 import com.MessTech.common.entity.MTPiggyHatRenderer;
 import com.MessTech.common.entity.MTRenderPiggy;
+import com.MessTech.common.gui.GuiUltimatePatternTerminal;
 import com.MessTech.common.items.MTFuelRodItemRenderer;
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.items.MTNACComponentItemRenderer;
+import com.MessTech.common.parts.PartUltimatePatternTerminal;
 import com.MessTech.common.util.MTAnimatedTooltipHandler;
 import com.MessTech.common.util.MTDynamicItemHelper;
 import com.MessTech.common.util.MTPigTech;
 
+import appeng.api.parts.IPart;
+import appeng.util.Platform;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
@@ -38,6 +45,20 @@ public class ClientProxy extends CommonProxy {
         // MessTech's own animated tooltip handler: the registry AuthorDynamic writes its author lines into, plus the
         // tooltip renderer that draws an animation's renderer (e.g. TRANSCENDENT_METAL) over the finished font.
         MTAnimatedTooltipHandler.init();
+    }
+
+    @Override
+    public Object getClientGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
+        if ((ID & 0xFF) != GUI_ULTIMATE_PATTERN_TERMINAL) {
+            return null;
+        }
+
+        final ForgeDirection side = ultimatePatternTerminalSide(ID);
+        final IPart part = Platform.getPartFromTE(world.getTileEntity(x, y, z), side);
+        if (part instanceof PartUltimatePatternTerminal terminal) {
+            return new GuiUltimatePatternTerminal(player.inventory, terminal);
+        }
+        return null;
     }
 
 }

@@ -1265,6 +1265,9 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             index++;
         }
         tag.setTag("threads", list);
+        // Expanding the per-thread detail is the player's choice, so the decision travels with the tooltip (the same
+        // thing AE's WirelessDataProvider does for its wireless hub's connected-device list).
+        tag.setBoolean("isSneaking", player.isSneaking());
     }
 
     @Override
@@ -1275,6 +1278,27 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         if (!tag.hasKey("threads")) return;
 
         NBTTagList list = tag.getTagList("threads", 10);
+
+        // Collapsed, the tooltip reads like an ordinary multiblock's: one progress bar for the work this machine is
+        // running (the sum over its active threads, so a dozen threads do not turn into a dozen bars). Sneaking expands
+        // it into the per-thread lines below - AE's WirelessDataProvider hides its connected-device list the same way.
+        if (!tag.getBoolean("isSneaking")) {
+            long progress = 0;
+            long max = 0;
+            for (int i = 0; i < list.tagCount(); i++) {
+                NBTTagCompound entry = list.getCompoundTagAt(i);
+                if (!entry.getBoolean("active")) continue;
+                progress += entry.getInteger("progress");
+                max += entry.getInteger("max");
+            }
+            currentTip.add(
+                GTWaila.getMachineProgressString(
+                    max > 0,
+                    (int) Math.min(Integer.MAX_VALUE, max),
+                    (int) Math.min(Integer.MAX_VALUE, progress)));
+            return;
+        }
+
         for (int i = 0; i < list.tagCount(); i++) {
             NBTTagCompound entry = list.getCompoundTagAt(i);
             int index = entry.getInteger("index");

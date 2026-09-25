@@ -10,8 +10,9 @@ first** when verifying API behaviour instead of guessing:
 
 | Path | Contents / use |
 |---|---|
-| `tmp/GT5-Unofficial-5.09.54.133/` | **GT5U source matching the current compile dependency** (5.09.54.133); first choice for `gregtech.api.*` / `gregtech.common.*` |
-| `tmp/GT5-Unofficial-master/` | GT5U master-branch snapshot, **noticeably older than the versioned 5.09.54.133**; historical/diff reference only — always verify against `tmp/GT5-Unofficial-5.09.54.133/` |
+| `tmp/GT5-Unofficial-beta3/` | **GT5U source matching the current compile dependency** (5.09.54.133, the version the `gtnhVersion = "2.9.0-beta-3"` manifest resolves); first choice for `gregtech.api.*` / `gregtech.common.*` |
+| `tmp/GT5-Unofficial-5.09.54.183/` | GT5U 5.09.54.183, the version the `master` branch builds against (2.9.0-RC-1); **not** this branch's dependency — diff reference only, never assume one of its APIs exists here |
+| `tmp/GT5-Unofficial-master/` | GT5U master-branch snapshot, **noticeably older than the versioned 5.09.54.133**; historical reference only — always verify against `tmp/GT5-Unofficial-beta3/` |
 | `tmp/ic2-decompiled/`, `tmp/ic2-src/` | Decompiled IC2 source incl. `ic2.core.*` internals (`ItemReactorUranium`, `ItemReactorHeatStorage`, `TileEntityNuclearReactorElectric`, ...) |
 | `build/rfg/minecraft-src/java/` | **Forge + Minecraft 1.7.10 decompiled source** (`net.minecraft.*` such as `RenderItem`, `ItemRenderer`, `FontRenderer`, plus `cpw.mods.fml.*`) |
 | `build/rfg/minecraft-src/resources/` | Vanilla MC assets |

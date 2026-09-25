@@ -11,6 +11,9 @@ dependencies {
     //implementation("com.github.GTNewHorizons:NewHorizonsCoreMod:2.9.49:dev")
     implementation(gtnhDev("GT5-Unofficial"))
     implementation(gtnhDev("NewHorizonsCoreMod"))
+    // NotEnoughEnergistics: the GTNH NEI -> AE pattern terminal transfer. MessTech hands its own terminal's pages to
+    // NEU's handler when the mod is present and falls back to its own import otherwise, see NEI_MessTechConfig.
+    implementation(gtnhDev("NotEnoughEnergistics"))
     // The space apiary modules talk to Forestry's bee API (forestry.api.apiculture). Forestry used to
     // reach the compile classpath only transitively through Binnie; pin it explicitly.
     implementation(gtnhDev("ForestryMC"))

@@ -14,6 +14,7 @@ import javax.annotation.Nullable;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 
+import gregtech.api.enums.GTValues;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTRecipeBuilder;
 import gregtech.api.util.GTUtility;
@@ -85,11 +86,38 @@ public final class MTAssemblyLineMatcher {
         return GTRecipeBuilder.builder()
             .itemInputsUnsafe(ingredients.toArray(new ItemStack[0]))
             .itemOutputs(definition.mOutput)
-            .fluidInputs(definition.mFluidInputs != null ? definition.mFluidInputs : new FluidStack[0])
+            .fluidInputs(nonNullFluids(definition.mFluidInputs))
             .eut(definition.mEUt)
             .duration(definition.mDuration)
             .build()
             .orElse(null);
+    }
+
+    /**
+     * The fluid inputs of a definition without the null slots, for {@code GTRecipeBuilder#fluidInputs(FluidStack...)}.
+     * <p>
+     * A definition may have no fluids at all or leave a fluid slot empty, and the registry is filled by every addon,
+     * not only by GT - {@code GTRecipeConstants#addAssemblingLineRecipe} skips null entries itself when it hashes what
+     * it registers. The builder does not tolerate either: with {@code gt.recipebuilder.panic.null} set (GTNH ships it
+     * set) a null array or a null entry throws {@code IllegalArgumentException("null in argument")}, which is what
+     * stopped {@code CommonProxy#serverStarted} from finishing. The nulls are dropped here instead, which is what the
+     * builder does to whatever it is handed ({@code ArrayExt#removeNullFluids}) - a definition with an empty fluid slot
+     * keeps its page and its recipe.
+     */
+    static FluidStack[] nonNullFluids(@Nullable FluidStack[] fluids) {
+        if (fluids == null || fluids.length == 0) return GTValues.emptyFluidStackArray;
+        int count = 0;
+        for (FluidStack fluid : fluids) {
+            if (fluid != null) count++;
+        }
+        if (count == fluids.length) return fluids;
+        if (count == 0) return GTValues.emptyFluidStackArray;
+        FluidStack[] nonNull = new FluidStack[count];
+        int index = 0;
+        for (FluidStack fluid : fluids) {
+            if (fluid != null) nonNull[index++] = fluid;
+        }
+        return nonNull;
     }
 
     /**

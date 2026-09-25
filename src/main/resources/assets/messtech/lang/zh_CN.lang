@@ -136,6 +136,9 @@ mt.recipe.assfactory.assemblyline=全能原初装配矩阵-装配线
 tile.AssMatrixBlock.name=装配矩阵方块
 tile.AdvAssMatrixBlock.name=高级装配矩阵方块
 
+# --- 终极样板编码终端 (Ultimate Pattern Terminal) ---
+item.UltimatePatternTerminal.name=终极样板编码终端
+
 # --- MachineTemplate ---
 machine.template.machinetype=模板机器
 machine.template.tooltip.0=模板机器: 每个A位置可放置基类任意舱室(总线/流体仓/能源仓/异域能源仓/动力仓/维护仓/消声仓)

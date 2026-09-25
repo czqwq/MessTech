@@ -3,6 +3,7 @@ package com.MessTech.common.recipe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -17,6 +18,7 @@ import javax.annotation.Nullable;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.oredict.OreDictionary;
 
 import com.MessTech.common.items.MTItemList;
 import com.MessTech.common.items.MTNACComponentItem;
@@ -27,10 +29,13 @@ import com.gtnewhorizons.modularui.api.drawable.UITexture;
 import gregtech.api.enums.CondensateType;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.ItemList;
+import gregtech.api.enums.Materials;
 import gregtech.api.enums.NaniteTier;
+import gregtech.api.enums.OrePrefixes;
 import gregtech.api.gui.modularui.GTUITextures;
 import gregtech.api.items.CircuitComponentFakeItem;
 import gregtech.api.modularui2.GTGuiTextures;
+import gregtech.api.objects.ItemData;
 import gregtech.api.recipe.RecipeCategory;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.RecipeMapBackend;
@@ -42,6 +47,7 @@ import gregtech.api.recipe.maps.LargeNEIFrontend;
 import gregtech.api.recipe.maps.QuantumComputerFrontend;
 import gregtech.api.recipe.metadata.SimpleRecipeMetadataKey;
 import gregtech.api.util.AssemblyLineUtils;
+import gregtech.api.util.GTOreDictUnificator;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTRecipeBuilder;
 import gregtech.api.util.GTRecipeConstants;
@@ -49,6 +55,7 @@ import gregtech.api.util.GTUtility;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
 import gregtech.nei.RecipeDisplayInfo;
 import gregtech.nei.formatter.HeatingCoilSpecialValueFormatter;
+import gtPlusPlus.core.util.minecraft.MaterialUtils;
 import gtPlusPlus.xmod.gregtech.api.enums.GregtechItemList;
 import tectech.recipe.BECAssemblyFrontend;
 import tectech.recipe.TecTechRecipeMaps;
@@ -222,7 +229,7 @@ public final class MTRecipeMaps {
         Collection<GTRecipe> added = GTValues.RA.stdBuilder()
             .itemInputs(displayInputSpec(recipe.mInputs, recipe.mOreDictAlt))
             .itemOutputs(recipe.mOutput)
-            .fluidInputs(recipe.mFluidInputs)
+            .fluidInputs(MTAssemblyLineMatcher.nonNullFluids(recipe.mFluidInputs))
             .special(displayDataStick(recipe))
             .eut(recipe.mEUt)
             .duration(recipe.mDuration)
@@ -261,14 +268,43 @@ public final class MTRecipeMaps {
      * The per-slot input spec {@code GTRecipeBuilder#itemInputs(Object...)} expects for {@link
      * #addAssemblyLineDisplayRecipe}: a slot that lists alternatives is passed as its whole {@code ItemStack[]} (so the
      * builder records it in {@code mOreDictAlt} and NEI offers every choice), a slot without them as the plain stack.
+     * <p>
+     * Definitions come from every addon, and GT only logs a null ingredient or a null alternative instead of refusing
+     * the definition ({@code GTRecipeConstants#addAssemblingLineRecipe} writes one error per such slot). The builder
+     * refuses them: with {@code gt.recipebuilder.panic.null} set (GTNH ships it set) a null entry throws {@code
+     * IllegalArgumentException("null in argument")} and the server never finishes starting. The null alternatives are
+     * dropped here, and a slot with nothing usable left is passed as an empty array - which records the empty slot the
+     * builder's own null branch produces, without the panic.
      */
     private static Object[] displayInputSpec(ItemStack[] inputs, ItemStack[][] alternatives) {
         Object[] spec = new Object[inputs.length];
         for (int i = 0; i < inputs.length; i++) {
-            ItemStack[] slot = alternatives != null && i < alternatives.length ? alternatives[i] : null;
-            spec[i] = slot != null && slot.length > 0 ? slot : inputs[i];
+            ItemStack[] slot = displayAlternatives(alternatives, i);
+            if (slot != null) {
+                spec[i] = slot;
+            } else if (inputs[i] != null) {
+                spec[i] = inputs[i];
+            } else {
+                spec[i] = GTValues.emptyItemStackArray;
+            }
         }
         return spec;
+    }
+
+    /**
+     * The alternatives slot {@code index} accepts, without its null entries, or null when the slot lists none at all -
+     * in which case the caller falls back to the slot's own ingredient.
+     */
+    @Nullable
+    private static ItemStack[] displayAlternatives(ItemStack[][] alternatives, int index) {
+        if (alternatives == null || index >= alternatives.length) return null;
+        ItemStack[] slot = alternatives[index];
+        if (slot == null || slot.length == 0) return null;
+        List<ItemStack> valid = new ArrayList<>(slot.length);
+        for (ItemStack alternative : slot) {
+            if (alternative != null) valid.add(alternative);
+        }
+        return valid.isEmpty() ? null : valid.toArray(new ItemStack[0]);
     }
 
     // --- Nano-Scale Foundry separate NEI pools (one per original NAC pool) ---
@@ -465,21 +501,28 @@ public final class MTRecipeMaps {
     }
 
     /**
-     * Independent one-step NEI pool for the future "24" Nano-Scale Foundry mode. Not used by the
+     * Independent one-step NEI pool for the "24" Nano-Scale Foundry mode. Not used by the
      * multiblock yet; this map only shows the direct real-item -> real-circuit recipes that would
      * otherwise require a chain of NAC packets/modules.
+     * <p>
+     * The slot limits and the NEI grid come from {@link NanoScaleFoundry24PoolFrontend}, so the two can never
+     * disagree. The Planck chain is the widest recipe: it measured 61 item inputs and 24 fluid inputs before
+     * {@link #packMaterialInputs} moved the raw material parts into the fluid grid, which is why the map declares an
+     * even 54 item / 54 fluid split instead of those numbers.
      */
     public static final RecipeMap<RecipeMapBackend> nanoScaleFoundry24PoolRecipes = RecipeMapBuilder
         .of("mt.recipe.nanoscale.pool24")
-        // Measured from the full recursive expansion: PlanckCircuit peaks at 47 distinct item inputs
-        // and 18 distinct fluid inputs. 48 fills a 6x8 item grid; 18 fills a 6x3 fluid grid below it.
-        .maxIO(48, 1, 18, 0)
+        .maxIO(
+            NanoScaleFoundry24PoolFrontend.MAX_ITEM_INPUTS,
+            NanoScaleFoundry24PoolFrontend.MAX_ITEM_OUTPUTS,
+            NanoScaleFoundry24PoolFrontend.MAX_FLUID_INPUTS,
+            NanoScaleFoundry24PoolFrontend.MAX_FLUID_OUTPUTS)
         .minInputs(0, 0)
         .useSpecialSlot()
         .frontend(NanoScaleFoundry24PoolFrontend::new)
         .neiHandlerInfo(
             builder -> builder.setDisplayStack(MTItemList.MTNanoScaleFoundry.get(1))
-                .setHeight(230))
+                .setHeight(NanoScaleFoundry24PoolFrontend.handlerHeight()))
         .build();
 
     /**
@@ -578,7 +621,9 @@ public final class MTRecipeMaps {
         List<GTRecipe> generated = new ArrayList<>();
         for (GTRecipe assembly : RecipeMaps.nanochipAssemblyMatrixRecipes.getAllRecipes()) {
             GTRecipe flat = flattenAssemblyTo24Pool(assembly);
-            if (flat != null) generated.add(flat);
+            if (flat == null) continue;
+            warnIfWiderThanPool(flat);
+            generated.add(flat);
         }
 
         RecipeCategory defaultCategory = nanoScaleFoundry24PoolRecipes.getDefaultRecipeCategory();
@@ -652,6 +697,208 @@ public final class MTRecipeMaps {
         return converted;
     }
 
+    /**
+     * The NEI grid of this pool is a fixed {@code maxIO} envelope, so a recipe wider than the pool capacity would
+     * spill outside the drawn background. NAC recipes keep growing, so report it instead of drawing a broken page.
+     */
+    private static void warnIfWiderThanPool(GTRecipe recipe) {
+        int itemInputs = recipe.mInputs == null ? 0 : recipe.mInputs.length;
+        int fluidInputs = recipe.mFluidInputs == null ? 0 : recipe.mFluidInputs.length;
+        if (itemInputs <= NanoScaleFoundry24PoolFrontend.MAX_ITEM_INPUTS
+            && fluidInputs <= NanoScaleFoundry24PoolFrontend.MAX_FLUID_INPUTS) {
+            return;
+        }
+        String output = recipe.mOutputs != null && recipe.mOutputs.length > 0 && recipe.mOutputs[0] != null
+            ? recipe.mOutputs[0].getDisplayName()
+            : "unknown";
+        MessTech.MT_LOG.warn(
+            "Nano-Scale Foundry 24 pool: the flattened recipe for {} needs {} item inputs and {} fluid inputs, "
+                + "more than the pool allows ({} / {}). Raise the MAX_* constants in NanoScaleFoundry24PoolFrontend.",
+            output,
+            itemInputs,
+            fluidInputs,
+            NanoScaleFoundry24PoolFrontend.MAX_ITEM_INPUTS,
+            NanoScaleFoundry24PoolFrontend.MAX_FLUID_INPUTS);
+    }
+
+    /** Prefixes that this pool shows as molten material instead of as items. */
+    private static final List<OrePrefixes> MOLTEN_PREFIXES = Arrays
+        .asList(OrePrefixes.bolt, OrePrefixes.plate, OrePrefixes.wireFine, OrePrefixes.screw, OrePrefixes.foil);
+
+    /** 16 x 1x wire holds the same material as 1 x 16x wire, so the two are interchangeable. */
+    private static final int WIRE_PACK_SIZE = 16;
+
+    /** Result of {@link #packMaterialInputs}: the surviving items plus the fluids they turned into. */
+    private static final class PackedInputs {
+
+        private final ItemStack[] items;
+        private final FluidStack[] fluids;
+
+        private PackedInputs(ItemStack[] items, FluidStack[] fluids) {
+            this.items = items;
+            this.fluids = fluids;
+        }
+    }
+
+    /**
+     * Packs the raw material components of a flattened recipe: bolts, plates, fine wires, screws and foils become the
+     * molten fluid of their material, and 1x wires are re-expressed as 16x wires 16:1. Both keep the material amount
+     * identical - a bolt, a fine wire or a screw is an eighth of an ingot, a foil is a quarter, a plate is one ingot,
+     * and a 16x wire is exactly sixteen 1x wires - so the recipe costs the same while the NEI page needs far fewer
+     * slots. Entries that share a material merge, because they all become the same fluid. Anything without an ore
+     * dictionary association, and anything whose material has no molten form, stays an item; a 1x wire count that is
+     * not a multiple of 16 keeps its remainder as 1x wires rather than rounding the material amount up.
+     */
+    private static PackedInputs packMaterialInputs(ItemStack[] stacks) {
+        List<ItemStack> items = new ArrayList<>(stacks.length);
+        List<FluidStack> fluids = new ArrayList<>();
+        for (ItemStack stack : stacks) {
+            if (stack == null || stack.stackSize <= 0) continue;
+            ItemData data = GTOreDictUnificator.getAssociation(stack);
+            OrePrefixes prefix = data == null ? null : data.mPrefix;
+            Materials material = data == null || data.mMaterial == null ? null : data.mMaterial.mMaterial;
+            if (prefix == null || material == null) {
+                // Most GT++ (and some addon) items never register an ItemData, but their ore dictionary name still
+                // carries both halves - "boltRhugnor", "screwQuantum", "plateAstralTitanium" - so that is the
+                // fallback used to find their molten fluid.
+                OreNameParts parts = parseOreDictionary(stack);
+                if (parts != null && MOLTEN_PREFIXES.contains(parts.prefix)) {
+                    FluidStack molten = moltenOfName(parts.materialName, materialAmount(parts.prefix, stack.stackSize));
+                    if (molten != null) {
+                        fluids.add(molten);
+                        continue;
+                    }
+                }
+            } else if (MOLTEN_PREFIXES.contains(prefix)) {
+                FluidStack molten = material.getMolten(materialAmount(prefix, stack.stackSize));
+                if (molten != null) {
+                    fluids.add(molten);
+                    continue;
+                }
+            } else if (prefix == OrePrefixes.wireGt01 && stack.stackSize >= WIRE_PACK_SIZE) {
+                ItemStack packed = GTOreDictUnificator
+                    .get(OrePrefixes.wireGt16, material, stack.stackSize / WIRE_PACK_SIZE);
+                if (packed != null && packed.stackSize > 0) {
+                    items.add(packed);
+                    int rest = stack.stackSize % WIRE_PACK_SIZE;
+                    if (rest > 0) {
+                        ItemStack leftover = stack.copy();
+                        leftover.stackSize = rest;
+                        items.add(leftover);
+                    }
+                    continue;
+                }
+            }
+            items.add(stack);
+        }
+        return new PackedInputs(items.toArray(new ItemStack[0]), fluids.toArray(new FluidStack[0]));
+    }
+
+    /** Ore dictionary name of a packed prefix, split into the prefix itself and the material name behind it. */
+    private static final class OreNameParts {
+
+        private final OrePrefixes prefix;
+        private final String materialName;
+
+        private OreNameParts(OrePrefixes prefix, String materialName) {
+            this.prefix = prefix;
+            this.materialName = materialName;
+        }
+    }
+
+    private static OreNameParts parseOreDictionary(ItemStack stack) {
+        for (int oreId : OreDictionary.getOreIDs(stack)) {
+            String ore = OreDictionary.getOreName(oreId);
+            if (ore == null) continue;
+            for (OrePrefixes prefix : MOLTEN_PREFIXES) {
+                String prefixName = prefix.getName();
+                if (ore.length() > prefixName.length() && ore.startsWith(prefixName)) {
+                    return new OreNameParts(prefix, ore.substring(prefixName.length()));
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Molten fluid of the material behind an ore dictionary suffix. GT's own materials are asked first (their names
+     * may differ in case), then GT++'s material registry, whose items never carry an ItemData.
+     */
+    private static FluidStack moltenOfName(String name, long amount) {
+        Materials material = Materials.get(name);
+        if (material == null || MaterialUtils.isNullGregtechMaterial(material)) {
+            material = null;
+            for (Materials candidate : Materials.values()) {
+                if (candidate.mName.equalsIgnoreCase(name)) {
+                    material = candidate;
+                    break;
+                }
+            }
+        }
+        if (material != null && !MaterialUtils.isNullGregtechMaterial(material)) {
+            FluidStack molten = material.getMolten(amount);
+            if (molten != null) return molten;
+        }
+        gtPlusPlus.core.material.Material gtpp = gtPlusPlus.core.material.Material.mMaterialsByName.get(name);
+        if (gtpp == null) {
+            gtpp = gtPlusPlus.core.material.Material.mMaterialCache.get(name.toLowerCase());
+        }
+        return gtpp == null ? null : gtpp.getFluidStack((int) amount);
+    }
+
+    /**
+     * Material amount in mB for {@code count} items of {@code prefix}. GT stores material amounts in units of
+     * {@link GTValues#M} per ingot and an ingot is {@link GTRecipeBuilder#INGOTS} mB, so the two cancel out for whole
+     * fractions of an ingot ({@code M / 8} for a bolt, {@code M * 1} for a plate) and the division stays exact.
+     */
+    private static long materialAmount(OrePrefixes prefix, long count) {
+        return Math.max(1, prefix.getMaterialAmount() * GTRecipeBuilder.INGOTS * count / GTValues.M);
+    }
+
+    private static FluidStack[] appendFluids(FluidStack[] base, FluidStack[] extra) {
+        if (extra.length == 0) return base;
+        FluidStack[] all = Arrays.copyOf(base, base.length + extra.length);
+        System.arraycopy(extra, 0, all, base.length, extra.length);
+        return all;
+    }
+
+    /**
+     * Puts one recipe's inputs into a stable, readable order. The display name comes first so that a whole family of
+     * related parts sits together - the two different RAM chips, every superconductor wire, every board - instead of
+     * one landing in the first slot and the next one ten slots later. The ore dictionary signature, the item and the
+     * amount only break ties, so the order is deterministic between runs.
+     */
+    private static void sortInputs(List<ItemStack> items, List<FluidStack> fluids) {
+        items.sort(
+            Comparator.comparing(MTRecipeMaps::itemSortKey)
+                .thenComparingInt(stack -> -stack.stackSize));
+        fluids.sort(
+            Comparator.comparing((FluidStack fluid) -> fluid.getLocalizedName())
+                .thenComparingInt(fluid -> -fluid.amount));
+    }
+
+    private static String itemSortKey(ItemStack stack) {
+        ItemData data = GTOreDictUnificator.getAssociation(stack);
+        String signature = data != null && data.mPrefix != null && data.mMaterial != null
+            ? data.mPrefix.getName() + data.mMaterial.mMaterial.mName
+            : "";
+        String displayName;
+        try {
+            displayName = stack.getDisplayName();
+        } catch (RuntimeException ignored) {
+            // A broken item name must not take the whole pool down with it.
+            displayName = stack.getItem()
+                .getUnlocalizedName();
+        }
+        return displayName + "|"
+            + signature
+            + "|"
+            + stack.getItem()
+                .getUnlocalizedName()
+            + "|"
+            + stack.getItemDamage();
+    }
+
     private static GTRecipe flattenAssemblyTo24Pool(GTRecipe assembly) {
         if (assembly == null || assembly.mOutputs == null || assembly.mOutputs.length == 0) return null;
 
@@ -674,6 +921,18 @@ public final class MTRecipeMaps {
         ItemStack[] itemInputs = mergeSameItem(ctx.items.toArray(new ItemStack[0]));
         FluidStack[] fluidInputs = mergeSameFluid(ctx.fluids.toArray(new FluidStack[0]));
         if (itemInputs.length == 0) return null;
+
+        // Show the raw material components as molten fluids and as packed wires, see packMaterialInputs().
+        PackedInputs packed = packMaterialInputs(itemInputs);
+        // Packing can produce entries that already exist (packed 16x wires, leftover 1x wires), so merge again and
+        // then sort: NEI fills the grid in array order, and an unsorted array scatters equal stacks across the page.
+        List<ItemStack> sortedItems = new ArrayList<>(Arrays.asList(mergeSameItem(packed.items)));
+        List<FluidStack> sortedFluids = new ArrayList<>(
+            Arrays.asList(mergeSameFluid(appendFluids(fluidInputs, packed.fluids))));
+        sortInputs(sortedItems, sortedFluids);
+        itemInputs = sortedItems.toArray(new ItemStack[0]);
+        fluidInputs = sortedFluids.toArray(new FluidStack[0]);
+        if (itemInputs.length == 0 && fluidInputs.length == 0) return null;
 
         ItemStack output = realOutput.copy();
         output.stackSize = Math.max(1, assembly.mOutputs[0].stackSize);
@@ -769,11 +1028,7 @@ public final class MTRecipeMaps {
         }
 
         GTRecipe producerRecipe = producer.recipe;
-        if (producerRecipe.mOutputs == null || producerRecipe.mOutputs.length == 0
-            || producerRecipe.mOutputs[0] == null) {
-            return false;
-        }
-        int outputAmount = Math.max(1, producerRecipe.mOutputs[0].stackSize);
+        int outputAmount = producer.outputAmount;
         int runs = (int) Math.max(1, (amount + outputAmount - 1) / outputAmount);
 
         // Guard against recursive cycles (for example Assembly Matrix feeding earlier circuit tiers).
@@ -792,14 +1047,21 @@ public final class MTRecipeMaps {
         }
     }
 
+    /**
+     * Finds the module recipe that produces {@code component}. Every output slot is checked, not just the
+     * first one: NAC recipes may emit several different components in one run (the Wire Tracer spool
+     * splits yield three strands at once), and those extra outputs have no recipe of their own.
+     */
     private static Producer findNACProducer(CircuitComponent component, FlattenContext ctx) {
         Producer cached = ctx.producerCache.get(component);
         if (cached != null) return cached;
         for (RecipeMap<?> map : NAC_24_RECIPE_MAPS) {
             for (GTRecipe recipe : map.getAllRecipes()) {
                 if (recipe.mOutputs == null || recipe.mOutputs.length == 0) continue;
-                if (getNACComponent(recipe.mOutputs[0]) == component) {
-                    Producer producer = new Producer(recipe, map);
+                for (int slot = 0; slot < recipe.mOutputs.length; slot++) {
+                    ItemStack output = recipe.mOutputs[slot];
+                    if (output == null || getNACComponent(output) != component) continue;
+                    Producer producer = new Producer(recipe, map, Math.max(1, output.stackSize));
                     ctx.producerCache.put(component, producer);
                     return producer;
                 }
@@ -914,10 +1176,13 @@ public final class MTRecipeMaps {
 
         private final GTRecipe recipe;
         private final RecipeMap<?> map;
+        /** Stack size of the matched output slot, used to work out how many runs are needed. */
+        private final int outputAmount;
 
-        private Producer(GTRecipe recipe, RecipeMap<?> map) {
+        private Producer(GTRecipe recipe, RecipeMap<?> map, int outputAmount) {
             this.recipe = recipe;
             this.map = map;
+            this.outputAmount = outputAmount;
         }
     }
 

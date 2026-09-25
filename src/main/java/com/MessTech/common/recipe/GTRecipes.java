@@ -47,6 +47,7 @@ import com.MessTech.common.items.MTNACComponentItems;
 import com.MessTech.common.machine.Base.IMTModule;
 import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
 
+import appeng.api.AEApi;
 import goodgenerator.items.GGMaterial;
 import goodgenerator.loader.Loaders;
 import gregtech.api.casing.Casings;
@@ -524,7 +525,38 @@ public class GTRecipes {
         addChemicalTwisterRecipes();
         addModuleRecipes();
         addSpaceApiaryRecipes();
+        addUltimatePatternTerminalRecipe();
         // chemical recipe has been moved to MTChemicalTwisterRecipes
+    }
+
+    /**
+     * The Ultimate Pattern Terminal (终极样板编码终端) is AE's extended pattern terminal on a part item, and its
+     * recipe says exactly that: a titanium frame carrying that very part, two Engineering Processors and a Pattern
+     * Capacity Card (样板容量卡, AE's own pattern-capacity upgrade), with a Calculation Processor in the middle.
+     */
+    private static void addUltimatePatternTerminalRecipe() {
+        var ae = AEApi.instance()
+            .definitions();
+
+        GTModHandler.addCraftingRecipe(
+            MTItemList.UltimatePatternTerminal.get(1),
+            new Object[] { "ABA", "CDC", "AEA", 'A', GTOreDictUnificator.get(OrePrefixes.plate, Materials.Titanium, 1),
+                'B', ae.parts()
+                    .patternTerminalEx()
+                    .maybeStack(1)
+                    .orNull(),
+                'C', ae.materials()
+                    .engProcessor()
+                    .maybeStack(1)
+                    .orNull(),
+                'D', ae.materials()
+                    .calcProcessor()
+                    .maybeStack(1)
+                    .orNull(),
+                'E', ae.materials()
+                    .cardPatternCapacity()
+                    .maybeStack(1)
+                    .orNull() });
     }
 
     /**
