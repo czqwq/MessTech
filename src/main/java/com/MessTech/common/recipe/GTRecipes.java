@@ -393,7 +393,7 @@ public class GTRecipes {
             16384,
             (int) TierEU.RECIPE_UIV,
             1,
-            new Object[] { ItemList.NanoChipModule_AssemblyMatrix.get(1), ItemList.NanoChipModule_SMDProcessor.get(1),
+            new Object[] { ItemList.NanoChipModule_AssemblyMatrix.get(1), ItemList.NanoChipModule_PartProcessor.get(1),
                 ItemList.NanoChipModule_BoardProcessor.get(1), ItemList.NanoChipModule_OpticalOrganizer.get(1),
                 ItemList.NanoChipModule_EncasementWrapper.get(1), ItemList.NanoChipModule_BiologicalCoordinator.get(1),
                 ItemList.NanoChipModule_EtchingArray.get(1), ItemList.NanoChipModule_CuttingChamber.get(1),

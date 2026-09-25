@@ -299,7 +299,7 @@ public final class MTRecipeMaps {
         .of("mt.recipe.nanoscale.smdprocessor")
         .maxIO(1, 1, 0, 0)
         .minInputs(1, 0)
-        .neiHandlerInfo(builder -> builder.setDisplayStack(ItemList.NanoChipModule_SMDProcessor.get(1)))
+        .neiHandlerInfo(builder -> builder.setDisplayStack(ItemList.NanoChipModule_PartProcessor.get(1)))
         .build();
 
     public static final RecipeMap<RecipeMapBackend> nanoScaleFoundryBoardProcessorRecipes = RecipeMapBuilder
@@ -505,7 +505,7 @@ public final class MTRecipeMaps {
     public static void populateNanoScaleFoundryRecipes() {
         copyPoolIfEmpty(RecipeMaps.nanochipConversionRecipes, nanoScaleFoundryConversionRecipes);
         copyPoolIfEmpty(RecipeMaps.nanochipAssemblyMatrixRecipes, nanoScaleFoundryAssemblyMatrixRecipes);
-        copyPoolIfEmpty(RecipeMaps.nanochipSMDProcessorRecipes, nanoScaleFoundrySMDProcessorRecipes);
+        copyPoolIfEmpty(RecipeMaps.nanochipPartProcessorRecipes, nanoScaleFoundrySMDProcessorRecipes);
         copyPoolIfEmpty(RecipeMaps.nanochipBoardProcessorRecipes, nanoScaleFoundryBoardProcessorRecipes);
         copyPoolIfEmpty(RecipeMaps.nanochipEtchingArray, nanoScaleFoundryEtchingArrayRecipes);
         copyPoolIfEmpty(RecipeMaps.nanochipCuttingChamber, nanoScaleFoundryCuttingChamberRecipes);
@@ -905,7 +905,7 @@ public final class MTRecipeMaps {
     }
 
     private static final RecipeMap<?>[] NAC_24_RECIPE_MAPS = new RecipeMap<?>[] {
-        RecipeMaps.nanochipAssemblyMatrixRecipes, RecipeMaps.nanochipSMDProcessorRecipes,
+        RecipeMaps.nanochipAssemblyMatrixRecipes, RecipeMaps.nanochipPartProcessorRecipes,
         RecipeMaps.nanochipBoardProcessorRecipes, RecipeMaps.nanochipEtchingArray, RecipeMaps.nanochipCuttingChamber,
         RecipeMaps.nanochipWireTracer, RecipeMaps.nanochipSuperconductorSplitter, RecipeMaps.nanochipOpticalOrganizer,
         RecipeMaps.nanochipEncasementWrapper, RecipeMaps.nanochipBiologicalCoordinator };
