@@ -79,7 +79,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 ### `docs/nac-module.md` - NAC module numbers and bonuses (Chinese)
 - 0. 所有 NAC 模块共用的基础逻辑
 - 1. Assembly Matrix（装配矩阵）
-- 2. SMD Processor（SMD 处理器）
+- 2. Part Processor（原 SMD Processor，5.09.54.183 起改名）
 - 3. Board Processor（基板处理器）
   - EU 倍率公式（按 impurity y，0~1）
   - 杂质增长
@@ -113,7 +113,9 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - **Looking a dependency up, in this order:** (1) the "Local reference source trees" table in
   `docs/GT5U-NOTES.md` § 0 - it lists what is already decompiled on disk, notably
   `build/rfg/minecraft-src/java/` for Forge + vanilla `net.minecraft.*` / `cpw.mods.fml.*` and
-  `tmp/GT5-Unofficial-5.09.54.133/` for the GT5U we compile against; (2) the rest of `tmp/`; (3) only if
+  `tmp/GT5-Unofficial-beta3/` for the GT5U **5.09.54.133 snapshot** (note: the compile dependency is resolved
+  from the `gtnhVersion` manifest in `dependencies.gradle` and is newer - 5.09.54.183 as of 2.9.0-RC-1 - so check
+  version-sensitive APIs against the resolved jar and see `tmp/Compare.md` for what moved); (2) the rest of `tmp/`; (3) only if
   neither has it, unpack or decompile the jar from the gradle cache. Do not start at (3).
 - When a check *is* asked for, prefer the narrowest thing that proves the change; do not sweep the whole
   `tools/**` tree.
@@ -125,6 +127,6 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   codes live in the lang files, the Java side is one `addInfo(translate(key))` per line, and the structure
   block calls stay untouched.
 - Chinese proper nouns (blocks, casings, hatches, buses, coils, fluids, items) are copied verbatim from the
-  GTNH localisation under `tmp/ZH-CN`; new user visible text goes into both lang files
+  GTNH localisation under `tmp/Translation-GTNH`; new user visible text goes into both lang files
   (`src/main/resources/assets/messtech/lang/{zh_CN,en_US}.lang`).
 - Numbers and mechanics that a tooltip or a doc claims must be traceable to a source line; do not invent them.

@@ -84,7 +84,9 @@ public enum MTItemList {
     MTModuleParallel_UIV,
     MTModuleParallel_UMV,
     MTModuleParallel_UXV,
-    MTModuleParallel_MAX;
+    MTModuleParallel_MAX,
+    /** The Ultimate Pattern Terminal part (终极样板编码终端). */
+    UltimatePatternTerminal;
 
     /** Reactor access hatches ordered EV..UIV (index {@code tier - MTReactorAccessHatch.MIN_TIER}). */
     public static final MTItemList[] REACTOR_ACCESS_HATCHES = { MTReactorAccessHatch_EV, MTReactorAccessHatch_IV,

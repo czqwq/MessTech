@@ -553,11 +553,12 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
                 if (i == circuitSlot) continue;
                 ItemStack stack = busTile.getStackInSlot(i);
                 if (stack == null) continue;
-                // Optional non-consumed selector: integrated circuits 1-4 in normal slots choose the
-                // target circuit level (Processor/Cluster/Supercomputer/Mainframe).
+                // Optional non-consumed selector: integrated circuits 1-5 in normal slots choose the
+                // target circuit level (1 Processor, 2 Assembly, 3 Supercomputer, 4 Mainframe, and 5 for the
+                // original GT circuit ladder that the primitive line makes).
                 if (GTUtility.isAnyIntegratedCircuit(stack)) {
                     int damage = stack.getItemDamage();
-                    if (damage >= 1 && damage <= 4) {
+                    if (damage >= 1 && damage <= 5) {
                         if (selectedLevel == 0) selectedLevel = damage;
                         continue;
                     }

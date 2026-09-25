@@ -2,6 +2,12 @@
 
 > 用途：给 Nano-Scale Foundry / 后续 AIO 机器定数值参考。
 > 来源：GT5U `MTENanochipAssemblyModuleBase` 与各模块源码、`en_US.lang` 的 `GT5U.tooltip.nac.module.*`。
+>
+> **版本基线（先读这段）**：本文整理的是 GT5U **5.09.54.133**（`tmp/GT5-Unofficial-beta3/`）的行为。
+> 5.09.54.183 起重做了模块供电模型（`Priority` / `getMaxRecipeDuration` / `NAC_WAITING_FOR_POWER` 全部删除，
+> 改为控制室按 `matrixPowerPortion` 比例分电 + 富余电量 2/4 超频），SMD Processor 改名 Part Processor，
+> 并上调了各线路校准阈值（详见 `tmp/Compare.md` 的 A 部分）。下面标了"183 起"的行即已过时项，
+> 其余数值尚未逐条复核，引用前请对照 183 源码。
 
 ## 0. 所有 NAC 模块共用的基础逻辑
 
@@ -41,20 +47,20 @@
 | 配方 Tier | 使用 `NanochipAssemblyMatrixTierKey`，不是默认 EU tier |
 | 结构限制 | 机器 Casing Tier >= 配方 Tier，否则 `insufficientMachineTier` |
 | 超频次数 | `Energy Hatch Tier - Recipe Casing Tier`（同通用公式，但 recipe tier 来自 metadata） |
-| Priority | `-1` |
+| Priority | `-1`（**183 起该机制已删除**，控制室不再给模块排序） |
 | 额外需求 | 至少 1 个 InputHatch |
 | 输出 | 成品会写入 NAC 电路历史/校准（`baseMulti.addToHistory`） |
 | 备注 | 负责把 CC + 组件装配成更高阶电路 |
 
 ---
 
-## 2. SMD Processor（SMD 处理器）
+## 2. Part Processor（SMD 处理器，183 起改名为 Part Processor）
 
-来源：`MTESMDProcessorModule`，无特殊 override
+来源：`MTESMDProcessorModule`（183 起为 `MTEPartProcessorModule`），无特殊 override
 
 | 项目 | 数值/规则 |
 |---|---|
-| RecipeMap | `nanochipSMDProcessorRecipes` |
+| RecipeMap | `nanochipSMDProcessorRecipes`（183 起为 `nanochipPartProcessorRecipes`） |
 | EU 倍率 | `1.0` |
 | 时长倍率 | `1.0` |
 | 超频因子 | `2` |

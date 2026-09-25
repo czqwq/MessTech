@@ -101,6 +101,9 @@ public final class MTItems {
     /** Decoration item whose look is cycled through the GT5U material effects (see {@code MTDynamicItemHelper}). */
     public static final MTItemPiggy piggy = new MTItemPiggy();
 
+    /** The Ultimate Pattern Terminal (终极样板编码终端) as an AE cable part item. */
+    public static final ItemUltimatePatternTerminal ultimatePatternTerminal = new ItemUltimatePatternTerminal();
+
     private MTItems() {}
 
     public static void registerItems() {
@@ -108,6 +111,8 @@ public final class MTItems {
         GameRegistry.registerItem(nacComponentItem, "MTNACComponentItem");
         GameRegistry.registerItem(messFood, "MessFood");
         GameRegistry.registerItem(piggy, "MTItemPiggy");
+        GameRegistry.registerItem(ultimatePatternTerminal, "UltimatePatternTerminal");
+        MTItemList.UltimatePatternTerminal.set(new ItemStack(ultimatePatternTerminal, 1));
         // The fuel rods extend GT's GTGenericItem, whose constructor already calls
         // GameRegistry.registerItem(this, "gt.<unlocalized>") (the same path GT's own rods use), so they must
         // not be registered here a second time.

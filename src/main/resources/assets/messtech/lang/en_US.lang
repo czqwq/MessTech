@@ -136,6 +136,9 @@ mt.recipe.assfactory.assemblyline=Omni-Primordial Assembly Matrix:Assembly Line
 tile.AssMatrixBlock.name=Assembly Matrix Block
 tile.AdvAssMatrixBlock.name=Advanced Assembly Matrix Block
 
+# --- Ultimate Pattern Terminal ---
+item.UltimatePatternTerminal.name=Ultimate Pattern Terminal
+
 # --- MachineTemplate ---
 machine.template.machinetype=Template Machine
 machine.template.tooltip.0=Template machine: every 'A' position accepts any hatch of the base class (buses/hatches/energy/exotic/dynamo/maintenance/muffler)

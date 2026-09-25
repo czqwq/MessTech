@@ -10,82 +10,152 @@ import com.gtnewhorizons.modularui.api.math.Size;
 import gregtech.api.recipe.BasicUIPropertiesBuilder;
 import gregtech.api.recipe.NEIRecipePropertiesBuilder;
 import gregtech.api.recipe.RecipeMapFrontend;
+import gregtech.api.util.GTRecipe;
 import gregtech.api.util.MethodsReturnNonnullByDefault;
 import gregtech.common.gui.modularui.UIHelper;
 
 /**
  * NEI frontend for the Nano-Scale Foundry "24 pool" one-step recipes.
  * <p>
- * The generic {@code LargeNEIFrontend} lays out large recipes in 3 columns, which turns 48 item
- * inputs into a very tall 3x16 grid. This frontend instead uses 6 columns, producing a compact
- * 6x8 item grid; fluids also use 6 columns so the whole recipe fits on screen.
+ * These recipes are recursively flattened Assembly Matrix chains and the raw material components are packed into
+ * molten fluids (see {@code MTRecipeMaps#packMaterialInputs}), so a page is dominated by two wide grids. The layout
+ * keeps everything inside the standard 170px recipe background: the selector, the progress bar, the single item
+ * output and the logo share the header row, the item inputs take {@link #COLUMNS} columns underneath it, and the
+ * fluid inputs follow directly below them.
  */
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class NanoScaleFoundry24PoolFrontend extends RecipeMapFrontend {
 
-    private static final int COLUMNS = 6;
-    private static final int ITEM_X = 6;
-    private static final int FLUID_X = 6;
-    private static final int Y_ORIGIN = 26;
-    private static final int SPECIAL_X = 6;
-    private static final int SPECIAL_Y = 8;
-    private static final int OUTPUT_X = 138;
-    private static final int OUTPUT_Y = 80;
-    private static final int SLOT_SPACING = 18;
+    /**
+     * Slot capacity of the pool. {@code MTRecipeMaps.nanoScaleFoundry24PoolRecipes} takes its {@code maxIO} from
+     * these constants and every position below is derived from them too, so raising a limit here re-flows the whole
+     * grid; edit only these values and never hardcode the numbers again.
+     * <p>
+     * The one measurement of the flattened recipes was 61 item inputs and 24 fluid inputs (the Planck chain), taken
+     * with packing switched off: {@code MTRecipeMaps#packMaterialInputs} turns bolts, plates, fine wires, screws and
+     * foils into molten fluids, which moves entries from the item grid into the fluid grid, so that pair no longer
+     * describes this pool and both sides are the same size instead - 54 = 9 columns x 6 rows each, which keeps the
+     * page at one height while giving the fluids the room the packing needs.
+     * {@code MTRecipeMaps#populateNanoScaleFoundry24PoolRecipes()} logs the recipe's name and both of its counts if a
+     * flattened recipe ever outgrows these limits, so that log is where the current peaks show up, not this comment.
+     */
+    public static final int MAX_ITEM_INPUTS = 54;
+    public static final int MAX_ITEM_OUTPUTS = 1;
+    public static final int MAX_FLUID_INPUTS = 54;
+    public static final int MAX_FLUID_OUTPUTS = 0;
 
-    private static final int PROGRESS_X = 116;
-    private static final int PROGRESS_Y = OUTPUT_Y;
+    /** 9 columns of 18px slots span 162px, which still fits inside the 170px recipe background. */
+    public static final int COLUMNS = 9;
+    private static final int SLOT = 18;
+    private static final int BACKGROUND_WIDTH = 170;
+
+    private static final int HEADER_Y = 6;
+    private static final int SPECIAL_X = 3;
+    private static final int PROGRESS_X = 60;
+    private static final int OUTPUT_X = 86;
+    private static final int LOGO_X = 147;
+
+    public static final int ITEM_X = 3;
+    public static final int ITEM_Y = 26;
+
+    /** Blank row between the item grid and the fluid grid. */
+    private static final int BLOCK_GAP = 6;
+    private static final int BOTTOM_MARGIN = 6;
 
     public NanoScaleFoundry24PoolFrontend(BasicUIPropertiesBuilder uiPropertiesBuilder,
         NEIRecipePropertiesBuilder neiPropertiesBuilder) {
         super(
             uiPropertiesBuilder.logo(MTRecipeMaps.MT_LOGO)
-                .logoPos(new Pos2d(152, 8))
-                .progressBarPos(new Pos2d(PROGRESS_X, PROGRESS_Y)),
+                .logoPos(new Pos2d(LOGO_X, HEADER_Y))
+                .progressBarPos(new Pos2d(PROGRESS_X, HEADER_Y)),
             neiPropertiesBuilder);
     }
 
-    private int getItemRowCount() {
-        return (Math.max(uiProperties.maxItemInputs, uiProperties.maxItemOutputs) - 1) / COLUMNS + 1;
+    /** Rows a grid of {@code slots} slots needs. */
+    public static int rowCount(int slots) {
+        return (Math.max(slots, 1) - 1) / COLUMNS + 1;
     }
 
-    private int getFluidRowCount() {
-        return (Math.max(uiProperties.maxFluidInputs, uiProperties.maxFluidOutputs) - 1) / COLUMNS + 1;
+    /** Rows of the item input grid, i.e. the grid's height in slots. */
+    public static int itemRows() {
+        return rowCount(MAX_ITEM_INPUTS);
+    }
+
+    /** Rows of the fluid input grid. */
+    public static int fluidRows() {
+        return rowCount(MAX_FLUID_INPUTS);
+    }
+
+    /**
+     * Y of the first fluid row.
+     */
+    public static int fluidY() {
+        return ITEM_Y + itemRows() * SLOT + BLOCK_GAP;
+    }
+
+    /** Height of the recipe background, derived from the two grids above. */
+    public static int backgroundHeight() {
+        return fluidY() + rowCount(MAX_FLUID_INPUTS) * SLOT + BOTTOM_MARGIN;
+    }
+
+    /** NEI handler height for this pool, keeping the recipe panel in step with the background. */
+    public static int handlerHeight() {
+        return backgroundHeight() + 4;
     }
 
     @Override
     protected NEIRecipePropertiesBuilder modifyNEIProperties(NEIRecipePropertiesBuilder neiPropertiesBuilder) {
-        // +1 row reserves the non-consumed 1-4 selector slot at the top.
-        int rows = 1 + getItemRowCount() + getFluidRowCount();
-        int height = 82 + Math.max(rows - 4, 0) * SLOT_SPACING;
-        return neiPropertiesBuilder.recipeBackgroundSize(new Size(170, height));
+        return neiPropertiesBuilder.recipeBackgroundSize(new Size(BACKGROUND_WIDTH, backgroundHeight()))
+            .recipeComparator(NanoScaleFoundry24PoolFrontend::compareRecipes);
+    }
+
+    /**
+     * Orders the page list the way the machine's selector reads: the circuit tiers (1 Processor, 2 Assembly,
+     * 3 Supercomputer, 4 Mainframe) then the original GT ladder (5), and finally the special Pico/Quantum/Planck
+     * chains, which need no selector at all. Within one level the output name decides, so the list is stable.
+     */
+    private static int compareRecipes(GTRecipe left, GTRecipe right) {
+        int byLevel = Integer.compare(selectorLevel(left), selectorLevel(right));
+        if (byLevel != 0) return byLevel;
+        return outputName(left).compareTo(outputName(right));
+    }
+
+    private static int selectorLevel(GTRecipe recipe) {
+        int level = recipe.getMetadataOrDefault(MTRecipeMaps.ONE_STEP_CIRCUIT_LEVEL, 0);
+        // Level 0 means "no selector"; park those at the end of the list.
+        return level == 0 ? Integer.MAX_VALUE : level;
+    }
+
+    private static String outputName(GTRecipe recipe) {
+        return recipe.mOutputs != null && recipe.mOutputs.length > 0 && recipe.mOutputs[0] != null
+            ? recipe.mOutputs[0].getDisplayName()
+            : "";
     }
 
     @Override
     public List<Pos2d> getItemInputPositions(int itemInputCount) {
-        return UIHelper.getGridPositions(itemInputCount, ITEM_X, Y_ORIGIN, COLUMNS);
+        return UIHelper.getGridPositions(itemInputCount, ITEM_X, ITEM_Y, COLUMNS);
     }
 
     @Override
     public List<Pos2d> getItemOutputPositions(int itemOutputCount) {
-        return UIHelper.getGridPositions(itemOutputCount, OUTPUT_X, OUTPUT_Y, 1);
+        return UIHelper.getGridPositions(itemOutputCount, OUTPUT_X, HEADER_Y, 1);
     }
 
     @Override
     public Pos2d getSpecialItemPosition() {
-        // Non-consumed 1-4 selector circuit is shown as a ghost slot in the top-left header row.
-        return new Pos2d(SPECIAL_X, SPECIAL_Y);
+        // Non-consumed 1-4 selector circuit is shown as a ghost slot in the header row.
+        return new Pos2d(SPECIAL_X, HEADER_Y);
     }
 
     @Override
     public List<Pos2d> getFluidInputPositions(int fluidInputCount) {
-        int fluidY = Y_ORIGIN + getItemRowCount() * SLOT_SPACING;
-        return UIHelper.getGridPositions(fluidInputCount, FLUID_X, fluidY, COLUMNS);
+        return UIHelper.getGridPositions(fluidInputCount, ITEM_X, fluidY(), COLUMNS);
     }
 
     @Override
     public List<Pos2d> getFluidOutputPositions(int fluidOutputCount) {
-        return UIHelper.getGridPositions(fluidOutputCount, OUTPUT_X, OUTPUT_Y, 1);
+        return UIHelper.getGridPositions(fluidOutputCount, OUTPUT_X, HEADER_Y, 1);
     }
 }

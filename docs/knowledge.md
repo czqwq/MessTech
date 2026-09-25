@@ -275,7 +275,7 @@ MTMultiMachineBase<T>
   `tmp/mttooltip/frag_<id>.{zh,en}.lang` fragment into both lang files and deletes the old keys that no
   Java file references any more.
 - Chinese terminology: proper nouns - blocks, casings, hatches, buses, coils, fluids, items - have to be
-  copied verbatim from the GTNH Chinese localisation that ships under `tmp/ZH-CN`: `GregTech_zh_CN.lang`
+  copied verbatim from the GTNH Chinese localisation that ships under `../tmp/Translation-GTNH`: `GregTech_zh_CN.lang`
   plus the per-mod overrides in `config/txloader/forceload/<Mod>[<id>]/lang/zh_CN.lang`
   (`GregTech[gregtech]`, `GregTech[tectech]`, `GregTech[goodgenerator]`, `GregTech[gtnhlanth]`, ...).
   `python tools/mttooltip/zh_terms.py lookup <regex>` searches that library, `... check` fails on a wrong
@@ -581,8 +581,10 @@ MTMultiMachineBase<T>
 
 ### MTNanoScaleFoundry and the 24 pool
 - Registered as `32411`, extends `TickableParallelismAcrossMultiMachineBase`, 3x3x3 structure.
-- 11 normal threads/circuits 1-11 map to the 11 normal NAC pools; 24 pool is intentionally not a
-  machine thread yet.
+- 11 normal threads/circuits 1-11 map to the 11 normal NAC pools. Consuming an Astral Array from an input bus
+  (`consumeAstralArrayFromBuses()`, persisted in NBT) permanently unlocks a 12th thread
+  (`OneStepCircuitPool`, circuit 12) bound to the 24 pool, so the machine really does run those recipes
+  (`getMaxThreadCount()` = 12).
 - Binding: a controller-slot circuit (1-11) selects one active pool; with the controller slot empty,
   each input bus circuit slot can bind that bus to its own pool so several pools run simultaneously.
 - `checkProcessing()` now keeps the machine on a one-second GT cycle and calls the thread scheduler
@@ -596,18 +598,173 @@ MTMultiMachineBase<T>
   depletion.
 - Waila now sends per-thread name/index/active/progress/EU/parallel plus first-task output item
   names/counts; body prints progress bar then output item lines.
+- The 11 per-module NEI pools (`mt.recipe.nanoscale.*`, one per original NAC pool) copy GT5U's own maps 1:1,
+  `maxIO` included. Four envelopes grew in GT5U 5.09.54.183 and are mirrored here: Part Processor (its ident is still
+  `smdprocessor`, GT renamed the module in that version) 1/1/0/0 -> 6/4/3/0, Etching Array 2/1/2/0 -> 2/2/2/0,
+  Wire Tracer 1/1/0/0 -> 2/4/0/0 and Encasement Wrapper 4/1/0/0 -> 4/1/2/0. `maxIO` is only the NEI page's envelope -
+  `RecipeMapBackend#doAdd` validates the minimums, never the maximums - so a stale value mis-draws the wider recipes
+  outside the panel instead of losing them. The 24 pool flattens GT5U's own maps, not these copies, so its recipes are
+  unaffected either way.
 - `MTRecipeMaps.nanoScaleFoundry24PoolRecipes` is a separate one-step NEI pool
-  (`mt.recipe.nanoscale.pool24`, display stack = circuit 24), using `LargeNEIFrontend`.
+  (`mt.recipe.nanoscale.pool24`, display stack = circuit 24), using the custom
+  `NanoScaleFoundry24PoolFrontend`: 9 slots per row, the 1-5 selector / progress bar / single item output / logo
+  sharing the header row, the item inputs in a 9x6 grid under it and the fluid inputs in a 9x6 grid below that.
 - `populateNanoScaleFoundry24PoolRecipes()` recursively flattens every original Assembly Matrix
   recipe through Assembly Matrix + all module pools down to `CircuitComponent.realComponent` real
   inputs. It keeps the whole Crystal/Wetware/Bio/Optical line (Processor/Assembly/Supercomputer/
   Mainframe) plus the independent special circuits Pico/Quantum/Planck.
   Board Processor fluid inputs are removed (machine-internal/NEI display only); other module fluids and
   Assembly Matrix fluids are kept; duplicate item/fluid inputs are merged and recipes are deduplicated.
-- Measured max IO: 47 distinct item inputs / 18 distinct fluid inputs (PlanckCircuit); the map is
-  declared as `maxIO(48, 1, 18, 0)`.
-- 24 pool duration/EUt are informational only until the actual 24 machine mode is implemented.
+- `packMaterialInputs()` then packs the raw material components: bolts, plates, fine wires, screws and foils become
+  the same material's molten fluid (a bolt, a fine wire or a screw is `M / 8` = 18 mB, a foil is `M / 4` = 36 mB, a
+  plate is `M * 1` = 144 mB, converted with `prefix.getMaterialAmount() * INGOTS / GTValues.M`), and 1x wires become
+  16x wires 16:1 with any remainder left as 1x. Both keep the material amount identical
+  (`16 x 1x wire == 1 x 16x wire`), and same-material entries merge into one fluid. No molten form means the item is
+  kept as is.
+  Material lookup goes through `GTOreDictUnificator.getAssociation()` first; GT++ materials (Rhugnor, Quantum,
+  AstralTitanium, ...) are **not** GT `Materials` and their items carry no `ItemData`, so `moltenOfName()` falls
+  back to parsing the ore dictionary name (`boltRhugnor`, `screwQuantum`) and resolves it through `Materials.get()`
+  / a case-insensitive `Materials.values()` scan, then through GT++'s own `Material.mMaterialsByName` /
+  `mMaterialCache` (`getFluidStack`).
+- Input order is normalised after packing: entries are merged again (packing can duplicate 16x/leftover wires) and
+  sorted by display name - so a whole part family (both RAM chips, every superconductor wire, every board) is
+  adjacent instead of one chip landing in slot 1 and the next family member in slot 10 - then by ore dictionary
+  signature, item and amount for determinism. Fluids sort by localized name.
+- The NEI page list is ordered by `recipeComparator`: selector levels 1-4 (Processor/Assembly/Supercomputer/
+  Mainframe), then 5, then the level-0 special Pico/Quantum/Planck chains last.
+- The selector is 1-5: `getOneStepCircuitLevel()` returns 5 for `CircuitCalibration.PRIMITIVE`, i.e. the original GT
+  circuit ladder (Nand chip / Microprocessor / IntegratedProcessor / NanoProcessor / QuantumProcessor) that the
+  primitive line makes, so it no longer collides with the "Processor" name match of level 1. The level is written as
+  a ghost integrated circuit in NEI and enforced by `MTNanoScaleFoundry.checkRecipe` (circuits 1-5 in bus slots).
+- Measured max IO before packing: 61 distinct item inputs / 24 distinct fluid inputs (PlanckCircuit, after the
+  producer lookup learned to follow every output slot of a multi-output module recipe). Packing moves entries from
+  the item grid into the fluid grid, so the map is declared as `maxIO(54, 1, 54, 0)` = 9x6 item rows + 9x6 fluid
+  rows; the even split keeps the page height at 254 while both sides have room. Those 61/24 were measured with
+  packing switched off and do not describe the pool any more - the post-packing peaks are nowhere recorded, which is
+  fine because only the capacity matters.
+  `NanoScaleFoundry24PoolFrontend` owns those constants - `maxIO`, every slot position, the recipe background
+  (170x254) and the NEI panel height are all derived from them - and `populateNanoScaleFoundry24PoolRecipes()` logs
+  the recipe's name with both counts if a flattened recipe ever grows past the capacity, so that warning is the only
+  place a current peak shows up.
+- The 24 pool runs for real once circuit 12 is unlocked: `checkRecipe` matches the flattened recipes against
+  the machine's buses and overclocks them like any other thread.
 
+### Ultimate Pattern Terminal (终极样板编码终端)
+- An AE **cable part**, not a block: `PartUltimatePatternTerminal extends PartPatternTerminalEx` (AE's extended
+  pattern terminal) and `ItemUltimatePatternTerminal` is its `IPartItem`. The item is placed with AE's own
+  `ApiPart#placeBus`, so the part attaches to a cable bus on the clicked side and AE's `BusRenderer` draws it in the
+  inventory; there is no block and no tile entity of this mod - the part's host tile is AE's cable bus. It takes a
+  channel, pulls blank patterns out of the network and writes AE's own encoded pattern item back, exactly like AE's
+  part. Of the GT-Not-Leisure original it started from, the second (Avaritia 9x9) crafting mode, its
+  `DireCraftPattern` item, the mode button and the two NEI overlay entries are all gone: none of them belongs to the
+  terminal this is a copy of.
+- The one deliberate difference from AE's part is the **input** grid: 4x4 x `INPUT_PAGES` (8) = 128 cells instead of
+  AE's 4x4 x 2 = 32, which is what the Nano-Scale Foundry "24" pool (up to 54 item plus 54 fluid inputs) needs. The
+  **outputs** keep AE's own 4x4 x 2 = 32 cells and AE's own placement. The inverted flag and the active page are kept
+  on the part instead of using AE's fields, because `PartPatternTerminalEx#setInverted` clears every input cell past
+  what the inverted layout shows and this terminal has four times as many.
+- Two mixins teach AE's own extended pattern terminal classes about that page count
+  (`Mixins.ULTIMATE_PATTERN_TERMINAL`, both gated on the `appliedenergistics2` mod). Both ask the same question first -
+  is the container's part a `PartUltimatePatternTerminal` - because both classes are shared with every other extended
+  pattern terminal (AE's own, AE2FC's fluid one, any addon's):
+  - `MixinContainerPatternTermEx` answers `getPatternInputPages` with that part's own count. AE inlines the constant
+    `PartPatternTerminalEx.exPatternInputsPages` (= 2) into that method, so a part subclass cannot change it, and
+    `GuiPatternTerm#initVirtualSlots` sizes the whole virtual input grid from that answer; every other terminal still
+    gets AE's two pages.
+  - `MixinGuiPatternTermEx` redirects the one `GuiScrollbar#setRange(0, 1, 1)` in AE's GUI constructor to that page
+    count, so the private `processingScrollBar` (AE hardwires it to two pages) can reach all eight. The redirect fires
+    for whichever `GuiPatternTermEx` is being built, so for anything but this terminal it hands AE's own call straight
+    back (`bar.setRange(min, max, pageSize)`); without that guard AE's own terminal's scroll range would be
+    *recomputed* by this mod, which only happens to match today because AE's container answers the same two pages.
+  Note the corollary: sneak-clicking this terminal takes AE's own path (`super.onPartActivate`), so it opens AE's own
+  `GuiPatternTermEx` on this mod's container - AE's GUI, this terminal's eight pages.
+- `GuiUltimatePatternTerminal extends GuiPatternTermEx` owns the input arrangement: AE's own loop over the
+  container's page count, with the inverted single column's row index wrapped (`activePage % rows`, because eight
+  pages do not fit AE's four rows). The outputs are AE's own loop unchanged, and the background, item list, view
+  cells, buttons, scroll bar and all of the syncing stay AE's code path.
+- The terminal opens through Forge instead of AE's `GuiBridge`: the bridge maps a container class to a GUI class by
+  name, so a new terminal cannot be added to it without touching AE's own. `PartUltimatePatternTerminal#onPartActivate`
+  packs its side into the bits above `GUI_ULTIMATE_PATTERN_TERMINAL` (20) and calls `player.openGui`;
+  `CommonProxy`/`ClientProxy` resolve the part back from the cable bus with `Platform.getPartFromTE` and hand the
+  server AE's own `ContainerPatternTermEx`, with the `ContainerOpenContext` a GUI opened through Forge's
+  `IGuiHandler` has to set itself (AE only fills it in `Platform#openGUI`, and without it AE's middle-click "how
+  many to craft" path on the blank pattern slot NPEs). The inherited `getGui(player)` is consulted first, so the
+  craft permission stays AE's own check.
+- The pattern NBT is exactly what AE writes (`PatternEncodingHelper`: `in`/`out` lists of
+  `IAEStack#toNBTGeneric()`, no `crafting` key, item `encodedUltimatePattern`). The expected outputs are placed by
+  hand or imported from NEI - there is no crafting page left to derive them from.
+- Artwork: the item wears AE's own `appliedenergistics2:ItemPart.PatternTerminalEx` sprite with sprite number 0 (the
+  block atlas, where that sprite lives), and the part draws AE's `PartPatternTerm_Bright` face on the cable; the GUI
+  is AE's own `pattern3.png`/`pattern4.png`. **A texture name must not carry a `blocks/` prefix**: both atlases
+  already prepend `textures/blocks`, so `appliedenergistics2:PartPatternTerm_Bright` is
+  `assets/appliedenergistics2/textures/blocks/PartPatternTerm_Bright.png` while `appliedenergistics2:blocks/...`
+  looks for a `textures/blocks/blocks/` folder that does not exist and silently lands on the purple-black missing
+  texture. `CableBusTextures.registerIcon` names it the same way.
+- The recipe is unchanged (a titanium frame around AE's own extended pattern terminal part, two Engineering
+  Processors, a Calculation Processor and a Pattern Capacity Card) and now produces the part item; its registry name
+  stays
+  `UltimatePatternTerminal`. An existing world loses the old block - there is no migration.
+- NEI: `NEI_MessTechConfig` makes **every GT machine recipe page** transferable into this terminal - the Nano-Scale
+  Foundry "24" pool is one of them - by walking `RecipeCategory.ALL_RECIPE_CATEGORIES` and taking the categories whose
+  frontend registers NEI pages, exactly like NotEnoughEnergistics picks the idents it serves. Each one gets both
+  `API.registerGuiOverlay` (NEI draws that page over this GUI; `RecipeInfo` looks the pair up by the GUI's exact class
+  and the page's unlocalized name) and `API.registerGuiOverlayHandler` (the transfer button). A page whose ident is not
+  registered simply gets no button, and the terminal is deliberately **not** an `addRecipeCatalyst` anywhere: it is a
+  pattern terminal, not a machine that runs those recipes.
+- Which handler packs the page depends on the pack: with **NotEnoughEnergistics** loaded - the GTNH transfer for AE's
+  pattern terminals, and now a dependency - its `NEEPatternTerminalHandler.instance` is registered for this GUI over
+  NEU's own ident set (`RecipeProcessor`'s processors plus a null ident, minus the two crafting idents, since this
+  terminal is built on AE's extended part and cannot craft), so the terminal behaves like AE's under NEU and NEU's
+  options apply. Without NEU, this mod's own `PatternImportOverlayHandler` takes the GT categories alone: it reads GT's
+  `FixedPositionedStack` flags, which a non-GT page does not have. NEU registers itself only for AE's own terminal
+  classes and NEI looks a transfer up by exact class, which is why this terminal has to ask for those idents itself.
+- The import packs the page's ingredients into input cells 0, 1, 2 .. in the order the page reads them (top to bottom,
+  left to right), instead of copying the panel positions into a matching cell layout. That layout does not exist here:
+  the terminal's pages are four cells wide while a GT page's panels are much wider, so a position-for-position copy
+  would scatter a handful of ingredients over pages of empty cells. Which stacks count as ingredients is asked of GT
+  itself (`PatternImportOverlayHandler#isIngredient`): every item and fluid input of a GT NEI page is a
+  `GTNEIDefaultHandler.FixedPositionedStack` built with `isInput` true, while outputs and the "24" pool's non-consumed
+  selector circuit - drawn as a ghost in that page's header row, outside both panels - are built with it false. Of the
+  inputs, `isNotConsumed()` keeps the "required but not consumed" ones out (a mold, a programming circuit ...), which
+  GT itself marks with a zero size or amount: a pattern holding them would consume them. NEU makes the same choice by
+  default for the AE terminals it serves.
+  **Never test that by position against the frontend's constants**: GT's NEI slots sit at the frontend position plus
+  `GTNEIDefaultHandler.WINDOW_OFFSET` (`(-5, -11)`, the recipe panel's interior offset) plus the one pixel
+  `FixedPositionedStack` adds, so the pool's item panel starts at `rely` 16, not at `ITEM_Y` 26, and the first column of
+  both panels is at `relx` -1. A filter built from `ITEM_X`/`ITEM_Y`/`itemRows()`/`fluidRows()` therefore dropped the
+  whole first item row (9 of 9), the first item of every following row and the first fluid of every fluid row - the
+  imported grid started at the recipe's **eleventh** item - and a page whose item inputs fit into those ten slots lost
+  every item and kept only its fluids. The same offset is also why the extra rows GT adds for a recipe wider than the
+  pool's `maxIO` are now imported for free: nothing is measured against the pool's rectangles any more.
+- The recipe's result is imported too, but **not** from `IRecipeHandler#getResultStack` alone: GT5U's
+  `GTNEIDefaultHandler.CachedDefaultRecipe#getResult()` answers `null` and the page draws its item output as an
+  "other stack" instead, so `getResultStack` and `getOtherStacks` are both read into the output cells in that order.
+  NEI hands results over separately from the ingredients, and reading only the first is why importing a page left the
+  terminal's output grid empty - AE then encoded an input-only tunnel pattern instead of a processing one.
+- What travels to the server (`PatternImportHandler`) is one compound holding `in` and `out`, each a map of cell
+  index to ItemStack, so the server side needs no geometry at all. It finds the target through
+  `player.openContainer instanceof ContainerPatternTerm` plus the part check - AE's own container is what the terminal
+  opens - and marks its `inputsSync`/`outputsSync` dirty. The overlay recognises its GUI by class.
+- Every cell carries its real item count **again** under `PatternImportHandler.COUNT_KEY` (`MTCount`, a long), written
+  by `PatternImportHandler#writeCell` and restored by `#readCell`. 1.7.10 stores `ItemStack`'s count in the NBT
+  **byte** `Count` (`ItemStack#writeToNBT` line 178) and reads it back as a byte, so a count outside -128..127
+  round-trips as a different number: 1024 and 4096 both come back as 0, 1025 and 4097 as 1. The pool's flattened
+  recipes do use such counts inside a single cell (reported from the Planck chain's page: 1024 Optical Fiber Cables,
+  4096 ASoC RAMs), which is why an imported cell showed a bare item instead of its amount: AE only draws the amount
+  for `stackSize > 1`, and its `AEItemStack#drawInGui` draws the icon with the count forced to 1
+  (`AEStack#drawOverlayInGui`, reached from the pattern slot's `VirtualMESlot#drawStackAndOverlay`), so a destroyed
+  count is indistinguishable from one item. The encoded pattern was worse: the cell became `Cnt: 0`, i.e. the material
+  itself was gone from the pattern. AE cannot help here: its own writes put the real size in the long `Cnt` and write
+  `Count: 0` on purpose (`PatternHelper` restores the size from `Cnt` when it reads 0), so the count is only ever
+  correct while a stack stays an AE stack - the NEI payload is the one hop that goes through a vanilla `ItemStack`.
+  `readCell` settles a missing or zero count on one (a zero-count cell is not encodable) and a cell the inventory has
+  no room for is reported instead of silently dropped.
+- The import also puts the container into **processing** mode (`ContainerPatternTerm#setCraftingMode(false)`) before
+  it writes, the same thing NotEnoughEnergistics does for a processing transfer. A pool page is a machine recipe, so
+  it can only become a processing pattern, and while AE's container is in crafting mode its next
+  `detectAndSendChanges()` mirrors the first nine cells into the crafting matrix (`copyToMatrix`) - clamping them to
+  one and clearing them when they are not items. `PartPatternTerminalEx` already defaults to processing mode, so this
+  only guards a terminal the player switched by hand.
 ### Blocks
 - `AssMatrixBlock` (Tier 1) / `AdvAssMatrixBlock` (Tier 2).
 - Static helpers: `getBlock()`, `getItem()`, `getItemStack()`, `getItemStack(int)`.
@@ -675,6 +832,13 @@ MTMultiMachineBase<T>
     existing harnesses stay in `tools/**` and are only run on request - their results are not part of the normal
     loop any more. (This supersedes the earlier "pick the harnesses by the file that was touched" rule; see also
     `AGENTS.md`.)
+12. An item **count** never travels in a vanilla `ItemStack` NBT tag: 1.7.10 writes `Count` as a byte and reads it
+    back as one, so anything outside -128..127 comes out as a different number (1024 and 4096 both become 0). GTNH
+    recipes do use those amounts - the Nano-Scale Foundry "24" pool has 1024-count and 4096-count inputs - so any
+    client to server transfer of stacks carries the count in its own `long` tag next to the vanilla NBT
+    (`PatternImportHandler#writeCell`/`#readCell`, the same thing NotEnoughEnergistics does in
+    `ItemUtils#writeItemStackToNBT`/`#loadItemStackFromNBT`). AE's own NBT is not affected: it writes the real size
+    into the long `Cnt` and leaves `Count` at 0 on purpose.
 
 ## Known pending / open items
 

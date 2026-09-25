@@ -10,8 +10,8 @@ first** when verifying API behaviour instead of guessing:
 
 | Path | Contents / use |
 |---|---|
-| `tmp/GT5-Unofficial-5.09.54.133/` | **GT5U source matching the current compile dependency** (5.09.54.133); first choice for `gregtech.api.*` / `gregtech.common.*` |
-| `tmp/GT5-Unofficial-master/` | GT5U master-branch snapshot, **noticeably older than the versioned 5.09.54.133**; historical/diff reference only — always verify against `tmp/GT5-Unofficial-5.09.54.133/` |
+| `tmp/GT5-Unofficial-beta3/` | **GT5U 5.09.54.133 源码快照**（上一版基线）；查 `gregtech.api.*` / `gregtech.common.*` 仍首选这里，但它**已不是当前编译依赖**——依赖由 `dependencies.gradle` 的 `gtnhVersion`（2.9.0-RC-1）manifest 解析，目前是 5.09.54.183，版本敏感的 API 请对照解析出来的 jar，差异清单见 `tmp/Compare.md` |
+| `tmp/GT5-Unofficial-master/` | GT5U master-branch snapshot, **noticeably older than the beta3 checkout (5.09.54.133)**; historical/diff reference only — always verify against `tmp/GT5-Unofficial-beta3/` |
 | `tmp/ic2-decompiled/`, `tmp/ic2-src/` | Decompiled IC2 source incl. `ic2.core.*` internals (`ItemReactorUranium`, `ItemReactorHeatStorage`, `TileEntityNuclearReactorElectric`, ...) |
 | `build/rfg/minecraft-src/java/` | **Forge + Minecraft 1.7.10 decompiled source** (`net.minecraft.*` such as `RenderItem`, `ItemRenderer`, `FontRenderer`, plus `cpw.mods.fml.*`) |
 | `build/rfg/minecraft-src/resources/` | Vanilla MC assets |

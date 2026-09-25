@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.IntFunction;
 
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 
@@ -48,6 +50,24 @@ public final class Utils {
             if (v != -1) out += v;
         }
         return out < 0 ? -1 : out;
+    }
+
+    /**
+     * Hands a stack back to the player, ported from GT-Not-Leisure's {@code Utils.placeItemBackInInventory}: try the
+     * inventory, drop whatever does not fit, then resync the inventory container so the client sees it at once.
+     */
+    public static void placeItemBackInInventory(EntityPlayer player, ItemStack stack) {
+        if (stack == null || stack.stackSize == 0) return;
+
+        if (!player.inventory.addItemStackToInventory(stack)) {
+            player.func_146097_a(stack, false, false);
+        } else if (stack.stackSize > 0) {
+            player.func_146097_a(stack, false, false);
+        }
+
+        if (player instanceof EntityPlayerMP) {
+            ((EntityPlayerMP) player).sendContainerToPlayer(player.inventoryContainer);
+        }
     }
 
     public static ItemStack addStringToStackName(ItemStack itemStack, String extra) {
