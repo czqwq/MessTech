@@ -566,6 +566,26 @@ public class MTParallelHelper extends ParallelHelper {
         result = CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
+    /**
+     * This class keeps its own copies of the input arrays, shadowing {@link ParallelHelper}'s fields. The inherited
+     * implementation would read those (never assigned) parent fields and crash with a {@link NullPointerException}
+     * whenever a machine runs with {@link #setConsumption(boolean) consumption disabled} - e.g. MTDTPF in wireless
+     * mode, which has no input bus at all. Copy the arrays this class actually uses instead.
+     */
+    @Override
+    protected void copyInputs() {
+        ItemStack[] itemInputsToUse = new ItemStack[itemInputs.length];
+        for (int i = 0; i < itemInputs.length; i++) {
+            itemInputsToUse[i] = itemInputs[i].copy();
+        }
+        FluidStack[] fluidInputsToUse = new FluidStack[fluidInputs.length];
+        for (int i = 0; i < fluidInputs.length; i++) {
+            fluidInputsToUse[i] = fluidInputs[i].copy();
+        }
+        itemInputs = itemInputsToUse;
+        fluidInputs = fluidInputsToUse;
+    }
+
     @Override
     protected void calculateItemOutputs(ItemStack[] truncatedItemOutputs) {
         if (customItemOutputCalculation != null) {

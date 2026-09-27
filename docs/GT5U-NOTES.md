@@ -327,6 +327,20 @@ and `WirelessNetworkManager` (`gregtech/common/misc/WirelessNetworkManager.java`
   (`ParallelHelper.calculateChancedOutputMultiplier` does `for roll < parallel`) plus output splitting loops,
   so a huge cap that is actually reached freezes the game with no crash/log. Keep caps sane and let
   `availableEUt / recipeEUt` and input counts do the real limiting.
+* **`MTParallelHelper` re-declares `ParallelHelper`'s fields as its own privates** (it is a fork of GT++'s helper),
+  so an *inherited* `ParallelHelper` method reads the never-assigned parent fields. `copyInputs()` is the one that
+  was reachable: it runs whenever consumption is disabled (`if (!consume) copyInputs();`), and MTDTPF in wireless
+  mode disables consumption — with no input bus the parent field is `null` and the machine crashed every tick with
+  `NullPointerException: Cannot read the array length because "this.itemInputs" is null`
+  (`ParallelHelper.copyInputs`, `MTDTPF$1.createParallelHelper` → `setConsumption(false)`). `MTParallelHelper` now
+  overrides `copyInputs()` to clone its own arrays. The shadowing has two more consequences that are *not* fixed
+  (they silently change balance if "fixed" naively, so they are recorded rather than flipped):
+  `setMaxParallelCalculator`/`setInputConsumer` write the parent fields and are therefore no-ops on
+  `MTParallelHelper` (its `determineParallel` reads its own), and its `setEUtModifier(float)` is a dead overload
+  because GT5U's setter takes a `double` — so `euModifier` (MTDTPF's runtime EU discount) never reaches the fork's
+  `determineParallel`, which is why parallels there are still computed from the undiscounted `recipe.mEUt`. When
+  adding a machine that disables consumption, or when GT5U adds a new state-touching `ParallelHelper` method, check
+  whether `MTParallelHelper` must override it too.
 * **`IVoidable.canDumpItemToME/canDumpFluidToME` are implemented in `MTMultiMachineBase`**
   so every MessTech multiblock satisfies `IVoidable` regardless of whether the GT5U `MTEMultiBlockBase`
   in the active dependency provides them. The implementation mirrors upstream

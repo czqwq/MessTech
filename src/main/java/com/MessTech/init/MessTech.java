@@ -34,6 +34,9 @@ public class MessTech {
 
     public MessTech() {
         instance = this;
+        // The material has to be handed to GT here: Materials.init() runs in GT's own preInit (before this mod's
+        // preInit) and IMaterialHandler#onMaterialsInit is only ever called from inside it.
+        com.MessTech.common.material.MTChaosMatter.register();
     }
 
     @Mod.EventHandler

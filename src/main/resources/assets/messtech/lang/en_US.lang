@@ -619,3 +619,4 @@ machine.module.parallel.label=Parallel
 machine.module.waila.speed=§7Duration reduction: §b%s
 machine.module.waila.eu=§7EU discount: §a%s
 machine.module.waila.parallel=§7Parallel: §e%s
+Material.chaosmatter=Chaos Matter

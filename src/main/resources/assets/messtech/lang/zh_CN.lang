@@ -620,3 +620,4 @@ machine.module.parallel.label=并行
 machine.module.waila.speed=§7耗时减免: §b%s
 machine.module.waila.eu=§7耗电减免: §a%s
 machine.module.waila.parallel=§7并行: §e%s
+Material.chaosmatter=混乱物质

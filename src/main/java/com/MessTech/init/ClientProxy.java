@@ -29,6 +29,13 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void preInit(FMLPreInitializationEvent event) {
         super.preInit(event);
+        // Chaos Matter: the look is a client-side material renderer, attached the same way GT's own
+        // Materials.initClient
+        // attaches the Infinity/TranscendentMetal ones.
+        gregtech.api.enums.Materials chaosMatter = com.MessTech.common.material.MTChaosMatter.getMaterial();
+        if (chaosMatter != null) {
+            chaosMatter.renderer = new com.MessTech.common.render.MTChaosMatterRenderer();
+        }
         MinecraftForgeClient.registerItemRenderer(MTItems.nacComponentItem, new MTNACComponentItemRenderer());
         // Fuel rods: same oblique-axis tumble preview as Transcendent Metal (burnable + depleted).
         MTFuelRodItemRenderer.registerItemRenderers();

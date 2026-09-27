@@ -35,6 +35,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - Blocks
 - GT5U API knowledge
 - Own-code conventions
+- Chaos Matter (混乱物质): GT material registration and the stacked-renderer look
 
 ### `docs/GT5U-NOTES.md` - GT5U API notes for the version we build against
 - 0. Local reference source trees (offline lookup)

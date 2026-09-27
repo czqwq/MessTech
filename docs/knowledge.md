@@ -1473,3 +1473,54 @@ MTMultiMachineBase<T>
   appear outside tooltips. This repo uses the smaller shape instead: an effect is a registered renderer, and the
   animation data stays common while the drawing stays client-only.
 
+
+## Chaos Matter (混乱物质) material and the stacked-renderer look
+- A normal GregTech material that MessTech registers itself (through GT's `MaterialBuilder`, not through a copy of GT's
+  pools), so GT generates the items: `gt.metaitem.01` carries `ingotChaosMatter`, its dusts, plates and gears plus the
+  ore dictionary entries, because `MetaGeneratedItemX32` walks `GregTechAPI.sGeneratedMaterials` and honours the
+  METAL/DUST/GEAR generation bits the builder sets.
+- **Registration timing is the whole trick.** GT runs `Materials.init()` in its own preInit (`GTMod.java:343`), which is
+  *before* this mod's preInit, and `IMaterialHandler#onMaterialsInit` is only ever called from inside it
+  (`Materials.java:1576`, right after `MaterialsIDMap#register()` handed every GT material its `mMetaItemSubID` and
+  before the material list is frozen at `initMaterialProperties()`). `MTChaosMatter.register()` therefore runs from
+  the `@Mod` constructor, which FML calls during mod construction - before any preInit has run.
+- **The id, with room left for GT.** `MaterialsIDMap` is GT's hardcoded 0..999 table, has no free-id API for addons,
+  and `fillGeneratedMaterialsMap()` throws when two materials share an id. `findFreeId()` reads the ids that are
+  actually taken (`Materials.getMaterialsMap()` -> `mMetaItemSubID`), looks for the widest run of unused ids inside
+  `100..949` (the top of the table is where GT registers its newest materials - Infinity, SpaceTime, the Halkonites -
+  and is left alone), requires at least 8 free ids in a row so a lone hole is not squatted, and takes the **middle** of
+  that run, leaving GT roughly the same amount of room on both sides. The pick is logged with the run and the counts
+  left below and above.
+- **The textures live in this mod.** `TextureSet`'s constructors hardcode `Mods.GregTech.resourceDomain` and an addon
+  cannot put files into another mod's domain, so `chaosTextureSet()` builds a normal set and then rewrites its
+  (public, element-mutable) `mTextures` array with `Textures.ItemIcons/BlockIcons.textureSet("messtech", "chaos", ...)`
+  containers. The 16x16 icons are drawn as a grey base with messy multi-colour speckles - the ingot is every alloy and
+  element at once - and live in `assets/messtech/textures/items/materialicons/chaos/`; any slot without a file falls
+  back to GT's global `NONE` set inside the container, and the `VOID` slots keep GT's shared void icon. GT's metal
+  *blocks* use the shared `Textures.BlockIcons.STORAGE_BLOCKS*` arrays, not a material set, so no block art is needed.
+- **The look is several of GT's renderers playing at the same time** (`MTChaosMatterRenderer`, attached to
+  `Materials.renderer` from the client proxy exactly like `Materials.initClient()` does for GT's own materials). GT's
+  material effects fall into four kinds and they combine differently:
+  - *geometry* - `TranscendentMetalRenderer` only rotates the matrix (0.3/0.5/0.2, 3.5 degrees per client tick); that
+    tumble is copied into `applySpin` (plus a second slower axis) but is **currently disabled**: the call in
+    `renderItem` is commented out on request, so the icon is drawn straight and only the effects below animate.
+  - *colour modulation* - `GaiaSpiritRenderer` (hue over 180 ticks) and `RainbowOverlayRenderer` (base colour x hue
+    over 90 ticks) only set `glColor`; both hues are mixed into the single icon draw, each on its own random period and
+    phase (see the playback bullet below).
+  - *translucent extra passes* - `InfinityRenderer#renderHalo`/`renderPulse`, `CosmicNeutroniumRenderer#renderHalo` and
+    `GlitchEffectRenderer#applyRedGlitchEffect`/`applyCyanGlitchEffect` are public statics in inventory space, so they
+    are drawn every frame on top of the icon: genuinely simultaneous.
+  - *whole-icon replacements* - `UniversiumRenderer` (a shader over the sprite), `CosmicNeutroniumRenderer` and
+    `InfinityRenderer` draw the icon themselves, so two of them cannot be stacked without one hiding the other; the
+    renderer plays one of them per window over the base, blended either additively (the "everything at once" burst) or
+    normally.
+  - *the playback is random, not a rotation* - `rollWindow(tick)` re-rolls everything when a window runs out: the layer
+    (never the one that just played), the window length (10..39 ticks), whether the window is an additive burst (35%),
+    whether the CosmicNeutronium halo joins in (50%) and when within the window the glitch burst starts (60% chance,
+    8 ticks, ghost offset re-rolled every 2 ticks). Both hue cycles also get a random period and phase per session
+    (`gaiaPeriod`/`rainbowPeriod`/`gaiaPhase`/`rainbowPhase`), so nothing in the look repeats on a fixed clock.
+  This is deliberately the opposite of `MTDynamicItemHelper`, which picks exactly one effect per damage value and
+  documents that stacking several renderers on one stack is not supported there.
+- The display name is the lang key `Material.chaosmatter` in both lang files, which is what
+  `IOreMaterial#getLocalizedName()` looks up (`"Material." + name.toLowerCase()`); `mDefaultLocalName` is only the
+  fallback for a missing translation.
