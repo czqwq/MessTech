@@ -16,6 +16,7 @@ import com.MessTech.common.machine.MTChemicalTwister;
 import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDBBFurnace;
 import com.MessTech.common.machine.MTDTPF;
+import com.MessTech.common.machine.MTGrandSpaceElevator;
 import com.MessTech.common.machine.MTHugeChemicalReactor;
 import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.MTNanoScaleFoundry;
@@ -241,6 +242,15 @@ public class MTMachineLoader {
                 translateToLocal("machine.hugechemicalreactor.name")).getStackForm(1L));
         // Its brand line carries the modular look instead of an author name, see MTModuleProjectText.
         brandAsModuleProject(MTItemList.MTHugeChemicalReactor);
+
+        // Structure showcase: a 65 x 81 x 65 space elevator, four motor-packed corner frames and 64 module slots.
+        // It exists to look at the shape (see tmp/structure.txt), so it runs no recipe logic of its own.
+        MTItemList.MTGrandSpaceElevator.set(
+            new MTGrandSpaceElevator(
+                MT_ID + 77,
+                "MTGrandSpaceElevator",
+                translateToLocal("machine.grandspaceelevator.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTGrandSpaceElevator.get(1));
 
         // Module hatches: speed, EU discount and parallel control, one variant per tier IV..MAX.
         // IDs are handed out per family so a tier can be added without shifting the other families.

@@ -145,6 +145,14 @@ machine.template.tooltip.0=Template machine: every 'A' position accepts any hatc
 machine.template.tooltip.1=Perfect Overclock disabled, speed bonus 1.0, max parallel 1 - copy this class and adjust
 machine.template.tooltip.2=Structure: 3 x 3 x 3, controller on the middle of the front face
 
+# --- Grand Space Elevator (MTGrandSpaceElevator) ---
+machine.grandspaceelevator.name=Grand Space Elevator
+machine.grandspaceelevator.machinetype=Grand Space Elevator
+machine.grandspaceelevator.tooltip.0=§7Structure showcase: 65 x 113 x 65, built the way GT5U builds its elevator - wide base pad, a tower that steps narrower, stepped buttresses, three ring platforms, cable out of the crown
+machine.grandspaceelevator.tooltip.1=§7The four frames are the tower's §bNeutronium frame§7 corner posts and their buttresses, packed with motor blocks that run unbroken from the pad to the crown
+machine.grandspaceelevator.tooltip.2=§b64§7 module slots, sized and pre-placed for the real space modules: each is a §b1 wide x 5 tall x 2 deep§7 slab (TileEntityModuleBase), already laid out as M casing plus the I controller cell - just swap the blocks
+machine.grandspaceelevator.tooltip.3=§eStructure: 65 x 113 x 65, controller at the foot of the tower
+
 # --- Space Modules Infinity ---
 machine.spacemodule.parallel=Parallel
 machine.spacemodule.crossparallel=Cross-Recipe Parallel

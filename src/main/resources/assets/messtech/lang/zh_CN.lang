@@ -145,6 +145,14 @@ machine.template.tooltip.0=模板机器: 每个A位置可放置基类任意舱�
 machine.template.tooltip.1=默认关闭无损超频, 速度加成1.0, 最大并行1 - 复制此类后自行调整
 machine.template.tooltip.2=结构: 3 x 3 x 3, 控制器位于正面中央
 
+# --- 宏伟太空电梯 (MTGrandSpaceElevator) ---
+machine.grandspaceelevator.name=宏伟太空电梯
+machine.grandspaceelevator.machinetype=宏伟太空电梯
+machine.grandspaceelevator.tooltip.0=§7结构展示机：65 x 113 x 65，按 GT5U 太空电梯的做法搭——宽底座 + 逐段收细的塔身 + 台阶式斜撑 + 三层环形平台 + 塔顶缆绳
+machine.grandspaceelevator.tooltip.1=§7四条框架是塔身四角的 §b中子素框架§b 立柱与其斜撑，框架之间塞满马达方块，马达从底座一直连到塔顶、中间没有断层
+machine.grandspaceelevator.tooltip.2=§b64§7 个模块位按太空模块的真实尺寸预留并预先摆好：每个模块是 §b1 宽 x 5 高 x 2 深§7 的结构（原版 TileEntityModuleBase），已铺成 M 外壳 + I 控制器位，直接替换方块即可
+machine.grandspaceelevator.tooltip.3=§e结构：65 x 113 x 65，控制器位于塔身底部
+
 # --- 无限太空模块 ---
 machine.spacemodule.parallel=并行
 machine.spacemodule.crossparallel=跨配方并行
