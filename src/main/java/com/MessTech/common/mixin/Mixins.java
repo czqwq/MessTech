@@ -39,7 +39,18 @@ public enum Mixins {
         .addTargetMod(TargetMod.APPLIED_ENERGISTICS2),
         new MixinClass("MixinGuiPatternTermEx").setClass("MixinGuiPatternTermEx")
             .setPhase(Phase.LATE)
-            .addTargetMod(TargetMod.APPLIED_ENERGISTICS2));
+            .addTargetMod(TargetMod.APPLIED_ENERGISTICS2)),
+
+    /**
+     * Raises the ceiling of vanilla's "moved too quickly!" server-side speed check
+     * ({@code NetHandlerPlayServer#processPlayer}) from {@code Config.MOVED_TOO_QUICKLY_THRESHOLD}. The target is a
+     * vanilla class, so there is no mod to gate on and the mixin is always applied - values at or below vanilla's
+     * 100.0 hand the constant straight back. See {@code MixinNetHandlerPlayServer_MovedTooQuickly} for why it
+     * coexists with Hodgepodge's own mixin on the same constant instead of replacing it.
+     */
+    MOVED_TOO_QUICKLY_THRESHOLD(new MixinClass("MixinNetHandlerPlayServer_MovedTooQuickly")
+        .setClass("MixinNetHandlerPlayServer_MovedTooQuickly")
+        .setPhase(Phase.LATE));
 
     /*
      * SPACE_ELEVATOR_MODULES(new MixinClass("MixinTileEntitySpaceElevator").setClass("MixinTileEntitySpaceElevator")

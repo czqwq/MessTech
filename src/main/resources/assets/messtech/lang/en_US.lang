@@ -620,3 +620,10 @@ machine.module.waila.speed=§7Duration reduction: §b%s
 machine.module.waila.eu=§7EU discount: §a%s
 machine.module.waila.parallel=§7Parallel: §e%s
 Material.chaosmatter=Chaos Matter
+
+# --- /messtech command (MTCommand / MTGoUpFlight). The placeholders are the speed, the duration in seconds and the
+# configured ceiling, in that order; the third line only shows up when MOVED_TOO_QUICKLY_THRESHOLD is below the square
+# of the speed, because that check compares squared per-axis distances and would pull the player back down.
+command.messtech.usage=§cUsage: /messtech GoUp [seconds]
+command.messtech.goup.start=§7Launched at §b%s §7blocks/s for §b%s §7seconds
+command.messtech.goup.threshold.low=§cWarning: MOVED_TOO_QUICKLY_THRESHOLD=§b%s§c is below this speed squared (§b%s§c), so the vanilla moved too quickly check will pull the player back

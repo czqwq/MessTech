@@ -1524,3 +1524,94 @@ MTMultiMachineBase<T>
 - The display name is the lang key `Material.chaosmatter` in both lang files, which is what
   `IOreMaterial#getLocalizedName()` looks up (`"Material." + name.toLowerCase()`); `mDefaultLocalName` is only the
   fallback for a missing translation.
+
+## Galacticraft hook: 高速上升自动开星系 GUI (`MTGalacticraftSpaceHandler`)
+- What it does: a **player** who crosses the altitude a rocket would leave the atmosphere at, while climbing at
+  **256 格/s 或更高**, is shown Galacticraft's celestial selection screen pinned to **tier 0**, i.e. Earth is the only
+  destination. Server side only - the screen itself arrives over GC's `C_UPDATE_DIMENSION_LIST` packet.
+- **Overworld only:** gated on `player.dimension == ConfigManagerCore.idDimensionOverworld` (GC's own field rather than
+  a hardcoded 0, so a pack that moves the Overworld still works). A fast climb on the Moon or in orbit does nothing.
+- Where GC does the same thing: `EntitySpaceshipBase#onUpdate` (`posY > IExitHeight#getYCoordinateToTeleport()`, or
+  `1200` when the dimension does not implement `IExitHeight`) -> `onReachAtmosphere()` ->
+  `EntityTieredRocket#onReachAtmosphere` -> `WorldUtil#toCelestialSelection(player, stats, getRocketTier(),
+  MapMode.TRAVEL)`. Only `WorldProviderOrbit` implements `IExitHeight` in GC core, so the Overworld's exit altitude is
+  the 1200 fallback. This hook copies that altitude rule verbatim so the two agree - with the Overworld-only gate it
+  normally resolves to 1200, but staying a copy means a pack whose Overworld provider does implement `IExitHeight`
+  cannot make the two disagree.
+- **256 格/s can never be a rocket**, which is why the trigger has to be the player: `EntityTier1Rocket` sets
+  `motionY = -d * cos(...)` with `d = min(timeSinceLaunch / 150, 1)`, i.e. at most **1 格/tick = 20 格/s**. Getting a
+  player up there with the launch still doing ≥ 12.8 格/tick (256 格/s) at `y = 1200` needs **50 TNT** at their feet
+  from sea level (~798 格/s off the pad, 267 格/s when it crosses); **49 falls short at 247.7 格/s**, and 40 is the
+  smallest pile that reaches 1200 at all (`tmp/tnt-launch/reach1200.py`).
+- **It is a living-player feature.** `Explosion` applies damage and knockback in the same block, so the first of those
+  50 TNT already deals 46 damage and kills; the corpse goes on flying with the full impulse, but the handler skips
+  players that are not `isEntityAlive()`. In practice the screen therefore shows up in **creative**, where the knockback
+  is unchanged and the damage is not taken.
+- Why tier 0 means Earth only: `WorldUtil#getPossibleDimensionsForSpaceshipTier` always adds the Overworld and filters
+  every planet through `IGalacticraftWorldProvider#canSpaceshipTierPass` - the Moon already needs tier 1.
+- Implementation notes: registered from `CommonProxy#preInit` **only when `Loader.isModLoaded("GalacticraftCore")`**
+  (GC only reaches this mod transitively through Galaxy Space, so its classes must not be touched otherwise), on the
+  **FML bus** (`TickEvent.PlayerTickEvent` is an FML event, unlike `MTProcessHandler`'s Forge-bus `WorldEvent`).
+  The trigger is the upward crossing alone - `prevPosY <= exit < posY` with `motionY >= 256 / 20` - which fires once
+  per flight without any per-player state. Both things that could fake a crossing move `prevPosY` and `posY`
+  *together*: `Entity#setPositionAndRotation` (`Entity.java:1259-1261`) is what a teleport and the client's own
+  movement packet (`NetHandlerPlayServer#processPlayer:394`) go through, and neither can leave `prevPosY` below the
+  altitude while `posY` is above it. That packet is handled outside the entity tick (`MinecraftServer#tick`:
+  `worldserver.tick()` at 696 vs `networkTick()` at 730) while `PlayerTickEvent.END` fires inside `EntityPlayer#onUpdate`,
+  so whichever of the two runs first, exactly one tick still sees the crossing.
+  `player.motionY` is the server-side impulse the explosion applied to the `EntityPlayerMP`.
+- Off switch: `Config.GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI` (category `General`, default `true`).
+- **Caveat for non-host players:** `NetHandlerPlayServer#processPlayer` (`build/rfg/minecraft-src`) rejects a reported
+  move when `max(|dx|, |motionX|)^2 + max(|dy|, |motionY|)^2 + max(|dz|, |motionZ|)^2 > 100` **and** the player is not
+  the single-player host, teleporting them back to `lastPos`. A 12.8 格/tick climb clears that threshold on its own, so
+  the host of an integrated server is exempt and the flight runs, while on a dedicated server / LAN guest the correction
+  may fight the ascent before it ever reaches 1200. That half is a source reading, not an in-game test. The limit is
+  raiseable - see "Vanilla 'moved too quickly' 上限" below.
+
+## Vanilla "moved too quickly" 上限 (`MixinNetHandlerPlayServer_MovedTooQuickly`)
+- **那行判定是 Forge 的构建期源码补丁，不是任何模组**：`forgepatches.zip` 里的
+  `net/minecraft/network/NetHandlerPlayServer.java.patch` 把原版的 `Math.min` 换成了 `Math.max`（注释
+  `//BUGFIX: min -> max, grabs the highest distance`），所以 `processPlayer` 比较的平方距离是"客户端上报位移"和
+  "实体自身 motion"**逐轴取大者**（结果见 `build/rfg/minecraft-src/.../NetHandlerPlayServer.java:341-347`，阈值在同一
+  方法的 347 行）。Forge 不为它提供任何开关，本地 528 个 GTNH 模组 jar 里也没有别的模组改这一行。
+- 阈值由本 mod 的 late mixin `MixinNetHandlerPlayServer_MovedTooQuickly` 抬高，配置项
+  `Config.MOVED_TOO_QUICKLY_THRESHOLD`（category `General`，**默认 `2000.0`**）。**只升不降**：
+  `configured > original` 才返回配置值，所以设成 100 及以下就退回原版行为，等于功能关闭。
+- **和 Hodgepodge 共存而不是二选一**：Hodgepodge 的 `MixinNetHandlerPlayServer_DisableMovedTooQuickly` 用同一条
+  `@ModifyConstant(method = "processPlayer", constant = @Constant(doubleValue = 100.0D, ordinal = 0))`，且只在
+  `FixesConfig.movedTooQuicklyThreshold > 100.0` 时才应用（配置在 `config/hodgepodge.cfg` 的 `[fixes]` 段，键
+  `D:movedTooQuicklyThreshold`）。两个 `@ModifyConstant` 打在同一常量上是**串接**而不是冲突——会冲突的是
+  `@Redirect`/`@Overwrite`，那种情况游戏直接起不来。因此最终上限 = max(原版 100、Hodgepodge 的值、本 mod 的值)；
+  本 mixin 用 `priority = 1500`（Hodgepodge 是 Mixin 默认的 1000）保证后应用，能在 Hodgepodge 的结果上继续抬。
+- 配置值是在 `processPlayer` **运行时**读的，而不是在 mixin 收集时用 `setApplyIf` 判定，所以与 GTNHMixins 何时收集
+  late mixin 列表无关（本 mod 的配置要到 `preInit` 才读，而那之前静态字段还是各自的初始值）。
+- 默认值的锚点：50 个 TNT 在脚下起爆瞬间 |motionY| = 50 x 0.7975 = 39.875 格/tick → 平方 1590.016，这是整段爬升里
+  检查看到的**最大值**（只在起飞那一 tick 出现，之后单调衰减，飞到 y=1200 时只剩 ~13.4 格/tick）。默认 `2000.0`
+  = 44.72 格/tick，比所需的 1590 多约 26% 冗余，约等于 56 个 TNT；`1.7976931348623157E308` 是彻底关掉。
+  判定在**服务端**，所以生效的是服务端那份配置。
+
+## `/messtech GoUp [秒数]` (`MTCommand` / `MTGoUpFlight`)
+- 指令本体 `MTCommand`：根指令 `messtech`，`GoUp` 是唯一的子命令，参数是秒数（默认 30）。权限等级 2（OP），
+  发送者必须是玩家（没有目标选择器，控制台没有可抛的对象）。注册在 `CommonProxy#serverStarting`
+  （`FMLServerStartingEvent#registerServerCommand`），飞行处理器在 `preInit` 里 `MTGoUpFlight.init()`。
+- 效果：把玩家以**固定速度 14.0 格/tick = 280 格/s** 抛向空中，持续 N 秒（默认 30 s = 600 tick）。不是"给一次冲量"，
+  而是**每 tick 重设 `motionY` 并推进位置**，所以重力和阻力都改不了它。
+- 为什么是 14.0：钩子的线是 256 格/s = 12.8 格/tick（`MTGalacticraftSpaceHandler`），14.0 超过去；即使被原版物理衰减
+  一 tick（`(14 - 0.08) * 0.98 = 13.64` 格/tick = 272.8 格/s）仍 > 12.8，所以两个 `PlayerTickEvent` 处理器谁先谁后
+  都不影响判定；而它的平方 196 又远低于 `MOVED_TOO_QUICKLY_THRESHOLD` 的默认 2000。到 y=1200 约 82 tick（4.1 s），
+  默认 30 s 绰绰有余（30 s 大约到 8400 格）。
+- **为什么必须 `setPositionAndUpdate` 而不能只设 `motionY`**：1.7.10 里玩家位置由客户端权威
+  （`NetHandlerPlayServer#processPlayer` 最后会 `setPositionAndRotation(客户端上报位置)`），服务端单方面设 `motionY`
+  会被下一个 `C03PacketPlayer` 顶掉。`EntityPlayerMP#setPositionAndUpdate` → `setPlayerLocation`
+  （`NetHandlerPlayServer.java:443-451`）会移动服务端实体、把 `hasMoved` 置 false（于是本次上报的客户端位置不被采用，
+  浮空踢人检查也走不到）并回发 `S08PacketPlayerPosLook` 钉住客户端。
+- S08 的 Y 特意写成 `y + 1.62`，正好抵消客户端 `posY → boundingBox.minY` 的 1.62 偏移，所以客户端下一包上报的 Y 会
+  落在服务端 `lastPosY` 上（`processPlayer` 的 `hasMoved` 追赶判定要求 `Δy² < 0.01`），`hasMoved` 于是每 tick 都能
+  重新变 true —— **移动包路径照常运行，钩子依赖的 `PlayerTickEvent` 也就照常触发**，这正是指令存在的目的。
+- 处理器挂在 `TickEvent.ServerTickEvent` 的 END（世界与移动包都处理完之后，位置以它为准），并会跳过已死亡、世界为空
+  或已登出的玩家，避免 map 里长期持有实体。
+- 与配置的耦合：14 格/tick 的平方是 196，**高于原版的 100**，所以这个指令本身就依赖 `MOVED_TOO_QUICKLY_THRESHOLD`
+  被抬高（默认 2000 满足）；配置低于该值时指令会额外发一条警告（`command.messtech.goup.threshold.low`），
+  而不是让玩家莫名被拉回去。
+- 副作用提醒：30 s 飞完玩家在约 8400 格高处，掉下来要很久，落地/掉出世界都按原版规则处理。
+

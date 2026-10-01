@@ -621,3 +621,10 @@ machine.module.waila.speed=§7耗时减免: §b%s
 machine.module.waila.eu=§7耗电减免: §a%s
 machine.module.waila.parallel=§7并行: §e%s
 Material.chaosmatter=混乱物质
+
+# --- /messtech 指令 (MTCommand / MTGoUpFlight)。占位符依次是速度、持续秒数、配置阈值：
+# 第三条只在 MOVED_TOO_QUICKLY_THRESHOLD 低于本次速度的平方时出现，因为原版 moved too quickly 检查
+# 比较的就是逐轴平方距离，阈值不够时服务端会把玩家拉回去。
+command.messtech.usage=§c用法: /messtech GoUp [秒数]
+command.messtech.goup.start=§7已抛向空中: §b%s §7格/s, 持续 §b%s §7秒
+command.messtech.goup.threshold.low=§c警告: 配置 MOVED_TOO_QUICKLY_THRESHOLD=§b%s§c 低于本次速度的平方 §b%s§c, 原版 moved too quickly 检查会把玩家拉回来

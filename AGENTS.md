@@ -36,6 +36,9 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - GT5U API knowledge
 - Own-code conventions
 - Chaos Matter (混乱物质): GT material registration and the stacked-renderer look
+- Galacticraft hook: 高速上升自动开星系 GUI (`MTGalacticraftSpaceHandler`)
+- Vanilla "moved too quickly" 上限 (`MixinNetHandlerPlayServer_MovedTooQuickly`)
+- `/messtech GoUp [秒数]` (`MTCommand` / `MTGoUpFlight`)
 
 ### `docs/GT5U-NOTES.md` - GT5U API notes for the version we build against
 - 0. Local reference source trees (offline lookup)

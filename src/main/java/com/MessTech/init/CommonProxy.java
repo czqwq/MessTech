@@ -7,7 +7,10 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import com.MessTech.common.block.MTBlocks;
+import com.MessTech.common.command.MTCommand;
+import com.MessTech.common.command.MTGoUpFlight;
 import com.MessTech.common.entity.MTEntityPiggy;
+import com.MessTech.common.galacticraft.MTGalacticraftSpaceHandler;
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
 import com.MessTech.common.network.MTNetwork;
@@ -63,6 +66,12 @@ public class CommonProxy implements IGuiHandler {
         // death event of the game.
         MTTrueKill.init();
         MTProcessHandler.init();
+        // Galacticraft's own rockets climb at 1 block per tick at most, so this hook can only ever fire for a player
+        // who was thrown up at 256 blocks/s or more (see MTGalacticraftSpaceHandler).
+        MTGalacticraftSpaceHandler.init();
+        // The flight behind /messtech GoUp: it drives the server entity and pins the client with the position packets
+        // setPositionAndUpdate sends, so it needs no client-side counterpart.
+        MTGoUpFlight.init();
         if (Loader.isModLoaded("Torcherino")) {
             MT_LOG.info("拿火把捅你皮撅子");
         }
@@ -95,6 +104,8 @@ public class CommonProxy implements IGuiHandler {
     // register server commands in this event handler (Remove if not needed)
     public void serverStarting(FMLServerStartingEvent event) {
         MT_LOG.debug("Hello the mess world!");
+        // /messtech - see MTCommand. Commands belong to this event, not to preInit.
+        event.registerServerCommand(new MTCommand());
     }
 
     @Override
