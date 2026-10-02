@@ -16,6 +16,7 @@ dependencies {
     implementation(gtnhDev("NotEnoughEnergistics"))
     implementation(gtnhDev("ForestryMC"))
     implementation(gtnhDev("Infernal-Mobs"))
+    implementation("com.cubefury.vendingmachine:VendingMachine:0.4.82:dev")
     implementation(gtnhDev("Galaxy-Space-GTNH"))
     implementation(gtnhDev("SGCraft"))
     implementation(gtnhDev("twilightforest"))

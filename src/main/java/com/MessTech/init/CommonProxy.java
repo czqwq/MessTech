@@ -18,6 +18,7 @@ import com.MessTech.common.parts.PartUltimatePatternTerminal;
 import com.MessTech.common.process.MTProcessHandler;
 import com.MessTech.common.recipe.MTChemicalTwisterRecipes;
 import com.MessTech.common.recipe.MTRecipeMaps;
+import com.MessTech.common.recipe.MTVendingMachineRecipes;
 import com.MessTech.common.recipe.RecipeMessFood;
 import com.MessTech.common.util.MTTrueKill;
 
@@ -33,6 +34,7 @@ import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.network.IGuiHandler;
 import cpw.mods.fml.common.network.NetworkRegistry;
+import gregtech.api.enums.Mods;
 
 public class CommonProxy implements IGuiHandler {
 
@@ -150,5 +152,11 @@ public class CommonProxy implements IGuiHandler {
         // Same for the Assembly Factory's Assembly Line pool: it is built from GT's Assembly Line definitions, which
         // other mods (TST's circuit lines, for one) only finish registering during their own postInit.
         MTRecipeMaps.populateAssFactoryAssemblyLineRecipes();
+        // Same reasoning for the Vending Machine: it reads its trade database in its own FMLServerStartingEvent
+        // handler, so the piggy trade can only be merged in after that (see MTVendingMachineRecipes). The machine is
+        // optional, so its classes must not be touched without it.
+        if (Mods.VendingMachine.isModLoaded()) {
+            MTVendingMachineRecipes.register();
+        }
     }
 }
