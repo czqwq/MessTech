@@ -821,19 +821,19 @@ public class GTRecipes {
             .duration(50 * SECONDS)
             .addTo(assemblerRecipes);
 
-        // Containment Field casing
+        Casings containmentFieldCasing = Casings.ContainmentFieldMachineCasing;
         GTValues.RA.stdBuilder()
             .itemInputs(
-                GTUtility.getIntegratedCircuit(11),
+                GTUtility.getIntegratedCircuit(15),
                 GTOreDictUnificator.get(OrePrefixes.frameGt, Materials.Steel, 1),
-                ItemList.Field_Generator_LuV.get(4),
+                ItemList.Field_Generator_UV.get(4),
                 new Object[] { OrePrefixes.circuit.get(Materials.ZPM), 8 },
-                GTOreDictUnificator.get(OrePrefixes.cableGt01, Materials.Naquadah, 4),
-                GTOreDictUnificator.get(OrePrefixes.plate, Materials.Steel, 8))
-            .fluidInputs(Materials.NaquadahAlloy.getMolten(144 * 4))
-            .itemOutputs(new ItemStack(Casings.ContainmentFieldMachineCasing.getItem(), 8, 1))
+                GTOreDictUnificator.get(OrePrefixes.cableGt16, Materials.Naquadah, 4),
+                GTOreDictUnificator.get(OrePrefixes.plateDense, Materials.Steel, 8))
+            .fluidInputs(Materials.NaquadahAlloy.getMolten(144 * 4 * 64))
+            .itemOutputs(containmentFieldCasing.toStack(8))
             .eut(RECIPE_UV)
-            .duration(20 * 30)
+            .duration(20 * 60)
             .addTo(assemblerRecipes);
 
         // Depleted rods: centrifuge recycling, scaled with the rod size (single 1x / dual 2x / quad 4x).
