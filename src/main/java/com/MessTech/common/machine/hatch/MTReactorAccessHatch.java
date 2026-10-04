@@ -4,13 +4,18 @@ import java.util.Arrays;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
@@ -19,7 +24,9 @@ import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import gregtech.api.enums.ItemList;
 import gregtech.api.enums.Textures;
+import gregtech.api.interfaces.IDataCopyable;
 import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
@@ -27,6 +34,7 @@ import gregtech.api.items.ItemRadioactiveCell;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatch;
 import gregtech.api.render.TextureFactory;
+import gregtech.api.util.GTUtility;
 import gregtech.common.items.ItemDepletedCell;
 import ic2.api.reactor.IReactorComponent;
 import ic2.core.Ic2Items;
@@ -45,7 +53,14 @@ import ic2.core.item.reactor.ItemReactorUranium;
  * of that, {@code updateTexture} is intentionally never called for this hatch, so multiblock casing updating
  * cannot overwrite the tier base.
  */
-public class MTReactorAccessHatch extends MTEHatch {
+public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable {
+
+    /** Data stick "type" carrying this hatch's copyable configuration. One identifier for every tier. */
+    public static final String DATA_STICK_DATA_TYPE = "MTReactorAccessHatch";
+    private static final Logger LOG = LogManager.getLogger("MessTech");
+
+    /** Payload layout version: a stick written by an older layout is refused instead of half applied. */
+    public static final int DATA_STICK_VERSION = 2;
 
     public static final int PAGE_WIDTH = 9;
     public static final int PAGE_HEIGHT = 6;
@@ -116,8 +131,35 @@ public class MTReactorAccessHatch extends MTEHatch {
 
     @Override
     public boolean onRightclick(IGregTechTileEntity aBaseMetaTileEntity, EntityPlayer aPlayer) {
+        ItemStack heldItem = aPlayer.getHeldItem();
+        if (ItemList.Tool_DataStick.isStackEqual(heldItem, false, true)) {
+            // Only the server applies (and answers for) the configuration; the client has nothing to do here.
+            if (!(aPlayer instanceof EntityPlayerMP)) return true;
+            if (!pasteCopiedData(aPlayer, heldItem.stackTagCompound)) {
+                GTUtility.sendChatTrans(aPlayer, "machine.mtreactor.accesshatch.copy.invalid");
+                return true;
+            }
+            GTUtility.sendChatTrans(aPlayer, "machine.mtreactor.accesshatch.copy.loaded");
+            return true;
+        }
         openGui(aPlayer);
         return true;
+    }
+
+    /**
+     * Left click with a data stick in hand saves this hatch's lock configuration, the GT way (see
+     * {@code MTEHatchOutputBus#onLeftclick}). This cannot break the block: {@code BlockMachines} builds on GT's
+     * {@code MaterialMachines} ({@code setRequiresTool()}) and reports a wrench as its harvest tool, so left clicking
+     * with a data stick deals no block damage.
+     */
+    @Override
+    public void onLeftclick(IGregTechTileEntity aBaseMetaTileEntity, EntityPlayer aPlayer) {
+        if (!(aPlayer instanceof EntityPlayerMP)) return;
+        ItemStack dataStick = aPlayer.getHeldItem();
+        if (!ItemList.Tool_DataStick.isStackEqual(dataStick, false, true)) return;
+        dataStick.stackTagCompound = getCopiedData(aPlayer);
+        dataStick.setStackDisplayName(StatCollector.translateToLocal("machine.mtreactor.accesshatch.name") + " Config");
+        GTUtility.sendChatTrans(aPlayer, "machine.mtreactor.accesshatch.copy.saved");
     }
 
     /**
@@ -151,7 +193,9 @@ public class MTReactorAccessHatch extends MTEHatch {
             .translateToLocalFormatted("machine.mtreactor.accesshatch.desc.0", pageCount, pageCount * SLOTS_PER_PAGE),
             EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.mtreactor.accesshatch.desc.1"),
             EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.mtreactor.accesshatch.desc.2"),
-            EnumChatFormatting.DARK_GRAY + StatCollector.translateToLocal("machine.mtreactor.accesshatch.desc.3") };
+            EnumChatFormatting.DARK_GRAY + StatCollector.translateToLocal("machine.mtreactor.accesshatch.desc.3"),
+            EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.mtreactor.accesshatch.desc.4"),
+            EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.mtreactor.accesshatch.desc.5") };
     }
 
     // region Inventory layout
@@ -514,6 +558,127 @@ public class MTReactorAccessHatch extends MTEHatch {
                 mSlotMemory[slot] = item;
             }
         }
+    }
+
+    // endregion
+
+    // region Data stick copy / paste (IDataCopyable)
+
+    @Override
+    public String getCopiedDataIdentifier(EntityPlayer player) {
+        return DATA_STICK_DATA_TYPE;
+    }
+
+    /**
+     * Data stick payload: how many 9x6 pages the configuration covers and, per slot, which component type is locked
+     * with which auto-output threshold. The components themselves are deliberately not part of the payload - the
+     * paste only ever applies settings to what the target hatch already holds.
+     */
+    @Override
+    public NBTTagCompound getCopiedData(EntityPlayer player) {
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setString("type", DATA_STICK_DATA_TYPE);
+        tag.setInteger("ver", DATA_STICK_VERSION);
+        tag.setInteger("page", pageCount);
+
+        // Sparse archive of the locked component types: only the slots that are locked.
+        NBTTagList lockList = new NBTTagList();
+        for (int i = 0; i < mSlotState.length; i++) {
+            if (mSlotState[i] < 0 || mSlotMemory[i] == null) continue;
+            NBTTagCompound entry = new NBTTagCompound();
+            entry.setInteger("slot", i);
+            entry.setInteger("threshold", mSlotState[i]);
+            entry.setTag("item", mSlotMemory[i].writeToNBT(new NBTTagCompound()));
+            lockList.appendTag(entry);
+        }
+        tag.setTag("locks", lockList);
+        return tag;
+    }
+
+    /**
+     * Replays a copied lock configuration into this hatch, slot for slot: the lock percentage and the component type a
+     * slot was locked to are taken straight from the stick. The inventory is never consulted and never written - which
+     * component sits in a slot (if any) stays exactly as it was.
+     * <p>
+     * Pages map one to one (page 0 to page 0, then upwards). When the source hatch has more pages than this one, only
+     * the pages this hatch really has are replayed and the player is told how many were dropped, which is what makes
+     * copying from an advanced hatch onto a lower tier one work.
+     * <p>
+     * A slot the configuration leaves unlocked is unlocked here as well, and a page this hatch does not have keeps no
+     * lock. A locked slot that happens to be empty is reported: the lock is still in place and takes effect as soon as
+     * the matching component is put in.
+     */
+    @Override
+    public boolean pasteCopiedData(EntityPlayer player, NBTTagCompound nbt) {
+        if (nbt == null || !DATA_STICK_DATA_TYPE.equals(nbt.getString("type"))) return false;
+
+        int sourcePages = nbt.getInteger("page");
+        if (nbt.getInteger("ver") != DATA_STICK_VERSION || sourcePages < 1) return false;
+        int sourceSlots = sourcePages * SLOTS_PER_PAGE;
+
+        ItemStack[] lockedType = new ItemStack[sourceSlots];
+        int[] lockedThreshold = new int[sourceSlots];
+        NBTTagList lockList = nbt.getTagList("locks", 10);
+        int entriesRead = 0;
+        for (int i = 0; i < lockList.tagCount(); i++) {
+            NBTTagCompound entry = lockList.getCompoundTagAt(i);
+            int slot = entry.getInteger("slot");
+            if (slot < 0 || slot >= sourceSlots) continue;
+            ItemStack type = ItemStack.loadItemStackFromNBT(entry.getCompoundTag("item"));
+            if (type == null) continue;
+            lockedType[slot] = type;
+            lockedThreshold[slot] = entry.getInteger("threshold");
+            entriesRead++;
+        }
+
+        int appliedPages = Math.min(pageCount, sourcePages);
+        int appliedSlots = appliedPages * SLOTS_PER_PAGE;
+        int applied = 0;
+        int emptyLocked = 0;
+
+        // The lock configuration is copied slot by slot, straight from the stick. The inventory is never consulted
+        // and never written: which component sits in a slot (if any) is the player's business.
+        for (int i = 0; i < appliedSlots; i++) {
+            ItemStack type = lockedType[i];
+            if (type == null) {
+                mSlotState[i] = -1;
+                mSlotMemory[i] = null;
+                continue;
+            }
+            mSlotState[i] = (byte) Math.max(0, Math.min(100, lockedThreshold[i]));
+            mSlotMemory[i] = type.copy();
+            applied++;
+            if (mInventory[i] == null) emptyLocked++;
+        }
+
+        // Pages this hatch does not have must not keep a lock from before.
+        for (int i = appliedSlots; i < mSlotState.length; i++) {
+            mSlotState[i] = -1;
+            mSlotMemory[i] = null;
+        }
+
+        markDirty();
+        if (sourcePages > appliedPages) {
+            player.addChatComponentMessage(
+                new ChatComponentTranslation(
+                    "machine.mtreactor.accesshatch.copy.pages_dropped",
+                    sourcePages - appliedPages,
+                    appliedPages));
+        }
+        if (applied == 0) {
+            LOG.warn(
+                "[MTReactorAccessHatch] stick carried {} lock entr(ies), {} readable, {} usable page(s)",
+                lockList.tagCount(),
+                entriesRead,
+                appliedPages);
+            player.addChatComponentMessage(new ChatComponentTranslation("machine.mtreactor.accesshatch.copy.no_locks"));
+            return true;
+        }
+        if (emptyLocked > 0) {
+            player.addChatComponentMessage(
+                new ChatComponentTranslation("machine.mtreactor.accesshatch.copy.empty_slots", emptyLocked));
+        }
+        return true;
     }
 
     // endregion

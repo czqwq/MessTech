@@ -258,6 +258,24 @@ MTMultiMachineBase<T>
   colour emphasis lives in the lang text itself (`§b` for values, `§c` for the danger thresholds, `§e` for the hatch
   tiers), so the Java side is one `addInfo(translate(key))` per line, and the structure block/`toolTipFinisher` follow
   unchanged. Reuse this layout (and key naming) for the other machines.
+- Data stick copy (`MTReactorAccessHatch implements IDataCopyable`): the GT5U pattern of `MTEHatchOutputBus` /
+  `MTEHatchConfigurableBase` - left click with an `ItemList.Tool_DataStick` saves, right click loads, and a constant
+  `"type"` string (`DATA_STICK_DATA_TYPE`) is checked on paste. Safe on a GT machine block: `MaterialMachines` is
+  `setRequiresTool()` and the harvest tool is a wrench, so a data stick deals no block damage.
+- The payload is settings only - a version (`ver`), the source page count (`page`) and a sparse `locks` list of
+  `{slot, threshold, item}` for the locked slots. **The components themselves are never stored or written**: a paste
+  replays that config slot for slot: the lock percentage and the remembered component type come straight from the
+  stick, the inventory is never read and never written, a slot the config leaves unlocked is unlocked, and a page the
+  hatch does not have keeps no lock. A locked slot that is empty is reported (`copy.empty_slots`) - the lock stands and
+  works as soon as the component is put in.
+- Two earlier revisions were wrong and must not come back: (a) storing the components and writing them into the target
+  (that is not a settings copy), and (b) matching the config against the target's items by type and skipping the rest
+  (that locked nothing whenever the comparison did not line up, and it made the paste depend on the inventory).
+- If a paste replays nothing, the hatch logs (logger `MessTech`, WARN) how many lock entries the stick carried, how many
+  survived `loadItemStackFromNBT` and how many pages were usable. A bare JVM cannot resolve Forge item ids, so this log
+  is the field diagnostic.
+- Pages map 0..N-1 one to one: a smaller hatch ignores the pages it does not have (`copy.pages_dropped`). The version
+  field exists so a stick written by an earlier layout is refused (`copy.invalid`) instead of half applied.
 
 ### Machine tooltips (house style)
 - Every machine controller tooltip is one `addInfo(translate(key))` per line with the keys
