@@ -105,7 +105,7 @@ public class GTRecipes {
 
         GTValues.RA.stdBuilder()
             .itemInputs(
-                new ItemStack(NanochipMeshInterfaceCasing.getItem(), 8, 1),
+                NanochipMeshInterfaceCasing.toStack(8),
                 UncertaintyX_Hatch.get(64),
                 Machine_Multi_Computer.get(8),
                 Machine_Multi_DataBank.get(1),
@@ -122,7 +122,7 @@ public class GTRecipes {
         GTValues.RA.stdBuilder()
             .itemInputs(
                 rack_Hatch.get(1),
-                new ItemStack(NanochipFirewallProjectionCasing.getItem(), 1, 4),
+                NanochipFirewallProjectionCasing.toStack(1),
                 new Object[] { OrePrefixes.circuit.get(Materials.UEV), 2 })
             .itemOutputs(MTItemList.MTHatchRack.get(1))
             .eut(RECIPE_UHV)
@@ -136,8 +136,8 @@ public class GTRecipes {
             .itemInputs(
                 GTOreDictUnificator.get(OrePrefixes.nanite, Materials.Neutronium, 8),
                 // ItemList.Casing_Assembler.get(64),
-                new ItemStack(Casings.AssemblerMachineCasing.getItem(), 64, 9),
-                new ItemStack(Casings.AssemblyLineCasing.getItem(), 64, 5),
+                Casings.AssemblerMachineCasing.toStack(64),
+                Casings.AssemblyLineCasing.toStack(64),
                 ItemList.Robot_Arm_UHV.get(64),
                 ItemList.Conveyor_Module_UHV.get(64),
                 ItemList.Electric_Pump_UHV.get(64),
@@ -272,7 +272,7 @@ public class GTRecipes {
             (int) TierEU.RECIPE_UXV,
             1,
             new Object[] { ItemList.LargeNaquadahReactor.get(64),
-                new ItemStack(Casings.NaquadahReactorCasing.getItem(), 64, 15), ItemList.Electric_Piston_UMV.get(32),
+                Casings.NaquadahReactorCasing.toStack(64), ItemList.Electric_Piston_UMV.get(32),
                 ItemList.Electric_Pump_UMV.get(64), ItemList.Field_Generator_UMV.get(16), ItemList.Sensor_UMV.get(8),
                 ItemList.Emitter_UMV.get(64), new Object[] { OrePrefixes.circuit.get(Materials.MAX), 16 },
                 MaterialsElements.STANDALONE.HYPOGEN.getGear(16), MaterialsElements.STANDALONE.HYPOGEN.getRing(64),
@@ -429,7 +429,7 @@ public class GTRecipes {
 
         GTValues.RA.stdBuilder()
             .itemInputs(Materials.Bronze.getPlates(4), new ItemStack(Items.brick, 1))
-            .itemOutputs(new ItemStack(Casings.BronzePlatedBricks.getItem(), 1, 10))
+            .itemOutputs(Casings.BronzePlatedBricks.toStack(1))
             .eut(0)
             .duration(1)
             .addTo(Steel_brick_Recipes);
@@ -505,13 +505,10 @@ public class GTRecipes {
                 CustomItemList.Machine_Multi_BECIONode.get(1), CustomItemList.Machine_Multi_BECStorage.get(1),
                 Machine_Multi_BECGenerator.get(1), ItemList.Robot_Arm_UMV.get(32), ItemList.Sensor_UMV.get(16),
                 GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UXV, 16),
-                new ItemStack(Casings.CoherencePreservingPlasmaConduit.getItem(), 16),
-                new ItemStack(Casings.CondensateTransformativeCoil.getItem(), 16, 5),
-                new ItemStack(Casings.PeaceEnforcementCasing.getItem(), 16, 4),
-                new ItemStack(
-                    Casings.ElectromagneticallyIsolatedCasing.getItem(),
-                    16,
-                    Casings.ElectromagneticallyIsolatedCasing.getBlockMeta()),
+                Casings.CoherencePreservingPlasmaConduit.toStack(16),
+                Casings.CondensateTransformativeCoil.toStack(16),
+                Casings.PeaceEnforcementCasing.toStack(16),
+                Casings.ElectromagneticallyIsolatedCasing.toStack(16),
                 CustomItemList.Pipe_BEC.get(64), GTOreDictUnificator.get(OrePrefixes.gearGt, Materials.SpaceTime, 8),
                 GTOreDictUnificator.get(OrePrefixes.gearGtSmall, Materials.SpaceTime, 16) },
             nanites(1, 1, 4, 5, 1, 4, 1, 1, 4, 5, 1, 4, 4, 4),
