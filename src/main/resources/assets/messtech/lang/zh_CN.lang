@@ -430,11 +430,11 @@ machine.bosescraftingarray.machinetype=玻色-爱因斯坦凝聚态物质聚合�
 machine.bosescraftingarray.tooltip.desc=§7独立的 BEC 式凝聚态装配阵列：靠纳米蜂群加速凝聚态装配配方
 machine.bosescraftingarray.tooltip.flavour=§7生成,收容,观测,聚合
 machine.bosescraftingarray.tooltip.structure.header=§6结构：
-machine.bosescraftingarray.tooltip.structure.frame=§7· 主体为§e相干性维持等离子导管§7，空位可安装输入/输出总线、输入仓、能源仓（含激光靶仓/多安能源仓）或奇点纳米蜂群收容总线
+machine.bosescraftingarray.tooltip.structure.frame=§7· 主体为§e相干性维持等离子导管§7，空位可安装输入/输出总线、输入仓、能源仓（含激光靶仓/多安能源仓）或纳米蜂群收容总线
 machine.bosescraftingarray.tooltip.structure.casings=§7· 其余外壳固定为§e电磁隔离机械方块§7、§e精细结构常数操纵器§7、§e和平执行机械方块§7、§e凝聚态物质转换线圈§7与§e凝聚态物质引导线圈
 machine.bosescraftingarray.tooltip.structure.hatches=§7· 结构校验要求至少 §b1§7 条输入、§b1§7 条输出与 §b1§7 个能源仓，缺一不可
 machine.bosescraftingarray.tooltip.nanite.header=§6纳米蜂群：
-machine.bosescraftingarray.tooltip.nanite.bus=§7· 至少 §b1§7 条§e奇点纳米蜂群收容总线§7用于识别蜂群，蜂群只被读取、不会被消耗
+machine.bosescraftingarray.tooltip.nanite.bus=§7· 至少 §b1§7 条§e纳米蜂群收容总线§7用于识别蜂群，蜂群只被读取、不会被消耗
 machine.bosescraftingarray.tooltip.nanite.tier=§7· 取所有总线中的§e最高§7蜂群等级；等级低于当前配方步骤时进度§c停滞
 machine.bosescraftingarray.tooltip.nanite.speed=§7· 每个蜂群提供 §b0.5§7 速度，速度与总线内的蜂群总数成正比
 machine.bosescraftingarray.tooltip.nanite.steps=§7· 配方时长按所需蜂群等级的数量均分成分步，规则与原版 BEC 相同
@@ -445,7 +445,7 @@ machine.bosescraftingarray.tooltip.process.parallel=§7· 并行上限为 §b2,1
 machine.bosescraftingarray.tooltip.process.overclock=§7· 启用§a无损超频（PoC）§7：每级超频耗时 §b÷4§7、EU/t §b×4§7，总耗电不变
 machine.bosescraftingarray.tooltip.details=§d细节：§7配方未标注蜂群等级时无需蜂群，直接按普通配方运行，但结构仍要求至少 §b1§7 条纳米总线
 machine.bosescraftingarray.tooltip.details.hint=§7· 只统计总线内蜂群的§e数量§7与§e最高等级§7，总线本身等级不影响速度
-machine.bosescraftingarray.need_nanite_bus=至少需要 1 个奇点纳米蜂群总线
+machine.bosescraftingarray.need_nanite_bus=至少需要 1 个纳米蜂群总线
 
 GT5U.gui.text.recipe_result.nanite_stalled=§c纳米蜂群等级不足或没有纳米蜂群
 

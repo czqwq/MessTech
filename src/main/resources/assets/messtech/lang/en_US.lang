@@ -428,11 +428,11 @@ machine.bosescraftingarray.machinetype=Bose-Einstein Condensate Crafting Array
 machine.bosescraftingarray.tooltip.desc=§7A standalone BEC-style condensate assembly array driven by nanite swarms
 machine.bosescraftingarray.tooltip.flavour=§7Generate, contain, observe, aggregate
 machine.bosescraftingarray.tooltip.structure.header=§6Structure:
-machine.bosescraftingarray.tooltip.structure.frame=§7· The body is §eCoherence-Preserving Plasma Conduit§7; free slots take input/output buses, input hatches, energy hatches (incl. laser/multi-amp) or Singularity Nanite Containment Buses
+machine.bosescraftingarray.tooltip.structure.frame=§7· The body is §eCoherence-Preserving Plasma Conduit§7; free slots take input/output buses, input hatches, energy hatches (incl. laser/multi-amp) or Nanite Containment Buses
 machine.bosescraftingarray.tooltip.structure.casings=§7· The remaining shell is fixed: §eElectromagnetically-Isolated Casing§7, §eFine-Structure Constant Manipulator§7, §ePeace Enforcement Casing§7, §eCondensate Transformative Coil§7 and §eCondensate Guidance Coil
 machine.bosescraftingarray.tooltip.structure.hatches=§7· Structure check needs at least §b1§7 input, §b1§7 output and §b1§7 energy hatch
 machine.bosescraftingarray.tooltip.nanite.header=§6Nanites:
-machine.bosescraftingarray.tooltip.nanite.bus=§7· At least §b1§7 §eSingularity Nanite Containment Bus§7 reads the swarm; nanites are never consumed
+machine.bosescraftingarray.tooltip.nanite.bus=§7· At least §b1§7 §eNanite Containment Bus§7 reads the swarm; nanites are never consumed
 machine.bosescraftingarray.tooltip.nanite.tier=§7· Uses the §ehighest§7 nanite tier of all buses; below the current recipe step, progress §cstalls
 machine.bosescraftingarray.tooltip.nanite.speed=§7· Every nanite adds §b0.5§7 speed, so speed scales with the total nanites in the buses
 machine.bosescraftingarray.tooltip.nanite.steps=§7· Recipe duration is split into equal steps by the number of required nanite tiers, same as the original BEC
@@ -443,7 +443,7 @@ machine.bosescraftingarray.tooltip.process.parallel=§7· Parallel cap is §b2,1
 machine.bosescraftingarray.tooltip.process.overclock=§7· §aPerfect overclock (PoC)§7 is enabled: each overclock step is §b÷4§7 time and §b×4§7 EU/t, so energy per craft is unchanged
 machine.bosescraftingarray.tooltip.details=§dDetails:§7 Recipes without nanite tiers need no nanites and run as plain recipes, but the structure still needs at least §b1§7 nanite bus
 machine.bosescraftingarray.tooltip.details.hint=§7· Only the §enumber§7 and the §ehighest tier§7 of nanites in the buses matter; the bus tier itself does not change the speed
-machine.bosescraftingarray.need_nanite_bus=Requires at least 1 Singularity Nanite Containment Bus
+machine.bosescraftingarray.need_nanite_bus=Requires at least 1 Nanite Containment Bus
 
 GT5U.gui.text.recipe_result.nanite_stalled=§cNanite tier too low or no nanites
 

@@ -145,7 +145,7 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
         private static boolean adder(BosesCraftingArray machine, IGregTechTileEntity baseTile, Short texture) {
             IMetaTileEntity metaTileEntity = baseTile.getMetaTileEntity();
             if (!(metaTileEntity instanceof MTEHatchNanite hatch)) return false;
-            if (!ItemList.Hatch_Nanite_Singularity.isStackEqual(hatch.getStackForm(1), true, true)) return false;
+            // GT5U 5.09.54.183 uses one nanite bus; the legacy Singularity ItemList entry is unset.
 
             hatch.updateTexture(texture);
             hatch.updateCraftingIcon(machine.getMachineCraftingIcon());
@@ -154,7 +154,7 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
 
         @Override
         public String getDisplayName() {
-            return ItemList.Hatch_Nanite_Singularity.getDisplayName();
+            return ItemList.Hatch_Nanite.getDisplayName();
         }
 
         @Override
