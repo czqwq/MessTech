@@ -3,9 +3,9 @@ name: Build and test
 
 on:
   pull_request:
-    branches: [ master, main ]
+    branches: [ master, master-29x-beta2-3, master-2.9.0-beta1 ]
   push:
-    branches: [ master, main ]
+    branches: [ master, master-29x-beta2-3, master-2.9.0-beta1 ]
 
 jobs:
   build-and-test:
