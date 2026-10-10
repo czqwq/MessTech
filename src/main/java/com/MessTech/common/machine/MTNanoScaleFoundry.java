@@ -436,7 +436,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
 
         if (thread.getCircuitNumber() == 2) {
             int recipeTier = recipe.getMetadataOrDefault(NanochipAssemblyMatrixTierKey.INSTANCE, 1);
-            if (getInputVoltageTier() < recipeTier) {
+            if (getEnergyHatchTier() < recipeTier) {
                 return CheckRecipeResultRegistry.insufficientMachineTier(recipeTier);
             }
         }
@@ -910,7 +910,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     private float getEtchingSpeedModifier() {
-        long tier = getInputVoltageTier();
+        long tier = getEnergyHatchTier();
         return 1.0F / Math.max(1, tier - 9);
     }
 
@@ -988,7 +988,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         double duration = recipe.mDuration * getSpeedBonus() * getThreadSpeedModifier(thread, recipe, fluids);
         double eut = recipe.mEUt * getEuModifier() * getThreadEuModifier(thread, recipe, fluids);
 
-        long energyTier = getInputVoltageTier();
+        long energyTier = getEnergyHatchTier();
         long recipeTier = GTUtility.getTier(recipe.mEUt);
         int maxOverclocks = (int) Math.max(0, energyTier - recipeTier);
 

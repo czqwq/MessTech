@@ -31,6 +31,10 @@ MTMultiMachineBase<T>
 ### MTMultiMachineBase
 - Generic multi-block base extends GT `MTEExtendedPowerMultiBlockBase`.
 - Provides standard `ProcessingLogic` setup, machine-mode switching, Waila NBT/body.
+- `getEnergyHatchTier()`: the highest `MTEHatch#getInputTier()` over
+  `getExoticAndNormalEnergyHatchList()` - the machine's energy tier with laser/multi-amp (exotic) hatches and
+  mixed-tier plain hatches included. Every "energy hatch tier" gate and bonus in MessTech reads this instead of
+  GT's `getInputVoltageTier()`, which iterates `mEnergyHatches` only and returns 0 for those machines.
 - No wireless code anymore (moved to `MTWirelessMultiMachineBase`).
 
 ### MTModuleMultiMachineBase (module system)
@@ -485,7 +489,9 @@ MTMultiMachineBase<T>
 - Extends `MTMultiMachineBase` (not wireless).
 - Modes:
   - 0 = Component Assembly Line: generic `ProcessingLogic` recipe map lookup; recipe casing tier
-    (`mSpecialValue`) limited by energy hatch tier (`getInputVoltageTier()`).
+    (`mSpecialValue`) limited by `MTMultiMachineBase#getEnergyHatchTier()` (the highest energy hatch tier, exotic
+    hatches included), so laser/multi-amp hatches count and the best hatch sets the limit. The same tier drives
+    the Tier 1 parallel count.
   - 1 = Assembly Line: data-stick / Data Access; LevelTier 2 required; unordered input matching by
     `MTAssemblyLineMatcher` instead of a recipe map lookup (not the original ordered AL), and no
     single-recipe locking (`supportsSingleRecipeLocking()` is false there, like GT's own Assembly Line).

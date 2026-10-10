@@ -315,7 +315,19 @@ and `WirelessNetworkManager` (`gregtech/common/misc/WirelessNetworkManager.java`
   mod pre-init, so classes that reference them in enum/static initializers must load after blocks exist
   (normal MTE registration order is fine).
 * When copying a shape from the structure writer, keep it under `// spotless:off ... spotless:on`.
-* Don't "fix" the base class to make one machine work — override in the concrete MTE instead.
+* **`getInputVoltageTier()` only sees plain energy hatches.** `MTEMultiBlockBase#getInputVoltageTier()`
+  iterates `mEnergyHatches` and returns **0** when that list is empty — the machine is powered by an exotic
+  hatch (laser hatch / multi-amp hatch, which are collected into `mExoticEnergyHatches`) — or when the plain
+  hatches have differing tiers. Never read it as "the machine's tier" without a fallback, and never let that 0
+  reach a recipe gate: it then refuses *every* recipe with `insufficientMachineTier`, whose display string is
+  "配方需要更高等级的结构方块。此配方需要：N" / "needs a higher tier structure block", which is easily mistaken
+  for a structure problem. To read the tier of every energy hatch, iterate
+  `getExoticAndNormalEnergyHatchList()` and take `MTEHatch#getInputTier()` (that is `mTier`, a `GTValues.VN`
+  index, for plain *and* exotic hatches) — `MTMultiMachineBase#getEnergyHatchTier()` does exactly that and keeps
+  the highest hatch tier, and every MessTech "energy hatch tier" gate/bonus reads it instead of
+  `getInputVoltageTier()` (`MTAssFactory` component tier + Tier 1 parallel; `MTNanoScaleFoundry` assembly matrix
+  module gate, etching speed bonus, work-thread overclock count).
+* **Don't "fix" the base class to make one machine work — override in the concrete MTE instead.**
 * **Always end `createTooltip()` with `.toolTipFinisher()`** — the tooltip arrays (`iArray`/`sArray`/`hArray`)
   are built there and nowhere else. If you skip it, `getStructureDescription()` (=
   `getTooltip().getStructureHint()`) returns `null`, and BlockRenderer6343's NEI preview
@@ -396,8 +408,12 @@ MessTech's computation multiblock, based on `CalculateMultiMachineBase`.
 
 * Two recipe pools, switched by screwdriver (also via the built-in mode button):
   * Mode 0 = **Component Assembly Line**: `GoodGeneratorRecipeMaps.componentAssemblyLineRecipes`,
-    generic `ProcessingLogic` via the base machine; recipe casing tier (`mSpecialValue`) is limited
-    to the current energy hatch tier (`getInputVoltageTier()`).
+    generic `ProcessingLogic` via the base machine; recipe casing tier (`mSpecialValue`, the recipe's
+    `COAL_CASING_TIER` metadata) is limited to the machine's energy hatch tier, i.e. the **highest**
+    `MTEHatch#getInputTier()` over `getExoticAndNormalEnergyHatchList()` (`MTMultiMachineBase#getEnergyHatchTier()`),
+    so laser hatches / multi-amp hatches count like plain ones and the best hatch on the machine sets the limit.
+    `getInputVoltageTier()` must not be used for this: it reads plain hatches only and gates everything at 0.
+    The same helper drives the Tier 1 parallel count (`3^能源仓等级`).
   * Mode 1 = **Assembly Line**: reads the authorised recipes from the controller data stick and
     Data Access hatches, resolves them against the input buses itself (`MTAssemblyLineMatcher`) and hands the
     winner to the standard `ProcessingLogic` pipeline; only usable when `LevelTier == 2`. No single-recipe
