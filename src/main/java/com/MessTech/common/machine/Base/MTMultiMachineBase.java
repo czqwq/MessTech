@@ -102,6 +102,27 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
 
     // endregion
 
+    // region Energy tier
+
+    /**
+     * Tier of the machine's energy hatches: the <b>highest</b> {@link MTEHatch#getInputTier()} among all of them,
+     * exotic hatches (laser hatch / multi-amp hatch) included.
+     * <p>
+     * Use this instead of {@link #getInputVoltageTier()}, which the GT base class implements by iterating
+     * {@code mEnergyHatches} only: it returns 0 for a machine powered by an exotic hatch (those are collected into
+     * {@code mExoticEnergyHatches}) and for plain hatches whose tiers differ, and a 0 that reaches a recipe gate
+     * refuses every recipe while displaying the recipe's own tier.
+     */
+    public long getEnergyHatchTier() {
+        long tier = 0;
+        for (MTEHatch hatch : getExoticAndNormalEnergyHatchList()) {
+            tier = Math.max(tier, hatch.getInputTier());
+        }
+        return tier;
+    }
+
+    // endregion
+
     // region Processing Logic
 
     /**

@@ -180,7 +180,7 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
         if (this.LevelTier == 2) {
             return Integer.MAX_VALUE;
         }
-        return (int) Math.pow(3, getInputVoltageTier());
+        return (int) Math.pow(3, getEnergyHatchTier());
     }
     // endregion
 
@@ -407,7 +407,7 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
             protected CheckRecipeResult validateRecipe(@Nonnull GTRecipe recipe) {
                 // Component Assembly Line mode: recipe casing tier is limited by the energy hatch tier.
                 if (machineMode == 0) {
-                    long energyTier = getInputVoltageTier();
+                    long energyTier = getEnergyHatchTier();
                     if (energyTier <= 0) return CheckRecipeResultRegistry.insufficientMachineTier(recipe.mSpecialValue);
                     if (recipe.mSpecialValue > energyTier) {
                         return CheckRecipeResultRegistry.insufficientMachineTier(recipe.mSpecialValue);
