@@ -1,7 +1,5 @@
 package com.MessTech.common.machine.module;
 
-import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
-
 import java.util.List;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
@@ -16,11 +14,9 @@ import com.MessTech.common.gui.module.SpaceModuleAssemblerInfinityGui;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
-import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import gregtech.api.GregTechAPI;
 import gregtech.api.enums.Mods;
 import gregtech.api.enums.Textures;
 import gregtech.api.interfaces.IIconContainer;
@@ -32,9 +28,7 @@ import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.structure.error.StructureError;
-import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.GTRecipe;
-import gregtech.api.util.GTStructureUtility;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gtnhintergalactic.recipe.IGRecipeMaps;
 import gtnhintergalactic.recipe.ResultNoSpaceProject;
@@ -61,10 +55,6 @@ public class SpaceModuleAssemblerInfinity extends SpaceModuleInfinityBase<SpaceM
 
     public SpaceModuleAssemblerInfinity(String aName) {
         super(aName);
-    }
-
-    public int getModuleTier() {
-        return 5;
     }
 
     @Override
@@ -141,7 +131,7 @@ public class SpaceModuleAssemblerInfinity extends SpaceModuleInfinityBase<SpaceM
     @Override
     public @NotNull CheckRecipeResult checkProcessing_EM() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
-        if (parentElevator == null || parentElevator.getMotorTier() < 5) {
+        if (!isMountedOnFormedElevator()) {
             return CheckRecipeResultRegistry.NO_RECIPE;
         }
         return checkProcessingWirelessLoop(MAX_CROSS_RECIPE_CYCLES);
@@ -155,55 +145,15 @@ public class SpaceModuleAssemblerInfinity extends SpaceModuleInfinityBase<SpaceM
 
     @Override
     public IStructureDefinition<? extends tectech.thing.metaTileEntity.multi.base.TTMultiblockBase> getStructure_EM() {
-        return StructureDefinition.<SpaceModuleAssemblerInfinity>builder()
-            .addShape(
-                "main",
-                transpose(new String[][] { { "H", "H" }, { "~", "H" }, { "H", "H" }, { "H", "H" }, { "H", "H" } }))
-            .addElement(
-                'H',
-                GTStructureUtility.ofHatchAdderOptional(
-                    SpaceModuleAssemblerInfinity::addModuleHatchToMachineList,
-                    TileEntitySpaceElevator.CASING_INDEX_BASE,
-                    1,
-                    GregTechAPI.sBlockCasingsSE,
-                    0))
-            .build();
+        return buildModuleStructure(SpaceModuleAssemblerInfinity::addModuleHatchToMachineList);
     }
 
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
-        parentElevator = findConnectedElevator(aBaseMetaTileEntity);
-        if (parentElevator == null || parentElevator.getMotorTier() < 5) {
-            errors.add(StructureErrors.of("machine.spacemodule.need_elevator_t5"));
-            return;
-        }
         if (!checkPiece("main", 0, 1, 0, errors)) return;
+        checkElevatorLinkage(errors, "V");
         checkHasAnyInput(errors);
         checkHasOutputBus(errors);
-    }
-
-    private TileEntitySpaceElevator findConnectedElevator(IGregTechTileEntity aBaseMetaTileEntity) {
-        if (aBaseMetaTileEntity == null) return null;
-        net.minecraft.tileentity.TileEntity self = (net.minecraft.tileentity.TileEntity) aBaseMetaTileEntity;
-        if (self.getWorldObj() == null) return null;
-        net.minecraft.world.World world = self.getWorldObj();
-        int x = aBaseMetaTileEntity.getXCoord();
-        int y = aBaseMetaTileEntity.getYCoord();
-        int z = aBaseMetaTileEntity.getZCoord();
-        int range = 8;
-        for (int dx = -range; dx <= range; dx++) {
-            for (int dy = -range; dy <= range; dy++) {
-                for (int dz = -range; dz <= range; dz++) {
-                    net.minecraft.tileentity.TileEntity te = world.getTileEntity(x + dx, y + dy, z + dz);
-                    if (te instanceof IGregTechTileEntity gt
-                        && gt.getMetaTileEntity() instanceof TileEntitySpaceElevator elevator
-                        && elevator.getMotorTier() >= 5) {
-                        return elevator;
-                    }
-                }
-            }
-        }
-        return null;
     }
 
     @Override

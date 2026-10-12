@@ -1,16 +1,12 @@
 package com.MessTech.common.machine.module;
 
-import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
-
 import java.util.List;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.StatCollector;
-import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
 
@@ -21,11 +17,9 @@ import com.MessTech.common.gui.module.SpaceModulePumpInfinityGui;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
-import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import gregtech.api.GregTechAPI;
 import gregtech.api.enums.Textures;
 import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
@@ -35,8 +29,6 @@ import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.structure.error.StructureError;
-import gregtech.api.structure.error.StructureErrors;
-import gregtech.api.util.GTStructureUtility;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gtnhintergalactic.recipe.SpacePumpingRecipes;
 import gtnhintergalactic.tile.multi.elevator.TileEntitySpaceElevator;
@@ -114,29 +106,13 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
 
     @Override
     public IStructureDefinition<? extends tectech.thing.metaTileEntity.multi.base.TTMultiblockBase> getStructure_EM() {
-        return StructureDefinition.<SpaceModulePumpInfinity>builder()
-            .addShape(
-                "main",
-                transpose(new String[][] { { "H", "H" }, { "~", "H" }, { "H", "H" }, { "H", "H" }, { "H", "H" } }))
-            .addElement(
-                'H',
-                GTStructureUtility.ofHatchAdderOptional(
-                    SpaceModulePumpInfinity::addOutputHatchToMachineList,
-                    TileEntitySpaceElevator.CASING_INDEX_BASE,
-                    1,
-                    GregTechAPI.sBlockCasingsSE,
-                    0))
-            .build();
+        return buildModuleStructure(SpaceModulePumpInfinity::addOutputHatchToMachineList);
     }
 
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
-        parentElevator = findConnectedElevator(aBaseMetaTileEntity);
-        if (parentElevator == null || parentElevator.getMotorTier() < 5) {
-            errors.add(StructureErrors.of("machine.spacemodule.need_elevator_t5"));
-            return;
-        }
         if (!checkPiece("main", 0, 1, 0, errors)) return;
+        checkElevatorLinkage(errors, "V");
         checkHasOutputHatch(errors);
     }
 
@@ -155,34 +131,10 @@ public class SpaceModulePumpInfinity extends SpaceModuleInfinityBase<SpaceModule
         return survivalBuildPiece("main", stackSize, 0, 1, 0, elementBudget, env, false, true);
     }
 
-    private TileEntitySpaceElevator findConnectedElevator(IGregTechTileEntity aBaseMetaTileEntity) {
-        if (aBaseMetaTileEntity == null) return null;
-        TileEntity self = (TileEntity) aBaseMetaTileEntity;
-        if (self.getWorldObj() == null) return null;
-        World world = self.getWorldObj();
-        int x = aBaseMetaTileEntity.getXCoord();
-        int y = aBaseMetaTileEntity.getYCoord();
-        int z = aBaseMetaTileEntity.getZCoord();
-        int range = 8;
-        for (int dx = -range; dx <= range; dx++) {
-            for (int dy = -range; dy <= range; dy++) {
-                for (int dz = -range; dz <= range; dz++) {
-                    TileEntity te = world.getTileEntity(x + dx, y + dy, z + dz);
-                    if (te instanceof IGregTechTileEntity gt
-                        && gt.getMetaTileEntity() instanceof TileEntitySpaceElevator elevator
-                        && elevator.getMotorTier() >= 5) {
-                        return elevator;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
     @Override
     public @NotNull CheckRecipeResult checkProcessing_EM() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
-        if (parentElevator == null || parentElevator.getMotorTier() < 5) {
+        if (!isMountedOnFormedElevator()) {
             return CheckRecipeResultRegistry.NO_RECIPE;
         }
         return startBatchedProcessing();

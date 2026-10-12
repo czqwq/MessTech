@@ -960,18 +960,30 @@ MTMultiMachineBase<T>
   `null` because the pump has no GT RecipeMap (custom map only).
 - NBT saves/loads all 4 recipe sub-panels (planet/gas/parallel arrays) and batch size.
 - GUI: `SpaceModulePumpInfinityGui` has separate Parallel / Planet Type / Gas Type buttons/panels.
-- Structure: original module frame (1 wide × 5 tall × 2 deep) with optional casing/output hatch.
+- Structure: the module slot of the Space Elevator (2 wide x 2 deep x 5 tall, controller on the second layer of
+  the first row), built from `SpaceModuleInfinityBase#buildModuleStructure` so the elevator registers the module
+  through its own structure check. The module is 2 wide and 5 long, so only the orientation that runs its long
+  axis along the slot fits.
+- Linkage is `SpaceModuleInfinityBase#isMountedOnFormedElevator()` - `parent != null && parent.getMotorTier() >=
+  getNeededMotorTier()`, where `parent` is set by the elevator's `connect(this)` every 20 ticks. The modules no
+  longer search their neighbourhood for an elevator.
+- `checkMachine` reports the linkage through `checkElevatorLinkage(errors, "V")` and tells the two reasons apart:
+  `machine.spacemodule.elevator_not_linked` when no elevator has taken the module in, and
+  `machine.spacemodule.elevator_level_too_low` (with the required `MK-<level>`) when it is mounted but the
+  elevator's motor tier is short.
 - `checkProcessing()`: looks up fluid by `(planetType, gasType)`, validates/deducts wireless EU,
   outputs `fluid * parallel`, 20-tick duration.
-- Requires `getMotorTier() >= 5` (Orbital Tier V) in `checkMachine`; otherwise structure error
-  `machine.spacemodule.need_elevator_t5`.
-- `checkProcessing()` also refuses to run without a connected Tier V elevator.
+- `checkProcessing()` refuses to run while `isMountedOnFormedElevator()` is false, i.e. without a Tier V elevator.
 - Textures now use the original pump module front screen + `OVERLAY_SIDE_PUMP_MODULE` engraving.
 
 ### Miner port status (latest)
 - `SpaceModuleMinerInfinity` now uses the real `IGRecipeMaps.spaceMiningRecipes` pool.
-- Structure: original module frame (1 wide × 5 tall × 2 deep) with optional casing and any of
-  Input Hatch / Input Bus / Output Bus / Data Input hatch.
+- Structure: the Space Elevator module slot (see the pump section above); hatches are an optional casing plus any
+  of Input Hatch / Input Bus / Output Bus / Data Input hatch.
+- Recipe lookup applies the same two gates as the native miner: `MODULE_TIER` metadata not above
+  `getModuleTier()`, and the asteroid's `minDistance..maxDistance` range covering the effective distance. The
+  module is constructed with `tModuleTier = 5`, so the tier gate currently passes every asteroid in the pool
+  (the pool's own `minModuleTier` values only go up to 3).
 - Requires a local Data Input hatch for computation input; if no packet is present it falls back to
   the parent elevator's shared computation (`getAvailableDataForModule()`).
 - GUI: full port of the original GT5U Miner GUI — Filter (64-slot whitelist/blacklist + asteroid
@@ -996,9 +1008,10 @@ MTMultiMachineBase<T>
 - Four tiers, each one class, re-seated on this GT5U's 16-entry `GTValues.V` (TST asks for tiers 18/25, which do
   not exist here): MK-I UEV (tier 10) 256 parallel / 16 slots / motor tier 1; MK-II UIV (12) 4096 / 32 / 2;
   MK-III MAX (14) 32768 / 64 / 3; MK-IV tier 15 `Integer.MAX_VALUE` / 128 / 4.
-- Structure: the usual space-module frame (`main` shape 2 wide x 5 tall, one optional casing plus
-  input bus / output bus / input hatch). `checkMachine` needs a connected `TileEntitySpaceElevator` whose motor tier
-  is at least `getNeededMotorTier()`, otherwise `machine.spacemoduleapiary.need_elevator_t{1..4}`.
+- Structure: the Space Elevator module slot (2 wide x 2 deep x 5 tall; see the pump section above), hatches are
+  one optional casing plus input bus / output bus / input hatch. `checkMachine` reports the linkage through
+  `checkElevatorLinkage(errors, getNeedElevatorLevel())` (the level is `I`..`IV` per MK) and the elevator is
+  mounted only while its motor tier is at least `getNeededMotorTier()`.
 - `checkProcessing_EM()` runs one 100-tick cycle (`CYCLE_TICKS`): queens are pulled from the input bus into the free
   bee slots by `takeBeesFromInputs()` and are **never consumed**; every occupied slot runs once through
   `MTBeeSimulator.simulate(queen, world, t)` with `t = MTBeeSimulator.voltageTierExact(getTier())`, and the drops are

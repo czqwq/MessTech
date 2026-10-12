@@ -23,9 +23,14 @@ import org.jetbrains.annotations.NotNull;
 
 import com.MessTech.common.gui.module.SpaceModuleInfinityGui;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
+import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
+import com.gtnewhorizon.structurelib.structure.IStructureElement;
+import com.gtnewhorizon.structurelib.structure.StructureDefinition;
+import com.gtnewhorizon.structurelib.structure.StructureUtility;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import gregtech.api.GregTechAPI;
 import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
@@ -37,7 +42,12 @@ import gregtech.api.metatileentity.implementations.MTEHatchMultiInput;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
+import gregtech.api.structure.error.StructureError;
+import gregtech.api.structure.error.StructureErrors;
+import gregtech.api.structure.error.TranslatableText;
+import gregtech.api.util.GTStructureUtility;
 import gregtech.api.util.GTUtility;
+import gregtech.api.util.IGTHatchAdder;
 import gregtech.common.tileentities.machines.IDualInputHatch;
 import gregtech.common.tileentities.machines.IDualInputInventory;
 import gregtech.common.tileentities.machines.MTEHatchInputBusME;
@@ -51,10 +61,20 @@ import mcp.mobius.waila.api.IWailaDataAccessor;
 /**
  * Shared base for the wireless MessTech space modules.
  * <p>
- * This class now extends GTNH's native {@link TileEntityModuleBase} instead of a regular GT
- * multiblock base. That means the vanilla Space Elevator recognises it as a real project module and
- * adds it to {@code mProjectModuleHatches} through the normal structure check, with no separate
- * mixin module list.
+ * This class extends GTNH's native {@link TileEntityModuleBase}, so the modules are real Space Elevator
+ * project modules rather than machines that merely stand next to one. Two things make that work:
+ * <ul>
+ * <li>the module's own structure is the module slot of the elevator - every subclass builds its piece
+ * from {@link #buildModuleStructure}. The elevator walks its own structure and only registers a module
+ * whose controller stands on one of its module slots, so the shape has to be the slot, not a lookalike;</li>
+ * <li>the elevator hands the module its parent: every 20 ticks it walks {@code mProjectModuleHatches} and
+ * calls {@code connect(this)} on each module whose {@code getNeededMotorTier()} the motor tier satisfies,
+ * and {@code disconnect()} on all of them when it stops working. {@link #isMountedOnFormedElevator()} reads
+ * exactly that, so the module never has to search the neighbourhood for an elevator.</li>
+ * </ul>
+ * Note that the slot only accepts a module in the right orientation: the module is 2 wide, 5 long and 2
+ * deep, so its long axis has to run along the cell of the slot. The four rotations the player can give it
+ * are not interchangeable; the ones that fit are the ones the elevator's own modules use.
  * <p>
  * The modules remain wireless: they draw power directly from the GT wireless network and do not draw
  * from the elevator's internal EU buffer.
@@ -136,6 +156,88 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     public void setWirelessParallel(int value) {
         this.wirelessParallel = Math.max(1, value);
     }
+
+    // region Elevator module slot
+
+    /**
+     * The module slot of the Space Elevator, exactly as {@link TileEntityModuleBase} defines it for the native
+     * modules: two rows of two, five layers tall, controller on the second layer of the first row. The elevator
+     * only calls {@code addProjectModuleToMachineList} on a controller standing on its own module slot, so a
+     * module that wants to be registered has to occupy that slot and not merely stand next to the elevator.
+     *
+     * @param hatchAdder adder that harvests the hatches of this module from the {@code H} positions
+     */
+    @SuppressWarnings("unchecked")
+    protected IStructureDefinition<T> buildModuleStructure(IGTHatchAdder<? super T> hatchAdder) {
+        // The wildcard in the adder is what lets the callers pass a method reference that takes their own
+        // concrete class; the element itself belongs to this module, hence the cast.
+        IStructureElement<T> hatchElement = (IStructureElement<T>) GTStructureUtility.ofHatchAdderOptional(
+            hatchAdder,
+            TileEntitySpaceElevator.CASING_INDEX_BASE,
+            1,
+            GregTechAPI.sBlockCasingsSE,
+            0);
+        return StructureDefinition.<T>builder()
+            .addShape(
+                "main",
+                StructureUtility
+                    .transpose(new String[][] { { "H", "H" }, { "~", "H" }, { "H", "H" }, { "H", "H" }, { "H", "H" } }))
+            .addElement('H', hatchElement)
+            .build();
+    }
+
+    /**
+     * @return the module tier this module was constructed with, i.e. {@code tModuleTier} - the same number the
+     *         native modules read back through their own {@code getModuleTier()}. Recipes carry a
+     *         {@code MODULE_TIER} metadata and only match when it is not above this value.
+     */
+    public int getModuleTier() {
+        return tModuleTier;
+    }
+
+    /**
+     * The elevator this module is mounted on, or null while it is not mounted on one. The elevator sets this in
+     * {@code connect(this)}; the module never looks for an elevator on its own.
+     */
+    public TileEntitySpaceElevator getConnectedElevator() {
+        return parentElevator;
+    }
+
+    /**
+     * @return true while the module is mounted on an elevator whose structure is formed and whose motor tier is
+     *         at least {@code getNeededMotorTier()}. The elevator only connects modules that satisfy both.
+     */
+    public boolean isMountedOnFormedElevator() {
+        return parentElevator != null && parentElevator.getMotorTier() >= getNeededMotorTier();
+    }
+
+    /**
+     * Adds the "why is this module not running" structure error, telling the two reasons apart: the module is
+     * standing on a module slot but the elevator has not taken it in (its structure is incomplete, or it is
+     * switched off), or it is mounted but the elevator's motor tier is below {@code getNeededMotorTier()}.
+     *
+     * @param errors error list of the structure check
+     * @param level  level suffix this module needs, e.g. {@code V} for {@code MK-V}
+     */
+    protected void addElevatorError(List<StructureError> errors, String level) {
+        if (parentElevator == null) {
+            errors.add(StructureErrors.of("machine.spacemodule.elevator_not_linked"));
+            return;
+        }
+        errors.add(
+            StructureErrors.of("machine.spacemodule.elevator_level_too_low", TranslatableText.literal("MK-" + level)));
+    }
+
+    /**
+     * Reports the elevator linkage of this module after its own structure turned out to be complete. Call it from
+     * {@code checkMachine} once {@code checkPiece} succeeded.
+     */
+    protected void checkElevatorLinkage(List<StructureError> errors, String level) {
+        if (!isMountedOnFormedElevator()) {
+            addElevatorError(errors, level);
+        }
+    }
+    // endregion
 
     // region Wireless API
 

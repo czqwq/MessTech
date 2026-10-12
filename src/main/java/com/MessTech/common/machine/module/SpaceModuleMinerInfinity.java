@@ -1,6 +1,5 @@
 package com.MessTech.common.machine.module;
 
-import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
 import static gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap;
 
 import java.math.BigInteger;
@@ -28,11 +27,9 @@ import com.cleanroommc.modularui.utils.item.LimitingItemStackHandler;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
-import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
-import gregtech.api.GregTechAPI;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.Materials;
 import gregtech.api.enums.Textures;
@@ -48,7 +45,6 @@ import gregtech.api.recipe.check.SimpleCheckRecipeResult;
 import gregtech.api.structure.error.StructureError;
 import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.GTRecipe;
-import gregtech.api.util.GTStructureUtility;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.api.util.ParallelHelper;
@@ -71,7 +67,8 @@ import tectech.thing.metaTileEntity.multi.base.render.TTRenderedExtendedFacingTe
  * <p>
  * Uses the real GTNH Intergalactic space mining recipe pool, consumes drones/drills/rods and plasma,
  * draws computation from the parent Space Elevator and power from the GT wireless network. It is an
- * Orbital Tier V module and therefore requires {@code getMotorTier() >= 5} to run.
+ * Orbital Tier V module: {@code TileEntitySpaceElevator} only mounts it while its motor tier is at
+ * least {@code getNeededMotorTier()}, i.e. while it carries acceleration track MK-V.
  */
 public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModuleMinerInfinity> {
 
@@ -238,8 +235,13 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         return eInputData.isEmpty();
     }
 
+    /**
+     * @return the module tier this module was constructed with, i.e. {@code tModuleTier}. The native mining
+     *         modules read the same field back through their own {@code getModuleTier()}, and the recipe pool
+     *         marks every asteroid with the {@code MODULE_TIER} it needs.
+     */
     public int getModuleTier() {
-        return 5;
+        return tModuleTier;
     }
 
     @Override
@@ -259,31 +261,18 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
 
     @Override
     public IStructureDefinition<? extends tectech.thing.metaTileEntity.multi.base.TTMultiblockBase> getStructure_EM() {
-        return StructureDefinition.<SpaceModuleMinerInfinity>builder()
-            .addShape(
-                "main",
-                transpose(new String[][] { { "H", "H" }, { "~", "H" }, { "H", "H" }, { "H", "H" }, { "H", "H" } }))
-            .addElement(
-                'H',
-                GTStructureUtility.ofHatchAdderOptional(
-                    SpaceModuleMinerInfinity::addModuleHatchToMachineList,
-                    TileEntitySpaceElevator.CASING_INDEX_BASE,
-                    1,
-                    GregTechAPI.sBlockCasingsSE,
-                    0))
-            .build();
+        return buildModuleStructure(SpaceModuleMinerInfinity::addModuleHatchToMachineList);
     }
 
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
         eInputData.clear();
-        parentElevator = findConnectedElevator(aBaseMetaTileEntity);
-        if (parentElevator == null || parentElevator.getMotorTier() < 5) {
-            errors.add(StructureErrors.of("machine.spacemodule.need_elevator_t5"));
-            return;
-        }
         if (!checkPiece("main", 0, 1, 0, errors)) return;
-        if (eInputData.isEmpty() && !parentElevator.hasDataHatches()) {
+        checkElevatorLinkage(errors, "V");
+        // Only look for computation while the elevator has the module mounted: a module that is not linked yet
+        // has no access to the shared computation either, and reporting a missing data hatch on top of the
+        // linkage error would just send the player after the wrong problem.
+        if (eInputData.isEmpty() && getConnectedElevator() != null && !getConnectedElevator().hasDataHatches()) {
             errors.add(StructureErrors.of("GT5U.gui.text.structure_error.missing_data_input_hatch"));
         }
         checkHasInputHatch(errors);
@@ -315,34 +304,10 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         return survivalBuildPiece("main", stackSize, 0, 1, 0, elementBudget, env, false, true);
     }
 
-    private TileEntitySpaceElevator findConnectedElevator(IGregTechTileEntity aBaseMetaTileEntity) {
-        if (aBaseMetaTileEntity == null) return null;
-        net.minecraft.tileentity.TileEntity self = (net.minecraft.tileentity.TileEntity) aBaseMetaTileEntity;
-        if (self.getWorldObj() == null) return null;
-        net.minecraft.world.World world = self.getWorldObj();
-        int x = aBaseMetaTileEntity.getXCoord();
-        int y = aBaseMetaTileEntity.getYCoord();
-        int z = aBaseMetaTileEntity.getZCoord();
-        int range = 8;
-        for (int dx = -range; dx <= range; dx++) {
-            for (int dy = -range; dy <= range; dy++) {
-                for (int dz = -range; dz <= range; dz++) {
-                    net.minecraft.tileentity.TileEntity te = world.getTileEntity(x + dx, y + dy, z + dz);
-                    if (te instanceof IGregTechTileEntity gt
-                        && gt.getMetaTileEntity() instanceof TileEntitySpaceElevator elevator
-                        && elevator.getMotorTier() >= 5) {
-                        return elevator;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
     @Override
     public @NotNull CheckRecipeResult checkProcessing_EM() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
-        if (parentElevator == null || parentElevator.getMotorTier() < 5) {
+        if (!isMountedOnFormedElevator()) {
             return CheckRecipeResultRegistry.NO_RECIPE;
         }
         // Bracketing is required for ME fluid hatches to report their real drainable amounts.
@@ -407,8 +372,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         ItemStack[] itemInputs = gatherItemInputs();
         currentDroneMask = getAvailDroneMask(itemInputs);
         ArrayList<FluidStack> allFluids = new ArrayList<>();
-        if (parentElevator != null) {
-            allFluids.addAll(parentElevator.getStoredFluids());
+        if (getConnectedElevator() != null) {
+            allFluids.addAll(getConnectedElevator().getStoredFluids());
         }
         allFluids.addAll(getStoredFluidsWithDualInput());
         FluidStack[] fluidInputs = allFluids.toArray(new FluidStack[0]);
@@ -432,6 +397,11 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
                 .voltage(Long.MAX_VALUE)
                 .findAll()
                 .filter(r -> {
+                    // Same two gates as the native miner: the asteroid has to be within this module's module
+                    // tier and within the selected distance. Without the first one the distance alone decided
+                    // the pool, so the module also pulled asteroids that a native module of its tier could not.
+                    int recipeTier = r.getMetadataOrDefault(IGRecipeMaps.MODULE_TIER, 1);
+                    if (recipeTier > getModuleTier()) return false;
                     SpaceMiningData data = r.getMetadata(IGRecipeMaps.SPACE_MINING_DATA);
                     return data != null && data.minDistance <= effectiveDistance
                         && data.maxDistance >= effectiveDistance;

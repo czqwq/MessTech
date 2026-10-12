@@ -1,6 +1,5 @@
 package com.MessTech.common.machine.module;
 
-import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
 import static gregtech.common.misc.WirelessNetworkManager.addEUToGlobalEnergyMap;
 
 import java.math.BigInteger;
@@ -22,9 +21,7 @@ import com.MessTech.common.util.MTBeeSimulator;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
-import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 
-import gregtech.api.GregTechAPI;
 import gregtech.api.enums.GTValues;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
@@ -33,8 +30,6 @@ import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.structure.error.StructureError;
-import gregtech.api.structure.error.StructureErrors;
-import gregtech.api.util.GTStructureUtility;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gtnhintergalactic.tile.multi.elevator.TileEntitySpaceElevator;
 import tectech.thing.metaTileEntity.multi.base.render.TTRenderedExtendedFacingTexture;
@@ -123,6 +118,8 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
     @Override
     public @NotNull CheckRecipeResult checkProcessing_EM() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
+        // Like the other space modules, the apiary only runs while its elevator has it mounted.
+        if (!isMountedOnFormedElevator()) return CheckRecipeResultRegistry.NO_RECIPE;
 
         takeBeesFromInputs();
         if (!hasAnyBee()) return CheckRecipeResultRegistry.NO_RECIPE;
@@ -227,64 +224,24 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
 
     @Override
     public IStructureDefinition<? extends tectech.thing.metaTileEntity.multi.base.TTMultiblockBase> getStructure_EM() {
-        return StructureDefinition.<SpaceModuleApiary>builder()
-            .addShape(
-                "main",
-                transpose(new String[][] { { "H", "H" }, { "~", "H" }, { "H", "H" }, { "H", "H" }, { "H", "H" } }))
-            .addElement(
-                'H',
-                GTStructureUtility.ofHatchAdderOptional(
-                    SpaceModuleApiary::addModuleHatchToMachineList,
-                    TileEntitySpaceElevator.CASING_INDEX_BASE,
-                    1,
-                    GregTechAPI.sBlockCasingsSE,
-                    0))
-            .build();
+        return buildModuleStructure(SpaceModuleApiary::addModuleHatchToMachineList);
     }
 
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
-        parentElevator = findConnectedElevator(aBaseMetaTileEntity);
-        if (parentElevator == null || parentElevator.getMotorTier() < getNeededMotorTier()) {
-            errors.add(StructureErrors.of(getNeedElevatorKey()));
+        if (!checkPiece("main", 0, 1, 0, errors)) return;
+        // Which motor tier is needed is a property of the module, so the shortfall is reported here rather than
+        // folded into the structure lookup.
+        if (!isMountedOnFormedElevator()) {
+            addElevatorError(errors, getNeedElevatorLevel());
             return;
         }
-        if (!checkPiece("main", 0, 1, 0, errors)) return;
         checkHasInputBus(errors);
         checkHasOutputBus(errors);
     }
 
-    /**
-     * The Space Elevator this module is mounted on. The elevator takes its modules in through the normal structure
-     * check, so the module only has to find it in the neighbourhood - the same lookup the other space modules use.
-     * Unlike them it does not filter on a motor tier here: which tier is needed is a property of the module
-     * ({@code getNeededMotorTier()}), and {@link #checkMachine} reports the shortfall.
-     */
-    private TileEntitySpaceElevator findConnectedElevator(IGregTechTileEntity aBaseMetaTileEntity) {
-        if (aBaseMetaTileEntity == null) return null;
-        net.minecraft.tileentity.TileEntity self = (net.minecraft.tileentity.TileEntity) aBaseMetaTileEntity;
-        if (self.getWorldObj() == null) return null;
-        net.minecraft.world.World world = self.getWorldObj();
-        int x = aBaseMetaTileEntity.getXCoord();
-        int y = aBaseMetaTileEntity.getYCoord();
-        int z = aBaseMetaTileEntity.getZCoord();
-        int range = 8;
-        for (int dx = -range; dx <= range; dx++) {
-            for (int dy = -range; dy <= range; dy++) {
-                for (int dz = -range; dz <= range; dz++) {
-                    net.minecraft.tileentity.TileEntity te = world.getTileEntity(x + dx, y + dy, z + dz);
-                    if (te instanceof IGregTechTileEntity gt
-                        && gt.getMetaTileEntity() instanceof TileEntitySpaceElevator elevator) {
-                        return elevator;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    /** @return the lang key of the structure error that says which elevator motor tier this module needs. */
-    protected abstract String getNeedElevatorKey();
+    /** @return the level suffix of the elevator motor tier this module needs, e.g. {@code I} for {@code MK-I}. */
+    protected abstract String getNeedElevatorLevel();
 
     @Override
     public void construct(ItemStack stackSize, boolean hintsOnly) {
@@ -394,8 +351,8 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         }
 
         @Override
-        protected String getNeedElevatorKey() {
-            return "machine.spacemoduleapiary.need_elevator_t1";
+        protected String getNeedElevatorLevel() {
+            return "I";
         }
 
         @Override
@@ -421,8 +378,8 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         }
 
         @Override
-        protected String getNeedElevatorKey() {
-            return "machine.spacemoduleapiary.need_elevator_t2";
+        protected String getNeedElevatorLevel() {
+            return "II";
         }
 
         @Override
@@ -448,8 +405,8 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         }
 
         @Override
-        protected String getNeedElevatorKey() {
-            return "machine.spacemoduleapiary.need_elevator_t3";
+        protected String getNeedElevatorLevel() {
+            return "III";
         }
 
         @Override
@@ -475,8 +432,8 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         }
 
         @Override
-        protected String getNeedElevatorKey() {
-            return "machine.spacemoduleapiary.need_elevator_t4";
+        protected String getNeedElevatorLevel() {
+            return "IV";
         }
 
         @Override

@@ -223,7 +223,8 @@ machine.spacemodulepump.tooltip.details.slots=§7· The 4 slots run independentl
 machine.spacemodulepump.tooltip.details.output=§7· Output hatches need free capacity; a full hatch pauses only its own slot
 machine.spacemoduleassembler.name=Infinite Space Assembler Module
 machine.spacemoduleassembler.machinetype=Space Assembler Module
-machine.spacemodule.need_elevator_t5=Requires a Space Elevator at Orbital Tier V
+machine.spacemodule.elevator_not_linked=§cError: module not linked to a Space Elevator
+machine.spacemodule.elevator_level_too_low=§cError: acceleration track tier too low, %s required
 
 # --- Space apiary modules ---
 machine.spacemoduleapiary1.name=Space Apiary Module MK-I
@@ -240,10 +241,6 @@ machine.spacemoduleapiary.tooltip.parallel=§7Max parallels: §b%s
 machine.spacemoduleapiary.tooltip.slots=§7Bee slots: §b%s
 machine.spacemoduleapiary.tooltip.power=§7Draws from the §bwireless network§7, 1A of its own tier per parallel per run
 machine.spacemoduleapiary.tooltip.details=§dDetails:§7 no energy hatches, no liquid DNA; the bee slots are edited in the GUI
-machine.spacemoduleapiary.need_elevator_t1=Requires a Space Elevator at Orbital Tier I
-machine.spacemoduleapiary.need_elevator_t2=Requires a Space Elevator at Orbital Tier II
-machine.spacemoduleapiary.need_elevator_t3=Requires a Space Elevator at Orbital Tier III
-machine.spacemoduleapiary.need_elevator_t4=Requires a Space Elevator at Orbital Tier IV
 machine.spacemoduleapiary.gui.empty=§7Empty bee slot
 machine.spacemoduleapiary.gui.empty_hint=§7Click with a queen to put it in
 machine.spacemoduleapiary.gui.extract_hint=§7Click to take the queen out

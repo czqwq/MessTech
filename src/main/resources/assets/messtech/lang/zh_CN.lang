@@ -223,7 +223,8 @@ machine.spacemodulepump.tooltip.details.slots=§7· 4 组槽位彼此独立并�
 machine.spacemodulepump.tooltip.details.output=§7· 输出仓需要留出容量；装满后对应的那一组暂停
 machine.spacemoduleassembler.name=无限太空组装模块
 machine.spacemoduleassembler.machinetype=太空组装模块
-machine.spacemodule.need_elevator_t5=需要在搭载了加速轨道 MK-V的太空电梯上才能工作
+machine.spacemodule.elevator_not_linked=§c错误：模块未链接到太空电梯
+machine.spacemodule.elevator_level_too_low=§c错误：加速轨道等级不足，需要 %s
 
 # --- 太空蜂箱模块 ---
 machine.spacemoduleapiary1.name=太空蜂箱模块 MK-I
@@ -240,10 +241,6 @@ machine.spacemoduleapiary.tooltip.parallel=§7最大并行：§b%s
 machine.spacemoduleapiary.tooltip.slots=§7蜂槽容量：§b%s
 machine.spacemoduleapiary.tooltip.power=§7从无线电网取电，每并行每次运行消耗本等级 1A
 machine.spacemoduleapiary.tooltip.details=§d细节：
-machine.spacemoduleapiary.need_elevator_t1=需要在搭载了加速轨道 MK-I的太空电梯上才能工作
-machine.spacemoduleapiary.need_elevator_t2=需要在搭载了加速轨道 MK-II的太空电梯上才能工作
-machine.spacemoduleapiary.need_elevator_t3=需要在搭载了加速轨道 MK-III的太空电梯上才能工作
-machine.spacemoduleapiary.need_elevator_t4=需要在搭载了加速轨道 MK-IV的太空电梯上才能工作
 machine.spacemoduleapiary.gui.empty=§7空蜂槽
 machine.spacemoduleapiary.gui.empty_hint=§7手持蜂后点击即可放入
 machine.spacemoduleapiary.gui.extract_hint=§7点击取出蜂后
