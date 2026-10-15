@@ -314,7 +314,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         {"         HHHHHH   HHHHHH         ","GKKKKKG H      HHH      HH       ","C     CG     E   E E      HAAAHHI","C DDD GF   E       E E          J","D DDD GF     E E E     E  BB BBBJ","C DDD GF   E       E E          J","C     CG   E   E     E    HAAAHHI","GCCCCCG H      HHH      HH       ","         HHHHHH   HHHHHH         "},
         {"          HHHHH   HHHHH          ","GKKKKKG  H E   H H E E HH        ","C     C H  E    H  E E   H       ","C I I CG   E   E     E    HAAAHHI","C  D  CG                  HAAAHHI","C I I CG     E   E E      HAAAHHI","C     C H  E    H  E E   H       ","GCCCCCG  H E   H H E E HH        ","          HHHHH   HHHHH          "},
         {"            HH     HH            ","GGGGGGG   HH  H   H  HH          ","GCCCCCG  H E   H H E E HH        ","GCCCCCG H      HHH      HH       ","GCCCCCG H       H       HH       ","GCCCCCG H      HHH      HH       ","GCCCCCG  H E   H H E E HH        ","GGGGGGG   HH  H   H  HH          ","            HH     HH            "},
-        {"                                 ","            HH     HH            ","          HHHHH   HHHHH          ","         HHHHHH   HHHHHH         ","         HIIIIHH HHIIIIH         ","         HHHHHH   HHHHHH         ","          HHHHH   HHHHH          ","            HH     HH            "},
+        {"                                 ","            HH     HH            ","          HHHHH   HHHHH          ","         HHHHHH   HHHHHH         ","         HIIIIHH HHIIIIH         ","         HHHHHH   HHHHHH         ","          HHHHH   HHHHH          ","            HH     HH            ","                                 "},
 
     };
     // spotless:on
