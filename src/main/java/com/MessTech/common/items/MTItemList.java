@@ -53,6 +53,8 @@ public enum MTItemList {
     MTReactorHeatHatch_UHV,
     MTReactorHeatHatch_UEV,
     MTReactorHeatHatch_UIV,
+    MTReactorCoolantInputHatch,
+    MTReactorHotCoolantOutputHatch,
     MTChemicalTwister,
     MTHugeChemicalReactor,
     MTModuleSpeed_IV,
@@ -97,6 +99,14 @@ public enum MTItemList {
     public static final MTItemList[] REACTOR_HEAT_HATCHES = { MTReactorHeatHatch_EV, MTReactorHeatHatch_IV,
         MTReactorHeatHatch_LuV, MTReactorHeatHatch_ZPM, MTReactorHeatHatch_UV, MTReactorHeatHatch_UHV,
         MTReactorHeatHatch_UEV, MTReactorHeatHatch_UIV };
+
+    /**
+     * Reactor coolant pair of the fluid ("wet") mode: cold coolant in ({@code MTReactorCoolantInputHatch}), hot coolant
+     * out ({@code MTReactorHotCoolantOutputHatch}). Not a tier family - one variant each at EV, see the hatch classes -
+     * so this array is only a list of the two entries that share a recipe, not a tier table.
+     */
+    public static final MTItemList[] REACTOR_FLUID_HATCHES = { MTReactorCoolantInputHatch,
+        MTReactorHotCoolantOutputHatch };
 
     /** Speed modules ordered IV..MAX (index {@code tier - IMTModule.MIN_TIER}). */
     public static final MTItemList[] SPEED_MODULES = { MTModuleSpeed_IV, MTModuleSpeed_LuV, MTModuleSpeed_ZPM,

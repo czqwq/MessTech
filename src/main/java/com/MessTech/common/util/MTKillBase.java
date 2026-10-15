@@ -28,9 +28,10 @@ import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import gregtech.api.util.GTUtility;
 
 /**
- * The "true kill" of the thrown piggy: kills a target that would normally survive, i.e. through armour, energy
- * shields, entity level invulnerability or a "second life" item. The piggy kills whatever it lands on, the player
- * that threw it into the sky included.
+ * The "true kill" ladder, shared by everything in this mod that has to kill a target that would normally survive:
+ * through armour, energy shields, entity level invulnerability or a "second life" item. The ladder itself is
+ * branch-less, and each thing that kills has one branch of it - {@link MTPiggyKill} for the thrown piggy and
+ * {@link MTBowKill} for the Voidstar Piercer - which only say how their kills read and whom they refuse.
  * <p>
  * It is a ladder of attempts, from the most polite one to the most direct one, because every kind of protection has
  * to be bypassed at the point where it actually gives up:
@@ -64,26 +65,19 @@ import gregtech.api.util.GTUtility;
  * later hit is NaN as well - {@code Math.max(NaN, 0)} is NaN, {@code MathHelper.clamp_float} passes NaN through and
  * even {@code health <= 0} is false for NaN - so the target never dies again. See {@link #repair}.</li>
  * </ul>
- * A player the piggy kills is announced by the piggy: the damage type has to stay {@value #BYPASS_DAMAGE_TYPE} for the
- * protection mods, and the death message of that type belongs to their infinity weapons, so the message is replaced
- * instead of translated - see {@link PiggyDamageSource}.
+ * A player the ladder kills is announced by the branch that ran it: the damage type has to stay
+ * {@value #BYPASS_DAMAGE_TYPE} for the protection mods, and the death message of that type belongs to their infinity
+ * weapons, so the message is replaced instead of translated - see {@link TrueKillDamageSource}.
  * <p>
  * Every step that is needed is logged with debug level, so a test can tell which one did the kill.
  */
-public final class MTTrueKill {
+public abstract class MTKillBase {
 
     /**
      * Damage type of every hit. See the class javadoc: the set based immunity mods cancel their events for every
      * source <em>except</em> this one, so this is the type that walks past them.
      */
     public static final String BYPASS_DAMAGE_TYPE = "infinity";
-
-    /**
-     * Translation key of the death message of a player the piggy kills. The game ships the death message to the
-     * clients as a translation component, so every client reads it in its own language, and the text of this key lives
-     * in the two language files of the mod. See {@link PiggyDamageSource}.
-     */
-    public static final String DEATH_MESSAGE_KEY = "death.attack.messtech.piggy";
 
     /** Amount that makes the shielded armour sets escalate to their own internal kill source. */
     private static final float OVERKILL = Float.MAX_VALUE;
@@ -108,48 +102,56 @@ public final class MTTrueKill {
      */
     private static final Set<Entity> DEATHS = Collections.newSetFromMap(new WeakHashMap<Entity, Boolean>());
 
-    private MTTrueKill() {}
+    /** This branch as it appears in the debug log and in the two messages below, e.g. {@code "Piggy"}. */
+    private final String killName;
 
     /**
-     * Registers the death tracker. Called by the common proxy during preInit.
+     * Translation key of the death message of a player this branch kills. The game ships the death message to the
+     * clients as a translation component, so every client reads it in its own language, and the text of the key lives
+     * in the two language files of the mod. See {@link TrueKillDamageSource}.
      */
-    public static void init() {
-        MinecraftForge.EVENT_BUS.register(new MTTrueKill());
+    private final String deathMessageKey;
+
+    /** Translation key of what the thrower is told when a target walks away from the whole ladder. */
+    private final String failureMessageKey;
+
+    protected MTKillBase(String killName, String deathMessageKey, String failureMessageKey) {
+        this.killName = killName;
+        this.deathMessageKey = deathMessageKey;
+        this.failureMessageKey = failureMessageKey;
     }
 
     /**
-     * Records every death whose death path completed. {@link EventPriority#LOWEST} and {@code receiveCanceled} are
-     * what make this the final state of the event: a mod that refuses the death of a protected entity, like Witchery
-     * does for its vampire players, runs before this and leaves no entry behind.
-     * <p>
-     * A death posts the event more than once for a player (the chain is {@code EntityPlayerMP.onDeath} ->
-     * {@code EntityPlayer.onDeath} -> {@code EntityLivingBase.onDeath}, and only the innermost one decides whether
-     * the death path runs), so a canceled post <em>removes</em> the entry again. Without that, a death gate that rolls
-     * per post - the flame protection of the vampire clothes does - could leave a "half dead" record behind and the
-     * ladder would stop on a player that is still standing at zero health.
+     * Registers the shared death tracker. Called by the common proxy during preInit; the branches share it, so it
+     * is registered once rather than once per branch.
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
-    public void onLivingDeath(LivingDeathEvent event) {
-        synchronized (DEATHS) {
-            if (event.isCanceled()) {
-                DEATHS.remove(event.entityLiving);
-            } else {
-                DEATHS.add(event.entityLiving);
-            }
-        }
+    public static void init() {
+        MinecraftForge.EVENT_BUS.register(new DeathTracker());
+    }
+
+    /**
+     * Whether this branch is willing to kill this target at all. The ladder does not change anything else about a
+     * refused target, so a branch can use this for a rule of its own - see {@link MTBowKill}.
+     *
+     * @param target  the target the ladder was asked to kill
+     * @param thrower the entity the kill is credited to, may be {@code null}
+     */
+    protected boolean accepts(Entity target, EntityLivingBase thrower) {
+        return true;
     }
 
     /**
      * Kills {@code rawTarget}. Has to be called on the server side.
      *
      * @param rawTarget  the entity that was hit, may be a body part of a multi part boss
-     * @param thrower    the player that threw the piggy, may be {@code null}. It is not protected: the piggy has to
-     *                   be able to kill the player that threw it straight up
-     * @param projectile the piggy itself, used to build the damage source and for the failure message
+     * @param thrower    the entity the kill is credited to, may be {@code null}
+     * @param projectile the entity that carried the kill, used to build the damage source and for the failure
+     *                   message
      * @return {@code true} when the target is dead (or gone) afterwards
      */
-    public static boolean kill(Entity rawTarget, EntityLivingBase thrower, Entity projectile) {
+    public final boolean kill(Entity rawTarget, EntityLivingBase thrower, Entity projectile) {
         if (rawTarget == null || rawTarget.worldObj == null || rawTarget.worldObj.isRemote) return false;
+        if (!accepts(rawTarget, thrower)) return false;
 
         Entity target = resolveMultiPart(rawTarget);
         repair(target);
@@ -206,7 +208,7 @@ public final class MTTrueKill {
         if (thrower instanceof EntityPlayer player) {
             GTUtility.sendChatToPlayer(
                 player,
-                StatCollector.translateToLocalFormatted("messtech.piggy.kill.failed", target.getCommandSenderName()));
+                StatCollector.translateToLocalFormatted(this.failureMessageKey, target.getCommandSenderName()));
         }
         return false;
     }
@@ -225,11 +227,11 @@ public final class MTTrueKill {
 
         // The entry is a memory, not a state: a player that respawned - the same entity, health back up - or a mob
         // that a mod revived is alive again, so the memory only counts while the health agrees with it. This is also
-        // what keeps a second throw from running a second death path on an entity that is already dying.
+        // what keeps a second hit from running a second death path on an entity that is already dying.
         return !(target instanceof EntityLivingBase living) || living.getHealth() <= 0.0F;
     }
 
-    /** One hit of the piggy. */
+    /** One hit of the ladder. */
     private static boolean hit(Entity target, DamageSource source) {
         // Dropping the vanilla immunity window first: a target that was hit a moment ago ignores hits otherwise.
         target.hurtResistantTime = 0;
@@ -250,9 +252,9 @@ public final class MTTrueKill {
         living.setHealth(0.0F);
 
         // The death message is built from the last hit the combat tracker of the target remembers, and a hit fills that
-        // tracker on its way through damageEntity(). This path does not go through the damage pipeline at all, so the
-        // piggy is written into the tracker by hand - otherwise a target that refused every hit and died here would be
-        // announced with whatever hit it took last, or with no attacker at all. See PiggyDamageSource.
+        // tracker on its way through damageEntity(). This path does not go through the damage pipeline at all, so this
+        // branch is written into the tracker by hand - otherwise a target that refused every hit and died here would be
+        // announced with whatever hit it took last, or with no attacker at all. See TrueKillDamageSource.
         CombatTracker tracker = living.func_110142_aN();
         tracker.func_94547_a(source, healthBeforeHit, 0.0F);
 
@@ -267,8 +269,9 @@ public final class MTTrueKill {
      * never fires again) and {@code Math.max(NaN, 0)} is NaN, which poisons the next hit as well.
      * <p>
      * The source is the damage pipeline of the game itself: {@code Float.MAX_VALUE} damage overflows to infinity in
-     * {@code applyArmorCalculations}, and the absorption bookkeeping computes {@code absorption - (infinity -
-     * infinity)}, i.e. NaN. The absorption is the value that is poisoned first, the health follows on the next hit.
+     * {@code applyArmorCalculations}, and the absorption bookkeeping computes
+     * {@code absorption - (infinity - infinity)}, i.e. NaN. The absorption is the value that is poisoned first, the
+     * health follows on the next hit.
      */
     private static void repair(Entity target) {
         if (!(target instanceof EntityLivingBase living)) return;
@@ -285,8 +288,8 @@ public final class MTTrueKill {
 
     /**
      * Hands a target that survived the whole ladder back in a state the game can work with. Every step that refuses
-     * the death leaves the health at zero, which would be a walking corpse - and the piggy is thrown at a target, not
-     * at the world, so the target has to keep working when the piggy fails.
+     * the death leaves the health at zero, which would be a walking corpse - and the ladder is asked to kill a
+     * target, not to break it, so the target has to keep working when the kill fails.
      */
     private static void restore(Entity target) {
         if (!(target instanceof EntityLivingBase living) || isDead(target)) return;
@@ -296,7 +299,7 @@ public final class MTTrueKill {
         }
     }
 
-    /** Dragon style bosses are hit on a body part, but the piggy wants the boss itself. */
+    /** Dragon style bosses are hit on a body part, but the ladder wants the boss itself. */
     private static Entity resolveMultiPart(Entity hit) {
         if (hit instanceof EntityDragonPart part && part.entityDragonObj instanceof Entity boss) return boss;
         return hit;
@@ -352,50 +355,78 @@ public final class MTTrueKill {
     }
 
     /**
-     * @return the damage source of the piggy. The piggy is the <em>indirect</em> entity on purpose:
-     *         {@code getEntity()} - the entity the game credits a kill to - is then a piggy and not a player. That is
-     *         what keeps the amount exactly {@code Float.MAX_VALUE} and the damage type exactly
+     * @return the damage source of this branch. The projectile is the <em>indirect</em> entity on purpose:
+     *         {@code getEntity()} - the entity the game credits a kill to - is then the projectile and not a player.
+     *         That is what keeps the amount exactly {@code Float.MAX_VALUE} and the damage type exactly
      *         {@value #BYPASS_DAMAGE_TYPE}: a mod that adjusts incoming damage while the attacker holds an infinity
      *         weapon keys off the attacker being a player, and the shield sets escalate their own kill source on
-     *         exactly this amount. It also means a mob killed by the piggy does not count as "hit by a player", which
-     *         is the same trade off the infinity weapons make.
+     *         exactly this amount. It also means a mob killed this way does not count as "hit by a player", which is
+     *         the same trade off the infinity weapons make.
      */
-    private static DamageSource indirect(EntityLivingBase thrower, Entity projectile) {
+    private DamageSource indirect(EntityLivingBase thrower, Entity projectile) {
         Entity owner = thrower != null ? thrower : projectile;
-        return new PiggyDamageSource(owner, projectile != null ? projectile : owner);
+        return new TrueKillDamageSource(this.deathMessageKey, owner, projectile != null ? projectile : owner);
+    }
+
+    private boolean killLog(Entity target, int step) {
+        MessTech.MT_LOG.debug("[{}] true kill of {} needed step {}", this.killName, target, step);
+        return true;
     }
 
     /**
-     * The damage source of the piggy. It is a damage source of its own for one reason only: the death message.
+     * The damage source of a branch. It is a damage source of its own for one reason only: the death message.
      * <p>
-     * The damage <em>type</em> has to stay {@link MTTrueKill#BYPASS_DAMAGE_TYPE}. The armour sets of the pack hand
+     * The damage <em>type</em> has to stay {@link MTKillBase#BYPASS_DAMAGE_TYPE}. The armour sets of the pack hand
      * every other type to their own immunity and let exactly this one through, so a type of our own would not only
      * change the message but also take the kill away (see the class javadoc). The death <em>message</em> is derived
      * from that same type by the game, and {@code death.attack.infinity} is the message of the infinity weapons of
-     * those mods: translating it here would relabel their kills as piggy hits. The message is therefore replaced on
-     * the source, the way Avaritia does it for its own infinity sword ({@code DamageSourceInfinitySword}).
+     * those mods: translating it here would relabel their kills as this mod's hits. The message is therefore replaced
+     * on the source, the way Avaritia does it for its own infinity sword ({@code DamageSourceInfinitySword}).
      */
-    private static final class PiggyDamageSource extends EntityDamageSourceIndirect {
+    private static final class TrueKillDamageSource extends EntityDamageSourceIndirect {
 
-        private PiggyDamageSource(Entity direct, Entity piggy) {
-            super(BYPASS_DAMAGE_TYPE, direct, piggy);
+        private final String deathMessageKey;
+
+        private TrueKillDamageSource(String deathMessageKey, Entity direct, Entity projectile) {
+            super(BYPASS_DAMAGE_TYPE, direct, projectile);
+            this.deathMessageKey = deathMessageKey;
         }
 
         /**
          * {@code EntityDamageSourceIndirect.func_151519_b}, i.e. the message of an indirect hit, with the translation
-         * key of the piggy instead of the one of the damage type. Both arguments are handed over the way the vanilla
+         * key of the branch instead of the one of the damage type. Both arguments are handed over the way the vanilla
          * method does it, so a language file can name the victim ({@code %1$s}) and, when a pack gives the entity a
-         * name, the piggy itself ({@code %2$s}); the mod only uses the first one.
+         * name, the projectile itself ({@code %2$s}); the lines of this mod only use the first one.
          */
         @Override
         public IChatComponent func_151519_b(EntityLivingBase victim) {
             Entity killer = getEntity() != null ? getEntity() : getSourceOfDamage();
-            return new ChatComponentTranslation(DEATH_MESSAGE_KEY, victim.func_145748_c_(), killer.func_145748_c_());
+            return new ChatComponentTranslation(this.deathMessageKey, victim.func_145748_c_(), killer.func_145748_c_());
         }
     }
 
-    private static boolean killLog(Entity target, int step) {
-        MessTech.MT_LOG.debug("[Piggy] true kill of {} needed step {}", target, step);
-        return true;
+    /**
+     * Records every death whose death path completed. {@link EventPriority#LOWEST} and {@code receiveCanceled} are
+     * what make this the final state of the event: a mod that refuses the death of a protected entity, like Witchery
+     * does for its vampire players, runs before this and leaves no entry behind.
+     * <p>
+     * A death posts the event more than once for a player (the chain is {@code EntityPlayerMP.onDeath} ->
+     * {@code EntityPlayer.onDeath} -> {@code EntityLivingBase.onDeath}, and only the innermost one decides whether
+     * the death path runs), so a canceled post <em>removes</em> the entry again. Without that, a death gate that rolls
+     * per post - the flame protection of the vampire clothes does - could leave a "half dead" record behind and the
+     * ladder would stop on a player that is still standing at zero health.
+     */
+    public static final class DeathTracker {
+
+        @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+        public void onLivingDeath(LivingDeathEvent event) {
+            synchronized (DEATHS) {
+                if (event.isCanceled()) {
+                    DEATHS.remove(event.entityLiving);
+                } else {
+                    DEATHS.add(event.entityLiving);
+                }
+            }
+        }
     }
 }

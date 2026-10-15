@@ -6,6 +6,8 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
 
+import com.MessTech.common.machine.MTReactorHeatSystem;
+
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.api.enums.Textures;
@@ -23,6 +25,13 @@ import gregtech.api.render.TextureFactory;
  * its {@code maxHeat}, so the player picks how much heat the reactor can take before it explodes. The base texture is
  * the multiblock casing; the heat control decal from
  * {@code assets/messtech/textures/blocks/hatch/Hatch_Reactor_Temp_Control.png} is layered on the front face.
+ * <p>
+ * The tier is also the cap for the access hatches ({@link #getHeatControlTier()}): a reactor whose heat hatch is EV
+ * refuses a UHV access hatch next to it. This is deliberately the same number as the heat ceiling's tier, so one
+ * hatch cannot buy pages without also buying heat headroom.
+ * <p>
+ * Every ceiling is finite, UIV included: {@link MTReactorHeatSystem#MAX_HEAT_CAPACITY} caps the whole scale so the
+ * heat effects ({@code heat / maxHeat} at 40 / 50 / 70 / 85 / 100%) stay reachable at every tier.
  */
 public class MTReactorHeatHatch extends MTEHatch {
 
@@ -37,9 +46,16 @@ public class MTReactorHeatHatch extends MTEHatch {
     /** Icon path relative to {@code textures/blocks}, matching {@code Textures.BlockIcons.custom}. */
     private static final String OVERLAY_PATH = "hatch/Hatch_Reactor_Temp_Control";
 
-    /** Heat ceiling per tier, indexed by {@code tier - MIN_TIER} (EV .. UIV). */
+    /**
+     * Heat ceiling per tier, indexed by {@code tier - MIN_TIER} (EV .. UIV).
+     * <p>
+     * The UIV entry used to be {@code Integer.MAX_VALUE}, which quietly switched the heat risk model off: the heat
+     * effects compare {@code heat / maxHeat} against the 40 / 50 / 70 / 85 / 100% thresholds, and at a 2.1e9 ceiling
+     * no reachable amount of hull heat drives that ratio anywhere near them. It is
+     * {@link MTReactorHeatSystem#MAX_HEAT_CAPACITY} (50,000,000) instead, so every tier's thresholds are reachable.
+     */
     private static final int[] HEAT_CAPACITY = { 10_000, 20_000, 50_000, 100_000, 200_000, 500_000, 1_000_000,
-        Integer.MAX_VALUE };
+        MTReactorHeatSystem.MAX_HEAT_CAPACITY };
 
     private static IIconContainer sHeatControlOverlay;
 
@@ -70,6 +86,14 @@ public class MTReactorHeatHatch extends MTEHatch {
         return getHeatCapacityForTier(mTier);
     }
 
+    /**
+     * The tier of this hatch. The reactor uses it twice: as the index into {@link #HEAT_CAPACITY} for the ceiling, and
+     * (see {@code MTReactor.checkMachine}) as the highest tier an access hatch of the same structure may have.
+     */
+    public int getHeatControlTier() {
+        return mTier;
+    }
+
     @Override
     public MetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
         return new MTReactorHeatHatch(mName, mTier, mDescriptionArray, mTextures);
@@ -81,7 +105,8 @@ public class MTReactorHeatHatch extends MTEHatch {
             EnumChatFormatting.AQUA
                 + StatCollector.translateToLocalFormatted("machine.mtreactor.heathatch.desc.0", getHeatCapacity()),
             EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.mtreactor.heathatch.desc.1"),
-            EnumChatFormatting.DARK_GRAY + StatCollector.translateToLocal("machine.mtreactor.heathatch.desc.2") };
+            EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.mtreactor.heathatch.desc.2"),
+            EnumChatFormatting.DARK_GRAY + StatCollector.translateToLocal("machine.mtreactor.heathatch.desc.3") };
     }
 
     /**

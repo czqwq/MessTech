@@ -247,10 +247,86 @@ MTMultiMachineBase<T>
 - No dynamo hatch in `checkMachine` -> auto enables wireless output mode (`MTGeneratorMultiBase`).
 
 ### MTReactor (nuclear reactor)
-- Generation: `EU/t = core output × 5 × IC2's balance/energy/generator/nuclear` (`MTReactor#getEuPerOutput()`).
-  GTNH's `config/IC2.ini` sets `nuclear = 5.0`, so one output point is worth 25 EU/t there - the factor IC2's own
-  `TileEntityNuclearReactorElectric#getOfferedEnergy()` and GT5U's NEI nuclear fake recipe use, and what makes a
-  GT quad uranium rod (12 pulses × `sEnergy` 2 = 24 output) generate 600 EU/t like the single block reactor.
+- Generation: `EU/t = core output × 5 × IC2's balance/energy/generator/nuclear × 2` (`MTReactor#getEuPerOutput()`;
+  the trailing `× 2` is `MESSTECH_OUTPUT_MULTIPLIER`). GTNH's `config/IC2.ini` sets `nuclear = 5.0`, so one output
+  point is worth 25 EU/t like in IC2 - the factor IC2's own `TileEntityNuclearReactorElectric#getOfferedEnergy()` and
+  GT5U's NEI nuclear fake recipe use, and what makes a GT quad uranium rod (12 pulses × `sEnergy` 2 = 24 output)
+  generate 600 EU/t in IC2's own reactor. MessTech doubles that to 1200 EU/t: the `× 2` is a deliberate maintainer
+  balance decision, not a config value, so it is named instead of being an unexplained literal - do not treat it as a
+  defect (see `docs/GT5U-NOTES.md` §15).
+- **Heat lives per page, and a page is anchored on its access hatch block.** `MTReactorHeatSystem` keeps
+  `Map<ChunkCoordinates, int[]>` keyed by the coordinates of the owning `MTReactorAccessHatch`
+  (`MTReactorHeatSystem.PageOwner#mtReactorKey()`), not an `int[]` indexed by the global page order over all access
+  hatches. That array renumbered every following page whenever one access hatch was added, removed or moved (the order
+  came from sorting the hatches by their block coordinates), so stored heat silently migrated from one hatch's page to
+  another hatch's page. `retainOnly()` drops the heat and the countdown of a hatch that left the structure, so a
+  removed hatch cannot hand its heat to a hatch that later occupies the same position.
+- **The heat cycle runs in `onPostTick()`, not in `checkProcessing()`**, which the base class skips while the machine
+  is switched off: the cycle, the passive cooling and the meltdown countdown keep running there. Only the fuel and the
+  energy output are gated by the power switch, through `isAllowedToWork()` -> `couldRun()` -> the `mLastCouldRun` flag
+  that `ReactorContext#produceEnergy()` reports; IC2's fuel rods test that method themselves, so a switched-off reactor
+  burns no fuel and produces nothing while its heat still moves.
+- **Meltdown countdown instead of an instant explosion:** a page at or over its ceiling arms a
+  `MTReactorHeatSystem.MELTDOWN_COUNTDOWN_TICKS = 600` tick (30 s) deadline. `armCountdowns()` runs at the end of
+  every material cycle and keeps the original deadline of a page that is still too hot (pinning the heat at the ceiling
+  cannot postpone the meltdown forever), `clearCountdown()` drops a page that came back under its ceiling, and
+  `resetCountdown()` cancels every countdown (a player action such as changing the heat hatch or toggling fluid mode).
+  The deadline is an absolute game tick that `explodeExpiredCountdowns()` checks every tick in `onPostTick()`, so a
+  page detonates 600 ticks after it first crossed the ceiling. A running countdown is **persisted as its remaining
+  ticks** (`mtReactorArmedCountdowns`) and re-anchored onto the machine's tick counter on load (`setLoadClock()` ->
+  `refreshCountdownClock()`), so a chunk unload or a server restart resumes the meltdown exactly where it stopped
+  instead of dropping or restarting it, and it only ticks down while the chunk is loaded. Since that payload holds the
+  remainder and nothing else, a reload can neither extend nor shorten the 30 s window.
+- **A ceiling change rescales the stored heat instead of detonating the machine** (`onCapacityChanged()`): every
+  page's heat is multiplied by `new ceiling / old ceiling`, so a reactor at 90% of its old ceiling ends up at 90% of
+  the new one. Before, the effect check was a plain `heat / maxHeat` ratio, so swapping a UHV heat hatch for an EV one
+  (or removing it) detonated the reactor on the very next cycle.
+- **Reactor plating counts again, IC2 style.** `ReactorContext#setMaxHeat()` is live and feeds
+  `MTReactorHeatSystem.setPageMaxHeat()`: plating raises the ceiling of *its own* 9x6 page on top of the heat control
+  hatch value (a page with platings must not raise the ceiling of a page without any), and within a page the largest
+  plating bonus wins, so the result does not depend on the component layout. `getPageMaxHeat()` is that page's
+  ceiling; a single item is bounded by `MAX_HEAT_BONUS_PER_ITEM` and the sum by `MAX_HEAT_CAPACITY`. `resetPageBonus()`
+  re-collects the bonus before that page's heat pass, so a removed plating stops contributing immediately. It used to
+  be a no-op that left plating with only its heat effect modifier (more heat per cycle) and a bigger explosion - a
+  pure downside.
+- **Passive cooling** comes from the heat control hatch tier (table in `docs/GT5U-NOTES.md` §15): every tick
+  `MTReactorHeatSystem.tick()` removes `rate / 20` HU, accumulated fractionally so no tier's rate is rounded away, from
+  the pages that carry at least 5% of the hottest page's heat (the empty pages of a large structure do not absorb the
+  budget), halved while a meltdown countdown is running, and it runs while the machine is switched off too - it is the
+  only way to bring an already hot reactor back down.
+- **World heat effects run once per cycle, not once per page:** `applyHeatEffects()` uses the hottest page's ratio and
+  that page's heat effect modifier, so an N-page reactor no longer irradiates the same entity and ignites the same air
+  block N times. Which page melts down is still decided per page.
+- **Multi-cycle prediction (`STABILITY_PREDICTION_CYCLES = 20`)**: `predictFuture()` repeats the heat pass on copies
+  of every page until the heat stops rising (the page found its equilibrium) or crosses the ceiling, so the GUI/Waila
+  can report how many cycles are left (`getCyclesToMeltdown()`, `-1` = stable) instead of the old boolean that could
+  only answer "is the next cycle fatal".
+- **Rated vs actually injected EU/t:** `getRatedEUPerTick()` is what the last completed cycle accumulated,
+  `getActualEUPerTick()` is how much of it the dynamo hatches really swallowed; a dynamo that cannot take the output
+  silently loses it, so both are shown and a shortfall below 90% of the rated value that persists for
+  `OUTPUT_SHORTFALL_REPORT_TICKS = 20` ticks is reported (`hasOutputShortfall()`). A page that explodes still settles
+  the EU/t the cycle had accumulated before the detonation.
+- **Fluid ("wet") mode** is toggled per controller with a screwdriver (`onScrewdriverRightClick`) and needs a coolant
+  input hatch and a hot coolant output hatch, otherwise the machine soft-stops. The loop mirrors IC2's: 1 mB of
+  `ic2coolant` per 1 HU of buffered component heat (`MTReactorHeatSystem.coolantForHeat()`,
+  `COOLANT_PER_BUFFER_UNIT = 1` - MessTech's own ratio rather than IC2's 2 mB/HU `huOutputModifier`, so the feed rate
+  reads as "as much coolant per second as the core makes heat per second"), the same amount of `ic2hotcoolant` is
+  filled, and if the output hatch cannot take all of it the drained coolant is refunded, so the loop can neither
+  duplicate nor delete fluid. `addEmitHeat`/`isFluidCooled` are live now, which is what makes the mode matter: IC2's
+  vents (`ItemReactorVent` / `ItemReactorVentSpread`) hand the heat they removed to the fluid buffer instead of losing
+  it, and MOX fuel (`ItemReactorMOX#getFinalHeat`) doubles its heat output above 50% heat. Neither is mode-gated on
+  the component side - the condensators, lithium cells and heat switches never asked about the mode at all. Dry mode
+  does not lose the buffered heat either: half of it is pushed back onto the core, IC2's `addHeat(huOutput / 2)`.
+- **A locked slot holding a full durability component is never pre-emptively output** (P21): only a component that
+  already lost durability is salvaged before a cycle that the prediction says destroys it. A fresh component dying in
+  the next cycle means the layout itself is wrong, so swapping it cannot help - the machine stays soft-stopped instead
+  of consuming input items.
+- **The explosion power limit is a config option now** (`Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT`, default 45, IC2's
+  own `protection/reactorExplosionPowerLimit`): it used to be a hardcoded `45.0F` and it is the value the summed
+  component influence is clamped to before it is mapped onto the DE power scale (`REACTOR_EXPLOSION_DE_POWER_LIMIT`,
+  40). `explodeReactor()` also clears the heat of every page on purpose - the controller tile entity and its heat store
+  survive the `explodeMultiblock()` call for the rest of the tick, so a hot store would otherwise be left behind on a
+  dead machine - and it settles the EU/t the cycle had accumulated first.
 - Controller face: the face art of GoodGenerator's neutron activator - `icons/NeutronActivator_Off` / `_On` and their
   two optional glow layers from the gregtech assets (five animated 16x16 frames each, `frametime: 8`) - over the casing
   that was already under the face (`Casings.AssemblyLineCasing`); the other five faces stay
@@ -261,25 +337,47 @@ MTMultiMachineBase<T>
   flavour line, then the `§6` group headings 结构 / 堆芯 / 发电 / 细节, with `addSeparator()` between the groups. The
   colour emphasis lives in the lang text itself (`§b` for values, `§c` for the danger thresholds, `§e` for the hatch
   tiers), so the Java side is one `addInfo(translate(key))` per line, and the structure block/`toolTipFinisher` follow
-  unchanged. Reuse this layout (and key naming) for the other machines.
+  unchanged. Reuse this layout (and key naming) for the other machines. The reactor tooltip has no muffler hatch line:
+  the structure never accepted one, and the old line advertised a hatch the player could not usefully place.
 - Data stick copy (`MTReactorAccessHatch implements IDataCopyable`): the GT5U pattern of `MTEHatchOutputBus` /
   `MTEHatchConfigurableBase` - left click with an `ItemList.Tool_DataStick` saves, right click loads, and a constant
   `"type"` string (`DATA_STICK_DATA_TYPE`) is checked on paste. Safe on a GT machine block: `MaterialMachines` is
   `setRequiresTool()` and the harvest tool is a wrench, so a data stick deals no block damage.
 - The payload is settings only - a version (`ver`), the source page count (`page`) and a sparse `locks` list of
   `{slot, threshold, item}` for the locked slots. **The components themselves are never stored or written**: a paste
-  replays that config slot for slot: the lock percentage and the remembered component type come straight from the
-  stick, the inventory is never read and never written, a slot the config leaves unlocked is unlocked, and a page the
-  hatch does not have keeps no lock. A locked slot that is empty is reported (`copy.empty_slots`) - the lock stands and
-  works as soon as the component is put in.
+  only touches this hatch's lock state (`mSlotState` / `mSlotMemory`), a slot the config leaves unlocked is unlocked
+  here, and a page this hatch does not have keeps no lock. A locked slot that is empty is reported
+  (`copy.empty_slots`) - the lock stands and works as soon as the component is put in.
+- **The component type decides where a lock lands, not the slot number** (`remapLocks()`): a stick written on one
+  layout and pasted onto another holds the same parts in different slots, so a pure slot-number replay locked the wrong
+  slots. Every entry is resolved in three passes: (1) a slot that already holds that component type - the only place
+  the existing inventory is read, (2) its original slot number when that slot does not already carry another lock,
+  (3) any other free slot on the same page. An occupied slot that carries a lock is never overwritten, a lock that
+  cannot be placed anywhere is dropped and reported (`copy.remap_dropped`), and `copy.remapped` reports how many locks
+  the paste applied over how many pages.
 - Two earlier revisions were wrong and must not come back: (a) storing the components and writing them into the target
-  (that is not a settings copy), and (b) matching the config against the target's items by type and skipping the rest
-  (that locked nothing whenever the comparison did not line up, and it made the paste depend on the inventory).
+  (that is not a settings copy), and (b) matching the config against the target's items by type and *skipping* every
+  entry that did not line up - that locked nothing whenever the comparison failed and made the paste depend on the
+  inventory. The type-first placement above is not that attempt: it only decides *where* a lock lands and falls back to
+  the slot number and then to any free slot on the page, so no entry is lost just because the target layout differs.
 - If a paste replays nothing, the hatch logs (logger `MessTech`, WARN) how many lock entries the stick carried, how many
   survived `loadItemStackFromNBT` and how many pages were usable. A bare JVM cannot resolve Forge item ids, so this log
   is the field diagnostic.
 - Pages map 0..N-1 one to one: a smaller hatch ignores the pages it does not have (`copy.pages_dropped`). The version
-  field exists so a stick written by an earlier layout is refused (`copy.invalid`) instead of half applied.
+  field exists so a stick written by an earlier layout is refused (`copy.invalid`) instead of half applied. The stick
+  itself performs no tier validation - it only carries and replays settings, and whether the target structure may hold
+  that hatch is the controller's job (`MTReactor.checkAccessHatchTier()` caps the access hatch tier with the heat
+  control hatch tier), so replaying a stick from a large hatch onto a lower tier one is legal and just drops pages.
+- **The meltdown is Draconic Evolution's reactor explosion, ported** (`MTExplosionDE` + `MTExplosionDETrace`, 1:1 out
+  of `tmp/Draconic-Evolution-master`): one block ring per tick out to `power * 10` blocks, one trace per ring block
+  which then blasts its whole vertical column, instead of IC2's `ExplosionIC2` (whose ray count does not scale - a 450
+  power explosion fires ~25 million rays and freezes the server before the first block breaks). What DE does *not* have
+  in that process is a visual, and neither had this port: DE triggers the fireball from the tile entity
+  (`TileReactorCore#goBoom` sends `(int) (power * 10F)`, the client answers with
+  `Particles.ReactorExplosionParticle`). MessTech has no packet channel, so the same effect is spawned as a synced
+  entity instead - `MTEntityDEBlast`, drawn by `MTDEBlastRenderer`, both documented with DE's own line numbers. Every
+  `MTExplosionDE` gets it, the meltdown and the bow's DE mode alike, and its boom is played client side at tick 3,
+  exactly where DE's particle plays its sound.
 
 ### Machine tooltips (house style)
 - Every machine controller tooltip is one `addInfo(translate(key))` per line with the keys
@@ -1265,9 +1363,13 @@ MTMultiMachineBase<T>
     and the oink itself. The renderer draws the effect icon as a billboard
     (`TextureMap.locationItemsTexture`, so animated effects animate on their own), scaled to 0.6 and spinning
     24 degrees per tick around the view axis.
-- `MTTrueKill` (`common/util`) is the "true kill" behind it. It is a ladder, because every kind of protection
-  gives up somewhere else; `MessTech.MT_LOG.debug("[Piggy] true kill of ... needed step N")` reports which step
-  did the kill, so a test can be traced in the log.
+- `MTKillBase` (`common/util`) is the "true kill" ladder behind it - shared, because every kind of protection gives
+  up somewhere else, and split into one branch per weapon: `MTPiggyKill` for the piggy, `MTBowKill` for the Voidstar
+  Piercer. A branch says only two things: how its kills read (the death message key and the "could not kill" line,
+  handed to the base constructor) and whom it refuses (`accepts`, overridden only by the bow). The ladder itself is
+  branch-less and `kill()` is `final`; each branch is a singleton (`MTPiggyKill.INSTANCE.kill(...)`).
+  `MessTech.MT_LOG.debug("[Piggy] true kill of ... needed step N")` reports which step did the kill, with the
+  branch name in the brackets ("Piggy", "Bow"), so a test can be traced in the log.
   1. `attackEntityFrom` with exactly `Float.MAX_VALUE`, damage type `"infinity"`, `setDamageIsAbsolute()` and
      **neither** armour piercing **nor** creative mode. Set based immunity cancels its hurt/attack/death events
      for every damage type *except* that one, and the shielded armour sets escalate on exactly that amount by
@@ -1303,12 +1405,12 @@ MTMultiMachineBase<T>
   6. Players again: three more death events, which is what counts down single use protection.
   7. Everything else: `setDead()` + `World#removeEntity`. Multi part bosses are resolved through
      `EntityDragonPart#entityDragonObj` first, so the boss is killed and not the part.
-  - **The thrower is not exempt.** Throwing the piggy straight up and letting it land on your own head kills you,
+  - **The thrower is not exempt in this branch.** Throwing the piggy straight up and letting it land on your own head kills you,
     which is the whole point of the item; previously the ladder returned early for `target == thrower`. Vanilla's
     `EntityThrowable` already keeps the thrower safe for the first five ticks in air (`entity1 != getThrower() ||
     ticksInAir >= 5`, MC `EntityThrowable.onUpdate` line 196), so a piggy thrown at your feet still does not blow
     up in your face.
-  - **A death counts only when the death path of the target ran.** `MTTrueKill.init()` (called from
+  - **A death counts only when the death path of the target ran.** `MTKillBase.init()` (called from
     `CommonProxy.preInit`) subscribes to `LivingDeathEvent` at `EventPriority.LOWEST` with
     `receiveCanceled = true`, i.e. it sees the final cancel state of the whole handler chain, and records the
     entity when the event was *not* cancelled. A canceled post *removes* the record again: the death of a player
@@ -1330,7 +1432,7 @@ MTMultiMachineBase<T>
     `absorption - (infinity - infinity)`, i.e. NaN. From there `Math.max(NaN, 0)` is NaN, so the *next* hit turns
     `health - NaN` into a NaN health, and `MathHelper.clamp_float` passes that NaN straight through. The entity
     then is unkillable for good: `health <= 0` is false for NaN, so not even a normal death check of the game ever
-    fires again, and the health bar just looks empty. `MTTrueKill.repair` therefore drops a NaN (or infinite)
+    fires again, and the health bar just looks empty. `MTKillBase.repair` therefore drops a NaN (or infinite)
     absorption to zero and a NaN health to zero after every hit, after every forced death and before the removal
     step - this is the exact "0 health, `HealF` NaN" state of the report.
   - If every step fails the thrower gets `messtech.piggy.kill.failed` in chat instead of a silent no-op, and the
@@ -1340,7 +1442,7 @@ MTMultiMachineBase<T>
     `DamageSource#func_151519_b` builds the key `death.attack.<type>`. As it is, the piggy would be announced with
     `death.attack.infinity`, the key Avaritia's `DamageSourceInfinitySword` uses for its own sword: translating that
     key in the language files of the mod would relabel every infinity sword kill as a piggy kill. The source therefore
-    replaces the *message* instead of the type: `MTTrueKill.PiggyDamageSource` overrides `func_151519_b` with a key of
+    replaces the *message* instead of the type: the nested `TrueKillDamageSource` of `MTKillBase` overrides `func_151519_b` with a key of
     its own (`death.attack.messtech.piggy`) — the same trick Avaritia uses for its sword. The victim is handed over as
     `%1$s` and the piggy as `%2$s`; the mod ships `%1$s被猪猪创飞了` (zh_CN) and
     `%1$s was knocked flying by a Piggy` (en_US). A death message is a `ChatComponentTranslation` that travels to the
@@ -1353,16 +1455,20 @@ MTMultiMachineBase<T>
     into the tracker by hand (`func_94547_a`) before it runs the death. Without that, the targets that only die there —
     the ones whose hit never reaches the damage pipeline — would be announced with the last hit somebody else landed on
     them, or with the generic `death.attack.generic`.
-  - `tmp/mtkill` is the harness for all of this: it compiles the shipped `MTTrueKill` against mirrors of the
+  - `tmp/mtkill` is the harness for all of this: it compiles the shipped ladder against mirrors of the
     vanilla damage pipeline (`build/rfg/minecraft-src`) and of the two Witchery halves (`EntityVampire.onDeath` +
     `GenericEvents.onLivingDeath`), and asserts the reported bugs (NaN absorption/health, the unkillable vampire,
     the self hit) as well as the old steps. The mirrors include the chat side
     (`ChatComponentTranslation`, `StatCollector`, `CombatTracker`, `DamageSource#func_151519_b`), so the death message
     is asserted end to end against the real `.lang` files of the mod: its key, its two arguments, the reported Chinese
     sentence, the English one, the fallback of an untranslated key and the fact that `death.attack.infinity` stays
-    untranslated. Run it with
+    untranslated.
+    **It has not been ported to the branches yet**: it still names `MTTrueKill` and calls the ladder statically, and
+    that class no longer exists (`MTKillBase` is abstract now, and the calls are `MTPiggyKill.INSTANCE.kill(...)` /
+    `MTBowKill.INSTANCE.kill(...)`). `tools/**` is only touched on request, so it is left exactly as it was; porting
+    it means renaming the type and routing the calls through the piggy branch. Its command was
     `javac -d tmp/mtkill/out -sourcepath tmp/mtkill/stubs src/main/java/com/MessTech/common/util/MTTrueKill.java tmp/mtkill/*.java`
-    and `java -cp tmp/mtkill/out MTKillHarness`.
+    followed by `java -cp tmp/mtkill/out MTKillHarness`.
 
 ## The "PigTech" text animation (`MTPigTechText` / `MTPigTech`)
 
@@ -1651,4 +1757,290 @@ MTMultiMachineBase<T>
   被抬高（默认 2000 满足）；配置低于该值时指令会额外发一条警告（`command.messtech.goup.threshold.low`），
   而不是让玩家莫名被拉回去。
 - 副作用提醒：30 s 飞完玩家在约 8400 格高处，掉下来要很久，落地/掉出世界都按原版规则处理。
+
+## 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`)
+- Name: `混沌终焉·虚无贯星弓` / `Chaos Finale: Voidstar Piercer` (`item.messtech.voidstarBow.name`), registry name
+  `VoidstarBow`, unlocalized `messtech.voidstarBow`, creative tab `tabCombat`, **max stack 1**, durability
+  1,024 (`MTItemVoidstarBow.MAX_DAMAGE`, i.e. under three stacks of arrows).
+- It is a plain `ItemBow` in everything but its **draw length** and its **sub-modes**: the `f < 0.1` minimum draw that
+  does not fire, arrow consumption, the Infinity enchantment that replaces it, Power / Punch / Flame and the
+  enchantment table are all vanilla's. Only the projectile, the charging effect, the icons, the glint, the draw
+  length and the two sub-modes are this mod's.
+- **Sub-modes (`MTItemVoidstarBow.MODE_PIERCE` / `MODE_DE`), switched with sneak + right click.** The mode lives in
+  the stack's own NBT (`MTVoidstarMode`), so two bows can be in different modes and it survives a relog; anything
+  missing or out of range reads as `MODE_PIERCE`, i.e. a bow that has never been switched behaves exactly like it did
+  before the modes existed. The switch is `onItemRightClick`: it **must not fall through to `super`** (vanilla's
+  `ItemBow` starts the draw in that very method, so a switch that did would fire an arrow when shift is released),
+  both sides return early so neither starts a use, and only the server writes the mode. The chat message is a
+  `ChatComponentTranslation` rather than a translated string, so the key travels to the client and each player reads
+  it in their own language; the keys are `messtech.voidstarBow.mode.pierce` / `.mode.de` and the tooltip shows the
+  current one through `messtech.voidstarBow.tooltip.mode` + `.modeName.*`. A block with its own right-click GUI takes
+  the click before the item does (`ItemInWorldManager#activateBlockOrUseItem` calls `onBlockActivated` first) - that
+  is the platform, the same in every GTNH tool, so switch the mode while aiming at air.
+- **DE mode's one explosion.** In `MODE_DE` the arrow's first block contact calls `MTExplosionDE` (the port of DE's
+  reactor explosion, see the reactor section) centred on the block it touched, with
+  `Config.VOIDSTAR_BOW_DE_POWER` power - default **20**, which is DE's own full reactor
+  ({@code 2 + fuelFraction * 18}, i.e. 2 for empty and 20 for full), i.e. a 200 block radius - and then removes
+  itself. None of the tunnel machinery runs: no piece is blasted and no block is drilled, which is the whole
+  difference to pierce mode. A shot that hits nothing at all still detonates when its flight ticks run out (the arrow
+  must not simply vanish after 600 blocks); an entity hit is unaffected by the mode and still goes through
+  `MTBowKill`.
+- **The draw is `Config.VOIDSTAR_BOW_DRAW_TICKS` ticks, 80 by default, i.e. four seconds** where vanilla's bow takes
+  one. `onPlayerStoppedUsing` keeps vanilla's own curve (`f = (f*f + 2f)/3`, the `f < 0.1` floor that does not fire
+  and the cap at 1) and only divides by the configured length instead of vanilla's hardcoded `20.0F`, so the arrow's
+  speed (`1.2 + 1.8 * draw`, see the arrow below), the `isCritical` mark at a full draw and the magic circle's unfold
+  all stretch with it: the minimum draw that fires at all is the same fifth of the charge, about 0.7 seconds. The
+  four seconds are the number the charge effect was designed around - the Yes Steve Model pack it was copied from
+  spreads its own unfold over four seconds. **One pose does not follow it**: vanilla's first person bow pose ramps
+  over twenty ticks in `ItemRenderer` line 466 (`f11 = f10 / 20.0F`), a hardcoded constant of the client renderer
+  that only a coremod could change, so a four second draw finishes its arm movement after the first second and keeps
+  charging after that. The config file and the class comment both say so.
+- **Icons** (`assets/messtech/textures/items/bow/`): `voidstarBow_standby` plus `_pulling_0/1/2`, each a
+  **16 x 256** PNG, i.e. a strip of 16 frames of 16x16 with `{"animation": {"frametime": 2}}` as its `.mcmeta`
+  (32 ticks per loop). Animated icons in the item atlas work in 1.7.10; this is the same mechanism as the animated
+  piggy strips (see "A Piggy + MTDynamicItemHelper"). The frame alpha of all four strips is bit-identical to the
+  corresponding vanilla `bow_standby`/`bow_pulling_N.png` (64/64 frames checked), so the bow is exactly as big as
+  vanilla's and only its colours move.
+  - The art is the vanilla bow recoloured into a void-metal ramp (`#2a1140` to `#a462e8`, keeping vanilla's own
+    shading structure) with a cyan-to-white energy string and a white-lilac shimmer travelling along the arc once
+    per 16-frame loop, plus a void-glow pulse that completes two cycles over the same loop, so frame 15 -> frame 0
+    does not jump. Generator: `tmp/chaosbow/gen_voidstar_textures.py` (deterministic; reads the vanilla icons out of
+    the 1.7.10 client jar). Review sheet: `tmp/chaosbow/preview_voidstar.png`.
+  - **The pull frames can only come from the Forge hook.**
+    `EntityPlayer#getItemIcon` (line 2051 in `build/rfg/minecraft-src`) selects the draw frame only for
+    `itemStackIn.getItem() == Items.bow` - an identity check a subclass never passes - and otherwise falls through to
+    `itemStackIn.getItem().getIcon(itemStackIn, pass, this, itemInUse, itemInUseCount)` (line 2070), i.e. Forge's
+    player sensitive `Item#getIcon(ItemStack, int, EntityPlayer, ItemStack, int)`. `MTItemVoidstarBow` overrides
+    exactly that, with vanilla's own cut-offs: >= 18 ticks drawn is `_pulling_2`, > 13 is `_pulling_1`, > 0 is
+    `_pulling_0`. Those two cut-offs are kept as *fractions* of the draw (90% and 65%) and applied to
+    `Config.VOIDSTAR_BOW_DRAW_TICKS`, so the three frames spread over the whole four second charge rather than over
+    the first second. Because the state the hook is handed is the *player's* (`itemInUse`), the pull animation also shows
+    for **other** players: `EntityOtherPlayerMP#onUpdate` (lines 86-96) rebuilds `itemInUse` from the "eating" flag
+    that `EntityPlayer#setItemInUse` sets server side (`EntityPlayer.java:2183`), which is what vanilla's own
+    third-person bow pose relies on as well.
+- **The glint**: `Item#hasEffect(ItemStack)` is overridden to `true`, so vanilla draws the purple enchantment glint
+  over the bow wherever it is rendered (`ItemRenderer.java:132` for the item in hand,
+  `RenderItem.java:561` for the inventory), whether it is enchanted or not. The animated strip is the static half of
+  the "enchanted" look, the glint the moving one.
+- **The magic circle** (`MTMagicCircleRenderer`, client only, registered on `MinecraftForge.EVENT_BUS` from
+  `ClientProxy#preInit`): textured quads in world space, drawn in `RenderWorldLastEvent` - **not** a particle. The
+  first version was a ring of rune particles, which read as a dotted circle; the quads are the circle itself.
+  Its construction is copied from the bow charge effect of the Yes Steve Model pack `wine_fox / 05_magical`
+  (`animations/arm.animation.json` -> `use_mainhand:bow`, the `ysmGlowdamofazhen` / `ysmGlowmofazhen*` bones of
+  `models/main.json`, sprites at `191,191` and `161,50` of `textures/magic.png`). That pack is a *model*, not a
+  renderer, so what is copied is its design, rebuilt as world space quads:
+  - **Two motifs.** `misc/magicRing.png` is the big circle (a ring of 24 segments, an inscribed square with corner
+    marks, an inner circle), `misc/magicFlower.png` is the small one (a four pointed compass flower with four short
+    diagonal petals). Thin violet line art, drawn by `tmp/chaosbow/gen_voidstar_ysm_circles.py` (256x256, 2x
+    supersampled). The pack's own pixels are another author's art under CC BY-NC-SA: same motifs, **not** the same
+    file - do not paste `magic.png` into this repo.
+  - **Every circle is two quads.** The pack's small circle bones carry a 27 unit plane and a 16.2 unit plane - 60% -
+    turned 45 degrees around its own centre (`INNER_RATIO` / `INNER_ANGLE`). That turned inner copy is what makes it
+    read as a magic circle rather than as a decal, and every circle here has one.
+  - **One big circle with four around it.** The pack parents four circle bones to the big one, nine units off its
+    pivot, i.e. `1.33` big radii (`CORNER_DISTANCE`), each `0.70` big radii across (`CORNER_RADIUS`). Being children
+    they are carried **around** it by its own spin, which is reproduced by turning the corner positions with the big
+    circle's angle.
+  - **The spin rates are the pack's own**, in degrees per second: the big circle 18 (`BIG_SPIN_PER_SECOND` - its keys
+    are 0 -> 90 degrees over five seconds), the small ones 180 (`SMALL_SPIN_PER_SECOND`), alternating direction.
+  - **The unfold is the pack's too.** Every small circle **bursts**: its scale keys start it at 3 and 4, collapse it
+    to 0 and then settle it on its resting value (`burstScale()`, `BURST_SCALE` / `BURST_COLLAPSE`), and the pack
+    slides them along the weapon axis while they do it (position keys like `0,0,38` to `0,0,-24`), which
+    `AXIAL_FLIGHT` brings back. The corners start at 10%, 17%, 24% and 31% of the draw and settle over the following
+    35% each; the big circle joins at 62% (`BIG_FIRST`) and flies forward out of the bow as it grows (`BIG_GROWTH`),
+    the way its own position keys do (`0,0,-42` to `0,0,13`).
+  - **The card** hangs `1.90` blocks in front of the eyes (`DISTANCE`, lowered `0.25` below the eye) in the plane
+    perpendicular to the player's `getLook(partialTicks)`, built from `right = normalize((-fz, 0, fx))` and
+    `up = right x forward` (a player looking straight up or down has no such right vector and falls back to the
+    world's x axis). Two batches, one per sprite, with the depth mask off and the depth test left on, so walls hide
+    the circle exactly like they hide the arrow.
+  - **The blending is the pack's**: plain alpha (`GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA`, its `entityTranslucent`
+    render type), not the additive of the first version, and with culling off so a circle shows from both sides. The
+    one deliberate deviation is `setBrightness(0xF000F0)`: the pack leaves those bones to the world light, while a
+    circle the player summons should glow in a cave instead of turning grey.
+  - Everything is a pure function of the draw (`getMaxItemUseDuration() - getItemInUseCount()`, divided by
+    `Config#VOIDSTAR_BOW_DRAW_TICKS` - four seconds, i.e. 80 ticks), so the animation can never drift out of step
+    with the bow: at a full draw it is one circle in the middle, four in the diagonal corners around it, all of it
+    still turning. The four-second draw is what makes the unfold read exactly like the pack's: the corners burst at
+    0.4 / 0.7 / 1.0 / 1.2 seconds and settle by 2.6, the big circle joins at 2.5 and is complete at 3.7.
+- **The arrow** (`MTEntityVoidstarArrow`, entity id 1, registered in `CommonProxy#preInit`, rendered with vanilla's
+  `RenderArrow` by `ClientProxy#preInit`):
+  - **Straight flight.** The launch direction is the shooter's `getLook(1.0F)` and its spread is zero (the vanilla
+    `setThrowableHeading` jitter of up to 0.0075 per axis is not applied); the speed is `1.2 + 1.8 * draw` blocks per
+    tick. The motion is written back from that aim **at the start and at the end of every tick**, so the two things
+    vanilla's arrow does at the end of its own tick - `motion *= 0.99` and `motionY -= 0.05` (`EntityArrow.java`
+    lines 454-457) - never reach the next move. A full draw therefore travels exactly 3.0 blocks per tick along the
+    line the crosshair points at, with no drop at all; writing it before the move is what makes the flight straight,
+    writing it after is what keeps the motion constant for `EntityTrackerEntry` (a motion that changed every tick
+    would be re-sent as a velocity update every tick).
+  - **It drills on instead of exploding where it hits.** The contact itself is recognised exactly as before -
+    vanilla's own ray trace stops the arrow against a block and its entity scan kills the arrow on a mob, so a mob in
+    front of a block is still hit first - and the tick of a block contact is the tick that advanced by less than the
+    arrow's own speed (`advance < speed * 0.995`; vanilla backs the arrow off by 0.05 blocks, i.e. 4.2% of `MIN_SPEED`
+    and 1.7% of `MAX_SPEED`, while an open tick advances by exactly the speed because `applyAim` overwrote the
+    motion). On that tick `onBlockContact` blasts the piece of tunnel between the last blast and the face in front of
+    the arrow (`World#func_147447_a` from where the arrow sits along its own aim) and **does not remove the arrow**:
+    the block vanilla stuck it into is gone, so vanilla's own in-ground branch finds a different block on the next
+    tick, clears its in-ground flag and releases the arrow, which flies on with the aim written back. Every contact
+    therefore extends the same tunnel and one shot fired into a mountain carves a corridor through it until
+    `MAX_FLIGHT_TICKS` (200 ticks = 600 blocks at a full draw) runs out.
+    - The pieces are handed out back to back: `blastX/Y/Z` starts at the muzzle and is moved to the face of every
+      contact, so no block is ever scanned twice (the tunnel is only ever blasted forwards).
+    - `stuckTicks` counts the ticks the arrow spent held up by blocks; above `MAX_STUCK_TICKS` (6) the flight ends
+      with the bang (`finish`) instead of the arrow sitting in a wall for the rest of its life. Two of those ticks
+      always belong to a contact that *did* go through (the tick vanilla stopped the arrow, and the tick it releases
+      itself again), so a bedrock wall - or a protection plugin, or an explosion resistant block - is what the limit
+      is for.
+    - A tick in which vanilla *bounced* the arrow (an entity that refused the damage, e.g. a player in creative mode:
+      the motion ends up pointing backwards) is an entity hit, not a block one, and it is handled by the bow's kill.
+  - **The client does not know the aim: it takes it from the velocity the server sends.** `MTEntityVoidstarArrow`
+    implements FML's `IThrowableEntity` for exactly that reason - `FMLMessage.EntitySpawnMessage#toBytes` only writes
+    the velocity into the spawn packet for an `IThrowableEntity` (the `instanceof` branch next to the data watcher
+    stream) and `EntitySpawnHandler#spawnEntity` reads it back and calls `setVelocity`, while vanilla's own
+    `EntityArrow` is not one. **Before that interface was there, this was a real bug in game**: the freshly created
+    client copy of the arrow had a motion of zero, `applyAim` wrote this class's *default* aim into it - `(0, 0, 1)`,
+    i.e. due south and perfectly level - and the copy flew off sideways at three blocks per tick until the position
+    updates of the server dragged it back onto the real line. That reads as a curving arrow (a model that points
+    away from the aim for a moment and then swings onto it), which is what a report of "the arrow flies flat and to
+    my right, then corrects" was. `adoptSyncedAim` now takes `aim`/`speed` from the client's own motion at the start
+    of every tick, and the tick before the first velocity arrives (`MIN_AIM_LENGTH`, at most the first tick) holds
+    the orientation the spawn packet brought instead of letting vanilla recompute a rotation from a motion of zero -
+    `atan2(0, 0)` is 0, i.e. yaw 0 and pitch 0.
+  - **A hit on an entity kills it with the bow's true kill.** Vanilla's hit (damage, knockback, the sound) happens
+    first inside `super.onUpdate`, and the arrow is then dead - which is how the entity hit is recognised at all,
+    since a block contact never kills the arrow any more. The target is found again by `findHitEntity`, which repeats
+    exactly the scan vanilla ran a moment ago on the same step: candidates in the box around the step, every box
+    expanded by `0.3` blocks, `AxisAlignedBB#calculateIntercept`, closest intercept wins, the shooter excluded. The
+    kill is `MTBowKill.INSTANCE.kill(victim, shooter, this)`, i.e. the same branch of the `MTKillBase` ladder the
+    tunnel uses (see below), so the two kill paths of this weapon cannot drift apart. A bounce counts as a hit too:
+    the ladder does not care that the entity refused the damage.
+  - The arrow is never pickable (`canBePickedUp = 0`). Aim, speed, muzzle, the last blast point and the stuck
+    counter are saved to NBT, so an arrow saved mid-air by a chunk unload resumes on the same line and does not blast
+    its own tunnel a second time.
+- **The tunnel** (`MTExplosionTunnel#blast`, server side only; the client learns about it from the ordinary block
+  change packets and from the deaths): every block whose centre is within `Config.VOIDSTAR_BOW_TUNNEL_RADIUS`
+  (default **6.0**, i.e. a thirteen by thirteen hole; the minimum 0.5 is the single column of blocks the line passes
+  through, 1.5 is three by three and 2.5 is five by five) of the blasted piece is destroyed, and every living thing
+  within the same radius of it is killed by the bow's branch of the true kill ladder, `MTBowKill` (see below).
+  - The line is walked in one block steps and every step only opens a cube of `ceil(radius)` around the point it
+    reached - not the bounding box of the whole segment, which for a 128 block flight fired at 45 degrees would be a
+    90 x 90 x 90 box (729,000 blocks) scanned to destroy a few hundred. Half a block of slack per step is what makes
+    `ceil(radius)` enough to cover a block whose centre can be within the radius.
+  - Survives: air, fluids (vanilla explosions do not destroy them either), anything with
+    `getBlockHardness < 0` (bedrock, the portal, GT's unbreakable blocks) and anything with
+    `getExplosionResistance > 100` (obsidian is 600, stone 30, GT machine casings 10-20, so "everything a player can
+    mine, nothing that is meant to be blast proof"). **Nothing is dropped** - the tooltip says so out loud.
+  - **The living things inside the tunnel are killed by `MTBowKill`, the bow's branch of `MTKillBase`.** Both kill
+    paths of the weapon - a direct hit (`onEntityHit`) and this sweep - go through that one branch, so they can never
+    behave differently. What the ladder does is described in the piggy's section above: the plain `Float.MAX_VALUE`
+    hit with the `"infinity"` damage type first (which is what walks past the armour sets that cancel the events of
+    every other type), then armour piercing and creative mode, then the fire hit against death gates that only open
+    for fire, and finally zero health plus `onDeath` by hand, which no damage cap or invulnerability flag can
+    intercept. A target that survives the whole ladder is handed back alive (`restore`) and the thrower is told so
+    with `messtech.voidstarBow.kill.failed`.
+    - **A previous version of this weapon did not use the ladder.** It "killed" its targets with the overheal
+      exploit: `heal(1 << 31)` - the amount the item's tooltip used to quote - which on a classpath without Forge's
+      heal patch is the instant kill of vanilla's Instant Health potion, and which this mod then had to follow with
+      a hand written `setHealth` and `onDeath`. Two platform facts were behind that: Forge patched the vanilla half
+      away (`EntityLivingBase#heal`, lines 795-805, starts with
+      `amount = ForgeEventFactory.onLivingHeal(this, amount); if (amount <= 0) return;`, so a wrapped heal does
+      nothing) and 1.7.10 only runs `onDeath` from inside `attackEntityFrom` (`EntityLivingBase.java:931-941`), so
+      zero health alone is a walking corpse. **That class (`MTOverheal`) is gone**: the ladder reaches everything the
+      overheal reached and more, because it does not skip the damage pipeline of the target when the target can be
+      killed through it.
+    - The bow's branch overrides `accepts` to refuse the shooter: the tunnel starts at the muzzle, which is inside
+      the player who fired, so without that rule every shot would kill its own archer. The tunnel pass skips
+      `victim == source` as well, and the arrow's `findHitEntity` excludes the shooter, so the rule is enforced
+      three times over - but only the branch's copy is the one the weapon depends on.
+    - The two messages of the branch are `death.attack.messtech.voidstar` (`%1$s` is the victim; the archer is
+      deliberately not named) and `messtech.voidstarBow.kill.failed`. They are the branch's whole reason to exist:
+      they are handed to the base constructor by `MTBowKill`, and they are what keeps a bow kill from being announced
+      with the piggy's line.
+    - An entity's own size counts as well as its position: the reach is `radius + max(width, height) / 2`, so a
+      horse or a boss whose centre sits outside the tunnel is still caught when half of it is inside.
+    - Anything already dead or dying (`isDead` or health <= 0) is skipped, so the ladder is not asked to kill a
+      corpse (an entity at zero health whose death path never ran cannot be killed by a second call either - the
+      ladder's own `isDead` would not see a completed death).
+  - **Letting go heals the archer to full** (`Config.VOIDSTAR_BOW_HEALS_SHOOTER`, default **true**,
+    `MTItemVoidstarBow#onPlayerStoppedUsing`). It is `player.heal(max - current)`, i.e. a real heal of the
+    difference rather than a health assignment, so the game's heal path runs (the Forge heal event and healing
+    effects included) and the archer can never be pushed past their own maximum. It happens in the same
+    `!world.isRemote` branch that spawns the arrow, so a shot that does not happen - a draw too weak to fire, no
+    arrow in the inventory - heals nothing.
+  - A shot fired by a player posts the standard `BlockEvent.BreakEvent` per block and leaves it standing when a
+    protection mod cancels it; the vanilla "block destroyed" effect (`World#playAuxSFX` id 2001, what `Explosion`
+    sends per block) is only sent for blocks within 12 blocks of the impact, because one packet per block over a
+    long tunnel is the thing that makes big explosions lag.
+  - A blasted piece longer than `Config.VOIDSTAR_BOW_TUNNEL_LENGTH` (default **128** blocks) keeps its far end and
+    drops the near one: the wall the arrow is pressed against is what the player is looking at. The cap is per
+    piece, so it only ever applies to a shot that flew further than that before meeting its first block; the pieces
+    of the drilling that follow are a few blocks long each.
+  - `Config.VOIDSTAR_BOW_BREAKS_BLOCKS` (default **true**, category `VoidstarBow`) turns the whole block destruction
+    off; the arrow is then still straight and still trails, it just stops at the wall. The two passes of the tunnel
+    have independent switches: `Config.VOIDSTAR_BOW_ANNIHILATES_LIVING` (default **true**) turns the true kill of the
+    living things off, so a server can have the tunnel without them, or the kills without the block damage. A third
+    switch, `Config.VOIDSTAR_BOW_HEALS_SHOOTER` (default **true**), turns the heal the archer gets on release off.
+- **Particles** (`MTEntityFXVoidstar`, `MTVoidstarFx`): the trail spawns three sparks along the step the arrow just
+  took (at 3 blocks per tick, one per position would be a dotted line), every drilled block gets a small burst at the
+  face, and the end of the flight gets the big one - a flash at the wall, sparks through the whole tunnel (the muzzle
+  position travels in data watcher ids 20/21/22, which is why every client can draw the burst locally although only
+  the server destroys blocks) and vanilla `largeexplode`/`smoke` particles.
+  - One sprite is left, `messtech:particle/voidstarSpark`, registered **into the item atlas** by the bow's own
+    `registerIcons`, and the particles use `getFXLayer() == 2`, which is the one atlas
+    `EffectRenderer#renderParticles` binds for a custom icon: layer 0 is the vanilla particle sheet, and
+    `EntityFX#setParticleIcon` throws for it. Layer 2 is bound to `TextureMap.locationItemsTexture`
+    (`EffectRenderer.java` lines 127-144).
+  - They are full bright (`getBrightnessForRender` returns `0xF000F0`, the value vanilla's spell particles return),
+    so the trail glows in an unlit cave instead of turning into grey dots. `noClip` is on: sparks hang in the air in
+    a tunnel that is being dug and must not be stopped by the blocks around them.
+  - The drilled block's burst is deliberately cheap (7 sparks): a shot into a mountain triggers it every few ticks
+    for as long as the arrow digs.
+- **The name wears the `STARFIELD` tooltip animation** (`MTStarfieldText` + `MTStarfieldTextRenderer`, both new):
+  - `MTStarfieldText.frame` colours character `i` with
+    `PALETTE[(i + floor(millis / 75)) mod 12]`, i.e. neighbouring characters wear neighbouring colours (the
+    gradient the player reads as a flow) and the band advances one character every 75 ms. The palette is
+    pink - purple - blue - dark aqua - aqua - white and back through a red and a gold, so every pass has a white
+    core with a night sky on one side and an ember on the other. Only colour codes are emitted - never bold, which
+    would move the advance by a pixel per character and pump the tooltip box (see
+    `MTModuleProjectTextRenderer` for that trap).
+  - `MTStarfieldTextRenderer` **replaces** the line (`replacesText()`): it draws the frame itself with the font and
+    then, on the plane of the tooltip box (`zLevel` 300, through a `Gui` subclass),
+    - one or two **twinkling stars per glyph**: the position comes from an avalanche hash of the character index, so
+      a star never leaves its pixel, while its blink phase comes from the same hash and a 260 ms clock, so the
+      neighbours twinkle independently; the brightest step also gets a four pixel cross,
+    - and a **shooting star** crossing the whole line from the upper left every 3.6 s, visible for the first 35% of
+      that period, with a fading tail.
+  - Glyph geometry (where a character starts, how wide it is) always comes from the `FontRenderer`, never from a
+    hand sum, so a resource pack with different letter widths keeps the stars on their letters.
+- **`MTAnimatedTooltipHandler#addItemNameAnimation` is the new registration shape this needs.** A tooltip's first
+  line is the item's display name, drawn by vanilla before any handler sees the tooltip, so an animation cannot be
+  attached by adding a line. The handler recognises the line a renderer belongs to by its **visible text**
+  (`rendererFor`), so an entry whose supplier answers with the item's name is enough - it must simply not be
+  appended to the tooltip, which is what the new `Entry#drawn` flag is for (`addItemTooltip`/`addAnimatedText` entries
+  are drawn, name entries are not). `ClientProxy#preInit` registers `MTStarfieldText.INSTANCE` with the lang key as
+  the supplier, so a resource pack rename follows.
+  - **The registration has to use `OreDictionary.WILDCARD_VALUE` as the stack's damage, and that was a real bug.**
+    The first version registered `new ItemStack(MTItems.voidstarBow)`, i.e. damage 0. The damage of a damageable stack
+    *is* its durability damage, `ItemStackMap.actualDamage` is `stack.getItemDamage()` and the handler's map is keyed
+    by it - so the effect worked on a freshly spawned bow and stopped working the moment the bow had been fired once,
+    which is exactly what "the rainbow effect does not show up" looked like in game. With `WILDCARD_VALUE` on the
+    NBT-insensitive map (`ItemStackMap(boolean NBTSensitive)` with `false`, the constructor the handler uses)
+    `DetailMap#getKeyType` answers `WildcardAll` - `isWildcard(damage)` and then `!NBTSensitive` -> `withWildcardTag`
+    - which lands the entry in the map's single `wildcard` field, and `DetailMap#get` returns that field **before**
+    looking at damage or NBT at all. Every damage, every enchantment and a renamed bow are therefore covered, which
+    is the same wildcard `MTItemPiggy`'s own registration uses.
+  - The other half of the tooltip plumbing was checked while hunting that: NEI does post gtnhlib's
+    `RenderTooltipEvent` (`codechicken/nei/util/RenderTooltipEventHelper`, called from `GuiContainerManager` line 633)
+    and honours `alternativeRenderer` (line 648), and the marker NEI appends to the first line
+    (`GuiDraw.TOOLTIP_LINESPACE = "\u00a7h"`) is a section code, i.e. `MTTextAnimation.visibleText` strips it and the
+    name still matches. Neither was the problem.
+- **Limitation**: the magic circle reads the use state of the player on the client that draws it, so *other* players
+  do not see the circle of somebody else drawing the bow (1.7.10 does not sync item use to other clients - the vanilla
+  bow pose has the same hole). The arrow, its trail, its bursts and the tunnel are unaffected - those travel with the
+  entity and every client simulates them.
+- Verification: `gradlew compileJava`, as always; the texture generators self-check their own output
+  (`tmp/chaosbow/gen_voidstar_textures.py`, `tmp/chaosbow/gen_voidstar_ysm_circles.py`) and the shell loops are not
+  part of the build. The Yes Steve Model pack the circle's design was read from is not a dependency: the layout,
+  timing and spin rates above were read out of its JSON files, and `tmp/chaosbow/inspect_ysm*.py` are the throwaway
+  scripts that read them.
 

@@ -40,15 +40,24 @@ import cpw.mods.fml.relauncher.SideOnly;
  */
 public final class MTAnimatedTooltipHandler {
 
-    /** One registered line: the supplier that produces it and, optionally, the animation it wears. */
+    /**
+     * One registered line: the supplier that produces it and, optionally, the animation it wears.
+     * <p>
+     * A name entry ({@link #addItemNameAnimation}) is the one kind that adds no line of its own: its supplier only
+     * says what the item's own name line looks like, so the renderer of its animation can be attached to that line
+     * while the tooltip keeps exactly the lines it had.
+     */
     private static final class Entry {
 
         private final Supplier<String> line;
         private final MTTextAnimation animation;
+        /** Whether {@link #line} is a line of its own, i.e. whether it is appended to the tooltip. */
+        private final boolean drawn;
 
-        private Entry(Supplier<String> line, MTTextAnimation animation) {
+        private Entry(Supplier<String> line, MTTextAnimation animation, boolean drawn) {
             this.line = line;
             this.animation = animation;
+            this.drawn = drawn;
         }
     }
 
@@ -90,6 +99,7 @@ public final class MTAnimatedTooltipHandler {
 
         registerRenderer(AuthorDynamic.TRANSCENDENT_METAL, new MTTranscendentMetalTextRenderer());
         registerRenderer(AuthorDynamic.MODULE_PROJECT, new MTModuleProjectTextRenderer());
+        registerRenderer(MTStarfieldText.INSTANCE, new MTStarfieldTextRenderer());
         MinecraftForge.EVENT_BUS.register(new MTAnimatedTooltipHandler());
     }
 
@@ -119,7 +129,33 @@ public final class MTAnimatedTooltipHandler {
         if (stack == null || line == null) return;
 
         List<Entry> entries = TOOLTIPS.computeIfAbsent(stack, key -> new ArrayList<>());
-        entries.add(new Entry(line, animation));
+        entries.add(new Entry(line, animation, true));
+    }
+
+    /**
+     * Puts an animation on the item's <b>own name line</b>, without adding a line of its own.
+     * <p>
+     * A tooltip's first line is the item's display name, drawn by vanilla before any handler sees the tooltip, so an
+     * animation cannot be attached to it by adding a line: the handler recognises the line a renderer belongs to by
+     * its <b>visible text</b> (see {@link #rendererFor}), so an entry whose supplier answers with the name of the
+     * item is enough to make the name wear the animation. The entry is not appended to the tooltip, which is the
+     * difference to {@link #addAnimatedText} - the name is already there, and adding it a second time would show
+     * the item twice.
+     * <p>
+     * The supplier is evaluated on every frame, so it should return the name as the item displays it (the lang key
+     * for a plain item, {@code ItemStack#getDisplayName} for one that can be renamed in an anvil).
+     *
+     * @param stack     the item whose name wears the animation; {@code OreDictionary.WILDCARD_VALUE} as its damage
+     *                  covers every variant
+     * @param name      the item's name line, i.e. the name the tooltip shows; formatting codes are allowed and are
+     *                  ignored when the line is matched
+     * @param animation the animation the name wears, e.g. {@link MTStarfieldText#INSTANCE}
+     */
+    public static void addItemNameAnimation(ItemStack stack, Supplier<String> name, MTTextAnimation animation) {
+        if (stack == null || name == null || animation == null) return;
+
+        List<Entry> entries = TOOLTIPS.computeIfAbsent(stack, key -> new ArrayList<>());
+        entries.add(new Entry(name, animation, false));
     }
 
     /**
@@ -187,6 +223,8 @@ public final class MTAnimatedTooltipHandler {
         if (entries == null) return;
 
         for (Entry entry : entries) {
+            if (!entry.drawn) continue; // a name animation decorates a line the tooltip already has
+
             String text = entry.line.get();
             if (text == null || text.isEmpty()) continue;
 

@@ -15,6 +15,8 @@ import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.value.sync.BooleanSyncValue;
 import com.cleanroommc.modularui.value.sync.IntSyncValue;
+import com.cleanroommc.modularui.value.sync.LongArraySyncValue;
+import com.cleanroommc.modularui.value.sync.LongSyncValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
@@ -27,10 +29,15 @@ import gregtech.api.util.GTUtility;
  * Controller GUI for the nuclear reactor.
  * <p>
  * The default terminal text widget is replaced on purpose: only the reactor status numbers are shown, without the
- * recipe progress bar and without the machine work progress. The "stable" line is the result of the next-cycle heat
- * simulation implemented in {@link MTReactor}.
+ * recipe progress bar and without the machine work progress. The lines come from the controller's own state:
+ * the core heat and its ceiling, the three-state meltdown report ({@code stable} / {@code N cycles} / countdown
+ * running, plus a red countdown alarm while one runs), rated vs actually injected EU/t with a dynamo shortfall
+ * warning, the fluid (wet) mode with its passive cooling, and the per-page heat map.
  */
 public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
+
+    /** Longest page list the heat map line shows before it collapses into a "+N more" tail. */
+    private static final int HEATMAP_MAX_ENTRIES = 12;
 
     public MTReactorGui(MTReactor multiblock) {
         super(multiblock);
@@ -50,6 +57,31 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
             new BooleanSyncValue(multiblock::isAutoMatchTarget, multiblock::setAutoMatchTarget).allowC2S());
         syncManager.syncValue("mtReactorMissingLocked", new BooleanSyncValue(multiblock::hasMissingLockedComponents));
         syncManager.syncValue("mtReactorLowLocked", new BooleanSyncValue(multiblock::hasLowOrDoomedLockedComponents));
+        syncManager.syncValue("mtReactorMeltdown", new BooleanSyncValue(multiblock::isMeltdownCountdownActive));
+        syncManager.syncValue("mtReactorMeltdownSeconds", new IntSyncValue(multiblock::getMeltdownCountdownSeconds));
+        syncManager.syncValue("mtReactorCycles", new IntSyncValue(multiblock::getCyclesToMeltdown));
+        syncManager.syncValue("mtReactorRatedOutput", new LongSyncValue(multiblock::getRatedEUPerTick));
+        syncManager.syncValue("mtReactorActualOutput", new LongSyncValue(multiblock::getActualEUPerTick));
+        syncManager.syncValue("mtReactorOutputShortfall", new BooleanSyncValue(multiblock::hasOutputShortfall));
+        syncManager.syncValue("mtReactorFluidMode", new BooleanSyncValue(multiblock::isFluidMode));
+        syncManager.syncValue("mtReactorCooling", new LongSyncValue(multiblock::getPassiveCoolingPerSecond));
+        syncManager.syncValue("mtReactorPendingHeat", new IntSyncValue(multiblock::getPendingCoolantHeat));
+        // MUI2 has no int[] sync value, so the per-page heat map travels as long[] (see pageHeatPercents).
+        syncManager.syncValue("mtReactorPageHeat", new LongArraySyncValue(this::pageHeatPercents, null));
+    }
+
+    /**
+     * The controller's per-page heat percentages as the {@code long[]} {@link LongArraySyncValue} needs. The order is
+     * the controller's: hatch by hatch, page by page (`MTReactor#getPageHeatPercents`).
+     */
+    private long[] pageHeatPercents() {
+        int[] percents = multiblock.getPageHeatPercents();
+        if (percents == null) return new long[0];
+        long[] result = new long[percents.length];
+        for (int i = 0; i < percents.length; i++) {
+            result[i] = percents[i];
+        }
+        return result;
     }
 
     @Override
@@ -88,6 +120,17 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
         BooleanSyncValue stable = syncManager.findSyncHandler("mtReactorStable", BooleanSyncValue.class);
         BooleanSyncValue missingLocked = syncManager.findSyncHandler("mtReactorMissingLocked", BooleanSyncValue.class);
         BooleanSyncValue lowLocked = syncManager.findSyncHandler("mtReactorLowLocked", BooleanSyncValue.class);
+        BooleanSyncValue meltdown = syncManager.findSyncHandler("mtReactorMeltdown", BooleanSyncValue.class);
+        IntSyncValue meltdownSeconds = syncManager.findSyncHandler("mtReactorMeltdownSeconds", IntSyncValue.class);
+        IntSyncValue cycles = syncManager.findSyncHandler("mtReactorCycles", IntSyncValue.class);
+        LongSyncValue ratedOutput = syncManager.findSyncHandler("mtReactorRatedOutput", LongSyncValue.class);
+        LongSyncValue actualOutput = syncManager.findSyncHandler("mtReactorActualOutput", LongSyncValue.class);
+        BooleanSyncValue outputShortfall = syncManager
+            .findSyncHandler("mtReactorOutputShortfall", BooleanSyncValue.class);
+        BooleanSyncValue fluidMode = syncManager.findSyncHandler("mtReactorFluidMode", BooleanSyncValue.class);
+        LongSyncValue cooling = syncManager.findSyncHandler("mtReactorCooling", LongSyncValue.class);
+        IntSyncValue pendingHeat = syncManager.findSyncHandler("mtReactorPendingHeat", IntSyncValue.class);
+        LongArraySyncValue pageHeat = syncManager.findSyncHandler("mtReactorPageHeat", LongArraySyncValue.class);
 
         return new ListWidget<>().fullWidth()
             .crossAxisAlignment(Alignment.CrossAxis.START)
@@ -107,7 +150,56 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
                 line(
                     () -> StatCollector
                         .translateToLocalFormatted("machine.mtreactor.gui.heat_percent", heatPercent.getValue())))
-            .child(stableLine(stable))
+            // The alarm line only exists while a page is actually counting down, so the terminal stays short in the
+            // normal case and cannot be mistaken for a decoration.
+            .child(
+                IKey.dynamic(
+                    () -> EnumChatFormatting.RED.toString() + EnumChatFormatting.BOLD
+                        + StatCollector
+                            .translateToLocalFormatted("machine.mtreactor.gui.meltdown", meltdownSeconds.getIntValue()))
+                    .asWidget()
+                    .fullWidth()
+                    .marginBottom(2)
+                    .setEnabledIf(w -> meltdown.getBoolValue()))
+            .child(stableLine(stable, cycles, meltdown))
+            .child(
+                line(
+                    () -> StatCollector
+                        .translateToLocalFormatted("machine.mtreactor.gui.output_rated", ratedOutput.getLongValue())))
+            .child(
+                line(
+                    () -> StatCollector
+                        .translateToLocalFormatted("machine.mtreactor.gui.output_actual", actualOutput.getLongValue())))
+            .child(
+                IKey.dynamic(
+                    () -> EnumChatFormatting.RED
+                        + StatCollector.translateToLocal("machine.mtreactor.gui.output_shortfall"))
+                    .asWidget()
+                    .fullWidth()
+                    .marginBottom(2)
+                    .setEnabledIf(w -> outputShortfall.getBoolValue()))
+            .child(
+                line(
+                    () -> StatCollector.translateToLocalFormatted(
+                        "machine.mtreactor.gui.fluidmode",
+                        StatCollector.translateToLocal(
+                            fluidMode.getBoolValue() ? "machine.mtreactor.gui.fluidmode.on"
+                                : "machine.mtreactor.gui.fluidmode.off"))))
+            .child(
+                line(
+                    () -> StatCollector
+                        .translateToLocalFormatted("machine.mtreactor.gui.cooling", cooling.getLongValue())))
+            // Only meaningful in fluid mode: it is the component heat the coolant loop has not carried away yet, and
+            // whatever of it the loop does not take ends up on the core.
+            .child(
+                IKey.dynamic(
+                    () -> StatCollector
+                        .translateToLocalFormatted("machine.mtreactor.gui.pending_heat", pendingHeat.getIntValue()))
+                    .asWidget()
+                    .fullWidth()
+                    .marginBottom(2)
+                    .setEnabledIf(w -> fluidMode.getBoolValue()))
+            .child(line(() -> heatMapText(pageHeat)))
             .child(IKey.dynamic(() -> {
                 if (missingLocked.getBoolValue()) {
                     return EnumChatFormatting.RED
@@ -131,29 +223,34 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
     @Override
     protected UITexture getTextureForReason(String key) {
         return switch (key) {
-            case "reactor_component_missing", "reactor_component_low" -> GTGuiTextures.OVERLAY_STRUCTURE_INCOMPLETE;
+            case "reactor_component_missing", "reactor_component_low", "reactor_coolant_missing", "reactor_too_many_pages" -> GTGuiTextures.OVERLAY_STRUCTURE_INCOMPLETE;
             default -> super.getTextureForReason(key);
         };
     }
 
+    /**
+     * Every reactor shutdown reason is a {@code SimpleShutDownReason.ofCritical(id)} whose text lives in the GT5U
+     * namespace under that id ({@code ExtraShutdownReason}); MessTech defines those keys in its own lang files because
+     * the reasons are its own.
+     */
     @Override
     protected String getToolTipForReason(String key) {
         return switch (key) {
-            case "reactor_component_missing" -> EnumChatFormatting.RED
-                + StatCollector.translateToLocal("GT5U.gui.text.shutdown_reason.reactor_component_missing");
-            case "reactor_component_low" -> EnumChatFormatting.RED
-                + StatCollector.translateToLocal("GT5U.gui.text.shutdown_reason.reactor_component_low");
+            case "reactor_component_missing", "reactor_component_low", "reactor_coolant_missing", "reactor_too_many_pages" -> EnumChatFormatting.RED
+                + StatCollector.translateToLocal("GT5U.gui.text.shutdown_reason." + key);
             default -> super.getToolTipForReason(key);
         };
     }
 
     /**
-     * The reactor's locked-component stop does not disable the machine (it resumes automatically once the auto
-     * input/output refills the slot), so the default {@code !isAllowedToWork} gate must be relaxed for our reasons.
+     * The reactor's locked-component and coolant stops do not disable the machine (they resume by themselves once the
+     * situation is fixed), so the default {@code !isAllowedToWork} gate must be relaxed for our reasons.
      */
     @Override
     protected boolean shouldShutdownReasonBeDisplayed(String shutdownString) {
-        if ("reactor_component_missing".equals(shutdownString) || "reactor_component_low".equals(shutdownString)) {
+        if ("reactor_component_missing".equals(shutdownString) || "reactor_component_low".equals(shutdownString)
+            || "reactor_coolant_missing".equals(shutdownString)
+            || "reactor_too_many_pages".equals(shutdownString)) {
             return GTUtility.isStringValid(shutdownString);
         }
         return super.shouldShutdownReasonBeDisplayed(shutdownString);
@@ -187,8 +284,16 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
             .marginBottom(2);
     }
 
-    private static IWidget stableLine(BooleanSyncValue stable) {
+    private static IWidget stableLine(BooleanSyncValue stable, IntSyncValue cycles, BooleanSyncValue meltdown) {
         return IKey.dynamic(() -> {
+            if (meltdown.getBoolValue()) {
+                return EnumChatFormatting.RED.toString() + EnumChatFormatting.BOLD
+                    + StatCollector.translateToLocal("machine.mtreactor.gui.stable.meltdown");
+            }
+            if (cycles.getIntValue() >= 0) {
+                return EnumChatFormatting.RED + StatCollector
+                    .translateToLocalFormatted("machine.mtreactor.gui.stable.cycles", cycles.getIntValue());
+            }
             boolean isStable = stable.getBoolValue();
             return (isStable ? EnumChatFormatting.GREEN : EnumChatFormatting.RED)
                 + StatCollector.translateToLocalFormatted(
@@ -200,5 +305,32 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
             .fullWidth()
             .marginBottom(2)
             .tooltip(t -> t.addLine(IKey.lang("machine.mtreactor.gui.stable.tooltip")));
+    }
+
+    /**
+     * The per-page heat map as one line. The terminal is a flat list of text lines, so the pages are joined with the
+     * {@code gui.heatmap.entry} pattern and capped at {@link #HEATMAP_MAX_ENTRIES} entries plus a {@code +N} tail - a
+     * 25 hatch structure would otherwise put 200 entries into one widget. The order is the controller's
+     * ({@code MTReactor#getPageHeatPercents}: hatch by hatch, page by page).
+     */
+    private static String heatMapText(LongArraySyncValue pageHeat) {
+        long[] percents = pageHeat == null ? null : pageHeat.getValue();
+        if (percents == null || percents.length == 0) {
+            return StatCollector.translateToLocal("machine.mtreactor.gui.heatmap.empty");
+        }
+        StringBuilder builder = new StringBuilder();
+        int shown = Math.min(percents.length, HEATMAP_MAX_ENTRIES);
+        for (int i = 0; i < shown; i++) {
+            if (i > 0) builder.append(' ');
+            builder.append(
+                StatCollector.translateToLocalFormatted("machine.mtreactor.gui.heatmap.entry", i + 1, percents[i]));
+        }
+        if (percents.length > shown) {
+            builder.append(' ')
+                .append(
+                    StatCollector
+                        .translateToLocalFormatted("machine.mtreactor.gui.heatmap.more", percents.length - shown));
+        }
+        return StatCollector.translateToLocalFormatted("machine.mtreactor.gui.heatmap", builder.toString());
     }
 }

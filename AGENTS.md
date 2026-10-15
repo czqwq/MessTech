@@ -36,6 +36,9 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - GT5U API knowledge
 - Own-code conventions
 - Chaos Matter (混乱物质): GT material registration and the stacked-renderer look
+- 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`): magic-circle charge FX, straight penetrating
+  arrow, tunnel blast, true kill (`MTKillBase` / `MTBowKill`), the DE sub-mode (`MTExplosionDE` + `MTEntityDEBlast` /
+  `MTDEBlastRenderer`) and the starfield tooltip name
 - Galacticraft hook: 高速上升自动开星系 GUI (`MTGalacticraftSpaceHandler`)
 - Vanilla "moved too quickly" 上限 (`MixinNetHandlerPlayServer_MovedTooQuickly`)
 - `/messtech GoUp [秒数]` (`MTCommand` / `MTGoUpFlight`)
@@ -99,6 +102,13 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - 10. Biological Coordinator（生物协调器）
 - 11. Splitter（分流器）
 - 给 Nano-Scale Foundry 定数值时的建议锚点
+
+### `docs/mochadoom-console.md` - 游戏机（把 Mocha Doom 移植进 MC 1.7.10）可行性研究（Chinese）
+- Mocha Doom 源码规模与包结构（444 文件 / 86,761 行，无第三方依赖，GPLv3）
+- 可替换的宿主接口（`DoomGraphicSystem` / `IDoomSystem` / `IDoomSound` / `ISoundDriver` / `IMusic`）
+- 必须打的 Mocha Doom 补丁清单，以及 MC 侧要新增的类
+- AWT 耦合面的真实范围、按键方案、帧缓冲 → GL 纹理、线程与生命周期
+- WAD 数据来源与许可、风险清单、里程碑
 
 ## Verification
 

@@ -17,6 +17,7 @@ import javax.annotation.Nonnull;
 import net.minecraft.block.material.Material;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
@@ -28,6 +29,8 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraftforge.fluids.Fluid;
+import net.minecraftforge.fluids.FluidStack;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -35,7 +38,9 @@ import com.MessTech.common.explosion.MTExplosionDE;
 import com.MessTech.common.gui.MTReactorGui;
 import com.MessTech.common.machine.Base.MTGeneratorMultiBase;
 import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
+import com.MessTech.common.machine.hatch.MTReactorCoolantInputHatch;
 import com.MessTech.common.machine.hatch.MTReactorHeatHatch;
+import com.MessTech.common.machine.hatch.MTReactorHotCoolantOutputHatch;
 import com.MessTech.common.process.MTProcessHandler;
 import com.MessTech.common.util.ExtraShutdownReason;
 import com.MessTech.init.Config;
@@ -56,12 +61,16 @@ import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
+import gregtech.api.metatileentity.implementations.MTEHatch;
+import gregtech.api.metatileentity.implementations.MTEHatchDynamo;
 import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.render.TextureFactory;
 import gregtech.api.structure.error.StructureError;
 import gregtech.api.structure.error.StructureErrors;
+import gregtech.api.util.GTModHandler;
+import gregtech.api.util.GTUtility;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.IGTHatchAdder;
 import gregtech.api.util.MultiblockTooltipBuilder;
@@ -85,38 +94,48 @@ import mcp.mobius.waila.api.IWailaDataAccessor;
  * independent reactor grid: components can never interact across page borders.</li>
  * <li>Every 20 ticks both component passes run exactly like IC2 does (heat pass first, then the energy pass), heat
  * accumulates per page and each page has its own heat effect modifier. The heat ceiling of every page is set by the
- * single {@link MTReactorHeatHatch} of the structure and not by the reactor components.</li>
- * <li>At 85% heat the core can ignite its surroundings, at 70% it irradiates entities, and at 100% the page
- * explodes. The explosion power is computed from the reactor components' {@code influenceExplosion}.</li>
+ * single {@link MTReactorHeatHatch} of the structure and not by the reactor components - except for the heat a reactor
+ * plating adds, which is accumulated on top (see {@link MTReactorHeatSystem#addMaxHeat(int)}).</li>
+ * <li>The heat cycle runs in {@link #onPostTick}, not in {@code checkProcessing}: it therefore keeps running while the
+ * machine is switched off, which is what lets the heat controls bring a hot reactor back down. Only the fuel and energy
+ * passes are gated by the power switch.</li>
+ * <li>At 85% heat the core can ignite its surroundings, at 70% it irradiates entities, and at 100% a 30 second meltdown
+ * countdown starts, after which the page explodes. The explosion power is computed from the reactor components'
+ * {@code influenceExplosion}. See {@link MTReactorHeatSystem} for the state and the countdown.</li>
  * <li>The generated energy ({@code output * 5 EU/t * balance/energy/generator/nuclear}, the IC2 conversion, see
  * {@link #getEuPerOutput()}) is emitted through dynamo hatches.</li>
  * </ul>
  */
 public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvivalConstructable {
 
-    /** IC2 reactor tick rate: components are processed once every 20 ticks. */
-    public static final int CYCLE_TICKS = 20;
+    /**
+     * IC2 reactor tick rate: components are processed once every 20 ticks. Kept as a separate constant because the heat
+     * system owns its own copy for the state it manages.
+     */
+    public static final int CYCLE_TICKS = MTReactorHeatSystem.CYCLE_TICKS;
     /**
      * IC2's own EU/t conversion of the accumulated reactor output, before the pack's balance factor:
      * {@code TileEntityNuclearReactorElectric#getOfferedEnergy()} returns
      * {@code output * 5.0F * balance/energy/generator/nuclear}.
      */
     private static final float IC2_EU_PER_OUTPUT = 5.0F;
+    /**
+     * The extra factor of 2 on top of IC2's conversion. This is a deliberate MessTech balance decision (it doubles the
+     * output of the ported IC2 numbers); it is not read from any config, so it is named here instead of being an
+     * unexplained literal - see {@code docs/GT5U-NOTES.md} section 15.
+     */
+    private static final int MESSTECH_OUTPUT_MULTIPLIER = 2;
+    /** Simulated reactor cycles used by the stability prediction, i.e. how far ahead the GUI can look. */
+    private static final int STABILITY_PREDICTION_CYCLES = 20;
+    /** Consecutive ticks of "the dynamos took less than the rated output" before the machine reports it. */
+    private static final int OUTPUT_SHORTFALL_REPORT_TICKS = 20;
 
     // Why not hardcoded?
     public static float getEuPerOutput() {
         if (MainConfig.get() == null) return IC2_EU_PER_OUTPUT * 2 * 5;
-        return IC2_EU_PER_OUTPUT * ConfigUtil.getFloat(MainConfig.get(), "balance/energy/generator/nuclear") * 2;
+        return IC2_EU_PER_OUTPUT * ConfigUtil.getFloat(MainConfig.get(), "balance/energy/generator/nuclear")
+            * MESSTECH_OUTPUT_MULTIPLIER;
     }
-
-    /**
-     * What IC2 clamps a reactor explosion to ({@code protection/reactorExplosionPowerLimit} in IC2's general.ini).
-     * The MTReactor does not read IC2's config: it computes the identical IC2 number itself and uses it to scale the
-     * component influence onto the {@link MTExplosionDE} power range, see {@link #explodeReactor()}.
-     */
-    private static final float IC2_EXPLOSION_POWER_LIMIT = 45.0F;
-    /** Safety cap for pages processed per cycle (a 3x3x3 shell cannot hold that many hatches anyway). */
-    private static final int MAX_PAGES = 256;
 
     // region Controller face
     /**
@@ -167,6 +186,78 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         @Override
         public long count(MTReactor t) {
             return t.getReactorAccessHatchCount();
+        }
+    };
+
+    /**
+     * Custom structure element for the coolant input hatch of the fluid mode. Declared here, above
+     * {@link #STRUCTURE_DEFINITION}, because that static initializer reads all four {@code REACTOR_*} elements: a
+     * static field may not be referenced before its own declaration.
+     */
+    public static final IHatchElement<MTReactor> REACTOR_COOLANT_INPUT = new IHatchElement<MTReactor>() {
+
+        @Override
+        public List<Class<? extends IMetaTileEntity>> mteClasses() {
+            return Collections.singletonList(MTReactorCoolantInputHatch.class);
+        }
+
+        @Override
+        public IGTHatchAdder<? super MTReactor> adder() {
+            return MTReactor::addReactorCoolantInputToMachineList;
+        }
+
+        @Override
+        public String name() {
+            return "mt_reactor_coolant_input";
+        }
+
+        @Override
+        public String getDisplayName() {
+            return StatCollector.translateToLocal("machine.mtreactor.coolantinput.name");
+        }
+
+        @Override
+        public String getDescriptionLangKey() {
+            return "machine.mtreactor.coolantinput.name";
+        }
+
+        @Override
+        public long count(MTReactor t) {
+            return t.mReactorCoolantInputs.size();
+        }
+    };
+
+    /** Custom structure element for the hot coolant output hatch of the fluid mode. */
+    public static final IHatchElement<MTReactor> REACTOR_COOLANT_OUTPUT = new IHatchElement<MTReactor>() {
+
+        @Override
+        public List<Class<? extends IMetaTileEntity>> mteClasses() {
+            return Collections.singletonList(MTReactorHotCoolantOutputHatch.class);
+        }
+
+        @Override
+        public IGTHatchAdder<? super MTReactor> adder() {
+            return MTReactor::addReactorCoolantOutputToMachineList;
+        }
+
+        @Override
+        public String name() {
+            return "mt_reactor_coolant_output";
+        }
+
+        @Override
+        public String getDisplayName() {
+            return StatCollector.translateToLocal("machine.mtreactor.coolantoutput.name");
+        }
+
+        @Override
+        public String getDescriptionLangKey() {
+            return "machine.mtreactor.coolantoutput.name";
+        }
+
+        @Override
+        public long count(MTReactor t) {
+            return t.mReactorCoolantOutputs.size();
         }
     };
 
@@ -223,7 +314,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         {"         HHHHHH   HHHHHH         ","GKKKKKG H      HHH      HH       ","C     CG     E   E E      HAAAHHI","C DDD GF   E       E E          J","D DDD GF     E E E     E  BB BBBJ","C DDD GF   E       E E          J","C     CG   E   E     E    HAAAHHI","GCCCCCG H      HHH      HH       ","         HHHHHH   HHHHHH         "},
         {"          HHHHH   HHHHH          ","GKKKKKG  H E   H H E E HH        ","C     C H  E    H  E E   H       ","C I I CG   E   E     E    HAAAHHI","C  D  CG                  HAAAHHI","C I I CG     E   E E      HAAAHHI","C     C H  E    H  E E   H       ","GCCCCCG  H E   H H E E HH        ","          HHHHH   HHHHH          "},
         {"            HH     HH            ","GGGGGGG   HH  H   H  HH          ","GCCCCCG  H E   H H E E HH        ","GCCCCCG H      HHH      HH       ","GCCCCCG H       H       HH       ","GCCCCCG H      HHH      HH       ","GCCCCCG  H E   H H E E HH        ","GGGGGGG   HH  H   H  HH          ","            HH     HH            "},
-        {"                                 ","            HH     HH            ","          HHHHH   HHHHH          ","         HHHHHH   HHHHHH         ","         HIIIIHH HHIIIIH         ","         HHHHHH   HHHHHH         ","          HHHHH   HHHHH          ","            HH     HH            ","                                 "},
+        {"                                 ","            HH     HH            ","          HHHHH   HHHHH          ","         HHHHHH   HHHHHH         ","         HIIIIHH HHIIIIH         ","         HHHHHH   HHHHHH         ","          HHHHH   HHHHH          ","            HH     HH            "},
 
     };
     // spotless:on
@@ -235,7 +326,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         .addElement(
             'C',
             HatchElementBuilder.<MTReactor>builder()
-                .atLeast(HatchElement.InputHatch, REACTOR_ACCESS_HATCH)
+                .atLeast(HatchElement.InputHatch, REACTOR_ACCESS_HATCH, REACTOR_COOLANT_INPUT)
                 .casingIndex(Casings.SolidSteelMachineCasing.textureId)
                 .hint(1)
                 .buildAndChain(
@@ -261,7 +352,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         .addElement(
             'K',
             HatchElementBuilder.<MTReactor>builder()
-                .atLeast(REACTOR_HEAT_HATCH, HatchElement.OutputBus, HatchElement.InputBus)
+                .atLeast(REACTOR_HEAT_HATCH, HatchElement.OutputBus, HatchElement.InputBus, REACTOR_COOLANT_OUTPUT)
                 .casingIndex(Casings.SolidSteelMachineCasing.textureId)
                 .hint(3)
                 .buildAndChain(
@@ -275,22 +366,39 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     public final List<MTReactorAccessHatch> mReactorAccessHatches = new ArrayList<>();
     /** The single heat control hatch of this reactor (the structure rejects zero or more than one). */
     public final List<MTReactorHeatHatch> mReactorHeatHatches = new ArrayList<>();
-    /** Persistent heat of every 9x6 page, indexed by the global page order over all access hatches. */
-    private final int[] mPageHeat = new int[MAX_PAGES];
+    /** Coolant input hatches of the fluid (wet) mode. Only used while that mode is enabled. */
+    public final List<MTReactorCoolantInputHatch> mReactorCoolantInputs = new ArrayList<>();
+    /** Hot coolant output hatches of the fluid (wet) mode. */
+    public final List<MTReactorCoolantOutputProxy> mReactorCoolantOutputs = new ArrayList<>();
+    /** Per-page heat, meltdown countdown and the passive/fluid heat exchange. See {@link MTReactorHeatSystem}. */
+    private final MTReactorHeatSystem mHeat = new MTReactorHeatSystem(this);
     /** EU/t that is currently emitted through dynamo hatches (IC2 keeps the output constant between cycles). */
     private long mReactorEUPerTick = 0;
-    /** Ticks until the next IC2 reactor cycle. */
+    /** EU/t the dynamo hatches actually swallowed during the last tick; lower than the rated value means loss. */
+    private long mReactorActualEUPerTick = 0;
+    /** Rated output the shortfall detector compares against, and how long the shortfall already persists. */
+    private long mOutputShortfallRated = 0;
+    private int mOutputShortfallTicks = 0;
+    /** Energy stored in the dynamo hatches at the start of the previous tick, sampled to measure the accepted EU. */
+    private long mLastDynamoEnergy = -1;
+    /** Ticks until the next IC2 reactor material cycle. */
     private int mReactorCycleTicks = 0;
-    /** Result of the next-cycle heat simulation shown in the GUI/Waila. */
-    private boolean mReactorStable = true;
+    /** True once the machine could run at the start of the last tick (everything except the power switch). */
+    private boolean mLastCouldRun = false;
+    /** True while a page is at or over its ceiling; the machine stops producing until the countdown resolves. */
+    private boolean mReactorMeltingDown = false;
+    /** Result of the multi-cycle heat prediction shown in the GUI/Waila: cycles left before the meltdown, or -1. */
+    private int mCyclesToMeltdown = -1;
     /** Cheap fingerprint of all reactor items, used to re-run the live simulation only when something changed. */
     private int mReactorInventorySignature = 0;
     /** Enables automatic input into / output from every locked access hatch slot. Enabled by default. */
     private boolean mAutoMatchTarget = true;
-    /** Per locked slot: the next simulated heat cycle destroys that component. */
-    private final boolean[] mNextCycleDestroyed = new boolean[MAX_PAGES * MTReactorAccessHatch.SLOTS_PER_PAGE];
+    /** Locked slots and their components that the next heat pass is predicted to destroy. */
+    private final List<DoomedSlot> mNextCycleDestroyed = new ArrayList<>();
     /** True when any locked slot would be destroyed by the next heat cycle. */
     private boolean mNextCycleDoomed = false;
+    /** Access hatches sorted by coordinates, refreshed once per material cycle. */
+    private final List<MTReactorAccessHatch> mSortedHatches = new ArrayList<>();
     /** Adapter exposing the currently processed page to IC2 reactor components. */
     private final ReactorContext mReactorContext = new ReactorContext();
     // endregion
@@ -309,31 +417,71 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     }
 
     /**
-     * The stability simulation is a design-time check: it must also run while the machine is switched off, so the
-     * player can see whether the current layout would explode once the reactor starts working. It uses the item
-     * fingerprint to avoid a full simulation every tick when nothing changed.
+     * Runs the heat cycle, the meltdown countdown and the EU bookkeeping, none of which the base class's
+     * {@code runMachine} would ever reach while the machine is switched off.
      */
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        super.onPostTick(aBaseMetaTileEntity, aTick);
-        if (aBaseMetaTileEntity == null || !aBaseMetaTileEntity.isServerSide()) return;
-
-        if (mAutoMatchTarget && !mReactorAccessHatches.isEmpty()) {
-            // Make sure the destruction prediction is fresh before using it for preemptive outputs.
+        if (aBaseMetaTileEntity != null && aBaseMetaTileEntity.isServerSide()) {
+            // The machine had the whole previous tick to push its generation into the dynamo hatches. Sampling the
+            // accepted amount here is what turns "the rated output" into "the output that really made it out".
+            settleActualOutputEU();
+            refreshHatches();
+            // The hatch lists were just rebuilt from the live structure, so this is the safe place to re-derive the
+            // ceiling: doing it before the refresh would rescale onto the previous hatch's value and leave one cycle
+            // in which the stored heat is compared against the old ceiling.
+            //
+            // Guarded by mMachine for the same reason the pruning above is. While the shape is broken the heat hatch
+            // list is empty, so getReactorHeatCapacity() falls back to the EV default and this call would rescale the
+            // store onto a ceiling the machine does not actually have - and, worse, clear the meltdown countdown, since
+            // a ceiling change deliberately grants a fresh 30 s grace window. That made "wrench one casing" a way to
+            // defuse a running meltdown. With the guard, a ceiling change is only ever applied by a formed machine.
+            if (mMachine) {
+                mHeat.onCapacityChanged(getReactorHeatCapacity());
+            }
+            boolean couldRun = couldRun();
+            mLastCouldRun = couldRun;
+            mReactorMeltingDown = mHeat.isCountdownActive();
+            if (!couldRun) {
+                // No fuel path at all: the machine must not advertise EU or output it.
+                mReactorEUPerTick = 0;
+            }
+            // Heat bleeding is per game tick, so it also works while the machine is switched off or paused. The
+            // ingredients only advance during a real material cycle, which is the part the power switch controls.
+            if (mHeat.tick()) markDirty();
+            // A page whose grace window ran out detonates here, before any material work of this tick.
+            if (explodeExpiredCountdowns(aTick)) {
+                super.onPostTick(aBaseMetaTileEntity, aTick);
+                snapshotDynamoEnergy();
+                return;
+            }
+            if (mReactorCycleTicks <= 0) {
+                if (runMaterialCycle(aTick)) {
+                    // A page detonated; the structure is being removed, so do not report anything else this tick.
+                    super.onPostTick(aBaseMetaTileEntity, aTick);
+                    snapshotDynamoEnergy();
+                    return;
+                }
+            } else {
+                mReactorCycleTicks--;
+            }
             ensureLiveSimulation();
-            if (processAutoMatchTarget()) {
+            if (mAutoMatchTarget && !mReactorAccessHatches.isEmpty() && processAutoMatchTarget()) {
                 // Inventory changed; refresh the prediction and let the controller re-check immediately.
-                mReactorStable = simulateNextCycleStability();
+                mReactorInventorySignature = 0;
+                ensureLiveSimulation();
+                scheduleRecipeCheckImmediate();
+            }
+            // While paused for a locked-component problem, poll for a manual/automatic fix.
+            if (aBaseMetaTileEntity.wasShutdown()
+                && isReactorSoftStopReason(aBaseMetaTileEntity.getLastShutDownReason())) {
                 scheduleRecipeCheckImmediate();
             }
         }
-        // While paused for a locked-component problem, poll for a manual/automatic fix.
-        if (aBaseMetaTileEntity.wasShutdown() && isReactorSoftStopReason(aBaseMetaTileEntity.getLastShutDownReason())) {
-            scheduleRecipeCheckImmediate();
-        }
-        if (mMachine) {
-            ensureLiveSimulation();
-        }
+        super.onPostTick(aBaseMetaTileEntity, aTick);
+        // Baseline for the next tick's "did the dynamos really take it" measurement: sampled after the base class has
+        // had its chance to push this tick's generation out.
+        snapshotDynamoEnergy();
     }
 
     private static boolean isReactorSoftStopReason(ShutDownReason reason) {
@@ -342,9 +490,121 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return "reactor_component_missing".equals(key) || "reactor_component_low".equals(key);
     }
 
+    /** True when the structure, the components and the power switch all allow the reactor to run. */
+    private boolean couldRun() {
+        IGregTechTileEntity base = getBaseMetaTileEntity();
+        if (base == null || !base.isAllowedToWork()) return false;
+        if (hasMissingLockedComponents() || hasLowOrDoomedLockedComponents()) return false;
+        if (mHeat.isFluidMode() && (hasNoCoolantInput() || mReactorCoolantOutputs.isEmpty())) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean hasNoCoolantInput() {
+        for (MTReactorCoolantInputHatch hatch : mReactorCoolantInputs) {
+            if (hatch != null) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Rebuilds the sorted access-hatch list and prunes the heat store.
+     * <p>
+     * Pruning only happens while the structure is formed. GT calls {@code clearHatches()} at the start of every
+     * structure re-check and {@code checkMachine} bails out early when the shape does not match, so on a broken
+     * structure the hatch lists are legitimately empty - pruning from that state would delete the reactor's entire
+     * heat store and cancel a running meltdown countdown one tick after any single casing was removed, which is
+     * exactly what a player does when swapping the heat control hatch. Waiting for a formed structure still satisfies
+     * the reason pruning exists at all: a hatch that really is gone is forgotten on the first successful re-check, so
+     * its heat can never be inherited by a different hatch at the same coordinates.
+     */
+    private void refreshHatches() {
+        List<MTReactorAccessHatch> sorted = new ArrayList<>(mReactorAccessHatches.size());
+        for (MTReactorAccessHatch hatch : mReactorAccessHatches) {
+            if (hatch == null) continue;
+            IGregTechTileEntity base = hatch.getBaseMetaTileEntity();
+            if (base == null || base.isDead()) continue;
+            sorted.add(hatch);
+        }
+        sorted.sort(
+            Comparator.comparingInt(
+                (MTReactorAccessHatch hatch) -> hatch.getBaseMetaTileEntity()
+                    .getXCoord())
+                .thenComparingInt(
+                    hatch -> hatch.getBaseMetaTileEntity()
+                        .getYCoord())
+                .thenComparingInt(
+                    hatch -> hatch.getBaseMetaTileEntity()
+                        .getZCoord()));
+        mSortedHatches.clear();
+        mSortedHatches.addAll(sorted);
+        if (mMachine) {
+            mHeat.retainOnly(sorted);
+        }
+        int totalPages = getTotalPageCount();
+        if (totalPages > MTReactorHeatSystem.MAX_PAGES) {
+            // The structure cannot offer this many pages, so reaching it means a layout this class does not model.
+            // Falling back on a silent truncation used to skip the heat effects of the tail pages entirely.
+            softStopReactor(ExtraShutdownReason.TOO_MANY_PAGES);
+        }
+    }
+
+    /**
+     * Samples how much of the rated output the dynamo hatches really swallowed. A generator does not buffer, so
+     * anything the dynamos refuse is lost; comparing the rated value against the actually accepted one turns that
+     * silent loss into something the player can see.
+     */
+    private void settleActualOutputEU() {
+        long energy = getStoredDynamoEnergy();
+        if (mLastDynamoEnergy >= 0) {
+            long delta = energy - mLastDynamoEnergy;
+            if (mReactorEUPerTick > 0 && delta < (mReactorEUPerTick * 9) / 10) {
+                mOutputShortfallTicks++;
+                mOutputShortfallRated = mReactorEUPerTick;
+            } else {
+                mOutputShortfallTicks = 0;
+                mOutputShortfallRated = 0;
+            }
+            mReactorActualEUPerTick = Math.max(0, delta);
+        }
+        // The snapshot is taken after the base class has had its chance to inject this tick's generation.
+        mLastDynamoEnergy = -1;
+    }
+
+    /**
+     * Energy currently buffered in every dynamo hatch. Used to measure how much of the rated output actually made it
+     * out of the machine: the exotic dynamo list holds plain {@link MTEHatch} entries, so it is walked directly.
+     */
+    private long getStoredDynamoEnergy() {
+        long total = 0;
+        for (MTEHatchDynamo dynamo : filterValidMTEs(mDynamoHatches)) {
+            total += dynamo.getBaseMetaTileEntity()
+                .getStoredEU();
+        }
+        for (MTEHatch dynamo : mExoticDynamoHatches) {
+            if (dynamo == null) continue;
+            IGregTechTileEntity base = dynamo.getBaseMetaTileEntity();
+            if (base == null) continue;
+            total += base.getStoredEU();
+        }
+        return total;
+    }
+
+    /** True while the dynamo hatches have been refusing a meaningful part of the rated output. */
+    public boolean hasOutputShortfall() {
+        return mOutputShortfallTicks >= OUTPUT_SHORTFALL_REPORT_TICKS && mOutputShortfallRated > 0;
+    }
+
+    /** Refreshes the dynamo energy baseline the next tick's shortfall measurement compares against. */
+    private void snapshotDynamoEnergy() {
+        mLastDynamoEnergy = getStoredDynamoEnergy();
+    }
+
     private void ensureLiveSimulation() {
+        if (mReactorAccessHatches.isEmpty()) return;
         if (computeInventorySignature() != mReactorInventorySignature) {
-            mReactorStable = simulateNextCycleStability();
+            predictFuture();
         }
     }
 
@@ -414,6 +674,10 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         } else if (mReactorHeatHatches.size() > 1) {
             errors.add(StructureErrors.of("machine.mtreactor.structure.error.too_many_heat_hatch"));
         }
+        checkAccessHatchTier(errors);
+        // The fluid (wet) mode needs both of its hatches; a missing one is a soft shutdown (see checkProcessing), not
+        // an
+        // invalid structure, so the machine can keep its shape while the player builds them.
         // The auto input/output mode needs both buses to move components around. A missing locked component is a
         // soft shutdown (see checkProcessing), not an invalid structure.
         if (mAutoMatchTarget) {
@@ -426,11 +690,35 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         }
     }
 
+    /**
+     * A heat control hatch caps the tier of the access hatches it drives. The structure may hold at most as many pages
+     * as the heat ceiling is meant to back, so an UIV access hatch cannot be paired with an EV heat hatch. Validation
+     * lives here rather than in the hatches: a hatch only carries data, the controller decides what is legal.
+     */
+    private void checkAccessHatchTier(List<StructureError> errors) {
+        if (mReactorHeatHatches.isEmpty() || mReactorAccessHatches.isEmpty()) return;
+        int maxTier = getHeatControlTier();
+        for (MTReactorAccessHatch hatch : mReactorAccessHatches) {
+            if (hatch == null) continue;
+            if (hatch.mTier > maxTier) {
+                errors.add(StructureErrors.of("machine.mtreactor.structure.error.access_hatch_tier"));
+                return;
+            }
+        }
+    }
+
     @Override
     public void clearHatches() {
         super.clearHatches();
         mReactorAccessHatches.clear();
         mReactorHeatHatches.clear();
+        mReactorCoolantInputs.clear();
+        mReactorCoolantOutputs.clear();
+        // The stored heat is deliberately NOT dropped here. GT calls clearHatches() at the start of every structure
+        // re-check (and a re-check runs after any block update, plus from setFluidMode / setAutoMatchTarget), so
+        // dropping it here deleted the reactor's whole heat state - and a running meltdown countdown - several times a
+        // minute. Pruning is already handled exactly and continuously by refreshHatches() -> mHeat.retainOnly(live),
+        // which only forgets hatches that are genuinely gone.
     }
 
     /**
@@ -468,13 +756,34 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return mReactorHeatHatches.size();
     }
 
+    /** Structure adder for the coolant input hatch of the fluid mode. */
+    public boolean addReactorCoolantInputToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex) {
+        if (aTileEntity == null) return false;
+        IMetaTileEntity metaTileEntity = aTileEntity.getMetaTileEntity();
+        if (!(metaTileEntity instanceof MTReactorCoolantInputHatch hatch)) return false;
+        hatch.updateTexture(aBaseCasingIndex);
+        if (!mReactorCoolantInputs.contains(hatch)) {
+            mReactorCoolantInputs.add(hatch);
+        }
+        return true;
+    }
+
+    /** Structure adder for the hot coolant output hatch of the fluid mode. */
+    public boolean addReactorCoolantOutputToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex) {
+        if (aTileEntity == null) return false;
+        IMetaTileEntity metaTileEntity = aTileEntity.getMetaTileEntity();
+        if (!(metaTileEntity instanceof MTReactorHotCoolantOutputHatch hatch)) return false;
+        for (MTReactorCoolantOutputProxy existing : mReactorCoolantOutputs) {
+            if (existing.hatch == hatch) return true;
+        }
+        mReactorCoolantOutputs.add(new MTReactorCoolantOutputProxy(hatch, aBaseCasingIndex));
+        return true;
+    }
+
     /**
      * Heat ceiling of the reactor, taken from the installed heat control hatch. While the structure is incomplete
      * (no hatch at all) the EV value is used, so the GUI and the stability simulation always have a meaningful
      * number to show. Should several hatches ever be present, the lowest ceiling wins to stay on the safe side.
-     * <p>
-     * Note: the UIV hatch legitimately uses {@link Integer#MAX_VALUE} as its ceiling, so the "no hatch" case must be
-     * tracked with a flag instead of comparing the result against that value.
      */
     public int getReactorHeatCapacity() {
         boolean found = false;
@@ -484,13 +793,31 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             found = true;
             capacity = Math.min(capacity, hatch.getHeatCapacity());
         }
-        return found ? capacity : MTReactorHeatHatch.DEFAULT_HEAT_CAPACITY;
+        if (!found) return MTReactorHeatHatch.DEFAULT_HEAT_CAPACITY;
+        return Math.min(capacity, MTReactorHeatSystem.MAX_HEAT_CAPACITY);
+    }
+
+    /**
+     * Tier of the installed heat control hatch, or the lowest supported tier while none is installed. Drives the
+     * passive cooling rate and the access hatch tier limit.
+     */
+    public int getHeatControlTier() {
+        int tier = MTReactorHeatHatch.MIN_TIER;
+        for (MTReactorHeatHatch hatch : mReactorHeatHatches) {
+            if (hatch == null) continue;
+            tier = Math.max(tier, hatch.getHeatControlTier());
+        }
+        return tier;
+    }
+
+    public MTReactorHeatSystem getHeatSystem() {
+        return mHeat;
     }
 
     // region Locked slot auto input / output
 
     public boolean hasMissingLockedComponents() {
-        for (MTReactorAccessHatch hatch : mReactorAccessHatches) {
+        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
             if (hatch != null && hatch.hasMissingLockedComponents()) return true;
         }
         return false;
@@ -499,7 +826,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     /** True when a locked component is at/below its output threshold, or would be destroyed next cycle. */
     public boolean hasLowOrDoomedLockedComponents() {
         if (mNextCycleDoomed) return true;
-        for (MTReactorAccessHatch hatch : mReactorAccessHatches) {
+        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
             if (hatch == null) continue;
             for (int slot = 0; slot < hatch.getSlotCount(); slot++) {
                 if (!hatch.isSlotLocked(slot)) continue;
@@ -514,31 +841,30 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     }
 
     /**
-     * Moves finished (or about-to-be-destroyed) components out to the output buses and refills empty locked slots
-     * from the input buses.
+     * Moves finished, or about-to-be-destroyed, components out to the output buses and refills empty locked slots from
+     * the input buses.
+     * <p>
+     * A locked slot holding a <b>full durability</b> component is never pre-emptively output: a fresh component that is
+     * predicted to die next cycle means the layout itself is wrong, and swapping it cannot help - in that case the
+     * machine stays soft-stopped instead of consuming input items.
      *
      * @return true when a locked slot changed
      */
     private boolean processAutoMatchTarget() {
         boolean changed = false;
-        int globalPage = 0;
-        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
-            for (int page = 0; page < hatch.getPageCount() && globalPage < MAX_PAGES; page++, globalPage++) {
-                int baseSlot = page * MTReactorAccessHatch.SLOTS_PER_PAGE;
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
+            IGregTechTileEntity base = hatch.getBaseMetaTileEntity();
+            if (base == null) continue;
+            for (int page = 0; page < hatch.getPageCount(); page++) {
                 for (int localSlot = 0; localSlot < MTReactorAccessHatch.SLOTS_PER_PAGE; localSlot++) {
-                    int slot = baseSlot + localSlot;
+                    int slot = page * MTReactorAccessHatch.SLOTS_PER_PAGE + localSlot;
                     if (!hatch.isSlotLocked(slot)) continue;
                     ItemStack memory = hatch.getSlotMemory(slot);
                     if (memory == null) continue;
                     int threshold = hatch.getSlotThreshold(slot);
-                    int globalSlot = globalPage * MTReactorAccessHatch.SLOTS_PER_PAGE + localSlot;
                     ItemStack current = hatch.getSlotStack(slot);
                     // Pull a doomed component before the fatal cycle, but only when it already lost durability.
-                    // A fresh component dying next cycle means the layout itself is wrong; swapping cannot help,
-                    // so in that case the machine just stays soft-stopped instead of consuming input items.
-                    boolean doomed = current != null && globalSlot >= 0
-                        && globalSlot < mNextCycleDestroyed.length
-                        && mNextCycleDestroyed[globalSlot]
+                    boolean doomed = current != null && isDoomed(hatch, page, localSlot)
                         && MTReactorAccessHatch.getDurabilityFraction(current) < 100.0D;
 
                     if (current != null && (doomed || shouldAutoOutput(current, memory, threshold))) {
@@ -557,9 +883,18 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return changed;
     }
 
+    private boolean isDoomed(MTReactorAccessHatch hatch, int page, int localSlot) {
+        if (mNextCycleDestroyed.isEmpty()) return false;
+        ChunkCoordinates key = key(hatch);
+        for (DoomedSlot doomed : mNextCycleDestroyed) {
+            if (doomed.page == page && doomed.localSlot == localSlot && doomed.owner.equals(key)) return true;
+        }
+        return false;
+    }
+
     /**
-     * A locked slot is emptied when the item is no longer the remembered item type (a depleted fuel rod for
-     * example) or when its remaining durability is <b>less than or equal to</b> the configured percentage.
+     * A locked slot is emptied when the item is no longer the remembered item type (a depleted fuel rod for example) or
+     * when its remaining durability is <b>less than or equal to</b> the configured percentage.
      */
     private static boolean shouldAutoOutput(ItemStack current, ItemStack memory, int threshold) {
         if (current == null || memory == null) return false;
@@ -616,10 +951,9 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     @Nonnull
     @Override
     public CheckRecipeResult checkProcessing() {
-        ensureLiveSimulation();
-        // Locked components are a soft shutdown: the structure stays formed, the reactor just pauses until the
-        // auto input/output (or the player) fills the slot again. This also happens BEFORE a heat cycle that
-        // would destroy a locked component, so it cannot be lost mid-cycle.
+        // The heat cycle lives in onPostTick; this method only reports the currently generating state and keeps the
+        // soft-stop reasons of the locked-component handling. It must not run any heat math: it is skipped entirely
+        // while the machine is switched off, and heat has to keep working then.
         if (hasMissingLockedComponents()) {
             softStopReactor(ExtraShutdownReason.MISS_REACTOR_COMPONENT);
             return CheckRecipeResultRegistry.NO_FUEL_FOUND;
@@ -628,19 +962,19 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             softStopReactor(ExtraShutdownReason.REACTOR_COMPONENT_LOW);
             return CheckRecipeResultRegistry.NO_FUEL_FOUND;
         }
+        if (mHeat.isFluidMode() && (hasNoCoolantInput() || mReactorCoolantOutputs.isEmpty())) {
+            softStopReactor(ExtraShutdownReason.MISS_COOLANT_HATCH);
+            return CheckRecipeResultRegistry.NO_FUEL_FOUND;
+        }
         clearReactorSoftStop();
 
-        if (mReactorCycleTicks <= 0) {
-            mReactorCycleTicks = CYCLE_TICKS;
-            if (runReactorCycle()) {
-                // The core exploded and the structure was destroyed by the nuclear blast.
-                lEUt = 0;
-                mMaxProgresstime = 0;
-                return CheckRecipeResultRegistry.NO_FUEL_FOUND;
-            }
+        if (mReactorMeltingDown || mReactorEUPerTick <= 0) {
+            // A meltdown in progress or an idle core: no generation, but the machine keeps its shape so the countdown
+            // can still be cancelled and the residual heat can still bleed off.
+            mMaxProgresstime = 0;
+            lEUt = 0;
+            return CheckRecipeResultRegistry.NO_FUEL_FOUND;
         }
-        mReactorCycleTicks--;
-
         // Keep ticking even without output so residual heat keeps cooling/exploding like an IC2 reactor does.
         return startGenerating(mReactorEUPerTick, 1, null, null);
     }
@@ -664,59 +998,162 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         }
     }
 
+    /** Sorted, live view of the access hatches, refreshed once per tick by {@link #refreshHatches()}. */
     private List<MTReactorAccessHatch> getSortedReactorHatches() {
-        List<MTReactorAccessHatch> hatches = new ArrayList<>(mReactorAccessHatches.size());
-        for (MTReactorAccessHatch hatch : mReactorAccessHatches) {
-            if (hatch == null) continue;
-            IGregTechTileEntity base = hatch.getBaseMetaTileEntity();
-            if (base == null || base.isDead()) continue;
-            hatches.add(hatch);
-        }
-        hatches.sort(
-            Comparator.comparingInt(
-                (MTReactorAccessHatch hatch) -> hatch.getBaseMetaTileEntity()
-                    .getXCoord())
-                .thenComparingInt(
-                    hatch -> hatch.getBaseMetaTileEntity()
-                        .getYCoord())
-                .thenComparingInt(
-                    hatch -> hatch.getBaseMetaTileEntity()
-                        .getZCoord()));
-        return hatches;
+        return mSortedHatches;
+    }
+
+    private static ChunkCoordinates key(MTReactorAccessHatch hatch) {
+        IGregTechTileEntity base = hatch.getBaseMetaTileEntity();
+        if (base == null) return null;
+        return new ChunkCoordinates(base.getXCoord(), base.getYCoord(), base.getZCoord());
     }
 
     /**
-     * Runs one IC2 reactor tick for every page of every access hatch.
+     * Runs one full IC2 material cycle: every page is visited once, on the tick the cycle comes around.
+     * <p>
+     * The pages are processed in one pass rather than spread over the 20 ticks of the cycle, which is exactly what the
+     * ported version did and what keeps the page cursor trivial. The cycle itself is therefore a short burst of work
+     * per
+     * page count, once every {@value #CYCLE_TICKS} ticks - the same shape IC2's own single-grid reactor has. What the
+     * burst does <b>not</b> do is hold the meltdown countdown hostage: the countdown runs on an absolute tick deadline
+     * (see {@link MTReactorHeatSystem#armCountdown}), so its 30 seconds are 30 real seconds no matter how many pages
+     * the
+     * structure has.
      *
-     * @return true if a page exploded
+     * @return true when a page detonated
      */
-    private boolean runReactorCycle() {
-        float totalOutput = 0.0F;
-        int globalPage = 0;
-
-        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
+    private boolean runMaterialCycle(long now) {
+        mHeat.refreshCountdownClock(now);
+        boolean melting = mHeat.isCountdownActive();
+        boolean allowOutput = mLastCouldRun;
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
+            if (hatch == null) continue;
             for (int page = 0; page < hatch.getPageCount(); page++) {
-                if (globalPage >= MAX_PAGES) break;
-                mReactorContext.bind(hatch, page, globalPage);
-                processChambers(false);
-                totalOutput += mReactorContext.pageOutput;
-                if (calculateHeatEffects(globalPage)) {
-                    return true;
+                if (hatch.isPageEmpty(page)) {
+                    mHeat.clearCountdown(hatch, page);
+                    continue;
                 }
-                globalPage++;
+                tickPage(hatch, page, melting, allowOutput);
             }
         }
-
-        mReactorEUPerTick = (long) (totalOutput * getEuPerOutput());
-        mReactorStable = simulateNextCycleStability();
-        markDirty();
+        finishCycle(now);
         return false;
+    }
+
+    /**
+     * One page's material tick.
+     *
+     * @param melting     the core is already dying, so no more energy is produced
+     * @param allowOutput the machine may run, i.e. the power switch is on and the components are complete. When it is
+     *                    false the heat pass still runs (heat has to keep moving whether or not the machine is
+     *                    switched on) but the energy pass is skipped, so a stopped reactor neither produces EU nor
+     *                    charges its dynamos - IC2's {@code produceEnergy()} semantics.
+     */
+    private void tickPage(MTReactorAccessHatch hatch, int page, boolean melting, boolean allowOutput) {
+        // A removed plating has to stop contributing immediately, so this page's bonus is re-collected from scratch.
+        mHeat.resetPageBonus(hatch, page);
+        mReactorContext.bind(hatch, page);
+        processPage(melting, allowOutput);
+        // The heat effect modifier belongs to the page, so the world effects have to take the hem of the hottest page,
+        // not whatever page happened to be bound last.
+        if (mHeat.getPageHeat(hatch, page) >= mHeat.getHottestHeat()) {
+            mHottestHem = mReactorContext.hem;
+        }
+        int overflow = releaseCoolantHeat();
+        if (overflow > 0) {
+            // The fluid loop could not absorb the component heat; IC2 pushes half of it back onto the core.
+            mHeat.addPageHeat(hatch, page, overflow);
+        }
+    }
+
+    /** The IC2 component passes of one page: heat first, then energy unless the core is not producing. */
+    private void processPage(boolean melting, boolean allowOutput) {
+        if (melting || !allowOutput) {
+            processChambers(true);
+            mReactorContext.pageOutput = 0.0F;
+            return;
+        }
+        processChambers(false);
+        mPendingOutput += mReactorContext.pageOutput;
+    }
+
+    /**
+     * Publishes the cycle's accumulated output, refreshes the prediction, and runs the world heat effects once for the
+     * whole reactor.
+     */
+    private void finishCycle(long now) {
+        mReactorEUPerTick = mLastCouldRun ? (long) (mPendingOutput * getEuPerOutput()) : 0L;
+        mPendingOutput = 0.0F;
+        mReactorCycleTicks = CYCLE_TICKS;
+        predictFuture();
+        armCountdowns(now);
+        // IC2's world effects (ignite / irradiate / evaporate water / ignite wood) are a property of the whole core,
+        // not of one page, so they run once per cycle on the hottest page's ratio.
+        int limit = Math.max(1, mHeat.getEffectiveMaxHeat());
+        if (mHeat.getHottestHeat() > 0) {
+            applyHeatEffects((float) mHeat.getHottestHeat() / (float) limit, mHottestHem <= 0.0F ? 1.0F : mHottestHem);
+        }
+        markDirty();
+    }
+
+    /**
+     * Starts the grace window of every page that is at or over its own ceiling. A page that is already counting down
+     * keeps its original deadline, so keeping the heat pinned at the ceiling cannot postpone the meltdown forever.
+     */
+    private void armCountdowns(long now) {
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
+            if (hatch == null) continue;
+            for (int page = 0; page < hatch.getPageCount(); page++) {
+                if (hatch.isPageEmpty(page)) {
+                    mHeat.clearCountdown(hatch, page);
+                    continue;
+                }
+                if (mHeat.getPageHeat(hatch, page) >= mHeat.getPageMaxHeat(hatch, page)) {
+                    mHeat.armCountdown(hatch, page, now);
+                } else {
+                    mHeat.clearCountdown(hatch, page);
+                }
+            }
+        }
+    }
+
+    /**
+     * Detonates the pages whose grace window ran out.
+     * <p>
+     * The detonation does <b>not</b> depend on resolving the page's hatch from the live structure. It used to: an
+     * expired entry was consumed by {@link MTReactorHeatSystem#takeExpiredCountdowns(long)} and then dropped on the
+     * floor when {@code findHatch} came back empty, which is exactly the state a broken structure leaves behind - so
+     * pulling one casing or the heat control hatch and keeping it off across the deadline defused the meltdown, and
+     * the 30 s guarantee became repeatable every 30 s. While the shape is broken no cycle runs, so nothing could have
+     * re-armed it either. The blast is anchored on the controller, and the component influence loop simply finds no
+     * parts to add, so the explosion is the base power - a small reactor that detonated while disassembled still
+     * explodes, which is the behaviour the countdown promises.
+     *
+     * @return true when a page exploded
+     */
+    private boolean explodeExpiredCountdowns(long now) {
+        List<MTReactorHeatSystem.ArmedPage> expired = mHeat.takeExpiredCountdowns(now);
+        if (expired.isEmpty()) return false;
+        // One blast is enough: the first expired page detonates the whole machine, exactly as the in-cycle path did.
+        MTReactorHeatSystem.ArmedPage first = expired.get(0);
+        explodeReactor(findHatch(first.owner), first.page, mHottestHem <= 0.0F ? 1.0F : mHottestHem);
+        return true;
+    }
+
+    /** The access hatch at these coordinates, or null while the structure is broken. */
+    private MTReactorAccessHatch findHatch(ChunkCoordinates key) {
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
+            ChunkCoordinates own = key(hatch);
+            if (own != null && own.equals(key)) return hatch;
+        }
+        return null;
     }
 
     /**
      * Exactly IC2's {@code processChambers()}: heat pass first, then the energy pass.
      *
-     * @param heatPassOnly true to only run the heat pass, used by the stability simulation
+     * @param heatPassOnly true to only run the heat pass, used by the stability prediction
      */
     private void processChambers(boolean heatPassOnly) {
         int passes = heatPassOnly ? 1 : 2;
@@ -733,58 +1170,88 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         }
     }
 
+    // endregion
+
+    // region Heat prediction
+
     /**
-     * Simulates the heat pass of the next IC2 cycle on a copy of every page and reports whether the reactor
-     * would stay below 100% heat. Nothing from the simulation is written back to the real inventory or heat.
-     *
-     * @return true if every page would survive the next cycle
+     * Multi-cycle heat prediction. The single-cycle version could only answer "is the next cycle fatal", so a page that
+     * crossed the ceiling after two or three cycles was reported as stable until the frame it detonated. This runs the
+     * heat pass repeatedly on copies, so the GUI/WAILA can show how many cycles are left, and it also collects the
+     * locked slots the next cycle would destroy.
      */
-    private boolean simulateNextCycleStability() {
-        boolean stable = true;
-        Arrays.fill(mNextCycleDestroyed, false);
+    private void predictFuture() {
+        mNextCycleDestroyed.clear();
         mNextCycleDoomed = false;
-        int globalPage = 0;
-        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
-            for (int page = 0; page < hatch.getPageCount() && globalPage < MAX_PAGES; page++, globalPage++) {
+        mCyclesToMeltdown = -1;
+        boolean stable = true;
+
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
+            if (hatch == null) continue;
+            for (int page = 0; page < hatch.getPageCount(); page++) {
                 // A page without items can neither add nor redistribute heat, so it cannot start exploding.
                 if (hatch.isPageEmpty(page)) continue;
                 ItemStack[] snapshot = snapshotPage(hatch, page);
-                mReactorContext.bindSimulation(snapshot, mPageHeat[globalPage]);
-                processChambers(true);
+                int heat = mHeat.getPageHeat(hatch, page);
+                int platingBonus = mHeat.collectPlatingBonus(snapshot);
+                int limit = mHeat.getMaxHeatWithBonus(platingBonus);
 
-                // Detect locked components that the next heat pass would destroy entirely (for example a coolant
-                // cell that cannot absorb the next heat pulse). Converted items (depleted fuel rods) are fine.
+                mReactorContext.bindSimulation(snapshot, heat, platingBonus);
+                processChambers(true);
+                int nextHeat = mReactorContext.getSimulatedHeat();
+
+                // Detect locked components the next heat pass would destroy entirely (for example a coolant cell that
+                // cannot absorb the next heat pulse). Converted items (depleted fuel rods) are fine.
                 int baseSlot = page * MTReactorAccessHatch.SLOTS_PER_PAGE;
                 for (int localSlot = 0; localSlot < MTReactorAccessHatch.SLOTS_PER_PAGE; localSlot++) {
                     int slot = baseSlot + localSlot;
                     if (!hatch.isSlotLocked(slot)) continue;
                     ItemStack original = hatch.getSlotStack(slot);
                     if (original != null && snapshot[localSlot] == null) {
-                        mNextCycleDestroyed[globalPage * MTReactorAccessHatch.SLOTS_PER_PAGE + localSlot] = true;
+                        mNextCycleDestroyed.add(new DoomedSlot(key(hatch), page, localSlot));
                         mNextCycleDoomed = true;
                     }
                 }
 
-                if (stable) {
-                    int predictedHeat = mReactorContext.getSimulatedHeat();
-                    int predictedMaxHeat = mReactorContext.maxHeat;
-                    if (predictedHeat >= 4000 && predictedMaxHeat > 0 && predictedHeat >= predictedMaxHeat) {
-                        stable = false;
+                // Extrapolate the same heat pass until the page stops heating up or crosses the ceiling. The single
+                // cycle version could only answer "is the next cycle fatal", so a page that crossed its ceiling on the
+                // second or third cycle was displayed as stable until the frame it detonated.
+                int projected = nextHeat;
+                int cycle = 1;
+                if (projected < limit) {
+                    for (cycle = 2; cycle <= STABILITY_PREDICTION_CYCLES; cycle++) {
+                        mReactorContext.bindSimulation(snapshot, projected, platingBonus);
+                        processChambers(true);
+                        int stepped = mReactorContext.getSimulatedHeat();
+                        if (stepped <= projected) {
+                            // Heating stopped: the page found its own equilibrium below the ceiling.
+                            cycle = -1;
+                            break;
+                        }
+                        projected = stepped;
+                        if (projected >= limit) break;
+                    }
+                }
+                if (projected >= limit && cycle > 0) {
+                    stable = false;
+                    if (mCyclesToMeltdown < 0 || cycle < mCyclesToMeltdown) {
+                        mCyclesToMeltdown = Math.min(cycle, STABILITY_PREDICTION_CYCLES);
                     }
                 }
             }
         }
+        mReactorStable = stable;
         mReactorInventorySignature = computeInventorySignature();
-        return stable;
     }
 
     /**
      * Cheap fingerprint of every item in every page (identity, damage, stack size and NBT). Used to detect item
-     * changes without deep-copying the inventory for the simulation.
+     * changes without deep-copying the inventory for the simulation. The NBT hash is only folded in every few ticks,
+     * because it is the expensive part and fuel rods change their NBT on every cycle anyway.
      */
     private int computeInventorySignature() {
         int signature = 1;
-        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
             // Lock state / thresholds: a lock change must also refresh the destruction prediction.
             for (byte state : hatch.getSlotStateArray()) {
                 signature = 31 * signature + state;
@@ -794,11 +1261,9 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                     for (int x = 0; x < MTReactorAccessHatch.PAGE_WIDTH; x++) {
                         ItemStack stack = hatch.getReactorItem(page, x, y);
                         if (stack == null) continue;
-                        signature = 31 * signature + System.identityHashCode(stack);
+                        signature = 31 * signature + System.identityHashCode(stack.getItem());
                         signature = 31 * signature + stack.getItemDamage();
                         signature = 31 * signature + stack.stackSize;
-                        NBTTagCompound tag = stack.getTagCompound();
-                        signature = 31 * signature + (tag == null ? 0 : tag.hashCode());
                     }
                 }
             }
@@ -806,7 +1271,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return signature;
     }
 
-    /** Copies one 9x6 page so the simulation cannot damage or deplete the real components. */
+    /** Copies one 9x6 page so the prediction cannot damage or deplete the real components. */
     private static ItemStack[] snapshotPage(MTReactorAccessHatch hatch, int page) {
         ItemStack[] snapshot = new ItemStack[MTReactorAccessHatch.SLOTS_PER_PAGE];
         for (int y = 0; y < MTReactorAccessHatch.PAGE_HEIGHT; y++) {
@@ -818,26 +1283,26 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return snapshot;
     }
 
+    // endregion
+
+    // region Heat effects
+
     /**
-     * IC2's heat effect logic, scaled to the currently processed page's own heat cap and heat effect modifier.
+     * IC2's heat effect logic, scaled to the hottest page's own heat cap and heat effect modifier.
+     * <p>
+     * The <b>world</b> effects (igniting air, irradiating entities, evaporating water, igniting wood) run once per
+     * cycle using the hottest page's power, not once per page. IC2 has a single grid, so a multi-page reactor running
+     * the per-page version irradiated the same entity and ignited the same air block once per over-heating page.
+     * Whether a page actually melts down is still decided per page, in {@link #armCountdowns} and
+     * {@link #explodeExpiredCountdowns}.
      *
-     * @return true if the page exploded
+     * @param power heat ratio of the hottest page, already clamped to at least 0
      */
-    private boolean calculateHeatEffects(int page) {
-        int heat = mPageHeat[page];
-        int maxHeat = mReactorContext.maxHeat;
-        float hem = mReactorContext.hem;
-        if (heat < 4000 || maxHeat <= 0) return false;
-
-        float power = (float) heat / (float) maxHeat;
-        if (power >= 1.0F) {
-            explodeReactor();
-            return true;
-        }
-
+    private void applyHeatEffects(float power, float hem) {
+        if (power < 0.4F) return;
         IGregTechTileEntity base = getBaseMetaTileEntity();
         World world = base == null ? null : base.getWorld();
-        if (world == null) return false;
+        if (world == null) return;
         Random random = world.rand;
 
         if (power >= 0.85F && random.nextFloat() <= 0.2F * hem) {
@@ -888,8 +1353,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                 }
             }
         }
-
-        return false;
     }
 
     private int[] getRandCoord(int radius) {
@@ -911,12 +1374,17 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
      * IC2's {@code explode()}: the explosion power is derived from the reactor components' influence, all
      * components are destroyed, and the multiblock itself is removed. The IC2 style ray explosion is replaced by
      * the Draconic Evolution style {@link MTExplosionDE} - see that class for why.
+     * <p>
+     * The heat of every page is reset here, on purpose: the structure is being removed by the blast, but the controller
+     * tile entity (and with it this heat store) survives the {@code explodeMultiblock()} call for the rest of the tick,
+     * so a hot store would otherwise be left behind on a dead machine. The energy the cycle accumulated before the
+     * detonation is settled first, so the pages that melted down do not also cost the player their output.
      */
-    private void explodeReactor() {
+    private void explodeReactor(MTReactorAccessHatch explodedHatch, int explodedPage, float hem) {
         float boomPower = 10.0F;
         float boomMod = 1.0F;
 
-        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
             for (int page = 0; page < hatch.getPageCount(); page++) {
                 for (int y = 0; y < MTReactorAccessHatch.PAGE_HEIGHT; y++) {
                     for (int x = 0; x < MTReactorAccessHatch.PAGE_WIDTH; x++) {
@@ -935,11 +1403,16 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             hatch.clearAllPages();
         }
 
-        Arrays.fill(mPageHeat, 0);
+        mHeat.clear();
         mReactorEUPerTick = 0;
+        // Settle what the pages produced before the detonation; the machine is about to be removed either way.
+        if (mPendingOutput > 0) {
+            addEnergyOutput((long) (mPendingOutput * getEuPerOutput()));
+            mPendingOutput = 0.0F;
+        }
         mReactorCycleTicks = CYCLE_TICKS;
         mReactorStable = false;
-        boomPower *= mReactorContext.hem * boomMod;
+        boomPower *= hem * boomMod;
 
         IGregTechTileEntity base = getBaseMetaTileEntity();
         World world = base == null ? null : base.getWorld();
@@ -957,14 +1430,142 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             }
         }
         if (world != null && !world.isRemote) {
-            // IC2 clamps its own reactors to protection/reactorExplosionPowerLimit (45); the MTReactor computes that
-            // exact number itself and maps it onto the Draconic Evolution power scale used by MTExplosionDE, whose
-            // maximum is twice DE's own full reactor (2 x 20 = 40) - see MTExplosionDE and Config.
-            float dePower = Math.min(boomPower, IC2_EXPLOSION_POWER_LIMIT) / IC2_EXPLOSION_POWER_LIMIT
-                * Config.REACTOR_EXPLOSION_DE_POWER_LIMIT;
+            // IC2 clamps its own reactors to protection/reactorExplosionPowerLimit (45); the MTReactor uses the
+            // MessTech config option Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT for that number and maps the result onto
+            // the Draconic Evolution power scale used by MTExplosionDE, whose maximum is twice DE's own full reactor
+            // (2 x 20 = 40) - see MTExplosionDE and Config.
+            float ic2Limit = Math.max(1.0F, Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT);
+            float dePower = Math.min(boomPower, ic2Limit) / ic2Limit * Config.REACTOR_EXPLOSION_DE_POWER_LIMIT;
             MTProcessHandler.addProcess(new MTExplosionDE(world, centerX, centerY, centerZ, dePower));
         }
     }
+    // endregion
+
+    // region Fluid (wet) mode
+
+    /**
+     * IC2's fluid loop for one page: the heat the components emitted this tick is absorbed by coolant, and whatever the
+     * coolant did not take goes back onto the core as {@code overflow / 2}.
+     * <p>
+     * Every step is paired so the loop can neither duplicate nor delete fluid: the coolant is drained first, then the
+     * same amount of hot coolant is filled, and if the output hatch cannot take it the drained coolant is put back.
+     *
+     * @return the heat the core has to take back, 0 when the coolant absorbed everything
+     */
+    private int releaseCoolantHeat() {
+        int pending = mHeat.getPendingEmitHeat();
+        // The flow buffer belongs to a single page tick, so it is cleared here whatever the outcome - but only after
+        // the exchange below has been resolved, never before it.
+        if (pending <= 0) {
+            mHeat.resetCycleEmitHeat();
+            return 0;
+        }
+        if (!mHeat.isFluidMode()) {
+            // Dry mode: the buffered heat goes back to the core, like an IC2 reactor without a fluid loop.
+            mHeat.resetCycleEmitHeat();
+            return pending / 2;
+        }
+        // GT's own accessor for the IC2 fluid, so this stays in step with however the pack exposes it. The hatch's own
+        // accessor is used for the cold coolant because it is null-guarded and matches the hatch's filter exactly;
+        // GTModHandler.getIC2Coolant would fall back to water when IC2 is absent, and this loop must never drain water
+        // as if it were coolant.
+        Fluid coolant = MTReactorCoolantInputHatch.getCoolantFluid();
+        FluidStack hotStack = GTModHandler.getHotCoolant(1);
+        Fluid hotCoolant = hotStack == null ? null : hotStack.getFluid();
+        if (coolant == null || hotCoolant == null) {
+            mHeat.resetCycleEmitHeat();
+            return pending / 2;
+        }
+        long needed = MTReactorHeatSystem.coolantForHeat(pending);
+        if (needed > Integer.MAX_VALUE) needed = Integer.MAX_VALUE;
+
+        long available = 0;
+        for (MTReactorCoolantInputHatch hatch : mReactorCoolantInputs) {
+            if (hatch == null) continue;
+            available += hatch.getCoolantAmount(coolant);
+        }
+        long free = 0;
+        for (MTReactorCoolantOutputProxy hatch : mReactorCoolantOutputs) {
+            free += hatch.getFreeSpace();
+        }
+        long taken = Math.min(needed, Math.min(available, free));
+        if (taken <= 0) {
+            // No coolant to take or nowhere for the hot coolant to go: nothing is drained at all.
+            mHeat.resetCycleEmitHeat();
+            return pending / 2;
+        }
+
+        long drained = 0;
+        for (MTReactorCoolantInputHatch hatch : mReactorCoolantInputs) {
+            if (hatch == null || drained >= taken) continue;
+            drained += hatch.drainCoolant(coolant, (int) Math.min(taken - drained, Integer.MAX_VALUE));
+        }
+        if (drained <= 0) {
+            mHeat.resetCycleEmitHeat();
+            return pending / 2;
+        }
+        long filled = 0;
+        for (MTReactorCoolantOutputProxy hatch : mReactorCoolantOutputs) {
+            if (filled >= drained) break;
+            filled += hatch.fill(hotCoolant, (int) Math.min(drained - filled, Integer.MAX_VALUE));
+        }
+        if (filled < drained) {
+            // The hot coolant had nowhere to go: put the drained coolant back so nothing is destroyed. The refund is
+            // best effort - an already full input hatch cannot take everything back, and that leftover is the coolant
+            // that paid for the heat actually exchanged.
+            refundCoolant(coolant, drained - filled);
+        }
+        if (filled <= 0) {
+            mHeat.resetCycleEmitHeat();
+            return pending / 2;
+        }
+        // mB of coolant exchanged: with COOLANT_PER_BUFFER_UNIT == 1 that is also the buffered-heat unit count. If that
+        // constant ever moves off 1, this call has to pass filled / COOLANT_PER_BUFFER_UNIT instead.
+        MTReactorHeatSystem.CoolantExchange exchange = mHeat.coolByCoolant(filled);
+        mHeat.resetCycleEmitHeat();
+        return exchange.overflow;
+    }
+
+    private void refundCoolant(Fluid coolant, long amount) {
+        long left = amount;
+        for (MTReactorCoolantInputHatch hatch : mReactorCoolantInputs) {
+            if (hatch == null || left <= 0) continue;
+            left -= hatch.refundCoolant(coolant, (int) Math.min(left, Integer.MAX_VALUE));
+        }
+    }
+
+    /** Fluid (wet) mode state, shown in the GUI. */
+    public boolean isFluidMode() {
+        return mHeat.isFluidMode();
+    }
+
+    /** Toggles the fluid mode; called by the controller's screwdriver handling and by the GUI. */
+    public void setFluidMode(boolean value) {
+        if (mHeat.isFluidMode() == value) return;
+        mHeat.setFluidMode(value);
+        // Switching the cooling model invalidates a running countdown: give the player the full grace period back.
+        mHeat.resetCountdown();
+        markDirty();
+        IGregTechTileEntity base = getBaseMetaTileEntity();
+        if (base != null && base.isServerSide()) checkStructure(true, base);
+    }
+
+    /**
+     * Screwdriver on the controller toggles the fluid (wet) mode. As with every manual interaction, it also cancels a
+     * running meltdown countdown - the machine is a machine, not a trap that keeps ticking while the player works on
+     * it.
+     */
+    @Override
+    public void onScrewdriverRightClick(ForgeDirection side, EntityPlayer aPlayer, float aX, float aY, float aZ,
+        ItemStack aTool) {
+        IGregTechTileEntity base = getBaseMetaTileEntity();
+        if (base == null || !base.isServerSide()) return;
+        setFluidMode(!mHeat.isFluidMode());
+        GTUtility.sendChatTrans(
+            aPlayer,
+            mHeat.isFluidMode() ? "machine.mtreactor.fluidmode.on" : "machine.mtreactor.fluidmode.off");
+    }
+
     // endregion
 
     // region NBT / info
@@ -972,7 +1573,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     @Override
     public void saveNBTData(NBTTagCompound aNBT) {
         super.saveNBTData(aNBT);
-        aNBT.setIntArray("mtReactorPageHeat", mPageHeat);
+        mHeat.saveNBTData(aNBT);
         aNBT.setBoolean("mtReactorStable", mReactorStable);
         aNBT.setBoolean("mtReactorAutoMatch", mAutoMatchTarget);
     }
@@ -980,17 +1581,20 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     @Override
     public void loadNBTData(NBTTagCompound aNBT) {
         super.loadNBTData(aNBT);
-        int[] savedHeat = aNBT.getIntArray("mtReactorPageHeat");
-        Arrays.fill(mPageHeat, 0);
-        if (savedHeat != null) {
-            System.arraycopy(savedHeat, 0, mPageHeat, 0, Math.min(savedHeat.length, mPageHeat.length));
-        }
-        // "mtReactorPageMaxHeat" from older saves is ignored: the ceiling always comes from the heat control hatch.
+        // The machine's tick counter is not persisted and restarts around here, so the store is told which tick the
+        // restored countdowns have to be anchored onto before it reads them.
+        IGregTechTileEntity base = getBaseMetaTileEntity();
+        mHeat.setLoadClock(base == null ? 0L : base.getTimer());
+        mHeat.loadNBTData(aNBT);
+        // "mtReactorPageHeat" (the old global-page-order int[]) and "mtReactorPageMaxHeat" from older saves are
+        // ignored: pages are anchored on hatch coordinates now and the ceiling always comes from the control hatch.
         if (aNBT.hasKey("mtReactorStable")) {
             mReactorStable = aNBT.getBoolean("mtReactorStable");
         }
         // Default on for existing/new machines unless explicitly disabled.
         mAutoMatchTarget = !aNBT.hasKey("mtReactorAutoMatch") || aNBT.getBoolean("mtReactorAutoMatch");
+        // The hatch may not be resolved yet at this point; the first onPostTick re-reads the capacity and rescales.
+        mReactorInventorySignature = 0;
     }
 
     @Override
@@ -1010,7 +1614,15 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                 "machine.mtreactor.waila.stable",
                 StatCollector.translateToLocal(
                     mReactorStable ? "machine.mtreactor.waila.stable.yes" : "machine.mtreactor.waila.stable.no")),
-            StatCollector.translateToLocalFormatted("machine.mtreactor.waila.output", mReactorEUPerTick) };
+            StatCollector.translateToLocalFormatted("machine.mtreactor.waila.output", mReactorEUPerTick),
+            StatCollector.translateToLocalFormatted("machine.mtreactor.waila.output_actual", mReactorActualEUPerTick),
+            StatCollector.translateToLocalFormatted(
+                "machine.mtreactor.waila.fluidmode",
+                StatCollector.translateToLocal(
+                    mHeat.isFluidMode() ? "machine.mtreactor.waila.fluidmode.on"
+                        : "machine.mtreactor.waila.fluidmode.off")),
+            StatCollector
+                .translateToLocalFormatted("machine.mtreactor.waila.cooling", mHeat.getPassiveCoolingPerSecond()) };
         String[] result = Arrays.copyOf(base, base.length + extra.length);
         System.arraycopy(extra, 0, result, base.length, extra.length);
         return result;
@@ -1038,8 +1650,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     }
 
     public int getHottestPageHeat() {
-        int index = getHottestPageIndex();
-        return index < 0 ? 0 : mPageHeat[index];
+        return mHeat.getHottestHeat();
     }
 
     /**
@@ -1048,35 +1659,79 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
      * reactor cycle (an empty or switched-off reactor never runs one).
      */
     public int getHottestPageMaxHeat() {
-        return Math.max(1, getReactorHeatCapacity());
+        return mHeat.getHottestMaxHeat();
     }
 
     public int getHottestPageHeatPercent() {
-        return (int) Math.round(getHottestPageHeat() * 100.0D / getHottestPageMaxHeat());
+        return mHeat.getHottestHeatPercent();
     }
 
     public boolean isReactorStable() {
         return mReactorStable;
     }
 
-    private int getHottestPageIndex() {
-        int pages = getTotalPageCount();
-        if (pages <= 0) return -1;
-        int hottest = 0;
-        for (int i = 1; i < pages; i++) {
-            if (mPageHeat[i] > mPageHeat[hottest]) hottest = i;
+    /** Cycles the prediction says the hottest page can run before the meltdown; -1 when it is stable. */
+    public int getCyclesToMeltdown() {
+        return mCyclesToMeltdown;
+    }
+
+    /** True while the meltdown countdown of a page is running. */
+    public boolean isMeltdownCountdownActive() {
+        return mHeat.isCountdownActive();
+    }
+
+    /** Seconds left before the page detonates, rounded up; 0 while nothing counts down. */
+    public int getMeltdownCountdownSeconds() {
+        return (mHeat.getCountdownTicks() + 19) / 20;
+    }
+
+    public float getMeltdownCountdownProgress() {
+        return mHeat.getCountdownProgress();
+    }
+
+    /** Rated EU/t of the last completed cycle. */
+    public long getRatedEUPerTick() {
+        return mReactorEUPerTick;
+    }
+
+    /** EU/t the dynamo hatches actually accepted over the last tick. */
+    public long getActualEUPerTick() {
+        return mReactorActualEUPerTick;
+    }
+
+    public long getPassiveCoolingPerSecond() {
+        return mHeat.getPassiveCoolingPerSecond();
+    }
+
+    /**
+     * Component heat the fluid loop has buffered but not carried away yet, in the units one mB of coolant absorbs.
+     * Shown by the GUI so a fluid-mode reactor whose coolant ran dry is visible before the heat comes back onto the
+     * core.
+     */
+    public int getPendingCoolantHeat() {
+        return mHeat.getPendingEmitHeat();
+    }
+
+    /** Heat percentage of every page, for the GUI heat map; ordered hatch by hatch, page by page. */
+    public int[] getPageHeatPercents() {
+        int max = getHottestPageMaxHeat();
+        int[] result = new int[getTotalPageCount()];
+        int index = 0;
+        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
+            for (int page = 0; page < hatch.getPageCount() && index < result.length; page++, index++) {
+                result[index] = (int) Math.round(mHeat.getPageHeat(hatch, page) * 100.0D / max);
+            }
         }
-        return hottest;
+        return result;
     }
 
     private int getTotalPageCount() {
         int pages = 0;
-        for (MTReactorAccessHatch hatch : mReactorAccessHatches) {
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
             if (hatch != null) pages += hatch.getPageCount();
         }
-        return Math.min(pages, MAX_PAGES);
+        return Math.min(pages, MTReactorHeatSystem.MAX_PAGES);
     }
-    // endregion
     // endregion
 
     // region Waila
@@ -1092,7 +1747,13 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         tag.setInteger("mtReactorMaxHeat", getHottestPageMaxHeat());
         tag.setInteger("mtReactorHeatPercent", getHottestPageHeatPercent());
         tag.setBoolean("mtReactorStable", mReactorStable);
+        tag.setInteger("mtReactorCyclesToMeltdown", mCyclesToMeltdown);
+        tag.setInteger("mtReactorCountdownSeconds", getMeltdownCountdownSeconds());
         tag.setLong("mtReactorOutput", mReactorEUPerTick);
+        tag.setLong("mtReactorOutputActual", mReactorActualEUPerTick);
+        tag.setBoolean("mtReactorFluidMode", mHeat.isFluidMode());
+        tag.setInteger("mtReactorPendingHeat", getPendingCoolantHeat());
+        tag.setBoolean("mtReactorOutputShortfall", hasOutputShortfall());
         tag.setBoolean("mtReactorMissingLocked", hasMissingLockedComponents());
         tag.setBoolean("mtReactorLowLocked", hasLowOrDoomedLockedComponents());
     }
@@ -1133,8 +1794,39 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                     StatCollector.translateToLocal(
                         stable ? "machine.mtreactor.waila.stable.yes" : "machine.mtreactor.waila.stable.no"))
                 + EnumChatFormatting.RESET);
+        int countdown = tag.getInteger("mtReactorCountdownSeconds");
+        if (countdown > 0) {
+            currentTip.add(
+                EnumChatFormatting.DARK_RED
+                    + StatCollector.translateToLocalFormatted("machine.mtreactor.waila.meltdown", countdown)
+                    + EnumChatFormatting.RESET);
+        } else if (!stable) {
+            currentTip.add(
+                EnumChatFormatting.RED + StatCollector.translateToLocalFormatted(
+                    "machine.mtreactor.waila.cycles",
+                    tag.getInteger("mtReactorCyclesToMeltdown")) + EnumChatFormatting.RESET);
+        }
         currentTip.add(
             StatCollector.translateToLocalFormatted("machine.mtreactor.waila.output", tag.getLong("mtReactorOutput")));
+        currentTip.add(
+            StatCollector.translateToLocalFormatted(
+                "machine.mtreactor.waila.output_actual",
+                tag.getLong("mtReactorOutputActual")));
+        if (tag.getBoolean("mtReactorOutputShortfall")) {
+            currentTip.add(
+                EnumChatFormatting.RED + StatCollector.translateToLocal("machine.mtreactor.waila.output_shortfall")
+                    + EnumChatFormatting.RESET);
+        }
+        if (tag.getBoolean("mtReactorFluidMode")) {
+            currentTip.add(
+                EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.mtreactor.waila.fluidmode.on")
+                    + EnumChatFormatting.RESET);
+            // The same line the GUI shows, so a wet reactor whose coolant ran dry is visible from outside the machine.
+            currentTip.add(
+                StatCollector.translateToLocalFormatted(
+                    "machine.mtreactor.gui.pending_heat",
+                    tag.getInteger("mtReactorPendingHeat")));
+        }
 
         if (tag.getBoolean("mtReactorMissingLocked")) {
             currentTip.add(
@@ -1162,15 +1854,19 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.access"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.pages"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.heat"))
+            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.tier"))
             .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.header"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.cycle"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.heat"))
+            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.meltdown"))
+            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.cooling"))
             .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.power.header"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.power.output"))
             .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.details.fluidmode"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.details.hint"))
             .beginStructureBlock(33, 8, 9, true)
             .addController(StatCollector.translateToLocal("gt.mbtt.structure.front_center_2nd_layer"))
@@ -1183,7 +1879,8 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                 StatCollector.translateToLocal("machine.mtreactor.heathatch.name"),
                 StatCollector.translateToLocal("gt.mbtt.structure.any_casing"))
             .addMaintenanceHatch(StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
-            .addMufflerHatch(StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
+            // No muffler hatch line: this machine produces no pollution, and the structure never accepted one. The
+            // old line promised a hatch the player could not usefully place.
             .toolTipFinisher();
         return tt;
     }
@@ -1226,7 +1923,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
         private MTReactorAccessHatch hatch;
         private int page;
-        private int heatIndex;
         private int maxHeat = MTReactorHeatHatch.DEFAULT_HEAT_CAPACITY;
         private float hem = 1.0F;
         private float pageOutput = 0.0F;
@@ -1234,26 +1930,32 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         private boolean simulating;
         private ItemStack[] simulatedItems;
         private int simulatedHeat;
+        private int simulatedBonus;
 
-        void bind(MTReactorAccessHatch hatch, int page, int heatIndex) {
+        void bind(MTReactorAccessHatch hatch, int page) {
             this.hatch = hatch;
             this.page = page;
-            this.heatIndex = heatIndex;
-            this.maxHeat = getReactorHeatCapacity();
+            this.maxHeat = mHeat.getPageMaxHeat(hatch, page);
             this.hem = 1.0F;
             this.pageOutput = 0.0F;
             this.simulating = false;
             this.simulatedItems = null;
             this.simulatedHeat = 0;
+            this.simulatedBonus = 0;
         }
 
-        void bindSimulation(ItemStack[] items, int heat) {
+        /**
+         * Binds a page snapshot for the prediction. The plating bonus is supplied up front (the prediction reads it
+         * straight out of the snapshot) so the ceiling is already correct while the heat pass runs, instead of only
+         * after the platings had their say.
+         */
+        void bindSimulation(ItemStack[] items, int heat, int platingBonus) {
             this.hatch = null;
             this.page = -1;
-            this.heatIndex = -1;
             this.simulatedItems = items;
             this.simulatedHeat = heat;
-            this.maxHeat = getReactorHeatCapacity();
+            this.simulatedBonus = Math.max(0, platingBonus);
+            this.maxHeat = mHeat.getMaxHeatWithBonus(simulatedBonus);
             this.hem = 1.0F;
             this.pageOutput = 0.0F;
             this.simulating = true;
@@ -1277,15 +1979,17 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
         @Override
         public int getHeat() {
-            return simulating ? simulatedHeat : mPageHeat[heatIndex];
+            if (simulating) return simulatedHeat;
+            if (hatch == null) return 0;
+            return mHeat.getPageHeat(hatch, page);
         }
 
         @Override
         public void setHeat(int heat) {
             if (simulating) {
                 simulatedHeat = heat;
-            } else {
-                mPageHeat[heatIndex] = heat;
+            } else if (hatch != null) {
+                mHeat.setPageHeat(hatch, page, heat);
             }
         }
 
@@ -1295,8 +1999,8 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                 simulatedHeat += amount;
                 return simulatedHeat;
             }
-            mPageHeat[heatIndex] += amount;
-            return mPageHeat[heatIndex];
+            if (hatch == null) return 0;
+            return mHeat.addPageHeat(hatch, page, amount);
         }
 
         @Override
@@ -1306,13 +2010,22 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
         @Override
         public void setMaxHeat(int newMaxHeat) {
-            // The heat ceiling is fixed by the heat control hatch, so component contributions (reactor plating and
-            // friends) are ignored on purpose instead of stacking on top of the hatch value.
+            // Reactor plating is the one component that may raise the ceiling (IC2 semantics). The heat control hatch
+            // stays the main term and the sum is clamped, so plating can never turn the risk model off. The bonus is
+            // per page: a 9x6 page is an independent reactor grid, so plating on one page must not lift another's.
+            if (simulating) {
+                simulatedBonus = Math.max(simulatedBonus, newMaxHeat - mHeat.getCapacity());
+                maxHeat = mHeat.getMaxHeatWithBonus(simulatedBonus);
+            } else if (hatch != null) {
+                mHeat.setPageMaxHeat(hatch, page, newMaxHeat - mHeat.getCapacity());
+                maxHeat = mHeat.getPageMaxHeat(hatch, page);
+            }
         }
 
         @Override
         public void addEmitHeat(int heat) {
-            // Fluid cooling is not supported by this reactor.
+            // Component heat that goes into the coolant loop instead of the core.
+            mHeat.addEmitHeat(heat);
         }
 
         @Override
@@ -1365,8 +2078,8 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
         @Override
         public void explode() {
-            if (!simulating) {
-                explodeReactor();
+            if (!simulating && hatch != null) {
+                explodeReactor(hatch, page, hem);
             }
         }
 
@@ -1377,11 +2090,10 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
         @Override
         public boolean produceEnergy() {
-            // The simulation always assumes the reactor is running, so switching the machine off does not make the
+            // The prediction always assumes the reactor is running, so switching the machine off does not make the
             // stability check meaningless: it shows whether the current layout would explode once enabled.
             if (simulating) return true;
-            IGregTechTileEntity base = MTReactor.this.getBaseMetaTileEntity();
-            return base != null && base.isAllowedToWork();
+            return mLastCouldRun;
         }
 
         @Override
@@ -1391,8 +2103,57 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
         @Override
         public boolean isFluidCooled() {
-            return false;
+            return mHeat.isFluidMode();
         }
     }
+    // endregion
+
+    // region Template support
+
+    /**
+     * Thin wrapper over the hot coolant output hatch. The reactor only ever needs its free space and its fill path, so
+     * keeping the two together avoids repeating the capacity arithmetic in every place that touches the loop.
+     */
+    private static final class MTReactorCoolantOutputProxy {
+
+        private final MTReactorHotCoolantOutputHatch hatch;
+
+        MTReactorCoolantOutputProxy(MTReactorHotCoolantOutputHatch hatch, int aBaseCasingIndex) {
+            this.hatch = hatch;
+            hatch.updateTexture(aBaseCasingIndex);
+        }
+
+        long getFreeSpace() {
+            return Math.max(0L, (long) hatch.getCapacity() - hatch.getFluidAmount());
+        }
+
+        long fill(Fluid fluid, int amount) {
+            if (fluid == null || amount <= 0) return 0;
+            return hatch.fill(new FluidStack(fluid, amount), true);
+        }
+    }
+
+    /** One locked slot the next heat pass is predicted to destroy. */
+    private static final class DoomedSlot {
+
+        final ChunkCoordinates owner;
+        final int page;
+        final int localSlot;
+
+        DoomedSlot(ChunkCoordinates owner, int page, int localSlot) {
+            this.owner = owner;
+            this.page = page;
+            this.localSlot = localSlot;
+        }
+    }
+
+    /** Output the current IC2 cycle has accumulated so far, published by {@link #finishCycle()}. */
+    private float mPendingOutput = 0.0F;
+    /** Heat effect modifier of the hottest page, used by the aggregated world heat effects. */
+    private float mHottestHem = 1.0F;
+    /**
+     * Result of the multi-cycle heat prediction shown in the GUI/Waila; true when no page is heading for a meltdown.
+     */
+    private boolean mReactorStable = true;
     // endregion
 }

@@ -9,7 +9,9 @@ import net.minecraftforge.common.util.ForgeDirection;
 import com.MessTech.common.block.MTBlocks;
 import com.MessTech.common.command.MTCommand;
 import com.MessTech.common.command.MTGoUpFlight;
+import com.MessTech.common.entity.MTEntityDEBlast;
 import com.MessTech.common.entity.MTEntityPiggy;
+import com.MessTech.common.entity.MTEntityVoidstarArrow;
 import com.MessTech.common.galacticraft.MTGalacticraftSpaceHandler;
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
@@ -20,7 +22,7 @@ import com.MessTech.common.recipe.MTChemicalTwisterRecipes;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.recipe.MTVendingMachineRecipes;
 import com.MessTech.common.recipe.RecipeMessFood;
-import com.MessTech.common.util.MTTrueKill;
+import com.MessTech.common.util.MTKillBase;
 
 import appeng.api.parts.IPart;
 import appeng.container.ContainerOpenContext;
@@ -64,9 +66,14 @@ public class CommonProxy implements IGuiHandler {
         MTItems.registerItems();
         // The thrown "A Piggy" (ids are per mod, so the single entity of this mod is id 0).
         MTEntityPiggy.register();
-        // The piggy's true kill needs to know whether a death path really ran (see MTTrueKill), so it watches the
-        // death event of the game.
-        MTTrueKill.init();
+        // The arrow of the Voidstar Piercer (id 1): straight flight, trail and the tunnel of an impact.
+        MTEntityVoidstarArrow.register();
+        // The fireball of a DE explosion (id 2): the visible half of MTExplosionDE, i.e. of the reactor explosion
+        // port. It has no renderer of its own - MTDEBlastRenderer draws every live one in the world pass.
+        MTEntityDEBlast.register();
+        // The true kill ladder (shared by the piggy's MTPiggyKill and the bow's MTBowKill) needs to know whether a
+        // death path really ran, so it watches the death event of the game.
+        MTKillBase.init();
         MTProcessHandler.init();
         // Galacticraft's own rockets climb at 1 block per tick at most, so this hook can only ever fire for a player
         // who was thrown up at 256 blocks/s or more (see MTGalacticraftSpaceHandler).

@@ -101,6 +101,9 @@ public final class MTItems {
     /** Decoration item whose look is cycled through the GT5U material effects (see {@code MTDynamicItemHelper}). */
     public static final MTItemPiggy piggy = new MTItemPiggy();
 
+    /** The Voidstar Piercer (混沌终焉·虚无贯星弓): a bow whose arrows blast a tunnel through everything they fly into. */
+    public static final MTItemVoidstarBow voidstarBow = new MTItemVoidstarBow();
+
     /** The Ultimate Pattern Terminal (终极样板编码终端) as an AE cable part item. */
     public static final ItemUltimatePatternTerminal ultimatePatternTerminal = new ItemUltimatePatternTerminal();
 
@@ -111,6 +114,7 @@ public final class MTItems {
         GameRegistry.registerItem(nacComponentItem, "MTNACComponentItem");
         GameRegistry.registerItem(messFood, "MessFood");
         GameRegistry.registerItem(piggy, "MTItemPiggy");
+        GameRegistry.registerItem(voidstarBow, "VoidstarBow");
         GameRegistry.registerItem(ultimatePatternTerminal, "UltimatePatternTerminal");
         MTItemList.UltimatePatternTerminal.set(new ItemStack(ultimatePatternTerminal, 1));
         // The fuel rods extend GT's GTGenericItem, whose constructor already calls

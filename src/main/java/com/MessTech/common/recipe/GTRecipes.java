@@ -46,6 +46,7 @@ import com.MessTech.common.items.MTItems;
 import com.MessTech.common.items.MTNACComponentItems;
 import com.MessTech.common.machine.Base.IMTModule;
 import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
+import com.MessTech.common.machine.hatch.MTReactorCoolantInputHatch;
 
 import appeng.api.AEApi;
 import goodgenerator.items.GGMaterial;
@@ -725,10 +726,11 @@ public class GTRecipes {
     }
 
     /**
-     * Nuclear reactor parts: reactor access hatches, heat control hatches, the controller and the Transcendent Metal
-     * fuel rods. The hatch recipes are one assembler recipe per tier (EV..UIV); the single rod is made in the canning
-     * machine from The Core and Avaritia Star Fuel, the dual/quad rods in the UIV assembler (same shape as GT's own
-     * fission fuel rod recipes in {@code FissionFuelLoader}).
+     * Nuclear reactor parts: reactor access hatches, heat control hatches, the coolant hatch pair of the fluid (wet)
+     * mode, the controller and the Transcendent Metal fuel rods. The hatch recipes are one assembler recipe per tier
+     * (EV..UIV; the coolant pair is EV only, see the hatch classes); the single rod is made in the canning machine from
+     * The Core and Avaritia Star Fuel, the dual/quad rods in the UIV assembler (same shape as GT's own fission fuel
+     * rod recipes in {@code FissionFuelLoader}).
      */
     private static void addReactorRecipes() {
         for (int i = 0; i < MTItemList.REACTOR_ACCESS_HATCHES.length; i++) {
@@ -756,6 +758,24 @@ public class GTRecipes {
                 .circuit(2)
                 .itemOutputs(MTItemList.REACTOR_HEAT_HATCHES[i].get(1))
                 .eut(eut)
+                .duration(MINUTES * 2)
+                .addTo(assemblerRecipes);
+        }
+
+        // Reactor coolant pair of the fluid ("wet") mode: tier casing + 2 solid steel casings + 2 tier circuits, which
+        // is deliberately cheaper than the heat control hatch above - they are plumbing, not a tier gate, and the
+        // recipe that actually matters is the coolant they consume. Cold coolant in and hot coolant out cost exactly
+        // the same, so building the loop is never gated behind the more expensive of the two.
+        int coolantTier = MTReactorCoolantInputHatch.TIER;
+        for (MTItemList coolantHatch : MTItemList.REACTOR_FLUID_HATCHES) {
+            GTValues.RA.stdBuilder()
+                .itemInputs(
+                    ItemList.MACHINE_CASINGS[coolantTier].get(1),
+                    ItemList.Casing_SolidSteel.get(2),
+                    new Object[] { OrePrefixes.circuit.get(TIER_CIRCUIT_MATERIALS[coolantTier]), 2 })
+                .circuit(3)
+                .itemOutputs(coolantHatch.get(1))
+                .eut(TIER_RECIPE_EU[coolantTier])
                 .duration(MINUTES * 2)
                 .addTo(assemblerRecipes);
         }

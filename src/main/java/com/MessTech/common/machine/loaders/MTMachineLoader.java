@@ -27,7 +27,9 @@ import com.MessTech.common.machine.hatch.MTModuleEuHatch;
 import com.MessTech.common.machine.hatch.MTModuleParallelHatch;
 import com.MessTech.common.machine.hatch.MTModuleSpeedHatch;
 import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
+import com.MessTech.common.machine.hatch.MTReactorCoolantInputHatch;
 import com.MessTech.common.machine.hatch.MTReactorHeatHatch;
+import com.MessTech.common.machine.hatch.MTReactorHotCoolantOutputHatch;
 import com.MessTech.common.machine.hatch.MTWirelessBeamlineAdvancedOutput;
 import com.MessTech.common.machine.hatch.MTWirelessBeamlineInput;
 import com.MessTech.common.machine.hatch.MTWirelessBeamlineOutput;
@@ -212,8 +214,7 @@ public class MTMachineLoader {
             AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
         }
 
-        // Reactor heat control hatches: one variant per tier, setting the reactor heat ceiling (EV 10k ... UIV int
-        // max).
+        // Reactor heat control hatches: one variant per tier, setting the reactor heat ceiling (EV 10k ... UIV 50M).
         for (int i = 0; i < MTItemList.REACTOR_HEAT_HATCHES.length; i++) {
             int tier = MTReactorHeatHatch.MIN_TIER + i;
             String tierName = GTValues.VN[tier];
@@ -226,6 +227,26 @@ public class MTMachineLoader {
                     tier).getStackForm(1L));
             AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
         }
+
+        // Reactor coolant pair for the fluid ("wet") mode. One variant each at EV by design (plumbing, not a tier
+        // gate; see the hatch classes for the 128,000 mB tank and the 1 mB : 1 HU ratio), so they are built here
+        // rather than in a tier loop. The IDs come from the free slots around the reactor family: MT_ID + 32 directly
+        // after the heat hatches, and MT_ID + 35 because MT_ID + 33 is MTChemicalTwister and MT_ID + 34 is
+        // MTHugeChemicalReactor.
+        MTItemList.MTReactorCoolantInputHatch.set(
+            new MTReactorCoolantInputHatch(
+                MT_ID + 32,
+                "MTReactorCoolantInputHatch",
+                translateToLocal("machine.mtreactor.coolantinput.name"),
+                MTReactorCoolantInputHatch.TIER).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTReactorCoolantInputHatch.get(1));
+        MTItemList.MTReactorHotCoolantOutputHatch.set(
+            new MTReactorHotCoolantOutputHatch(
+                MT_ID + 35,
+                "MTReactorHotCoolantOutputHatch",
+                translateToLocal("machine.mtreactor.coolantoutput.name"),
+                MTReactorHotCoolantOutputHatch.TIER).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTReactorHotCoolantOutputHatch.get(1));
 
         MTItemList.MTChemicalTwister.set(
             new MTChemicalTwister(

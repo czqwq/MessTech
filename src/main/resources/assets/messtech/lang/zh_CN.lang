@@ -454,17 +454,22 @@ machine.mtreactor.tooltip.flavour=§7堆芯是你自己摆的，账单也是你�
 machine.mtreactor.tooltip.structure.header=§6结构：
 machine.mtreactor.tooltip.structure.access=§7· 反应堆访问仓 §e(EV..UIV)§7 提供组件槽位，每页 §b9x6§7 都是一座独立反应堆
 machine.mtreactor.tooltip.structure.pages=§7· 页数由访问仓等级决定：§eEV§7 1 页，每升一级 §b+1§7 页，§eUIV§7 8 页
-machine.mtreactor.tooltip.structure.heat=§7· 热量控制仓必须且只能装 §b1§7 个 §e(EV..UIV)§7，其等级决定整堆热量上限（§b10,000§7 ~ §b2,147,483,647§7）
+machine.mtreactor.tooltip.structure.heat=§7· 热量控制仓必须且只能装 §b1§7 个 §e(EV..UIV)§7，其等级决定整堆热量上限（§b10,000§7 ~ §b50,000,000§7）
+machine.mtreactor.tooltip.structure.tier=§7· 该等级同时也是访问仓的等级上限：等级高于热量控制仓的访问仓会被拒绝
 machine.mtreactor.tooltip.core.header=§6堆芯：
 machine.mtreactor.tooltip.core.cycle=§7· 每 §b20§7 tick 结算一次 IC2 循环：先热力后发电，热量按页独立累积
-machine.mtreactor.tooltip.core.heat=§7· 堆温 §c≥70%§7 辐照周围实体，§c≥85%§7 有概率点燃周围方块，§c100%§7 §c核爆§7并炸毁整台机器
+machine.mtreactor.tooltip.core.heat=§7· 堆温 §c≥70%§7 辐照周围实体，§c≥85%§7 有概率点燃周围方块
+machine.mtreactor.tooltip.core.meltdown=§7· 堆温到 §c100%§7 时不会立刻爆炸：先进入 §c30 秒§7 熔毁倒计时，倒计时走完才 §c核爆§7并炸毁整台机器
+machine.mtreactor.tooltip.core.cooling=§7· 热量控制仓会持续被动散热，反应堆停机时同样生效
 machine.mtreactor.tooltip.power.header=§6发电：
 machine.mtreactor.tooltip.power.output=§7· 发电量 = §b堆芯输出 × 5 × IC2 §b配置文件倍率 * 2§7，由动力仓输出
 machine.mtreactor.tooltip.details=§d细节：§7槽位可锁定同类组件，耐久 §b≤§7 阈值时自动输出并从总线补货（需要输入/输出总线）
+machine.mtreactor.tooltip.details.fluidmode=§7· 用螺丝刀右键控制器可切换流体（水冷）模式；该模式需要 1 个核反应堆冷却液输入仓和 1 个核反应堆热冷却液输出仓
 machine.mtreactor.tooltip.details.hint=§7· Shift+右键锁定同类物品，Alt+Shift+右键全部解锁，中键打开设置
 machine.mtreactor.structure.error.missing_access_hatch=缺少核反应堆访问仓
 machine.mtreactor.structure.error.missing_heat_hatch=缺少核反应堆热量控制仓
 machine.mtreactor.structure.error.too_many_heat_hatch=核反应堆热量控制仓只能安装一个
+machine.mtreactor.structure.error.access_hatch_tier=访问仓等级高于热量控制仓的等级
 machine.mtreactor.waila.access_hatches=控制仓数量: %s
 machine.mtreactor.waila.components=组件数量: %s
 machine.mtreactor.waila.incomplete=结构不完整
@@ -474,14 +479,37 @@ machine.mtreactor.waila.stable=稳定: %s
 machine.mtreactor.waila.stable.yes=是
 machine.mtreactor.waila.stable.no=否(轻而易举啊!)
 machine.mtreactor.waila.output=发电: %s EU/t
+machine.mtreactor.waila.output_actual=实际输出: %s EU/t
+machine.mtreactor.waila.output_shortfall=动力仓无法接收额定输出
+machine.mtreactor.waila.meltdown=熔毁倒计时: %s 秒
+machine.mtreactor.waila.cycles=%s 个循环后熔毁
+machine.mtreactor.waila.fluidmode=流体模式: %s
+machine.mtreactor.waila.fluidmode.on=已开启
+machine.mtreactor.waila.fluidmode.off=已关闭
+machine.mtreactor.waila.cooling=被动散热: %s HU/s
 machine.mtreactor.gui.access_hatches=控制仓数量: %s
 machine.mtreactor.gui.components=组件数量: %s
 machine.mtreactor.gui.heat=热量: %s / %s
 machine.mtreactor.gui.heat_percent=堆温百分比: %s%%
 machine.mtreactor.gui.stable=稳定: %s
-machine.mtreactor.gui.stable.tooltip=实时模拟下一个 IC2 热力循环，假设反应堆正在运行。
+machine.mtreactor.gui.stable.tooltip=对接下来若干 IC2 循环的实时推演："稳定"表示推演未看到熔毁，否则会给出还剩下多少个循环，或提示 30 秒熔毁倒计时已经开始。
 machine.mtreactor.gui.stable.yes=是
 machine.mtreactor.gui.stable.no=否
+machine.mtreactor.gui.stable.cycles=%s 个循环后熔毁
+machine.mtreactor.gui.stable.meltdown=熔毁倒计时中
+machine.mtreactor.gui.meltdown=熔毁倒计时: %s 秒
+machine.mtreactor.gui.output_rated=额定输出: %s EU/t
+machine.mtreactor.gui.output_actual=实际输出: %s EU/t
+machine.mtreactor.gui.output_shortfall=动力仓无法接收额定输出
+machine.mtreactor.gui.fluidmode=流体模式: %s
+machine.mtreactor.gui.fluidmode.on=已开启
+machine.mtreactor.gui.fluidmode.off=已关闭
+machine.mtreactor.gui.cooling=被动散热: %s HU/s
+machine.mtreactor.gui.pending_heat=缓冲组件热量: %s HU —— 冷却液未带走的部分会回落到堆芯
+machine.mtreactor.gui.heatmap=各页热量: %s
+machine.mtreactor.gui.heatmap.entry=%s页:%s%%
+machine.mtreactor.gui.heatmap.more=另有 %s 页
+machine.mtreactor.gui.heatmap.empty=各页热量: 无页面
 machine.mtreactor.gui.auto_match=自动输入/输出匹配目标
 machine.mtreactor.gui.auto_match.on=已启用
 machine.mtreactor.gui.auto_match.off=已禁用
@@ -492,7 +520,6 @@ machine.mtreactor.slot.fuel_durability=燃料棒剩余耐久: %s%%
 machine.mtreactor.slot.coolant_heat=冷却单元热值: %s / %s (%s%%)
 machine.mtreactor.slot.threshold=自动输出百分比:
 machine.mtreactor.slot.threshold.short=已锁定，耐久 ≤ %s%% 时自动输出
-machine.mtreactor.slot.percent=%
 machine.mtreactor.slot.hint=Shift+右键: 锁定同类物品（全部页）/解锁单个槽位；Alt+Shift+右键: 解除同类物品的全部锁定；中键: 打开设置
 machine.mtreactor.structure.error.missing_locked_component=锁定槽位缺少对应组件
 machine.mtreactor.structure.error.missing_input_bus=自动模式需要输入总线
@@ -500,6 +527,8 @@ machine.mtreactor.structure.error.missing_output_bus=自动模式需要输出总
 machine.mtreactor.gui.component_low=锁定槽位组件耐久已达到/低于阈值
 GT5U.gui.text.shutdown_reason.reactor_component_missing=§4已停机：锁定槽位缺少反应堆组件
 GT5U.gui.text.shutdown_reason.reactor_component_low=§4已停机：锁定槽位的反应堆组件耐久已达到/低于阈值
+GT5U.gui.text.shutdown_reason.reactor_coolant_missing=§4已停机：流体（水冷）模式缺少冷却液输入仓或热冷却液输出仓
+GT5U.gui.text.shutdown_reason.reactor_too_many_pages=§4已停机：结构页数超过热量存储上限，末尾的页会被跳过
 machine.mtreactor.gui.page=第 %s / %s 页
 machine.mtreactor.gui.previous=上一页
 machine.mtreactor.gui.next=下一页
@@ -516,10 +545,26 @@ machine.mtreactor.accesshatch.copy.invalid=闪存内没有本仓的锁定配置
 machine.mtreactor.accesshatch.copy.pages_dropped=目标仓页数不足，已忽略 %s 页，仅应用前 %s 页
 machine.mtreactor.accesshatch.copy.empty_slots=%s 个已锁定槽位当前是空的，放入对应组件后自动输入/输出即可生效
 machine.mtreactor.accesshatch.copy.no_locks=闪存内没有可用的锁定设置，未改动任何槽位
+machine.mtreactor.accesshatch.copy.remapped=已应用 %s 个锁定，覆盖 %s 页
+machine.mtreactor.accesshatch.copy.remap_dropped=%s 个锁定未能落位：目标仓已经没有可用的同类组件空槽，因此被丢弃
+machine.mtreactor.accesshatch.desc.6=粘贴时按组件类型落位：先找已放有该类型的槽位，其次原槽位，最后同页空位；放不下的锁定会被丢弃并提示
 machine.mtreactor.heathatch.name=核反应堆热量控制仓
 machine.mtreactor.heathatch.desc.0=热量上限: %s
 machine.mtreactor.heathatch.desc.1=每台核反应堆必须且只能安装一个热量控制仓
 machine.mtreactor.heathatch.desc.2=控制仓的等级决定整座反应堆的热量上限
+machine.mtreactor.heathatch.desc.3=本仓等级同时也是该反应堆允许的访问仓等级上限
+machine.mtreactor.fluidmode.on=已开启流体（水冷）模式
+machine.mtreactor.fluidmode.off=已关闭流体（水冷）模式
+machine.mtreactor.coolantinput.name=核反应堆冷却液输入仓
+machine.mtreactor.coolanthatch.desc.0=冷却液储罐容量: %s mB
+machine.mtreactor.coolanthatch.desc.1=冷冷却液输入，隔壁等量热冷却液输出，比例为 1 mB 冷却液 : 1 HU 热量
+machine.mtreactor.coolanthatch.desc.2=这是一条通路而不是散热器：必须持续供给冷却液并持续抽走热冷却液，否则环路不带走热量（一页四联燃料棒约 24,000 HU/s）
+machine.mtreactor.coolanthatch.desc.3=只接受 IC2 冷却液，且该过滤器无法关闭
+machine.mtreactor.coolanthatch.filter_fixed=冷却液过滤器已固定：本仓只接受 IC2 冷却液
+machine.mtreactor.coolantoutput.name=核反应堆热冷却液输出仓
+machine.mtreactor.hotcoolanthatch.desc.0=热冷却液储罐容量: %s mB
+machine.mtreactor.hotcoolanthatch.desc.1=只接受 IC2 热冷却液：冷却液输入仓送进多少冷冷却液，这里就排出多少热冷却液
+machine.mtreactor.hotcoolanthatch.desc.2=请接入大型热交换机或流体反应堆回路：这里堵塞时，堆芯的热量就出不去
 
 # --- 超时空金属燃料棒 ---
 gt.rodTranscendentMetal.name=超时空金属燃料棒
@@ -553,6 +598,28 @@ messtech.itemEffect.magMatter=磁流体物质
 messtech.itemEffect.eternity=永恒
 messtech.itemEffect.universium=宇宙素
 messtech.itemEffect.sixPhasedCopper=六相铜
+
+# --- 混沌终焉·虚无贯星弓 ---
+# 弓的名字挂着 STARFIELD 星空动画（MTStarfieldText）：处理器按“可见文本”认领动画对应的那一行，
+# 所以这条键同时也是动画注册用的名字。
+item.messtech.voidstarBow.name=混沌终焉·虚无贯星弓
+messtech.voidstarBow.tooltip.charge=§7· §6蓄力：§7满蓄力需要 §b%1$s 秒§7，期间在你面前展开一座 §d魔法阵§7，展开时四角再依次炸开四座小魔法阵
+messtech.voidstarBow.tooltip.flight=§7· §6飞行：§7箭矢保持 §b绝对直线§7 且几乎不下坠，一路拖出 §d混沌火花
+messtech.voidstarBow.tooltip.pierce=§7· §6命中：§7把挡路的方块整条 §c炸穿§7并 §b继续往里钻§7，直到射程用尽或撞上钻不开的东西
+messtech.voidstarBow.tooltip.kill=§7· §6湮灭：§7被它直接命中或被隧道扫到的活物会被 §c真杀§7 抹除，护甲、护盾、无敌与保命道具都拦不住（§c开弓者自己免疫§7）
+messtech.voidstarBow.tooltip.heal=§7· §6回响：§7松手放箭的瞬间，开弓者被治疗回 §b满血
+messtech.voidstarBow.kill.failed=连混沌终焉也没能抹掉 %s
+death.attack.messtech.voidstar=%1$s 被混沌终焉贯穿了
+# --- 子模式（潜行右击切换，聊天栏提示） ---
+messtech.voidstarBow.mode.pierce=§6混沌终焉·虚无贯星弓 §7→ §d贯星模式§7：箭矢炸穿路径上的一切并§b继续往里钻
+messtech.voidstarBow.mode.de=§6混沌终焉·虚无贯星弓 §7→ §5DE 模式§7：命中方块时只炸这一次（DE 反应堆核爆），随后箭矢消失
+messtech.voidstarBow.modeName.pierce=§d贯星（贯穿）
+messtech.voidstarBow.modeName.de=§5DE（核爆）
+messtech.voidstarBow.tooltip.mode=§7· §6当前模式：§f%1$s§7（潜行右击切换）
+messtech.voidstarBow.tooltip.deBlast=§7· §6核爆：§7命中方块时以 §cMTExplosionDE§7 引发一次爆炸并 §c不再贯穿§7，爆炸威力 §b%1$s§7（1 = 约 10 格半径）
+messtech.voidstarBow.tooltip.detail=§d细节：§7被炸穿的方块直接湮灭、不掉落；基岩级方块会把箭矢拦下来
+# 上面那记超量治疗击杀受害者的死亡提示词（MTOverheal.DEATH_MESSAGE_KEY）。%1$s 是受害者；EntityDamageSource
+# 还会填入 %2$s，但这条文案不提开弓者更好读。
 # “PigTech” 动画（MTPigTechText）作用的字符串，改这里动画会跟着改。它显示在
 # messTech.addBy 那条静态的“添加模组:”之后，前缀本身不参与动画。
 messtech.pigTech=PigTech

@@ -1,13 +1,16 @@
 package com.MessTech.init;
 
+import net.minecraft.client.renderer.entity.RenderArrow;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.oredict.OreDictionary;
 
 import com.MessTech.common.entity.MTEntityPiggy;
+import com.MessTech.common.entity.MTEntityVoidstarArrow;
 import com.MessTech.common.entity.MTPiggyHatRenderer;
 import com.MessTech.common.entity.MTRenderPiggy;
 import com.MessTech.common.gui.GuiUltimatePatternTerminal;
@@ -15,9 +18,12 @@ import com.MessTech.common.items.MTFuelRodItemRenderer;
 import com.MessTech.common.items.MTItems;
 import com.MessTech.common.items.MTNACComponentItemRenderer;
 import com.MessTech.common.parts.PartUltimatePatternTerminal;
+import com.MessTech.common.render.MTDEBlastRenderer;
+import com.MessTech.common.render.MTMagicCircleRenderer;
 import com.MessTech.common.util.MTAnimatedTooltipHandler;
 import com.MessTech.common.util.MTDynamicItemHelper;
 import com.MessTech.common.util.MTPigTech;
+import com.MessTech.common.util.MTStarfieldText;
 
 import appeng.api.parts.IPart;
 import appeng.util.Platform;
@@ -43,6 +49,9 @@ public class ClientProxy extends CommonProxy {
         MTDynamicItemHelper.registerItemRenderer(MTItems.piggy);
         // The thrown piggy: billboarded icon of the stack it was thrown with.
         RenderingRegistry.registerEntityRenderingHandler(MTEntityPiggy.class, new MTRenderPiggy());
+        // The Voidstar Piercer's arrow: vanilla's own arrow renderer, registered for the subclass explicitly rather
+        // than left to the render manager's walk up the class hierarchy.
+        RenderingRegistry.registerEntityRenderingHandler(MTEntityVoidstarArrow.class, new RenderArrow());
         // The worn piggy: vanilla cannot draw a plain item on the head (only blocks and skulls), so the helmet slot
         // is watched and the pig is drawn on top of the head, from inside the model of the player.
         MTPiggyHatRenderer.init();
@@ -52,6 +61,21 @@ public class ClientProxy extends CommonProxy {
         // MessTech's own animated tooltip handler: the registry AuthorDynamic writes its author lines into, plus the
         // tooltip renderer that draws an animation's renderer (e.g. TRANSCENDENT_METAL) over the finished font.
         MTAnimatedTooltipHandler.init();
+        // The Voidstar Piercer's name wears the STARFIELD animation: the handler identifies the line a renderer
+        // belongs to by its visible text, so a name entry attaches the starfield to the item's own name line without
+        // adding a second copy of it to the tooltip.
+        // The damage has to be the wildcard one: the damage of a damageable stack is its durability damage and the
+        // handler's map is keyed by it, so an entry registered at damage 0 stops matching as soon as the bow has been
+        // fired once (the same wildcard the piggy's own registration uses).
+        MTAnimatedTooltipHandler.addItemNameAnimation(
+            new ItemStack(MTItems.voidstarBow, 1, OreDictionary.WILDCARD_VALUE),
+            () -> StatCollector.translateToLocal("item.messtech.voidstarBow.name"),
+            MTStarfieldText.INSTANCE);
+        // The magic circle of the Voidstar Piercer: a textured quad in world space, drawn while the bow is charged
+        // (see MTMagicCircleRenderer; the particles the arrow leaves behind are MTVoidstarFx's).
+        MTMagicCircleRenderer.init();
+        // And the fireball of a DE explosion: MTEntityDEBlast carries it to the client, this draws it.
+        MTDEBlastRenderer.init();
     }
 
     @Override

@@ -7,7 +7,7 @@ import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.world.World;
 
 import com.MessTech.common.util.MTDynamicItemHelper.Effect;
-import com.MessTech.common.util.MTTrueKill;
+import com.MessTech.common.util.MTPiggyKill;
 import com.MessTech.init.MessTech;
 
 import cpw.mods.fml.common.registry.EntityRegistry;
@@ -15,7 +15,7 @@ import cpw.mods.fml.common.registry.EntityRegistry;
 /**
  * The thrown "A Piggy".
  * <p>
- * A plain {@link EntityThrowable} with one job: whatever it hits is killed for good (see {@link MTTrueKill}). The
+ * A plain {@link EntityThrowable} with one job: whatever it hits is killed for good (see {@link MTPiggyKill}). The
  * effect (the damage value of the thrown stack) travels in a data watcher entry, so the client draws the same icon
  * the player was holding.
  */
@@ -74,7 +74,7 @@ public class MTEntityPiggy extends EntityThrowable {
         if (this.worldObj.isRemote) return;
 
         if (hit.entityHit != null) {
-            MTTrueKill.kill(hit.entityHit, getThrower(), this);
+            MTPiggyKill.INSTANCE.kill(hit.entityHit, getThrower(), this);
         }
 
         // Vanilla style: the server only flags the pop, every client spawns the particles itself.

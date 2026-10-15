@@ -597,20 +597,94 @@ GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
   `assets/messtech/textures/blocks/hatch/Hatch_Reactor_Temp_Control.png` (base texture = multiblock casing,
   same `updateTexture(aBaseCasingIndex)` + `withOverlay` pattern as `MTReactorAccessHatch`).
 * Heat ceilings (`HEAT_CAPACITY`, index `tier - MIN_TIER`): EV 10,000 / IV 20,000 / LuV 50,000 / ZPM 100,000 /
-  UV 200,000 / UHV 500,000 / UEV 1,000,000 / **UIV `Integer.MAX_VALUE`**. EV equals the old hardcoded default.
+  UV 200,000 / UHV 500,000 / UEV 1,000,000 / **UIV `MTReactorHeatSystem.MAX_HEAT_CAPACITY` = 50,000,000**. EV equals
+  the old hardcoded default. `MTReactor.getReactorHeatCapacity()` clamps what it finds to the same cap.
+* **Why the UIV ceiling is finite:** the heat effects compare `heat / maxHeat` against the 40 / 50 / 70 / 85 / 100%
+  thresholds, and with `Integer.MAX_VALUE` (2.1e9) no amount of heat a reactor can hold drives that ratio anywhere
+  near them — a UIV heat hatch silently switched the whole risk model off. 50,000,000 is far above anything one 9x6
+  page can produce (IC2's largest heat storage item is well under 100,000) while keeping every threshold reachable,
+  and `MTReactorHeatSystem.getEffectiveMaxHeat()` clamps `ceiling + plating bonus` to it as well.
 * Structure: registered as another custom `IHatchElement` (`MTReactor.REACTOR_HEAT_HATCH`, `name() =
-  "mt_reactor_heat_hatch"`, `count()` = `getReactorHeatHatchCount()`) and added to the `'C'`
-  `HatchElementBuilder.atLeast(...)` group, so it can go on any of the 0-25 casings of the shell.
+  "mt_reactor_heat_hatch"`, `count()` = `getReactorHeatHatchCount()`) and added to the `'K'`
+  `HatchElementBuilder.atLeast(...)` group next to the I/O buses and the hot coolant output, so it can go on any of
+  the 0-25 casings of the shell (the `'C'` group holds the access hatches, the input hatch and the coolant input).
   `checkMachine()` requires **exactly one**: empty → `missing_heat_hatch`, `size() > 1` → `too_many_heat_hatch`
   (both are our own lang keys; a duplicate hatch cannot be resolved by picking one, so it is a structure error).
+* **The heat hatch tier also caps the access hatch tier** (`MTReactor.checkAccessHatchTier()`, structure error
+  `machine.mtreactor.structure.error.access_hatch_tier`): an access hatch above `getHeatControlTier()` invalidates the
+  structure, so one hatch cannot buy pages per hatch without also buying the heat headroom for them. The check lives
+  in the controller and not in the hatches because a hatch only carries data — which is also why the data stick
+  replays settings across tiers without validating them (see `docs/knowledge.md`).
 * The hatch sets the heat ceiling of the reactor: `MTReactor.getReactorHeatCapacity()` returns the (lowest)
-  hatch value or `DEFAULT_HEAT_CAPACITY = 10,000` while the structure is broken.
-  `ReactorContext.bind()` / `bindSimulation()` seed `maxHeat` with it, and **`ReactorContext.setMaxHeat()` is a
-  no-op on purpose** — in IC2 reactor plating (`ItemReactorHeatStorage`) raises `maxHeat` through that call, but
-  here the hatch is the only thing that may set the ceiling, so plating no longer stacks. If plating should stack
-  again, change that no-op back to `this.maxHeat = newMaxHeat` and start `maxHeat` from the hatch value.
-* Explosion/stability math is unchanged: `calculateHeatEffects()` does `power = heat / maxHeat` with the hatch
-  value, so `>= 1.0F` explodes and `>= 0.85F` ignites the surroundings.
+  hatch value or `DEFAULT_HEAT_CAPACITY = 10,000` while the structure is broken, and `getHeatControlTier()` returns
+  the (highest) hatch tier — it drives the passive cooling rate and the access hatch tier limit.
+  `ReactorContext.bind()` / `bindSimulation()` seed `maxHeat` with it, and **reactor plating stacks again, IC2
+  style**: `ReactorContext.setMaxHeat()` resolves IC2's `setMaxHeat(getMaxHeat() + maxHeatAdd)` into
+  `MTReactorHeatSystem.setPageMaxHeat()`, which records the bonus **per page** (`pageBonus`, keyed like the heat
+  store): a 9x6 page is an independent reactor grid, so a page full of platings must not raise the ceiling of one
+  without any. Within a page the largest `maxHeatAdd` wins, so the result does not depend on the component layout, and
+  `getPageMaxHeat(owner, page)` is the hatch ceiling plus that page's own bonus, bounded per item by
+  `MAX_HEAT_BONUS_PER_ITEM` (100,000) and overall by `MAX_HEAT_CAPACITY`. `resetPageBonus()` runs before that page's
+  heat pass, so a removed plating stops contributing immediately. The call used to be a no-op, which left plating as a
+  pure downside (higher heat effect modifier, unchanged ceiling, bigger explosion).
+* **Changing the hatch rescales the stored heat instead of detonating the reactor.**
+  `MTReactorHeatSystem.onCapacityChanged()` multiplies every page's heat by `new ceiling / old ceiling` and clears the
+  running meltdown countdowns. With the old plain `heat / maxHeat` check a reactor holding 900,000 HU under a UHV
+  hatch detonated on the first cycle after that hatch was replaced by an EV one.
+* **`Integer.MAX_VALUE` as the sentinel** (the lesson from the `mPageMaxHeat` era): `getReactorHeatCapacity()`
+  searches for the lowest hatch value starting from `Integer.MAX_VALUE`, so the "no hatch at all" case is tracked with
+  a separate `boolean found` flag. The UIV ceiling is finite now, but the flag is what keeps that starter value from
+  being mistaken for a real ceiling.
+* Heat math is still `power = heat / maxHeat` per page, but the consequences changed: `>= 1.0F` no longer explodes on
+  the spot — the page arms a **meltdown countdown** — and `>= 0.85F` still ignites the surroundings. The world effects
+  (0.85 ignite air / 0.7 irradiate entities / 0.5 evaporate water / 0.4 ignite wood) run **once per cycle** on the
+  hottest page's ratio and that page's heat effect modifier, not once per page, so an N-page reactor no longer
+  irradiates the same entity N times. Which page detonates is still decided per page.
+* **Meltdown countdown, 600 ticks (30 s)** — `MTReactorHeatSystem.MELTDOWN_COUNTDOWN_TICKS`, armed by
+  `armCountdown()` with an absolute game-tick deadline `now + 600`. `MTReactor.armCountdowns()` runs at the end of
+  every material cycle, keeps the deadline of a page that is still at or over its ceiling (pinning the heat there
+  cannot postpone the explosion) and `clearCountdown()` drops a page that came back under it. The deadline is absolute
+  because a page is only visited once per cycle: counting "20 ticks per visit" stretched the grace window to
+  30 s x page count, i.e. no grace at all on a large reactor. `explodeExpiredCountdowns()` is checked every tick in
+  `MTReactor.onPostTick()`, so the page detonates 600 ticks after it first crossed the ceiling, with the machine
+  switched on or off (the heat cycle runs either way); `resetCountdown()` cancels everything on a player action
+  (hatch change, fluid mode toggle).
+* **The countdown survives a reload** — as its *remaining* ticks, never as an absolute deadline, because the machine's
+  tick counter is not persisted: `saveNBTData()` writes `mtReactorArmedCountdowns` (`{x, y, z, page, ticks}`),
+  `MTReactor.loadNBTData()` hands its own counter over with `setLoadClock(getTimer())` before the store reads them, and
+  `refreshCountdownClock()` re-anchors every restored deadline onto the running counter. The meltdown therefore resumes
+  exactly where it stopped after a chunk unload or a server restart, it only ticks down while the chunk is loaded, and
+  a reload can neither extend nor shorten the 30 s window (the restored `ticks` is clamped to [1, 600], and an
+  already-expired entry is not saved at all). A backwards jump of the counter is treated as a reset: every deadline is
+  re-expressed by the window it had left.
+* **Passive cooling per hatch tier** (`MTReactorHeatSystem.PASSIVE_COOLING_PER_SECOND`, index `tier - MIN_TIER`,
+  EV..UIV): 83 / 167 / 417 / 833 / 1,667 / 4,167 / 8,333 / 200,000 HU/s. The seven real tiers are exactly
+  `round(ceiling / 120)`, i.e. one full ceiling per 2400 ticks (two minutes) — slow enough that the hatch cannot
+  out-cool a running reactor, fast enough that shutting the machine down is a real way to save it. The UIV entry is
+  deliberately decoupled from that rule: `ceiling / 120` would be 416,667 HU/s, faster than the reactor can produce
+  heat, while 200,000 HU/s drains the whole 50,000,000 in 250 s. The rate is applied per tick as a fraction
+  (`rate / 20`, accumulated in `coolingProgress`; truncating it made every tier below ZPM cool at the same 4 HU/tick)
+  and only to pages carrying at least 5% of the hottest page's heat (`PASSIVE_COOLING_SHARE_THRESHOLD`), halved while
+  a countdown is running. `MTReactorHeatSystem.tick()` is called from `MTReactor.onPostTick()` every tick, so it works
+  while the machine is switched off too — the only way to cool a hot reactor back down.
+* **Fluid ("wet") mode** — toggled on the controller with a screwdriver (`onScrewdriverRightClick`, chat keys
+  `machine.mtreactor.fluidmode.on` / `.off`), which also clears a running countdown. The controller then requires a
+  `MTReactorCoolantInputHatch` and a `MTReactorHotCoolantOutputHatch` (`ExtraShutdownReason.MISS_COOLANT_HATCH`
+  soft-stop, not a structure error). The exchange is `MTReactorHeatSystem.coolantForHeat()`:
+  `COOLANT_PER_BUFFER_UNIT = 1`, i.e. **1 mB of `ic2coolant` per 1 HU of buffered component heat**, and the same
+  amount of `ic2hotcoolant` leaves. That is MessTech's own ratio, not IC2's: IC2 converts through `huOutputModifier`
+  (2 mB/HU by default), while 1:1 keeps the feed rate readable as "as much coolant per second as the core makes heat
+  per second". What the coolant did not absorb comes back as `getPendingEmitHeat() / 2` and is pushed onto the page
+  (IC2's `addHeat(huOutput / 2)`); dry mode has no coolant to absorb it, so the same half is pushed back instead of
+  being dropped. The two fluids come from GT's accessors — `MTReactorCoolantInputHatch.getCoolantFluid()` for the cold
+  coolant and `GTModHandler.getHotCoolant(1)` for the hot one — deliberately not `GTModHandler.getIC2Coolant(long)`,
+  which falls back to water when IC2 is absent (`GTModHandler` 212-215) and must never be drained as if it were coolant.
+* **The two IC2 fluid hooks are live** now, which is what makes the mode matter: `ReactorContext#isFluidCooled()`
+  reports the mode (`ItemReactorMOX#getFinalHeat` doubles MOX heat output above 50% heat only in wet mode) and
+  `ReactorContext#addEmitHeat()` buffers instead of dropping (`ItemReactorVent` / `ItemReactorVentSpread` send the heat
+  they removed there, so a vent's contribution is mode-dependent). Condensators, lithium cells and heat switches never
+  query either hook — checked against the IC2 compile dependency (`tmp/ic2-decompiled`, and the constant pool of
+  `tmp/ic2-242638-2353971-deobf.jar`) — so they behave identically in both modes.
 * **The heat effects never replace a block** (the IC2 code they were copied from did): the `>= 0.85F` branch only
   places `Blocks.fire` into **air** (`isAir` check), the `Blocks.flowing_lava` replacement is gone. In IC2 that
   branch turned any non-air block into fire or lava — GT casings use their own `MaterialCasings`, so they became
@@ -620,11 +694,17 @@ GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
   ignition are kept (they can never touch a casing/hatch).
 * Explosion power is **IC2's number remapped onto the Draconic Evolution scale**: `explodeReactor()` still mirrors
   IC2's `explode()` (start at 10, add every component's `influenceExplosion`, multiply the `0 < influence < 1` ones
-  into `boomMod`, then `* hem * boomMod`) and clamps the result to `IC2_EXPLOSION_POWER_LIMIT = 45` (IC2's own
-  `protection/reactorExplosionPowerLimit` default — the config is **not** read, no IC2 dependency/mixin), but the
+  into `boomMod`, then `* hem * boomMod`) and clamps the result to `Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT`
+  (default 45, IC2's own `protection/reactorExplosionPowerLimit`; it used to be a hardcoded `45.0F` and IC2's ini is
+  still **not** read, no IC2 dependency/mixin — the option only exists so a pack can change the number), but the
   blast itself is now `MTExplosionDE`:
-  `dePower = min(boomPower, 45) / 45 * Config.REACTOR_EXPLOSION_DE_POWER_LIMIT` (default 40, `Reactor` category).
+  `dePower = min(boomPower, ic2Limit) / ic2Limit * Config.REACTOR_EXPLOSION_DE_POWER_LIMIT` (default 40, `Reactor`
+  category, limit floored at 1 so the division cannot blow up).
   `explodeMultiblock()` + `doExplosion(GTValues.V[8])` on the access hatches still remove the machine itself first.
+* `explodeReactor()` clears the heat of every page **on purpose** (comment in the source): the controller tile entity
+  and with it the heat store survive the `explodeMultiblock()` call for the rest of the tick, so a hot store would be
+  left behind on a dead machine. Before that it settles the EU/t the cycle had accumulated (`mPendingOutput`), so the
+  page that melted down does not also cost the player the output the whole reactor produced that cycle.
 * **Why IC2's `ExplosionIC2` was dropped** (it looked like a "powerless" explosion in game): IC2 shoots
   `2 * steps^2` rays with `steps = ceil(pi / atan(0.4 / power))`, i.e. ~250k rays at power 45 but ~**25 million** at
   power 450, each ray stepping through the blocks until its energy runs out (up to 900 blocks in air). The whole
@@ -647,14 +727,22 @@ GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
   idle or freshly built reactor kept showing the old 10,000, and old saves reloaded the stale array. The array is
   gone; `MTReactor.getHottestPageMaxHeat()` reads `getReactorHeatCapacity()` live (used by the GUI sync value,
   Waila, the scanner info and the heat percentage), so replacing the hatch is visible immediately.
-* **Sentinel trap:** `getReactorHeatCapacity()` searches for the lowest hatch value and used `Integer.MAX_VALUE`
-  as the starting/sentinel value — but UIV's real ceiling *is* `Integer.MAX_VALUE`, so a UIV heat hatch was
-  mistaken for "no hatch" and fell back to 10,000. Use a separate `boolean found` flag for the empty case.
+* **The output has an extra `× 2` on purpose** (`MTReactor.MESSTECH_OUTPUT_MULTIPLIER`): `getEuPerOutput()` is
+  `IC2_EU_PER_OUTPUT * ConfigUtil.getFloat(MainConfig.get(), "balance/energy/generator/nuclear") * 2` (with a
+  `* 2 * 5` fallback when IC2's config is unavailable), so one output point is worth 50 EU/t with GTNH's
+  `nuclear = 5.0` instead of IC2's 25. It is a deliberate MessTech balance decision (the source names the constant and
+  points at this section), not a config value and not a bug: do not "fix" it back to IC2's number.
 * Registration: `MTItemList.MTReactorHeatHatch_EV..UIV`, IDs `MT_ID + 24 .. + 31` (32424..32431), built in
   `MTMachineLoader` exactly like the access hatches. MTEs self-register in the `CommonMetaTileEntity(int, ...)`
   constructor, so the ID must be unused (it throws otherwise) — the access hatches occupy `MT_ID + 16 .. + 23`.
   Both loops now iterate the shared arrays `MTItemList.REACTOR_ACCESS_HATCHES` / `REACTOR_HEAT_HATCHES`, which
   `GTRecipes.addReactorRecipes()` also uses so the recipe order cannot drift from the registration order.
+* Fluid hatch pair registration: `MTItemList.MTReactorCoolantInputHatch` at `MT_ID + 32` (32432) and
+  `MTItemList.MTReactorHotCoolantOutputHatch` at `MT_ID + 35` (32435) — `MT_ID + 33` / `+ 34` were already taken by
+  `MTChemicalTwister` / `MTHugeChemicalReactor`, so the pair is split around them. One variant each at EV by design
+  (plumbing, not a tier gate: `MTReactorCoolantInputHatch.TIER = 4`, whose `8000 * 2^4 = 128,000 mB` tank holds twice
+  what one cycle can ask for), built in `MTMachineLoader` outside the tier loops and listed in
+  `MTItemList.REACTOR_FLUID_HATCHES`.
 
 ## 16. Reactor recipes (`GTRecipes.addReactorRecipes()`)
 
@@ -665,6 +753,11 @@ GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
 * Access hatch (assembler, `TierEU.RECIPE_<TIER>`, 2 min, circuit 1): tier casing + lever + 4 tier circuits.
 * Heat control hatch (assembler, same EU/t and time, circuit 2): tier casing + 4 solid steel casings
   (`ItemList.Casing_SolidSteel`, "脱氧钢机械方块") + 4 tier circuits.
+* Coolant hatch pair (assembler, EV casing + 2 solid steel casings + 2 EV tier circuits, circuit 3, 2 min,
+  `TIER_RECIPE_EU[MTReactorCoolantInputHatch.TIER]`): the loop over `MTItemList.REACTOR_FLUID_HATCHES` builds the
+  identical recipe for the cold coolant input and the hot coolant output, so neither end of the loop is gated behind
+  the more expensive one. Deliberately cheaper than the heat control hatch — they are plumbing, and the coolant they
+  consume is the real cost.
 * Reactor controller (assembler, `RECIPE_EV`, 2 min, circuit 1): 16 solid steel casings + 16
   `Ic2Items.nuclearReactor` + 64 `Ic2Items.reactorChamber` + 144×256 molten lead (36864 L). Use
   `GTUtility.copyAmount(...)` on the IC2 static stacks — they are singletons and the recipe builder must not

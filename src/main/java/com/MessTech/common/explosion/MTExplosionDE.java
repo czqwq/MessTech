@@ -3,6 +3,7 @@ package com.MessTech.common.explosion;
 import net.minecraft.util.DamageSource;
 import net.minecraft.world.World;
 
+import com.MessTech.common.entity.MTEntityDEBlast;
 import com.MessTech.common.process.IMTProcess;
 import com.MessTech.common.process.MTProcessHandler;
 import com.MessTech.common.util.Utils;
@@ -10,13 +11,20 @@ import com.MessTech.common.util.Utils;
 /**
  * 1:1 port of Draconic Evolution's
  * {@code com.brandon3055.draconicevolution.common.tileentities.multiblocktiles.reactor.ReactorExplosion} (see
- * {@code tmp/Draconic-Evolution-master}), used as the MTReactor meltdown.
+ * {@code tmp/Draconic-Evolution-master}), used as the MTReactor meltdown and as the Voidstar Piercer's DE mode.
  * <p>
  * The explosion expands one block ring per tick up to {@code power * 10} blocks of radius and drops one
  * {@link MTExplosionDETrace} per ring block, which then blasts its whole vertical column, instead of IC2's
  * {@code ExplosionIC2}. IC2 never scales: its ray count is {@code 2 * ceil(pi / atan(0.4 / power))^2}, so a
  * 450 power explosion fires ~25 million rays (each one stepping hundreds of blocks) which freezes the server for
  * minutes before the very first block is removed.
+ * <p>
+ * <b>The fireball is ported too.</b> DE's process has no visual either - what the player sees is a client side
+ * effect that {@code TileReactorCore#goBoom} triggers over the network, the
+ * {@code Particles.ReactorExplosionParticle} that grows one block per tick up to {@code power * 10}. This mod has no
+ * packet channel, so the same thing is spawned as a synced entity instead ({@link MTEntityDEBlast}, drawn by
+ * {@code MTDEBlastRenderer}); the parameter DE sends over the wire - {@code (int) (power * 10F)} - is the entity's
+ * maximum size. Every explosion of this class gets it, the reactor meltdown and the bow's DE mode alike.
  */
 public class MTExplosionDE implements IMTProcess {
 
@@ -47,6 +55,14 @@ public class MTExplosionDE implements IMTProcess {
         this.zCoord = z;
         this.power = Math.min(power, MAX_POWER);
         isDead = world.isRemote;
+
+        if (!world.isRemote) {
+            // The fireball, i.e. what DE sends to its clients as `(int) (power * 10F)` with the explosion.
+            MTEntityDEBlast blast = new MTEntityDEBlast(world);
+            blast.setPosition(x + 0.5D, y + 0.5D, z + 0.5D);
+            blast.setMaxSize(this.power * 10.0D);
+            world.spawnEntityInWorld(blast);
+        }
     }
 
     @Override
