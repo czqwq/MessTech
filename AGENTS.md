@@ -103,12 +103,21 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - 11. Splitter（分流器）
 - 给 Nano-Scale Foundry 定数值时的建议锚点
 
-### `docs/mochadoom-console.md` - 游戏机（把 Mocha Doom 移植进 MC 1.7.10）可行性研究（Chinese）
-- Mocha Doom 源码规模与包结构（444 文件 / 86,761 行，无第三方依赖，GPLv3）
-- 可替换的宿主接口（`DoomGraphicSystem` / `IDoomSystem` / `IDoomSound` / `ISoundDriver` / `IMusic`）
-- 必须打的 Mocha Doom 补丁清单，以及 MC 侧要新增的类
-- AWT 耦合面的真实范围、按键方案、帧缓冲 → GL 纹理、线程与生命周期
-- WAD 数据来源与许可、风险清单、里程碑
+### `docs/mochadoom-console.md` - 游戏机 / Mocha Doom port（Chinese）
+- 0-7. 可行性研究：Mocha Doom 源码规模与包结构（444 文件 / 86,761 行，无第三方依赖，GPLv3）、
+  可替换的宿主接口（`DoomGraphicSystem` / `IDoomSystem` / `IDoomSound` / `ISoundDriver` / `IMusic`）、
+  AWT 耦合面的真实范围、WAD 数据与许可、风险
+- 9. 实际落地：`com.MessTech.doom.*` 里的 437 个文件与包重定位、11 处引擎补丁
+  （`Engine.bootstrap` / `HeadlessRaster` / `System.exit` → `DoomFatalError` / `HostPaths` /
+  `aliasKey` 键位别名）、`MTGameConsoleHost` 的线程与帧数据流、键位表、Freedoom 自动下载
+- 9.7 声音（javax.sound 混音器；9.7.1 音乐：`s/opl/` 里**自己仿真的 YM3812 (OPL2)** ——
+  `GenMidiBank` 解 WAD 的 GENMIDI 音色表、`DoomSong` 兼容 MUS 与 MIDI 两种曲谱、`OplMusicPlayer`
+  驱动、`OplMusicModule` 泵进 `MusicMixBuffer`；再混进同一条数据线。要点：GENMIDI 字节布局的推导、
+  算子槽位 `n + n/3`、环形空闲空间当节拍器、音乐也要算"有活干"）、9.8 已知限制、
+  9.9 按键自定义（`MTGameConsoleBindings`：参考扫描码 + `aliasKey` 槽、`keys.cfg`、
+  窗口内的按键设置模式，以及不再回写 `mochadoom.cfg` 的原因）
+- 9.6 验证记录（`spotlessApply build`、无头 120 帧、别名生效、音频初始化/收尾、按键模型自检、
+  音乐在 Java 8 / JDK 25 两种模式下的证据、引擎端到端 85.5 KB/s）
 
 ## Verification
 

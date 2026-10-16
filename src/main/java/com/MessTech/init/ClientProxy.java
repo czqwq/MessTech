@@ -13,6 +13,7 @@ import com.MessTech.common.entity.MTEntityPiggy;
 import com.MessTech.common.entity.MTEntityVoidstarArrow;
 import com.MessTech.common.entity.MTPiggyHatRenderer;
 import com.MessTech.common.entity.MTRenderPiggy;
+import com.MessTech.common.gui.GuiGameConsole;
 import com.MessTech.common.gui.GuiUltimatePatternTerminal;
 import com.MessTech.common.items.MTFuelRodItemRenderer;
 import com.MessTech.common.items.MTItems;
@@ -27,6 +28,7 @@ import com.MessTech.common.util.MTStarfieldText;
 
 import appeng.api.parts.IPart;
 import appeng.util.Platform;
+import cpw.mods.fml.client.FMLClientHandler;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
@@ -90,6 +92,16 @@ public class ClientProxy extends CommonProxy {
             return new GuiUltimatePatternTerminal(player.inventory, terminal);
         }
         return null;
+    }
+
+    /**
+     * The game console's window: a plain {@code GuiScreen}, not a container, because the DOOM
+     * engine behind it runs on this client and nothing about it is shared with the server.
+     */
+    @Override
+    public void openGameConsole(EntityPlayer player) {
+        FMLClientHandler.instance()
+            .showGuiScreen(new GuiGameConsole());
     }
 
 }

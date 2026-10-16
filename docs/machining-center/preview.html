@@ -1,0 +1,1633 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>多功能集成加工中心 · 交互式 3D 结构预览</title>
+<!--
+  多功能集成加工中心 / MT 集成加工车间 —— 单文件交互式 3D 预览
+  · 无外部依赖、无网络请求（可直接双击 file:// 打开）
+  · 数据来源优先级：fetch('./machine-structure.json') → XMLHttpRequest → 页内内联快照（script#structure-dump）
+  · 渲染：手写透视 / 正交投影 + 画家算法（无 WebGL、无 three.js）
+  结构规格见同目录 machine-spec.md，方块溯源与注册名见 design.md §1。
+-->
+<style>
+  :root{
+    --bg:#20242c; --panel:#2c313c; --panel2:#252a33; --line:#39414e; --line2:#333a45;
+    --fg:#dfe4ee; --muted:#9aa4b5; --accent:#5b8fd0; --ok:#7dcf95; --bad:#e07a7a; --warn:#dfc06e;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);overflow:hidden;
+       font:13px/1.5 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+       display:flex;flex-direction:column;height:100vh}
+  header{padding:8px 14px;border-bottom:1px solid var(--line2);background:var(--panel2);
+         display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;flex:none}
+  header h1{margin:0;font-size:16px;font-weight:600}
+  header .sub{font-size:12px;color:var(--muted)}
+  main{flex:1;display:flex;min-height:0}
+  #stage{position:relative;flex:1;min-width:0;background:#1b1f26}
+  #view{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+  #hud{position:absolute;left:10px;top:8px;font-size:12px;color:var(--muted);pointer-events:none;
+       text-shadow:0 1px 2px #000;line-height:1.5}
+  #hud .src{color:var(--warn)}
+  #hint{position:absolute;left:10px;bottom:8px;font-size:12px;color:#6f7a8b;pointer-events:none}
+  #tip{position:absolute;z-index:6;pointer-events:none;display:none;max-width:320px;
+       background:rgba(18,22,28,.94);border:1px solid #4a5464;border-radius:3px;padding:4px 7px;
+       font-size:12px;line-height:1.45;white-space:nowrap}
+  #tip .k{color:var(--muted)}
+  aside{width:372px;flex:none;overflow-y:auto;border-left:1px solid var(--line2);
+        background:var(--panel2);padding:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 10px;margin-bottom:10px}
+  .card h2{margin:0 0 6px;font-size:13px;color:#cfe0ff;font-weight:600}
+  .card h3{margin:9px 0 3px;font-size:12px;color:#a9b8cf;font-weight:600}
+  .card .note{font-size:11.5px;color:var(--muted);margin:4px 0 0}
+  .btnrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
+  .btn{background:#39414e;color:var(--fg);border:1px solid #4a5464;border-radius:3px;
+       padding:3px 9px;cursor:pointer;font-size:12px;font-family:inherit}
+  .btn:hover{background:#465060}
+  .btn.on{background:#3b6ea5;border-color:#6ba0dd;color:#fff}
+  .btn:disabled{opacity:.45;cursor:default}
+  .row{display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap}
+  label.ck{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+  input[type=range]{width:100%;accent-color:#5b8fd0}
+  .mats{max-height:290px;overflow-y:auto;border:1px solid var(--line);border-radius:3px;background:#262b34}
+  .mat{display:grid;grid-template-columns:18px 16px 14px 1fr 54px;align-items:center;gap:6px;
+       padding:3px 6px;border-bottom:1px solid #313742;cursor:pointer;font-size:12px}
+  .mat:last-child{border-bottom:0}
+  .mat:hover{background:#303744}
+  .mat input{margin:0}
+  .sw{width:14px;height:14px;border:1px solid #10131a;border-radius:2px;display:inline-block}
+  .mat .ch{font-family:Consolas,monospace;font-weight:700;color:#fff;text-align:center}
+  .mat .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mat .nm i{color:var(--muted);font-style:normal;font-size:11px}
+  .mat .rg{font-family:Consolas,monospace;font-size:10.5px;color:var(--warn);
+           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mat .ct{text-align:right;font-family:Consolas,monospace;color:#cfe0ff}
+  .mat.off{opacity:.42}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px}
+  .kv .k{color:var(--muted);white-space:nowrap}
+  .kv .v{font-family:Consolas,monospace;word-break:break-all}
+  .mono{font-family:Consolas,"Courier New",monospace;font-size:11.5px;color:#c8d2e0;
+        background:#262b34;border:1px solid var(--line);border-radius:3px;padding:4px 6px;
+        white-space:pre-wrap;word-break:break-word}
+  .checks{margin:4px 0 0;padding:0;list-style:none;font-size:12px}
+  .checks li{margin:1px 0;display:flex;gap:6px}
+  .checks .ok{color:var(--ok)}
+  .checks .bad{color:var(--bad)}
+  .checks .why{color:var(--muted)}
+  #exportPre{max-height:250px;overflow:auto;background:#1b1f26;border:1px solid var(--line);
+             border-radius:3px;margin:6px 0 0;padding:6px 8px;font:11.5px/1.4 Consolas,"Courier New",monospace;
+             white-space:pre;color:#c8d2e0}
+  .detail .kv{margin-top:2px}
+  .tag{display:inline-block;padding:0 5px;border-radius:2px;background:#3b6ea5;color:#fff;font-size:11px}
+  .tag.pin{background:#8a6fc0}
+  .err{color:var(--bad);font-size:12px}
+  code{font-family:Consolas,monospace;color:var(--warn)}
+</style>
+</head>
+<body>
+<header>
+  <h1>多功能集成加工中心 · MT 集成加工车间</h1>
+  <span class="sub">MTIntegratedMachiningCenter / Multifunction Integrated Machining Center —
+    结构 19 × 12 × 21，控制器 (9, 2, 20)</span>
+</header>
+<main>
+  <div id="stage">
+    <canvas id="view"></canvas>
+    <div id="hud"><div id="hudLine">正在加载结构数据…</div><div id="hudSrc" class="src"></div></div>
+    <div id="hint">左键拖拽旋转 · 滚轮缩放 · 右键 / 中键拖拽平移 · 悬停拾取方块 · 左键点击固定选中</div>
+    <div id="tip"></div>
+  </div>
+  <aside>
+    <div class="card">
+      <h2>数据来源</h2>
+      <div id="srcInfo" class="note">正在尝试读取 <code>machine-structure.json</code>…</div>
+      <div class="btnrow">
+        <button class="btn" id="btnReload">重新读取磁盘 JSON</button>
+        <button class="btn" id="btnPickFile">手动选择 JSON 文件…</button>
+      </div>
+      <input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+      <div class="note" id="fileHint">浏览器在 <code>file://</code> 下会拦截对本地 JSON 的读取；
+        若上面的按钮都拿不到磁盘数据，页面会直接使用 HTML 内联的结构快照（打开即有图）。</div>
+    </div>
+
+    <div class="card">
+      <h2>视角</h2>
+      <div class="btnrow">
+        <button class="btn" data-view="front">正面（z=20 大门）</button>
+        <button class="btn" data-view="side">侧面（x=0/18）</button>
+        <button class="btn" data-view="top">俯视（+y）</button>
+        <button class="btn" data-view="iso">45° 鸟瞰</button>
+      </div>
+      <div class="btnrow">
+        <button class="btn" id="btnOrtho">正交投影（当前：透视）</button>
+        <button class="btn" id="btnReset">复位视角</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>切层</h2>
+      <div class="row">
+        <span>y 层滑块</span>
+        <span id="layerLabel" class="mono">—</span>
+      </div>
+      <input type="range" id="layerSlider" min="0" max="11" step="1" value="11">
+      <div class="btnrow" id="layerModes">
+        <button class="btn" data-mode="only">只看当前层</button>
+        <button class="btn on" data-mode="below">显示当前层以下</button>
+        <button class="btn" data-mode="all">显示全部</button>
+      </div>
+      <div class="note" id="layerInfo">—</div>
+      <h2 style="margin-top:10px">剖面（隐藏外壳）</h2>
+      <div class="row">
+        <label class="ck"><input type="checkbox" id="cbHideFront"> 隐藏正面墙 z=20（含控制器所在格）</label>
+      </div>
+      <div class="row">
+        <label class="ck"><input type="checkbox" id="cbHideRoof"> 隐藏屋顶 y=10/11</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>材料图例 / 过滤</h2>
+      <div class="btnrow">
+        <button class="btn" id="btnAll">全选</button>
+        <button class="btn" id="btnNone">全不选</button>
+        <button class="btn" id="btnInvert">反选</button>
+      </div>
+      <div class="note">点击整行也可以切换显示/隐藏；右侧数字是该材料的方块总数（<code>0 ⌀</code> = 当前结构未使用，如 <code>R</code> 强化玻璃）。</div>
+      <div class="mats" id="mats"></div>
+    </div>
+
+    <div class="card">
+      <h2>方块详情</h2>
+      <div class="detail" id="detail"><span class="note">把鼠标移到方块上即可查看；左键点击可固定选中。</span></div>
+      <div class="btnrow"><button class="btn" id="btnClearSel">清除选中</button></div>
+    </div>
+
+    <div class="card">
+      <h2>统计与自检</h2>
+      <div id="stats"><span class="note">等待数据…</span></div>
+    </div>
+
+    <div class="card">
+      <h2>结构字母表导出（String[][] structure_string）</h2>
+      <div class="btnrow">
+        <button class="btn" id="btnGen">重新生成</button>
+        <button class="btn" id="btnCopy">复制到剪贴板</button>
+        <button class="btn" id="btnDownload">下载为 .java 片段</button>
+      </div>
+      <div class="note" id="exportInfo">—</div>
+      <pre id="exportPre">（生成中…）</pre>
+    </div>
+  </aside>
+</main>
+
+<!-- ↓↓↓ 页内内联快照：machine-structure.json 的压缩副本（无缩进），用于 file:// 下 fetch/XHR 被拦截时
+     「打开即有图」。运行时永远优先 fetch 磁盘上的最新文件；若拿到的数据与这份快照指纹不同，
+     右上角数据来源会显示「⚠ 与内联快照不同，页内快照已过期」。
+     刷新方式：machine-structure.json 改动后，把下面 script 标签之间的内容（注意是文档里最后出现的那个
+     id=structure-dump 标签）整段替换成新的 JSON 即可，不需要额外脚本；不要改标签本身。 -->
+<script type="application/json" id="structure-dump">
+{"machine":"MTIntegratedMachiningCenter","nameZh":"多功能集成加工中心","nameEn":"Multifunction Integrated Machining Center","structure":"integrated_machining_workshop","size":{"x":19,"y":12,"z":21},"controller":{"x":9,"y":2,"z":20},"offsets":{"horizontal":9,"vertical":2,"depth":20},"materials":{"concrete_light":{"letter":"A","block":"gt.blockconcretes","registry":"gt.blockconcretes","meta":8,"nameEn":"Light Concrete","nameZh":"浅色混凝土","color":"#c9c4b8","java":"GregTechAPI.sBlockConcretes","role":"外墙填充板、柱"},"concrete_light_smooth":{"letter":"B","block":"gt.blockconcretes","registry":"gt.blockconcretes","meta":15,"nameEn":"Smooth Light Concrete","nameZh":"平滑浅色混凝土","color":"#dcd8ce","java":"GregTechAPI.sBlockConcretes","role":"地坪、屋面板、女儿墙、门头"},"concrete_dark_smooth":{"letter":"C","block":"gt.blockconcretes","registry":"gt.blockconcretes","meta":7,"nameEn":"Smooth Dark Concrete","nameZh":"平滑深色混凝土","color":"#4a4d52","java":"GregTechAPI.sBlockConcretes","role":"地坪压边"},"concrete_hsc":{"letter":"D","block":"gt.blockcasings9","registry":"gt.blockcasings9","meta":3,"nameEn":"Superplasticizer-Treated High Strength Concrete","nameZh":"减水剂强化高强混凝土","color":"#8b8479","java":"Casings.SuperplasticizerTreatedHighStrengthConcrete","role":"地基整板、设备垫层"},"casing_stainless":{"letter":"E","block":"gt.blockcasings4","registry":"gt.blockcasings4","meta":1,"nameEn":"Clean Stainless Steel Machine Casing","nameZh":"洁净不锈钢机械方块","color":"#b9c2cb","java":"Casings.CleanStainlessSteelMachineCasing","role":"加工平台、工件夹具"},"casing_solid_steel":{"letter":"F","block":"gt.blockcasings2","registry":"gt.blockcasings2","meta":0,"nameEn":"Solid Steel Machine Casing","nameZh":"实心钢机械方块","color":"#6f7378","java":"Casings.SolidSteelMachineCasing","role":"结构钢柱、楣窗框、仓室挂点"},"casing_lathe":{"letter":"G","block":"gt.blockcasings4","registry":"gt.blockcasings4","meta":2,"nameEn":"Stable Titanium Machine Casing","nameZh":"稳定钛机械方块（车床机壳）","color":"#9aa6b4","java":"Casings.StableTitaniumMachineCasing","role":"回转工作台、主轴、天车吊爪"},"frame_steel":{"letter":"H","block":"GoodGenerator:radiationProtectionSteelFrame","registry":"GoodGenerator:radiationProtectionSteelFrame","meta":0,"nameEn":"Radiation Protection Steel Frame","nameZh":"防辐射钢框架","color":"#3f4247","java":"Casings.RadiantProofSteelFrameBox","role":"承重钢梁、通高角柱、天车轨道"},"grate":{"letter":"I","block":"gt.blockcasings3","registry":"gt.blockcasings3","meta":10,"nameEn":"Grate Machine Casing","nameZh":"格栅机械方块","color":"#5c5f66","java":"Casings.GrateMachineCasing","role":"地沟盖板、吊装口、爬梯"},"glass_boro":{"letter":"K","block":"bartworks:BW_TieredGlass","registry":"bartworks:BW_TieredGlass","meta":-1,"nameEn":"Borosilicate Glass","nameZh":"硼玻璃（任意等级）","color":"#7fb6c9","java":"Casings.BorosilicateGlassAny","role":"幕墙、高窗、天窗"},"stripe_yellow":{"letter":"L","block":"gt.blockcasings3","registry":"gt.blockcasings3","meta":0,"nameEn":"Yellow Stripes Block","nameZh":"黄色条纹方块","color":"#d8b23a","java":"Casings.YellowStripesBlockA","role":"安全警示"},"hazard_explosion":{"letter":"M","block":"gt.blockcasings3","registry":"gt.blockcasings3","meta":4,"nameEn":"Explosion Hazard Sign Block","nameZh":"爆炸危险警示方块","color":"#c2703a","java":"Casings.ExplosionHazardSignBlock","role":"设备区四角安全桩"},"casing_iridium_bolted":{"letter":"N","block":"bartworks:blockCasingsBW","registry":"bartworks:bw.werkstoffblockscasing.01","meta":31850,"nameEn":"Bolted Iridium Casing","nameZh":"螺栓铱机壳","color":"#5a6b76","java":"Casings.BoltedIridiumCasing","role":"钢柱柱脚"},"computer_advanced":{"letter":"O","block":"tectech:gt.blockcasingsTT","registry":"tectech:gt.blockcasingsTT","meta":3,"nameEn":"Advanced Computer Casing","nameZh":"高级电脑机壳","color":"#2f3a46","java":"Casings.AdvancedComputerCasing","role":"工控柜、刀库、主轴箱"},"molecular_advanced":{"letter":"P","block":"tectech:gt.blockcasingsTT","registry":"tectech:gt.blockcasingsTT","meta":5,"nameEn":"Advanced Molecular Casing","nameZh":"高级分子机壳","color":"#3e4a58","java":"Casings.AdvancedMolecularCasing","role":"大门门框"},"molecular_coil":{"letter":"Q","block":"tectech:gt.blockcasingsTT","registry":"tectech:gt.blockcasingsTT","meta":6,"nameEn":"Molecular Coil","nameZh":"分子线圈方块","color":"#8a6fc0","java":"Casings.MolecularCoil","role":"天车滑车"},"glass_reinforced":{"letter":"R","block":"gt.blockglass1","registry":"gt.blockglass1","meta":10,"nameEn":"Reinforced Glass","nameZh":"强化玻璃","color":"#6f9db5","java":"Casings.ReinforcedGlass","role":"备用高强玻璃"},"casing_sterile":{"letter":"S","block":"gt.blockcasings9","registry":"gt.blockcasings9","meta":4,"nameEn":"Sterile Water Plant Casing","nameZh":"无菌水厂机壳","color":"#dfe6e9","java":"Casings.SterileWaterPlantCasing","role":"夹层办公室"}},"layers":[[{"x":0,"z":0,"m":"concrete_dark_smooth"},{"x":0,"z":1,"m":"concrete_hsc"},{"x":0,"z":2,"m":"concrete_hsc"},{"x":0,"z":3,"m":"concrete_hsc"},{"x":0,"z":4,"m":"concrete_hsc"},{"x":0,"z":5,"m":"concrete_hsc"},{"x":0,"z":6,"m":"concrete_hsc"},{"x":0,"z":7,"m":"concrete_hsc"},{"x":0,"z":8,"m":"concrete_hsc"},{"x":0,"z":9,"m":"concrete_hsc"},{"x":0,"z":10,"m":"concrete_hsc"},{"x":0,"z":11,"m":"concrete_hsc"},{"x":0,"z":12,"m":"concrete_hsc"},{"x":0,"z":13,"m":"concrete_hsc"},{"x":0,"z":14,"m":"concrete_hsc"},{"x":0,"z":15,"m":"concrete_hsc"},{"x":0,"z":16,"m":"concrete_hsc"},{"x":0,"z":17,"m":"concrete_hsc"},{"x":0,"z":18,"m":"concrete_hsc"},{"x":0,"z":19,"m":"concrete_hsc"},{"x":0,"z":20,"m":"concrete_dark_smooth"},{"x":1,"z":0,"m":"concrete_dark_smooth"},{"x":1,"z":1,"m":"concrete_hsc"},{"x":1,"z":2,"m":"concrete_hsc"},{"x":1,"z":3,"m":"concrete_hsc"},{"x":1,"z":4,"m":"concrete_hsc"},{"x":1,"z":5,"m":"concrete_hsc"},{"x":1,"z":6,"m":"concrete_hsc"},{"x":1,"z":7,"m":"concrete_hsc"},{"x":1,"z":8,"m":"concrete_hsc"},{"x":1,"z":9,"m":"concrete_hsc"},{"x":1,"z":10,"m":"concrete_hsc"},{"x":1,"z":11,"m":"concrete_hsc"},{"x":1,"z":12,"m":"concrete_hsc"},{"x":1,"z":13,"m":"concrete_hsc"},{"x":1,"z":14,"m":"concrete_hsc"},{"x":1,"z":15,"m":"concrete_hsc"},{"x":1,"z":16,"m":"concrete_hsc"},{"x":1,"z":17,"m":"concrete_hsc"},{"x":1,"z":18,"m":"concrete_hsc"},{"x":1,"z":19,"m":"concrete_hsc"},{"x":1,"z":20,"m":"concrete_dark_smooth"},{"x":2,"z":0,"m":"concrete_dark_smooth"},{"x":2,"z":1,"m":"concrete_hsc"},{"x":2,"z":2,"m":"concrete_hsc"},{"x":2,"z":3,"m":"concrete_hsc"},{"x":2,"z":4,"m":"concrete_hsc"},{"x":2,"z":5,"m":"concrete_hsc"},{"x":2,"z":6,"m":"concrete_hsc"},{"x":2,"z":7,"m":"concrete_hsc"},{"x":2,"z":8,"m":"concrete_hsc"},{"x":2,"z":9,"m":"concrete_hsc"},{"x":2,"z":10,"m":"concrete_hsc"},{"x":2,"z":11,"m":"concrete_hsc"},{"x":2,"z":12,"m":"concrete_hsc"},{"x":2,"z":13,"m":"concrete_hsc"},{"x":2,"z":14,"m":"concrete_hsc"},{"x":2,"z":15,"m":"concrete_hsc"},{"x":2,"z":16,"m":"concrete_hsc"},{"x":2,"z":17,"m":"concrete_hsc"},{"x":2,"z":18,"m":"concrete_hsc"},{"x":2,"z":19,"m":"concrete_hsc"},{"x":2,"z":20,"m":"concrete_dark_smooth"},{"x":3,"z":0,"m":"concrete_dark_smooth"},{"x":3,"z":1,"m":"concrete_hsc"},{"x":3,"z":2,"m":"concrete_hsc"},{"x":3,"z":3,"m":"concrete_hsc"},{"x":3,"z":4,"m":"concrete_hsc"},{"x":3,"z":5,"m":"concrete_hsc"},{"x":3,"z":6,"m":"concrete_hsc"},{"x":3,"z":7,"m":"concrete_hsc"},{"x":3,"z":8,"m":"concrete_hsc"},{"x":3,"z":9,"m":"concrete_hsc"},{"x":3,"z":10,"m":"concrete_hsc"},{"x":3,"z":11,"m":"concrete_hsc"},{"x":3,"z":12,"m":"concrete_hsc"},{"x":3,"z":13,"m":"concrete_hsc"},{"x":3,"z":14,"m":"concrete_hsc"},{"x":3,"z":15,"m":"concrete_hsc"},{"x":3,"z":16,"m":"concrete_hsc"},{"x":3,"z":17,"m":"concrete_hsc"},{"x":3,"z":18,"m":"concrete_hsc"},{"x":3,"z":19,"m":"concrete_hsc"},{"x":3,"z":20,"m":"concrete_dark_smooth"},{"x":4,"z":0,"m":"concrete_dark_smooth"},{"x":4,"z":1,"m":"concrete_hsc"},{"x":4,"z":2,"m":"concrete_hsc"},{"x":4,"z":3,"m":"concrete_hsc"},{"x":4,"z":4,"m":"concrete_hsc"},{"x":4,"z":5,"m":"concrete_hsc"},{"x":4,"z":6,"m":"concrete_hsc"},{"x":4,"z":7,"m":"concrete_hsc"},{"x":4,"z":8,"m":"concrete_hsc"},{"x":4,"z":9,"m":"concrete_hsc"},{"x":4,"z":10,"m":"concrete_hsc"},{"x":4,"z":11,"m":"concrete_hsc"},{"x":4,"z":12,"m":"concrete_hsc"},{"x":4,"z":13,"m":"concrete_hsc"},{"x":4,"z":14,"m":"concrete_hsc"},{"x":4,"z":15,"m":"concrete_hsc"},{"x":4,"z":16,"m":"concrete_hsc"},{"x":4,"z":17,"m":"concrete_hsc"},{"x":4,"z":18,"m":"concrete_hsc"},{"x":4,"z":19,"m":"concrete_hsc"},{"x":4,"z":20,"m":"concrete_dark_smooth"},{"x":5,"z":0,"m":"concrete_dark_smooth"},{"x":5,"z":1,"m":"concrete_hsc"},{"x":5,"z":2,"m":"concrete_hsc"},{"x":5,"z":3,"m":"concrete_hsc"},{"x":5,"z":4,"m":"concrete_hsc"},{"x":5,"z":5,"m":"concrete_hsc"},{"x":5,"z":6,"m":"concrete_hsc"},{"x":5,"z":7,"m":"concrete_hsc"},{"x":5,"z":8,"m":"concrete_hsc"},{"x":5,"z":9,"m":"concrete_hsc"},{"x":5,"z":10,"m":"concrete_hsc"},{"x":5,"z":11,"m":"concrete_hsc"},{"x":5,"z":12,"m":"concrete_hsc"},{"x":5,"z":13,"m":"concrete_hsc"},{"x":5,"z":14,"m":"concrete_hsc"},{"x":5,"z":15,"m":"concrete_hsc"},{"x":5,"z":16,"m":"concrete_hsc"},{"x":5,"z":17,"m":"concrete_hsc"},{"x":5,"z":18,"m":"concrete_hsc"},{"x":5,"z":19,"m":"concrete_hsc"},{"x":5,"z":20,"m":"concrete_dark_smooth"},{"x":6,"z":0,"m":"concrete_dark_smooth"},{"x":6,"z":1,"m":"concrete_hsc"},{"x":6,"z":2,"m":"concrete_hsc"},{"x":6,"z":3,"m":"concrete_hsc"},{"x":6,"z":4,"m":"concrete_hsc"},{"x":6,"z":5,"m":"concrete_hsc"},{"x":6,"z":6,"m":"concrete_hsc"},{"x":6,"z":7,"m":"concrete_hsc"},{"x":6,"z":8,"m":"concrete_hsc"},{"x":6,"z":9,"m":"concrete_hsc"},{"x":6,"z":10,"m":"concrete_hsc"},{"x":6,"z":11,"m":"concrete_hsc"},{"x":6,"z":12,"m":"concrete_hsc"},{"x":6,"z":13,"m":"concrete_hsc"},{"x":6,"z":14,"m":"concrete_hsc"},{"x":6,"z":15,"m":"concrete_hsc"},{"x":6,"z":16,"m":"concrete_hsc"},{"x":6,"z":17,"m":"concrete_hsc"},{"x":6,"z":18,"m":"concrete_hsc"},{"x":6,"z":19,"m":"concrete_hsc"},{"x":6,"z":20,"m":"concrete_dark_smooth"},{"x":7,"z":0,"m":"concrete_dark_smooth"},{"x":7,"z":1,"m":"concrete_hsc"},{"x":7,"z":2,"m":"concrete_hsc"},{"x":7,"z":3,"m":"concrete_hsc"},{"x":7,"z":4,"m":"concrete_hsc"},{"x":7,"z":5,"m":"concrete_hsc"},{"x":7,"z":6,"m":"concrete_hsc"},{"x":7,"z":7,"m":"concrete_hsc"},{"x":7,"z":8,"m":"concrete_hsc"},{"x":7,"z":9,"m":"concrete_hsc"},{"x":7,"z":10,"m":"concrete_hsc"},{"x":7,"z":11,"m":"concrete_hsc"},{"x":7,"z":12,"m":"concrete_hsc"},{"x":7,"z":13,"m":"concrete_hsc"},{"x":7,"z":14,"m":"concrete_hsc"},{"x":7,"z":15,"m":"concrete_hsc"},{"x":7,"z":16,"m":"concrete_hsc"},{"x":7,"z":17,"m":"concrete_hsc"},{"x":7,"z":18,"m":"concrete_hsc"},{"x":7,"z":19,"m":"concrete_hsc"},{"x":7,"z":20,"m":"concrete_dark_smooth"},{"x":8,"z":0,"m":"concrete_dark_smooth"},{"x":8,"z":1,"m":"concrete_hsc"},{"x":8,"z":2,"m":"concrete_hsc"},{"x":8,"z":3,"m":"concrete_hsc"},{"x":8,"z":4,"m":"concrete_hsc"},{"x":8,"z":5,"m":"concrete_hsc"},{"x":8,"z":6,"m":"concrete_hsc"},{"x":8,"z":7,"m":"concrete_hsc"},{"x":8,"z":8,"m":"concrete_hsc"},{"x":8,"z":9,"m":"concrete_hsc"},{"x":8,"z":10,"m":"concrete_hsc"},{"x":8,"z":11,"m":"concrete_hsc"},{"x":8,"z":12,"m":"concrete_hsc"},{"x":8,"z":13,"m":"concrete_hsc"},{"x":8,"z":14,"m":"concrete_hsc"},{"x":8,"z":15,"m":"concrete_hsc"},{"x":8,"z":16,"m":"concrete_hsc"},{"x":8,"z":17,"m":"concrete_hsc"},{"x":8,"z":18,"m":"concrete_hsc"},{"x":8,"z":19,"m":"concrete_hsc"},{"x":8,"z":20,"m":"concrete_dark_smooth"},{"x":9,"z":0,"m":"concrete_dark_smooth"},{"x":9,"z":1,"m":"concrete_hsc"},{"x":9,"z":2,"m":"concrete_hsc"},{"x":9,"z":3,"m":"concrete_hsc"},{"x":9,"z":4,"m":"concrete_hsc"},{"x":9,"z":5,"m":"concrete_hsc"},{"x":9,"z":6,"m":"concrete_hsc"},{"x":9,"z":7,"m":"concrete_hsc"},{"x":9,"z":8,"m":"concrete_hsc"},{"x":9,"z":9,"m":"concrete_hsc"},{"x":9,"z":10,"m":"concrete_hsc"},{"x":9,"z":11,"m":"concrete_hsc"},{"x":9,"z":12,"m":"concrete_hsc"},{"x":9,"z":13,"m":"concrete_hsc"},{"x":9,"z":14,"m":"concrete_hsc"},{"x":9,"z":15,"m":"concrete_hsc"},{"x":9,"z":16,"m":"concrete_hsc"},{"x":9,"z":17,"m":"concrete_hsc"},{"x":9,"z":18,"m":"concrete_hsc"},{"x":9,"z":19,"m":"concrete_hsc"},{"x":9,"z":20,"m":"concrete_dark_smooth"},{"x":10,"z":0,"m":"concrete_dark_smooth"},{"x":10,"z":1,"m":"concrete_hsc"},{"x":10,"z":2,"m":"concrete_hsc"},{"x":10,"z":3,"m":"concrete_hsc"},{"x":10,"z":4,"m":"concrete_hsc"},{"x":10,"z":5,"m":"concrete_hsc"},{"x":10,"z":6,"m":"concrete_hsc"},{"x":10,"z":7,"m":"concrete_hsc"},{"x":10,"z":8,"m":"concrete_hsc"},{"x":10,"z":9,"m":"concrete_hsc"},{"x":10,"z":10,"m":"concrete_hsc"},{"x":10,"z":11,"m":"concrete_hsc"},{"x":10,"z":12,"m":"concrete_hsc"},{"x":10,"z":13,"m":"concrete_hsc"},{"x":10,"z":14,"m":"concrete_hsc"},{"x":10,"z":15,"m":"concrete_hsc"},{"x":10,"z":16,"m":"concrete_hsc"},{"x":10,"z":17,"m":"concrete_hsc"},{"x":10,"z":18,"m":"concrete_hsc"},{"x":10,"z":19,"m":"concrete_hsc"},{"x":10,"z":20,"m":"concrete_dark_smooth"},{"x":11,"z":0,"m":"concrete_dark_smooth"},{"x":11,"z":1,"m":"concrete_hsc"},{"x":11,"z":2,"m":"concrete_hsc"},{"x":11,"z":3,"m":"concrete_hsc"},{"x":11,"z":4,"m":"concrete_hsc"},{"x":11,"z":5,"m":"concrete_hsc"},{"x":11,"z":6,"m":"concrete_hsc"},{"x":11,"z":7,"m":"concrete_hsc"},{"x":11,"z":8,"m":"concrete_hsc"},{"x":11,"z":9,"m":"concrete_hsc"},{"x":11,"z":10,"m":"concrete_hsc"},{"x":11,"z":11,"m":"concrete_hsc"},{"x":11,"z":12,"m":"concrete_hsc"},{"x":11,"z":13,"m":"concrete_hsc"},{"x":11,"z":14,"m":"concrete_hsc"},{"x":11,"z":15,"m":"concrete_hsc"},{"x":11,"z":16,"m":"concrete_hsc"},{"x":11,"z":17,"m":"concrete_hsc"},{"x":11,"z":18,"m":"concrete_hsc"},{"x":11,"z":19,"m":"concrete_hsc"},{"x":11,"z":20,"m":"concrete_dark_smooth"},{"x":12,"z":0,"m":"concrete_dark_smooth"},{"x":12,"z":1,"m":"concrete_hsc"},{"x":12,"z":2,"m":"concrete_hsc"},{"x":12,"z":3,"m":"concrete_hsc"},{"x":12,"z":4,"m":"concrete_hsc"},{"x":12,"z":5,"m":"concrete_hsc"},{"x":12,"z":6,"m":"concrete_hsc"},{"x":12,"z":7,"m":"concrete_hsc"},{"x":12,"z":8,"m":"concrete_hsc"},{"x":12,"z":9,"m":"concrete_hsc"},{"x":12,"z":10,"m":"concrete_hsc"},{"x":12,"z":11,"m":"concrete_hsc"},{"x":12,"z":12,"m":"concrete_hsc"},{"x":12,"z":13,"m":"concrete_hsc"},{"x":12,"z":14,"m":"concrete_hsc"},{"x":12,"z":15,"m":"concrete_hsc"},{"x":12,"z":16,"m":"concrete_hsc"},{"x":12,"z":17,"m":"concrete_hsc"},{"x":12,"z":18,"m":"concrete_hsc"},{"x":12,"z":19,"m":"concrete_hsc"},{"x":12,"z":20,"m":"concrete_dark_smooth"},{"x":13,"z":0,"m":"concrete_dark_smooth"},{"x":13,"z":1,"m":"concrete_hsc"},{"x":13,"z":2,"m":"concrete_hsc"},{"x":13,"z":3,"m":"concrete_hsc"},{"x":13,"z":4,"m":"concrete_hsc"},{"x":13,"z":5,"m":"concrete_hsc"},{"x":13,"z":6,"m":"concrete_hsc"},{"x":13,"z":7,"m":"concrete_hsc"},{"x":13,"z":8,"m":"concrete_hsc"},{"x":13,"z":9,"m":"concrete_hsc"},{"x":13,"z":10,"m":"concrete_hsc"},{"x":13,"z":11,"m":"concrete_hsc"},{"x":13,"z":12,"m":"concrete_hsc"},{"x":13,"z":13,"m":"concrete_hsc"},{"x":13,"z":14,"m":"concrete_hsc"},{"x":13,"z":15,"m":"concrete_hsc"},{"x":13,"z":16,"m":"concrete_hsc"},{"x":13,"z":17,"m":"concrete_hsc"},{"x":13,"z":18,"m":"concrete_hsc"},{"x":13,"z":19,"m":"concrete_hsc"},{"x":13,"z":20,"m":"concrete_dark_smooth"},{"x":14,"z":0,"m":"concrete_dark_smooth"},{"x":14,"z":1,"m":"concrete_hsc"},{"x":14,"z":2,"m":"concrete_hsc"},{"x":14,"z":3,"m":"concrete_hsc"},{"x":14,"z":4,"m":"concrete_hsc"},{"x":14,"z":5,"m":"concrete_hsc"},{"x":14,"z":6,"m":"concrete_hsc"},{"x":14,"z":7,"m":"concrete_hsc"},{"x":14,"z":8,"m":"concrete_hsc"},{"x":14,"z":9,"m":"concrete_hsc"},{"x":14,"z":10,"m":"concrete_hsc"},{"x":14,"z":11,"m":"concrete_hsc"},{"x":14,"z":12,"m":"concrete_hsc"},{"x":14,"z":13,"m":"concrete_hsc"},{"x":14,"z":14,"m":"concrete_hsc"},{"x":14,"z":15,"m":"concrete_hsc"},{"x":14,"z":16,"m":"concrete_hsc"},{"x":14,"z":17,"m":"concrete_hsc"},{"x":14,"z":18,"m":"concrete_hsc"},{"x":14,"z":19,"m":"concrete_hsc"},{"x":14,"z":20,"m":"concrete_dark_smooth"},{"x":15,"z":0,"m":"concrete_dark_smooth"},{"x":15,"z":1,"m":"concrete_hsc"},{"x":15,"z":2,"m":"concrete_hsc"},{"x":15,"z":3,"m":"concrete_hsc"},{"x":15,"z":4,"m":"concrete_hsc"},{"x":15,"z":5,"m":"concrete_hsc"},{"x":15,"z":6,"m":"concrete_hsc"},{"x":15,"z":7,"m":"concrete_hsc"},{"x":15,"z":8,"m":"concrete_hsc"},{"x":15,"z":9,"m":"concrete_hsc"},{"x":15,"z":10,"m":"concrete_hsc"},{"x":15,"z":11,"m":"concrete_hsc"},{"x":15,"z":12,"m":"concrete_hsc"},{"x":15,"z":13,"m":"concrete_hsc"},{"x":15,"z":14,"m":"concrete_hsc"},{"x":15,"z":15,"m":"concrete_hsc"},{"x":15,"z":16,"m":"concrete_hsc"},{"x":15,"z":17,"m":"concrete_hsc"},{"x":15,"z":18,"m":"concrete_hsc"},{"x":15,"z":19,"m":"concrete_hsc"},{"x":15,"z":20,"m":"concrete_dark_smooth"},{"x":16,"z":0,"m":"concrete_dark_smooth"},{"x":16,"z":1,"m":"concrete_hsc"},{"x":16,"z":2,"m":"concrete_hsc"},{"x":16,"z":3,"m":"concrete_hsc"},{"x":16,"z":4,"m":"concrete_hsc"},{"x":16,"z":5,"m":"concrete_hsc"},{"x":16,"z":6,"m":"concrete_hsc"},{"x":16,"z":7,"m":"concrete_hsc"},{"x":16,"z":8,"m":"concrete_hsc"},{"x":16,"z":9,"m":"concrete_hsc"},{"x":16,"z":10,"m":"concrete_hsc"},{"x":16,"z":11,"m":"concrete_hsc"},{"x":16,"z":12,"m":"concrete_hsc"},{"x":16,"z":13,"m":"concrete_hsc"},{"x":16,"z":14,"m":"concrete_hsc"},{"x":16,"z":15,"m":"concrete_hsc"},{"x":16,"z":16,"m":"concrete_hsc"},{"x":16,"z":17,"m":"concrete_hsc"},{"x":16,"z":18,"m":"concrete_hsc"},{"x":16,"z":19,"m":"concrete_hsc"},{"x":16,"z":20,"m":"concrete_dark_smooth"},{"x":17,"z":0,"m":"concrete_dark_smooth"},{"x":17,"z":1,"m":"concrete_hsc"},{"x":17,"z":2,"m":"concrete_hsc"},{"x":17,"z":3,"m":"concrete_hsc"},{"x":17,"z":4,"m":"concrete_hsc"},{"x":17,"z":5,"m":"concrete_hsc"},{"x":17,"z":6,"m":"concrete_hsc"},{"x":17,"z":7,"m":"concrete_hsc"},{"x":17,"z":8,"m":"concrete_hsc"},{"x":17,"z":9,"m":"concrete_hsc"},{"x":17,"z":10,"m":"concrete_hsc"},{"x":17,"z":11,"m":"concrete_hsc"},{"x":17,"z":12,"m":"concrete_hsc"},{"x":17,"z":13,"m":"concrete_hsc"},{"x":17,"z":14,"m":"concrete_hsc"},{"x":17,"z":15,"m":"concrete_hsc"},{"x":17,"z":16,"m":"concrete_hsc"},{"x":17,"z":17,"m":"concrete_hsc"},{"x":17,"z":18,"m":"concrete_hsc"},{"x":17,"z":19,"m":"concrete_hsc"},{"x":17,"z":20,"m":"concrete_dark_smooth"},{"x":18,"z":0,"m":"concrete_dark_smooth"},{"x":18,"z":1,"m":"concrete_hsc"},{"x":18,"z":2,"m":"concrete_hsc"},{"x":18,"z":3,"m":"concrete_hsc"},{"x":18,"z":4,"m":"concrete_hsc"},{"x":18,"z":5,"m":"concrete_hsc"},{"x":18,"z":6,"m":"concrete_hsc"},{"x":18,"z":7,"m":"concrete_hsc"},{"x":18,"z":8,"m":"concrete_hsc"},{"x":18,"z":9,"m":"concrete_hsc"},{"x":18,"z":10,"m":"concrete_hsc"},{"x":18,"z":11,"m":"concrete_hsc"},{"x":18,"z":12,"m":"concrete_hsc"},{"x":18,"z":13,"m":"concrete_hsc"},{"x":18,"z":14,"m":"concrete_hsc"},{"x":18,"z":15,"m":"concrete_hsc"},{"x":18,"z":16,"m":"concrete_hsc"},{"x":18,"z":17,"m":"concrete_hsc"},{"x":18,"z":18,"m":"concrete_hsc"},{"x":18,"z":19,"m":"concrete_hsc"},{"x":18,"z":20,"m":"concrete_dark_smooth"}],[{"x":0,"z":0,"m":"casing_iridium_bolted"},{"x":0,"z":1,"m":"concrete_light_smooth"},{"x":0,"z":2,"m":"concrete_light_smooth"},{"x":0,"z":3,"m":"concrete_light_smooth"},{"x":0,"z":4,"m":"casing_iridium_bolted"},{"x":0,"z":5,"m":"concrete_light_smooth"},{"x":0,"z":6,"m":"concrete_light_smooth"},{"x":0,"z":7,"m":"concrete_light_smooth"},{"x":0,"z":8,"m":"concrete_light_smooth"},{"x":0,"z":9,"m":"casing_iridium_bolted"},{"x":0,"z":10,"m":"concrete_light_smooth"},{"x":0,"z":11,"m":"concrete_light_smooth"},{"x":0,"z":12,"m":"concrete_light_smooth"},{"x":0,"z":13,"m":"casing_iridium_bolted"},{"x":0,"z":14,"m":"concrete_light_smooth"},{"x":0,"z":15,"m":"concrete_light_smooth"},{"x":0,"z":16,"m":"concrete_light_smooth"},{"x":0,"z":17,"m":"concrete_light_smooth"},{"x":0,"z":18,"m":"casing_iridium_bolted"},{"x":0,"z":19,"m":"casing_iridium_bolted"},{"x":0,"z":20,"m":"concrete_light_smooth"},{"x":1,"z":1,"m":"concrete_light_smooth"},{"x":1,"z":2,"m":"concrete_light_smooth"},{"x":1,"z":3,"m":"concrete_light_smooth"},{"x":1,"z":4,"m":"concrete_light_smooth"},{"x":1,"z":5,"m":"concrete_light_smooth"},{"x":1,"z":6,"m":"concrete_light_smooth"},{"x":1,"z":7,"m":"concrete_light_smooth"},{"x":1,"z":8,"m":"concrete_light_smooth"},{"x":1,"z":9,"m":"concrete_light_smooth"},{"x":1,"z":10,"m":"concrete_light_smooth"},{"x":1,"z":11,"m":"concrete_light_smooth"},{"x":1,"z":12,"m":"concrete_light_smooth"},{"x":1,"z":13,"m":"concrete_light_smooth"},{"x":1,"z":14,"m":"concrete_light_smooth"},{"x":1,"z":15,"m":"concrete_light_smooth"},{"x":1,"z":16,"m":"grate"},{"x":1,"z":17,"m":"concrete_light_smooth"},{"x":1,"z":18,"m":"concrete_light_smooth"},{"x":1,"z":19,"m":"concrete_light_smooth"},{"x":1,"z":20,"m":"concrete_light_smooth"},{"x":2,"z":1,"m":"concrete_light_smooth"},{"x":2,"z":2,"m":"concrete_light_smooth"},{"x":2,"z":3,"m":"concrete_light_smooth"},{"x":2,"z":4,"m":"concrete_light_smooth"},{"x":2,"z":5,"m":"concrete_light_smooth"},{"x":2,"z":6,"m":"concrete_light_smooth"},{"x":2,"z":7,"m":"concrete_light_smooth"},{"x":2,"z":8,"m":"concrete_light_smooth"},{"x":2,"z":9,"m":"concrete_light_smooth"},{"x":2,"z":10,"m":"concrete_light_smooth"},{"x":2,"z":11,"m":"hazard_explosion"},{"x":2,"z":12,"m":"concrete_hsc"},{"x":2,"z":13,"m":"concrete_hsc"},{"x":2,"z":14,"m":"concrete_hsc"},{"x":2,"z":15,"m":"hazard_explosion"},{"x":2,"z":16,"m":"grate"},{"x":2,"z":17,"m":"concrete_light_smooth"},{"x":2,"z":18,"m":"concrete_light_smooth"},{"x":2,"z":19,"m":"grate"},{"x":2,"z":20,"m":"concrete_light_smooth"},{"x":3,"z":1,"m":"concrete_light_smooth"},{"x":3,"z":2,"m":"concrete_light_smooth"},{"x":3,"z":3,"m":"concrete_light_smooth"},{"x":3,"z":4,"m":"concrete_light_smooth"},{"x":3,"z":5,"m":"concrete_light_smooth"},{"x":3,"z":6,"m":"concrete_light_smooth"},{"x":3,"z":7,"m":"concrete_light_smooth"},{"x":3,"z":8,"m":"concrete_light_smooth"},{"x":3,"z":9,"m":"concrete_light_smooth"},{"x":3,"z":10,"m":"concrete_light_smooth"},{"x":3,"z":11,"m":"concrete_hsc"},{"x":3,"z":12,"m":"concrete_hsc"},{"x":3,"z":13,"m":"concrete_hsc"},{"x":3,"z":14,"m":"concrete_hsc"},{"x":3,"z":15,"m":"concrete_hsc"},{"x":3,"z":16,"m":"grate"},{"x":3,"z":17,"m":"concrete_light_smooth"},{"x":3,"z":18,"m":"concrete_light_smooth"},{"x":3,"z":19,"m":"grate"},{"x":3,"z":20,"m":"concrete_light_smooth"},{"x":4,"z":0,"m":"casing_iridium_bolted"},{"x":4,"z":1,"m":"concrete_light_smooth"},{"x":4,"z":2,"m":"concrete_light_smooth"},{"x":4,"z":3,"m":"concrete_light_smooth"},{"x":4,"z":4,"m":"concrete_light_smooth"},{"x":4,"z":5,"m":"concrete_light_smooth"},{"x":4,"z":6,"m":"concrete_light_smooth"},{"x":4,"z":7,"m":"concrete_light_smooth"},{"x":4,"z":8,"m":"concrete_light_smooth"},{"x":4,"z":9,"m":"concrete_light_smooth"},{"x":4,"z":10,"m":"concrete_light_smooth"},{"x":4,"z":11,"m":"concrete_hsc"},{"x":4,"z":12,"m":"concrete_hsc"},{"x":4,"z":13,"m":"concrete_hsc"},{"x":4,"z":14,"m":"concrete_hsc"},{"x":4,"z":15,"m":"concrete_hsc"},{"x":4,"z":16,"m":"grate"},{"x":4,"z":17,"m":"concrete_light_smooth"},{"x":4,"z":18,"m":"concrete_light_smooth"},{"x":4,"z":19,"m":"casing_iridium_bolted"},{"x":4,"z":20,"m":"concrete_light_smooth"},{"x":5,"z":1,"m":"concrete_light_smooth"},{"x":5,"z":2,"m":"concrete_light_smooth"},{"x":5,"z":3,"m":"concrete_light_smooth"},{"x":5,"z":4,"m":"concrete_light_smooth"},{"x":5,"z":5,"m":"concrete_light_smooth"},{"x":5,"z":6,"m":"concrete_light_smooth"},{"x":5,"z":7,"m":"concrete_light_smooth"},{"x":5,"z":8,"m":"concrete_light_smooth"},{"x":5,"z":9,"m":"concrete_light_smooth"},{"x":5,"z":10,"m":"concrete_light_smooth"},{"x":5,"z":11,"m":"concrete_hsc"},{"x":5,"z":12,"m":"concrete_hsc"},{"x":5,"z":13,"m":"concrete_hsc"},{"x":5,"z":14,"m":"concrete_hsc"},{"x":5,"z":15,"m":"concrete_hsc"},{"x":5,"z":16,"m":"grate"},{"x":5,"z":17,"m":"concrete_light_smooth"},{"x":5,"z":18,"m":"concrete_light_smooth"},{"x":5,"z":19,"m":"grate"},{"x":5,"z":20,"m":"concrete_light_smooth"},{"x":6,"z":1,"m":"concrete_light_smooth"},{"x":6,"z":2,"m":"concrete_light_smooth"},{"x":6,"z":3,"m":"concrete_light_smooth"},{"x":6,"z":4,"m":"concrete_light_smooth"},{"x":6,"z":5,"m":"concrete_light_smooth"},{"x":6,"z":6,"m":"concrete_light_smooth"},{"x":6,"z":7,"m":"concrete_light_smooth"},{"x":6,"z":8,"m":"concrete_light_smooth"},{"x":6,"z":9,"m":"concrete_light_smooth"},{"x":6,"z":10,"m":"concrete_light_smooth"},{"x":6,"z":11,"m":"concrete_hsc"},{"x":6,"z":12,"m":"concrete_hsc"},{"x":6,"z":13,"m":"concrete_hsc"},{"x":6,"z":14,"m":"concrete_hsc"},{"x":6,"z":15,"m":"concrete_hsc"},{"x":6,"z":16,"m":"grate"},{"x":6,"z":17,"m":"concrete_light_smooth"},{"x":6,"z":18,"m":"concrete_light_smooth"},{"x":6,"z":19,"m":"grate"},{"x":6,"z":20,"m":"concrete_light_smooth"},{"x":7,"z":1,"m":"concrete_light_smooth"},{"x":7,"z":2,"m":"concrete_light_smooth"},{"x":7,"z":3,"m":"concrete_light_smooth"},{"x":7,"z":4,"m":"concrete_light_smooth"},{"x":7,"z":5,"m":"concrete_light_smooth"},{"x":7,"z":6,"m":"concrete_light_smooth"},{"x":7,"z":7,"m":"concrete_light_smooth"},{"x":7,"z":8,"m":"concrete_light_smooth"},{"x":7,"z":9,"m":"concrete_light_smooth"},{"x":7,"z":10,"m":"concrete_light_smooth"},{"x":7,"z":11,"m":"concrete_hsc"},{"x":7,"z":12,"m":"concrete_hsc"},{"x":7,"z":13,"m":"concrete_hsc"},{"x":7,"z":14,"m":"concrete_hsc"},{"x":7,"z":15,"m":"concrete_hsc"},{"x":7,"z":16,"m":"grate"},{"x":7,"z":17,"m":"concrete_light_smooth"},{"x":7,"z":18,"m":"concrete_light_smooth"},{"x":7,"z":19,"m":"grate"},{"x":7,"z":20,"m":"stripe_yellow"},{"x":8,"z":1,"m":"concrete_light_smooth"},{"x":8,"z":2,"m":"concrete_light_smooth"},{"x":8,"z":3,"m":"concrete_light_smooth"},{"x":8,"z":4,"m":"concrete_light_smooth"},{"x":8,"z":5,"m":"concrete_light_smooth"},{"x":8,"z":6,"m":"concrete_light_smooth"},{"x":8,"z":7,"m":"concrete_light_smooth"},{"x":8,"z":8,"m":"concrete_light_smooth"},{"x":8,"z":9,"m":"concrete_light_smooth"},{"x":8,"z":10,"m":"concrete_light_smooth"},{"x":8,"z":11,"m":"concrete_hsc"},{"x":8,"z":12,"m":"concrete_hsc"},{"x":8,"z":13,"m":"concrete_hsc"},{"x":8,"z":14,"m":"concrete_hsc"},{"x":8,"z":15,"m":"concrete_hsc"},{"x":8,"z":16,"m":"grate"},{"x":8,"z":17,"m":"concrete_light_smooth"},{"x":8,"z":18,"m":"concrete_light_smooth"},{"x":8,"z":19,"m":"concrete_light_smooth"},{"x":8,"z":20,"m":"stripe_yellow"},{"x":9,"z":0,"m":"casing_iridium_bolted"},{"x":9,"z":1,"m":"concrete_light_smooth"},{"x":9,"z":2,"m":"concrete_light_smooth"},{"x":9,"z":3,"m":"concrete_light_smooth"},{"x":9,"z":4,"m":"concrete_light_smooth"},{"x":9,"z":5,"m":"concrete_light_smooth"},{"x":9,"z":6,"m":"concrete_light_smooth"},{"x":9,"z":7,"m":"concrete_light_smooth"},{"x":9,"z":8,"m":"concrete_light_smooth"},{"x":9,"z":9,"m":"concrete_light_smooth"},{"x":9,"z":10,"m":"concrete_light_smooth"},{"x":9,"z":11,"m":"concrete_hsc"},{"x":9,"z":12,"m":"concrete_hsc"},{"x":9,"z":13,"m":"concrete_hsc"},{"x":9,"z":14,"m":"concrete_hsc"},{"x":9,"z":15,"m":"concrete_hsc"},{"x":9,"z":16,"m":"grate"},{"x":9,"z":17,"m":"concrete_light_smooth"},{"x":9,"z":18,"m":"concrete_light_smooth"},{"x":9,"z":19,"m":"casing_iridium_bolted"},{"x":9,"z":20,"m":"stripe_yellow"},{"x":10,"z":1,"m":"concrete_light_smooth"},{"x":10,"z":2,"m":"concrete_light_smooth"},{"x":10,"z":3,"m":"concrete_light_smooth"},{"x":10,"z":4,"m":"concrete_light_smooth"},{"x":10,"z":5,"m":"concrete_light_smooth"},{"x":10,"z":6,"m":"concrete_light_smooth"},{"x":10,"z":7,"m":"concrete_light_smooth"},{"x":10,"z":8,"m":"concrete_light_smooth"},{"x":10,"z":9,"m":"concrete_light_smooth"},{"x":10,"z":10,"m":"concrete_light_smooth"},{"x":10,"z":11,"m":"concrete_hsc"},{"x":10,"z":12,"m":"concrete_hsc"},{"x":10,"z":13,"m":"concrete_hsc"},{"x":10,"z":14,"m":"concrete_hsc"},{"x":10,"z":15,"m":"concrete_hsc"},{"x":10,"z":16,"m":"grate"},{"x":10,"z":17,"m":"concrete_light_smooth"},{"x":10,"z":18,"m":"concrete_light_smooth"},{"x":10,"z":19,"m":"concrete_light_smooth"},{"x":10,"z":20,"m":"stripe_yellow"},{"x":11,"z":1,"m":"concrete_light_smooth"},{"x":11,"z":2,"m":"concrete_light_smooth"},{"x":11,"z":3,"m":"concrete_light_smooth"},{"x":11,"z":4,"m":"concrete_light_smooth"},{"x":11,"z":5,"m":"concrete_light_smooth"},{"x":11,"z":6,"m":"concrete_light_smooth"},{"x":11,"z":7,"m":"concrete_light_smooth"},{"x":11,"z":8,"m":"concrete_light_smooth"},{"x":11,"z":9,"m":"concrete_light_smooth"},{"x":11,"z":10,"m":"concrete_light_smooth"},{"x":11,"z":11,"m":"concrete_hsc"},{"x":11,"z":12,"m":"concrete_hsc"},{"x":11,"z":13,"m":"concrete_hsc"},{"x":11,"z":14,"m":"concrete_hsc"},{"x":11,"z":15,"m":"concrete_hsc"},{"x":11,"z":16,"m":"grate"},{"x":11,"z":17,"m":"concrete_light_smooth"},{"x":11,"z":18,"m":"concrete_light_smooth"},{"x":11,"z":19,"m":"grate"},{"x":11,"z":20,"m":"stripe_yellow"},{"x":12,"z":1,"m":"concrete_light_smooth"},{"x":12,"z":2,"m":"concrete_light_smooth"},{"x":12,"z":3,"m":"concrete_light_smooth"},{"x":12,"z":4,"m":"concrete_light_smooth"},{"x":12,"z":5,"m":"concrete_light_smooth"},{"x":12,"z":6,"m":"concrete_light_smooth"},{"x":12,"z":7,"m":"concrete_light_smooth"},{"x":12,"z":8,"m":"concrete_light_smooth"},{"x":12,"z":9,"m":"concrete_light_smooth"},{"x":12,"z":10,"m":"concrete_light_smooth"},{"x":12,"z":11,"m":"concrete_hsc"},{"x":12,"z":12,"m":"concrete_hsc"},{"x":12,"z":13,"m":"concrete_hsc"},{"x":12,"z":14,"m":"concrete_hsc"},{"x":12,"z":15,"m":"concrete_hsc"},{"x":12,"z":16,"m":"grate"},{"x":12,"z":17,"m":"concrete_light_smooth"},{"x":12,"z":18,"m":"concrete_light_smooth"},{"x":12,"z":19,"m":"grate"},{"x":12,"z":20,"m":"concrete_light_smooth"},{"x":13,"z":0,"m":"casing_iridium_bolted"},{"x":13,"z":1,"m":"concrete_light_smooth"},{"x":13,"z":2,"m":"concrete_light_smooth"},{"x":13,"z":3,"m":"concrete_light_smooth"},{"x":13,"z":4,"m":"concrete_light_smooth"},{"x":13,"z":5,"m":"concrete_light_smooth"},{"x":13,"z":6,"m":"concrete_light_smooth"},{"x":13,"z":7,"m":"concrete_light_smooth"},{"x":13,"z":8,"m":"concrete_light_smooth"},{"x":13,"z":9,"m":"concrete_light_smooth"},{"x":13,"z":10,"m":"concrete_light_smooth"},{"x":13,"z":11,"m":"concrete_hsc"},{"x":13,"z":12,"m":"concrete_hsc"},{"x":13,"z":13,"m":"concrete_hsc"},{"x":13,"z":14,"m":"concrete_hsc"},{"x":13,"z":15,"m":"concrete_hsc"},{"x":13,"z":16,"m":"grate"},{"x":13,"z":17,"m":"concrete_light_smooth"},{"x":13,"z":18,"m":"concrete_light_smooth"},{"x":13,"z":19,"m":"casing_iridium_bolted"},{"x":13,"z":20,"m":"concrete_light_smooth"},{"x":14,"z":1,"m":"concrete_light_smooth"},{"x":14,"z":2,"m":"concrete_light_smooth"},{"x":14,"z":3,"m":"concrete_light_smooth"},{"x":14,"z":4,"m":"concrete_light_smooth"},{"x":14,"z":5,"m":"concrete_light_smooth"},{"x":14,"z":6,"m":"concrete_light_smooth"},{"x":14,"z":7,"m":"concrete_light_smooth"},{"x":14,"z":8,"m":"concrete_light_smooth"},{"x":14,"z":9,"m":"concrete_light_smooth"},{"x":14,"z":10,"m":"concrete_light_smooth"},{"x":14,"z":11,"m":"concrete_hsc"},{"x":14,"z":12,"m":"concrete_hsc"},{"x":14,"z":13,"m":"concrete_hsc"},{"x":14,"z":14,"m":"concrete_hsc"},{"x":14,"z":15,"m":"concrete_hsc"},{"x":14,"z":16,"m":"grate"},{"x":14,"z":17,"m":"concrete_light_smooth"},{"x":14,"z":18,"m":"concrete_light_smooth"},{"x":14,"z":19,"m":"grate"},{"x":14,"z":20,"m":"concrete_light_smooth"},{"x":15,"z":1,"m":"concrete_light_smooth"},{"x":15,"z":2,"m":"concrete_light_smooth"},{"x":15,"z":3,"m":"concrete_light_smooth"},{"x":15,"z":4,"m":"concrete_light_smooth"},{"x":15,"z":5,"m":"concrete_light_smooth"},{"x":15,"z":6,"m":"concrete_light_smooth"},{"x":15,"z":7,"m":"concrete_light_smooth"},{"x":15,"z":8,"m":"concrete_light_smooth"},{"x":15,"z":9,"m":"concrete_light_smooth"},{"x":15,"z":10,"m":"concrete_light_smooth"},{"x":15,"z":11,"m":"concrete_hsc"},{"x":15,"z":12,"m":"concrete_hsc"},{"x":15,"z":13,"m":"concrete_hsc"},{"x":15,"z":14,"m":"concrete_hsc"},{"x":15,"z":15,"m":"concrete_hsc"},{"x":15,"z":16,"m":"grate"},{"x":15,"z":17,"m":"concrete_light_smooth"},{"x":15,"z":18,"m":"concrete_light_smooth"},{"x":15,"z":19,"m":"grate"},{"x":15,"z":20,"m":"concrete_light_smooth"},{"x":16,"z":1,"m":"concrete_light_smooth"},{"x":16,"z":2,"m":"concrete_light_smooth"},{"x":16,"z":3,"m":"concrete_light_smooth"},{"x":16,"z":4,"m":"concrete_light_smooth"},{"x":16,"z":5,"m":"concrete_light_smooth"},{"x":16,"z":6,"m":"concrete_light_smooth"},{"x":16,"z":7,"m":"concrete_light_smooth"},{"x":16,"z":8,"m":"concrete_light_smooth"},{"x":16,"z":9,"m":"concrete_light_smooth"},{"x":16,"z":10,"m":"concrete_light_smooth"},{"x":16,"z":11,"m":"hazard_explosion"},{"x":16,"z":12,"m":"concrete_hsc"},{"x":16,"z":13,"m":"concrete_hsc"},{"x":16,"z":14,"m":"concrete_hsc"},{"x":16,"z":15,"m":"hazard_explosion"},{"x":16,"z":16,"m":"grate"},{"x":16,"z":17,"m":"concrete_light_smooth"},{"x":16,"z":18,"m":"concrete_light_smooth"},{"x":16,"z":19,"m":"grate"},{"x":16,"z":20,"m":"concrete_light_smooth"},{"x":17,"z":1,"m":"concrete_light_smooth"},{"x":17,"z":2,"m":"concrete_light_smooth"},{"x":17,"z":3,"m":"concrete_light_smooth"},{"x":17,"z":4,"m":"concrete_light_smooth"},{"x":17,"z":5,"m":"concrete_light_smooth"},{"x":17,"z":6,"m":"concrete_light_smooth"},{"x":17,"z":7,"m":"concrete_light_smooth"},{"x":17,"z":8,"m":"concrete_light_smooth"},{"x":17,"z":9,"m":"concrete_light_smooth"},{"x":17,"z":10,"m":"concrete_light_smooth"},{"x":17,"z":11,"m":"concrete_light_smooth"},{"x":17,"z":12,"m":"concrete_light_smooth"},{"x":17,"z":13,"m":"concrete_light_smooth"},{"x":17,"z":14,"m":"concrete_light_smooth"},{"x":17,"z":15,"m":"concrete_light_smooth"},{"x":17,"z":16,"m":"grate"},{"x":17,"z":17,"m":"concrete_light_smooth"},{"x":17,"z":18,"m":"concrete_light_smooth"},{"x":17,"z":19,"m":"concrete_light_smooth"},{"x":17,"z":20,"m":"concrete_light_smooth"},{"x":18,"z":0,"m":"casing_iridium_bolted"},{"x":18,"z":1,"m":"concrete_light_smooth"},{"x":18,"z":2,"m":"concrete_light_smooth"},{"x":18,"z":3,"m":"concrete_light_smooth"},{"x":18,"z":4,"m":"casing_iridium_bolted"},{"x":18,"z":5,"m":"concrete_light_smooth"},{"x":18,"z":6,"m":"concrete_light_smooth"},{"x":18,"z":7,"m":"concrete_light_smooth"},{"x":18,"z":8,"m":"concrete_light_smooth"},{"x":18,"z":9,"m":"casing_iridium_bolted"},{"x":18,"z":10,"m":"concrete_light_smooth"},{"x":18,"z":11,"m":"concrete_light_smooth"},{"x":18,"z":12,"m":"concrete_light_smooth"},{"x":18,"z":13,"m":"casing_iridium_bolted"},{"x":18,"z":14,"m":"concrete_light_smooth"},{"x":18,"z":15,"m":"concrete_light_smooth"},{"x":18,"z":16,"m":"concrete_light_smooth"},{"x":18,"z":17,"m":"concrete_light_smooth"},{"x":18,"z":18,"m":"casing_iridium_bolted"},{"x":18,"z":19,"m":"casing_iridium_bolted"},{"x":18,"z":20,"m":"concrete_light_smooth"}],[{"x":0,"z":0,"m":"frame_steel"},{"x":0,"z":1,"m":"concrete_light"},{"x":0,"z":2,"m":"concrete_light"},{"x":0,"z":3,"m":"concrete_light"},{"x":0,"z":4,"m":"casing_solid_steel"},{"x":0,"z":5,"m":"concrete_light"},{"x":0,"z":6,"m":"concrete_light"},{"x":0,"z":7,"m":"concrete_light"},{"x":0,"z":8,"m":"concrete_light"},{"x":0,"z":9,"m":"casing_solid_steel"},{"x":0,"z":10,"m":"concrete_light"},{"x":0,"z":11,"m":"concrete_light"},{"x":0,"z":12,"m":"concrete_light"},{"x":0,"z":13,"m":"casing_solid_steel"},{"x":0,"z":14,"m":"concrete_light"},{"x":0,"z":15,"m":"concrete_light"},{"x":0,"z":16,"m":"concrete_light"},{"x":0,"z":17,"m":"concrete_light"},{"x":0,"z":18,"m":"concrete_light"},{"x":0,"z":19,"m":"frame_steel"},{"x":0,"z":20,"m":"casing_solid_steel"},{"x":1,"z":0,"m":"casing_solid_steel"},{"x":1,"z":20,"m":"concrete_light"},{"x":2,"z":0,"m":"casing_solid_steel"},{"x":2,"z":11,"m":"casing_solid_steel"},{"x":2,"z":20,"m":"concrete_light"},{"x":3,"z":0,"m":"casing_solid_steel"},{"x":3,"z":20,"m":"concrete_light"},{"x":4,"z":0,"m":"casing_solid_steel"},{"x":4,"z":20,"m":"casing_solid_steel"},{"x":5,"z":0,"m":"casing_solid_steel"},{"x":5,"z":20,"m":"concrete_light"},{"x":6,"z":0,"m":"casing_solid_steel"},{"x":6,"z":20,"m":"concrete_light"},{"x":7,"z":0,"m":"casing_solid_steel"},{"x":7,"z":20,"m":"molecular_advanced"},{"x":8,"z":0,"m":"casing_solid_steel"},{"x":8,"z":11,"m":"casing_solid_steel"},{"x":8,"z":12,"m":"casing_solid_steel"},{"x":8,"z":14,"m":"casing_solid_steel"},{"x":9,"z":0,"m":"casing_solid_steel"},{"x":10,"z":0,"m":"casing_solid_steel"},{"x":10,"z":12,"m":"casing_solid_steel"},{"x":10,"z":14,"m":"casing_solid_steel"},{"x":11,"z":0,"m":"casing_solid_steel"},{"x":11,"z":20,"m":"molecular_advanced"},{"x":12,"z":0,"m":"casing_solid_steel"},{"x":12,"z":20,"m":"concrete_light"},{"x":13,"z":0,"m":"casing_solid_steel"},{"x":13,"z":20,"m":"casing_solid_steel"},{"x":14,"z":0,"m":"casing_solid_steel"},{"x":14,"z":20,"m":"concrete_light"},{"x":15,"z":0,"m":"casing_solid_steel"},{"x":15,"z":20,"m":"concrete_light"},{"x":16,"z":0,"m":"casing_solid_steel"},{"x":16,"z":11,"m":"casing_solid_steel"},{"x":16,"z":20,"m":"concrete_light"},{"x":17,"z":0,"m":"casing_solid_steel"},{"x":17,"z":20,"m":"concrete_light"},{"x":18,"z":0,"m":"frame_steel"},{"x":18,"z":1,"m":"concrete_light"},{"x":18,"z":2,"m":"concrete_light"},{"x":18,"z":3,"m":"concrete_light"},{"x":18,"z":4,"m":"casing_solid_steel"},{"x":18,"z":5,"m":"concrete_light"},{"x":18,"z":6,"m":"concrete_light"},{"x":18,"z":7,"m":"concrete_light"},{"x":18,"z":8,"m":"concrete_light"},{"x":18,"z":9,"m":"casing_solid_steel"},{"x":18,"z":10,"m":"concrete_light"},{"x":18,"z":11,"m":"concrete_light"},{"x":18,"z":12,"m":"concrete_light"},{"x":18,"z":13,"m":"casing_solid_steel"},{"x":18,"z":14,"m":"concrete_light"},{"x":18,"z":15,"m":"concrete_light"},{"x":18,"z":16,"m":"concrete_light"},{"x":18,"z":17,"m":"concrete_light"},{"x":18,"z":18,"m":"concrete_light"},{"x":18,"z":19,"m":"frame_steel"},{"x":18,"z":20,"m":"casing_solid_steel"}],[{"x":0,"z":0,"m":"frame_steel"},{"x":0,"z":1,"m":"glass_boro"},{"x":0,"z":2,"m":"glass_boro"},{"x":0,"z":3,"m":"glass_boro"},{"x":0,"z":4,"m":"frame_steel"},{"x":0,"z":5,"m":"glass_boro"},{"x":0,"z":6,"m":"glass_boro"},{"x":0,"z":7,"m":"glass_boro"},{"x":0,"z":8,"m":"glass_boro"},{"x":0,"z":9,"m":"frame_steel"},{"x":0,"z":10,"m":"glass_boro"},{"x":0,"z":11,"m":"glass_boro"},{"x":0,"z":12,"m":"glass_boro"},{"x":0,"z":13,"m":"frame_steel"},{"x":0,"z":14,"m":"glass_boro"},{"x":0,"z":15,"m":"glass_boro"},{"x":0,"z":16,"m":"glass_boro"},{"x":0,"z":17,"m":"glass_boro"},{"x":0,"z":18,"m":"glass_boro"},{"x":0,"z":19,"m":"frame_steel"},{"x":0,"z":20,"m":"glass_boro"},{"x":1,"z":0,"m":"glass_boro"},{"x":1,"z":20,"m":"glass_boro"},{"x":2,"z":0,"m":"glass_boro"},{"x":2,"z":11,"m":"casing_solid_steel"},{"x":2,"z":20,"m":"glass_boro"},{"x":3,"z":0,"m":"glass_boro"},{"x":3,"z":20,"m":"glass_boro"},{"x":4,"z":0,"m":"frame_steel"},{"x":4,"z":20,"m":"frame_steel"},{"x":5,"z":0,"m":"glass_boro"},{"x":5,"z":20,"m":"glass_boro"},{"x":6,"z":0,"m":"glass_boro"},{"x":6,"z":20,"m":"glass_boro"},{"x":7,"z":0,"m":"glass_boro"},{"x":7,"z":20,"m":"glass_boro"},{"x":8,"z":0,"m":"glass_boro"},{"x":8,"z":11,"m":"casing_solid_steel"},{"x":8,"z":12,"m":"casing_solid_steel"},{"x":8,"z":13,"m":"casing_stainless"},{"x":8,"z":14,"m":"casing_solid_steel"},{"x":8,"z":20,"m":"glass_boro"},{"x":9,"z":0,"m":"glass_boro"},{"x":9,"z":12,"m":"casing_stainless"},{"x":9,"z":13,"m":"casing_lathe"},{"x":9,"z":14,"m":"casing_stainless"},{"x":9,"z":20,"m":"glass_boro"},{"x":10,"z":0,"m":"glass_boro"},{"x":10,"z":12,"m":"casing_solid_steel"},{"x":10,"z":13,"m":"casing_stainless"},{"x":10,"z":14,"m":"casing_solid_steel"},{"x":10,"z":20,"m":"glass_boro"},{"x":11,"z":0,"m":"glass_boro"},{"x":11,"z":20,"m":"glass_boro"},{"x":12,"z":0,"m":"glass_boro"},{"x":12,"z":20,"m":"glass_boro"},{"x":13,"z":0,"m":"frame_steel"},{"x":13,"z":20,"m":"frame_steel"},{"x":14,"z":0,"m":"glass_boro"},{"x":14,"z":20,"m":"glass_boro"},{"x":15,"z":0,"m":"glass_boro"},{"x":15,"z":20,"m":"glass_boro"},{"x":16,"z":0,"m":"glass_boro"},{"x":16,"z":11,"m":"casing_solid_steel"},{"x":16,"z":20,"m":"glass_boro"},{"x":17,"z":0,"m":"glass_boro"},{"x":17,"z":20,"m":"glass_boro"},{"x":18,"z":0,"m":"frame_steel"},{"x":18,"z":1,"m":"glass_boro"},{"x":18,"z":2,"m":"glass_boro"},{"x":18,"z":3,"m":"glass_boro"},{"x":18,"z":4,"m":"frame_steel"},{"x":18,"z":5,"m":"glass_boro"},{"x":18,"z":6,"m":"glass_boro"},{"x":18,"z":7,"m":"glass_boro"},{"x":18,"z":8,"m":"glass_boro"},{"x":18,"z":9,"m":"frame_steel"},{"x":18,"z":10,"m":"glass_boro"},{"x":18,"z":11,"m":"glass_boro"},{"x":18,"z":12,"m":"glass_boro"},{"x":18,"z":13,"m":"frame_steel"},{"x":18,"z":14,"m":"glass_boro"},{"x":18,"z":15,"m":"glass_boro"},{"x":18,"z":16,"m":"glass_boro"},{"x":18,"z":17,"m":"glass_boro"},{"x":18,"z":18,"m":"glass_boro"},{"x":18,"z":19,"m":"frame_steel"},{"x":18,"z":20,"m":"glass_boro"}],[{"x":0,"z":0,"m":"frame_steel"},{"x":0,"z":1,"m":"glass_boro"},{"x":0,"z":2,"m":"glass_boro"},{"x":0,"z":3,"m":"glass_boro"},{"x":0,"z":4,"m":"frame_steel"},{"x":0,"z":5,"m":"glass_boro"},{"x":0,"z":6,"m":"glass_boro"},{"x":0,"z":7,"m":"glass_boro"},{"x":0,"z":8,"m":"glass_boro"},{"x":0,"z":9,"m":"frame_steel"},{"x":0,"z":10,"m":"glass_boro"},{"x":0,"z":11,"m":"glass_boro"},{"x":0,"z":12,"m":"glass_boro"},{"x":0,"z":13,"m":"frame_steel"},{"x":0,"z":14,"m":"glass_boro"},{"x":0,"z":15,"m":"glass_boro"},{"x":0,"z":16,"m":"glass_boro"},{"x":0,"z":17,"m":"glass_boro"},{"x":0,"z":18,"m":"glass_boro"},{"x":0,"z":19,"m":"frame_steel"},{"x":0,"z":20,"m":"glass_boro"},{"x":1,"z":0,"m":"glass_boro"},{"x":1,"z":20,"m":"glass_boro"},{"x":2,"z":0,"m":"glass_boro"},{"x":2,"z":11,"m":"casing_solid_steel"},{"x":2,"z":20,"m":"glass_boro"},{"x":3,"z":0,"m":"glass_boro"},{"x":3,"z":20,"m":"glass_boro"},{"x":4,"z":0,"m":"frame_steel"},{"x":4,"z":20,"m":"frame_steel"},{"x":5,"z":0,"m":"glass_boro"},{"x":5,"z":20,"m":"glass_boro"},{"x":6,"z":0,"m":"glass_boro"},{"x":6,"z":20,"m":"glass_boro"},{"x":7,"z":0,"m":"glass_boro"},{"x":7,"z":20,"m":"glass_boro"},{"x":8,"z":0,"m":"glass_boro"},{"x":8,"z":11,"m":"casing_solid_steel"},{"x":8,"z":12,"m":"casing_solid_steel"},{"x":8,"z":13,"m":"casing_stainless"},{"x":8,"z":14,"m":"casing_solid_steel"},{"x":8,"z":20,"m":"glass_boro"},{"x":9,"z":0,"m":"glass_boro"},{"x":9,"z":10,"m":"grate"},{"x":9,"z":12,"m":"casing_stainless"},{"x":9,"z":13,"m":"casing_lathe"},{"x":9,"z":14,"m":"casing_stainless"},{"x":9,"z":20,"m":"glass_boro"},{"x":10,"z":0,"m":"glass_boro"},{"x":10,"z":12,"m":"casing_solid_steel"},{"x":10,"z":13,"m":"casing_stainless"},{"x":10,"z":14,"m":"casing_solid_steel"},{"x":10,"z":20,"m":"glass_boro"},{"x":11,"z":0,"m":"glass_boro"},{"x":11,"z":20,"m":"glass_boro"},{"x":12,"z":0,"m":"glass_boro"},{"x":12,"z":20,"m":"glass_boro"},{"x":13,"z":0,"m":"frame_steel"},{"x":13,"z":20,"m":"frame_steel"},{"x":14,"z":0,"m":"glass_boro"},{"x":14,"z":20,"m":"glass_boro"},{"x":15,"z":0,"m":"glass_boro"},{"x":15,"z":20,"m":"glass_boro"},{"x":16,"z":0,"m":"glass_boro"},{"x":16,"z":11,"m":"casing_solid_steel"},{"x":16,"z":20,"m":"glass_boro"},{"x":17,"z":0,"m":"glass_boro"},{"x":17,"z":20,"m":"glass_boro"},{"x":18,"z":0,"m":"frame_steel"},{"x":18,"z":1,"m":"glass_boro"},{"x":18,"z":2,"m":"glass_boro"},{"x":18,"z":3,"m":"glass_boro"},{"x":18,"z":4,"m":"frame_steel"},{"x":18,"z":5,"m":"glass_boro"},{"x":18,"z":6,"m":"glass_boro"},{"x":18,"z":7,"m":"glass_boro"},{"x":18,"z":8,"m":"glass_boro"},{"x":18,"z":9,"m":"frame_steel"},{"x":18,"z":10,"m":"glass_boro"},{"x":18,"z":11,"m":"glass_boro"},{"x":18,"z":12,"m":"glass_boro"},{"x":18,"z":13,"m":"frame_steel"},{"x":18,"z":14,"m":"glass_boro"},{"x":18,"z":15,"m":"glass_boro"},{"x":18,"z":16,"m":"glass_boro"},{"x":18,"z":17,"m":"glass_boro"},{"x":18,"z":18,"m":"glass_boro"},{"x":18,"z":19,"m":"frame_steel"},{"x":18,"z":20,"m":"glass_boro"}],[{"x":0,"z":0,"m":"frame_steel"},{"x":0,"z":1,"m":"glass_boro"},{"x":0,"z":2,"m":"glass_boro"},{"x":0,"z":3,"m":"glass_boro"},{"x":0,"z":4,"m":"frame_steel"},{"x":0,"z":5,"m":"glass_boro"},{"x":0,"z":6,"m":"glass_boro"},{"x":0,"z":7,"m":"glass_boro"},{"x":0,"z":8,"m":"glass_boro"},{"x":0,"z":9,"m":"frame_steel"},{"x":0,"z":10,"m":"glass_boro"},{"x":0,"z":11,"m":"glass_boro"},{"x":0,"z":12,"m":"glass_boro"},{"x":0,"z":13,"m":"frame_steel"},{"x":0,"z":14,"m":"glass_boro"},{"x":0,"z":15,"m":"glass_boro"},{"x":0,"z":16,"m":"glass_boro"},{"x":0,"z":17,"m":"glass_boro"},{"x":0,"z":18,"m":"glass_boro"},{"x":0,"z":19,"m":"frame_steel"},{"x":0,"z":20,"m":"glass_boro"},{"x":1,"z":0,"m":"glass_boro"},{"x":1,"z":20,"m":"glass_boro"},{"x":2,"z":0,"m":"glass_boro"},{"x":2,"z":11,"m":"casing_solid_steel"},{"x":2,"z":20,"m":"glass_boro"},{"x":3,"z":0,"m":"glass_boro"},{"x":3,"z":3,"m":"computer_advanced"},{"x":3,"z":4,"m":"computer_advanced"},{"x":3,"z":20,"m":"glass_boro"},{"x":4,"z":0,"m":"frame_steel"},{"x":4,"z":3,"m":"computer_advanced"},{"x":4,"z":4,"m":"computer_advanced"},{"x":4,"z":20,"m":"frame_steel"},{"x":5,"z":0,"m":"glass_boro"},{"x":5,"z":3,"m":"computer_advanced"},{"x":5,"z":4,"m":"computer_advanced"},{"x":5,"z":20,"m":"glass_boro"},{"x":6,"z":0,"m":"glass_boro"},{"x":6,"z":20,"m":"glass_boro"},{"x":7,"z":0,"m":"glass_boro"},{"x":7,"z":20,"m":"glass_boro"},{"x":8,"z":0,"m":"glass_boro"},{"x":8,"z":10,"m":"grate"},{"x":8,"z":11,"m":"casing_solid_steel"},{"x":8,"z":12,"m":"casing_solid_steel"},{"x":8,"z":13,"m":"casing_stainless"},{"x":8,"z":14,"m":"casing_solid_steel"},{"x":8,"z":20,"m":"glass_boro"},{"x":9,"z":0,"m":"glass_boro"},{"x":9,"z":10,"m":"grate"},{"x":9,"z":12,"m":"casing_lathe"},{"x":9,"z":13,"m":"casing_stainless"},{"x":9,"z":14,"m":"casing_lathe"},{"x":9,"z":20,"m":"glass_boro"},{"x":10,"z":0,"m":"glass_boro"},{"x":10,"z":12,"m":"casing_solid_steel"},{"x":10,"z":13,"m":"casing_stainless"},{"x":10,"z":14,"m":"casing_solid_steel"},{"x":10,"z":20,"m":"glass_boro"},{"x":11,"z":0,"m":"glass_boro"},{"x":11,"z":20,"m":"glass_boro"},{"x":12,"z":0,"m":"glass_boro"},{"x":12,"z":20,"m":"glass_boro"},{"x":13,"z":0,"m":"frame_steel"},{"x":13,"z":20,"m":"frame_steel"},{"x":14,"z":0,"m":"glass_boro"},{"x":14,"z":20,"m":"glass_boro"},{"x":15,"z":0,"m":"glass_boro"},{"x":15,"z":20,"m":"glass_boro"},{"x":16,"z":0,"m":"glass_boro"},{"x":16,"z":11,"m":"casing_solid_steel"},{"x":16,"z":20,"m":"glass_boro"},{"x":17,"z":0,"m":"glass_boro"},{"x":17,"z":20,"m":"glass_boro"},{"x":18,"z":0,"m":"frame_steel"},{"x":18,"z":1,"m":"glass_boro"},{"x":18,"z":2,"m":"glass_boro"},{"x":18,"z":3,"m":"glass_boro"},{"x":18,"z":4,"m":"frame_steel"},{"x":18,"z":5,"m":"glass_boro"},{"x":18,"z":6,"m":"glass_boro"},{"x":18,"z":7,"m":"glass_boro"},{"x":18,"z":8,"m":"glass_boro"},{"x":18,"z":9,"m":"frame_steel"},{"x":18,"z":10,"m":"glass_boro"},{"x":18,"z":11,"m":"glass_boro"},{"x":18,"z":12,"m":"glass_boro"},{"x":18,"z":13,"m":"frame_steel"},{"x":18,"z":14,"m":"glass_boro"},{"x":18,"z":15,"m":"glass_boro"},{"x":18,"z":16,"m":"glass_boro"},{"x":18,"z":17,"m":"glass_boro"},{"x":18,"z":18,"m":"glass_boro"},{"x":18,"z":19,"m":"frame_steel"},{"x":18,"z":20,"m":"glass_boro"}],[{"x":0,"z":0,"m":"frame_steel"},{"x":0,"z":1,"m":"glass_boro"},{"x":0,"z":2,"m":"glass_boro"},{"x":0,"z":3,"m":"glass_boro"},{"x":0,"z":4,"m":"frame_steel"},{"x":0,"z":5,"m":"glass_boro"},{"x":0,"z":6,"m":"glass_boro"},{"x":0,"z":7,"m":"glass_boro"},{"x":0,"z":8,"m":"glass_boro"},{"x":0,"z":9,"m":"frame_steel"},{"x":0,"z":10,"m":"glass_boro"},{"x":0,"z":11,"m":"glass_boro"},{"x":0,"z":12,"m":"glass_boro"},{"x":0,"z":13,"m":"frame_steel"},{"x":0,"z":14,"m":"glass_boro"},{"x":0,"z":15,"m":"glass_boro"},{"x":0,"z":16,"m":"glass_boro"},{"x":0,"z":17,"m":"glass_boro"},{"x":0,"z":18,"m":"glass_boro"},{"x":0,"z":19,"m":"frame_steel"},{"x":0,"z":20,"m":"glass_boro"},{"x":1,"z":0,"m":"glass_boro"},{"x":1,"z":11,"m":"frame_steel"},{"x":1,"z":12,"m":"concrete_light_smooth"},{"x":1,"z":13,"m":"concrete_light_smooth"},{"x":1,"z":14,"m":"concrete_light_smooth"},{"x":1,"z":15,"m":"concrete_light_smooth"},{"x":1,"z":16,"m":"concrete_light_smooth"},{"x":1,"z":17,"m":"concrete_light_smooth"},{"x":1,"z":18,"m":"concrete_light_smooth"},{"x":1,"z":19,"m":"concrete_light_smooth"},{"x":1,"z":20,"m":"glass_boro"},{"x":2,"z":0,"m":"glass_boro"},{"x":2,"z":11,"m":"frame_steel"},{"x":2,"z":12,"m":"concrete_light_smooth"},{"x":2,"z":13,"m":"concrete_light_smooth"},{"x":2,"z":14,"m":"concrete_light_smooth"},{"x":2,"z":15,"m":"concrete_light_smooth"},{"x":2,"z":16,"m":"concrete_light_smooth"},{"x":2,"z":17,"m":"concrete_light_smooth"},{"x":2,"z":18,"m":"concrete_light_smooth"},{"x":2,"z":19,"m":"concrete_light_smooth"},{"x":2,"z":20,"m":"glass_boro"},{"x":3,"z":0,"m":"glass_boro"},{"x":3,"z":11,"m":"frame_steel"},{"x":3,"z":12,"m":"concrete_light_smooth"},{"x":3,"z":13,"m":"concrete_light_smooth"},{"x":3,"z":14,"m":"concrete_light_smooth"},{"x":3,"z":15,"m":"concrete_light_smooth"},{"x":3,"z":16,"m":"concrete_light_smooth"},{"x":3,"z":17,"m":"concrete_light_smooth"},{"x":3,"z":18,"m":"concrete_light_smooth"},{"x":3,"z":19,"m":"concrete_light_smooth"},{"x":3,"z":20,"m":"glass_boro"},{"x":4,"z":0,"m":"frame_steel"},{"x":4,"z":11,"m":"frame_steel"},{"x":4,"z":12,"m":"concrete_light_smooth"},{"x":4,"z":13,"m":"concrete_light_smooth"},{"x":4,"z":14,"m":"concrete_light_smooth"},{"x":4,"z":15,"m":"concrete_light_smooth"},{"x":4,"z":16,"m":"concrete_light_smooth"},{"x":4,"z":17,"m":"concrete_light_smooth"},{"x":4,"z":18,"m":"concrete_light_smooth"},{"x":4,"z":19,"m":"concrete_light_smooth"},{"x":4,"z":20,"m":"frame_steel"},{"x":5,"z":0,"m":"glass_boro"},{"x":5,"z":11,"m":"frame_steel"},{"x":5,"z":12,"m":"concrete_light_smooth"},{"x":5,"z":13,"m":"concrete_light_smooth"},{"x":5,"z":14,"m":"concrete_light_smooth"},{"x":5,"z":15,"m":"concrete_light_smooth"},{"x":5,"z":16,"m":"concrete_light_smooth"},{"x":5,"z":17,"m":"concrete_light_smooth"},{"x":5,"z":18,"m":"concrete_light_smooth"},{"x":5,"z":19,"m":"concrete_light_smooth"},{"x":5,"z":20,"m":"glass_boro"},{"x":6,"z":0,"m":"glass_boro"},{"x":6,"z":3,"m":"computer_advanced"},{"x":6,"z":11,"m":"frame_steel"},{"x":6,"z":12,"m":"concrete_light_smooth"},{"x":6,"z":13,"m":"concrete_light_smooth"},{"x":6,"z":14,"m":"concrete_light_smooth"},{"x":6,"z":15,"m":"concrete_light_smooth"},{"x":6,"z":16,"m":"concrete_light_smooth"},{"x":6,"z":17,"m":"concrete_light_smooth"},{"x":6,"z":18,"m":"concrete_light_smooth"},{"x":6,"z":19,"m":"concrete_light_smooth"},{"x":6,"z":20,"m":"glass_boro"},{"x":7,"z":0,"m":"glass_boro"},{"x":7,"z":11,"m":"frame_steel"},{"x":7,"z":12,"m":"concrete_light_smooth"},{"x":7,"z":13,"m":"concrete_light_smooth"},{"x":7,"z":14,"m":"concrete_light_smooth"},{"x":7,"z":15,"m":"concrete_light_smooth"},{"x":7,"z":16,"m":"concrete_light_smooth"},{"x":7,"z":17,"m":"concrete_light_smooth"},{"x":7,"z":18,"m":"concrete_light_smooth"},{"x":7,"z":19,"m":"concrete_light_smooth"},{"x":7,"z":20,"m":"glass_boro"},{"x":8,"z":0,"m":"glass_boro"},{"x":8,"z":10,"m":"casing_solid_steel"},{"x":8,"z":11,"m":"frame_steel"},{"x":8,"z":12,"m":"concrete_light_smooth"},{"x":8,"z":13,"m":"concrete_light_smooth"},{"x":8,"z":14,"m":"concrete_light_smooth"},{"x":8,"z":15,"m":"concrete_light_smooth"},{"x":8,"z":16,"m":"concrete_light_smooth"},{"x":8,"z":17,"m":"concrete_light_smooth"},{"x":8,"z":18,"m":"concrete_light_smooth"},{"x":8,"z":19,"m":"concrete_light_smooth"},{"x":8,"z":20,"m":"glass_boro"},{"x":9,"z":0,"m":"glass_boro"},{"x":9,"z":10,"m":"computer_advanced"},{"x":9,"z":11,"m":"frame_steel"},{"x":9,"z":12,"m":"concrete_light_smooth"},{"x":9,"z":13,"m":"concrete_light_smooth"},{"x":9,"z":14,"m":"concrete_light_smooth"},{"x":9,"z":15,"m":"concrete_light_smooth"},{"x":9,"z":16,"m":"concrete_light_smooth"},{"x":9,"z":17,"m":"concrete_light_smooth"},{"x":9,"z":18,"m":"concrete_light_smooth"},{"x":9,"z":19,"m":"concrete_light_smooth"},{"x":9,"z":20,"m":"glass_boro"},{"x":10,"z":0,"m":"glass_boro"},{"x":10,"z":10,"m":"casing_solid_steel"},{"x":10,"z":11,"m":"frame_steel"},{"x":10,"z":12,"m":"concrete_light_smooth"},{"x":10,"z":13,"m":"concrete_light_smooth"},{"x":10,"z":14,"m":"concrete_light_smooth"},{"x":10,"z":15,"m":"concrete_light_smooth"},{"x":10,"z":16,"m":"concrete_light_smooth"},{"x":10,"z":17,"m":"concrete_light_smooth"},{"x":10,"z":18,"m":"concrete_light_smooth"},{"x":10,"z":19,"m":"concrete_light_smooth"},{"x":10,"z":20,"m":"glass_boro"},{"x":11,"z":0,"m":"glass_boro"},{"x":11,"z":11,"m":"frame_steel"},{"x":11,"z":12,"m":"concrete_light_smooth"},{"x":11,"z":13,"m":"concrete_light_smooth"},{"x":11,"z":14,"m":"concrete_light_smooth"},{"x":11,"z":15,"m":"concrete_light_smooth"},{"x":11,"z":16,"m":"concrete_light_smooth"},{"x":11,"z":17,"m":"concrete_light_smooth"},{"x":11,"z":18,"m":"concrete_light_smooth"},{"x":11,"z":19,"m":"concrete_light_smooth"},{"x":11,"z":20,"m":"glass_boro"},{"x":12,"z":0,"m":"glass_boro"},{"x":12,"z":11,"m":"frame_steel"},{"x":12,"z":12,"m":"concrete_light_smooth"},{"x":12,"z":13,"m":"concrete_light_smooth"},{"x":12,"z":14,"m":"concrete_light_smooth"},{"x":12,"z":15,"m":"concrete_light_smooth"},{"x":12,"z":16,"m":"concrete_light_smooth"},{"x":12,"z":17,"m":"concrete_light_smooth"},{"x":12,"z":18,"m":"concrete_light_smooth"},{"x":12,"z":19,"m":"concrete_light_smooth"},{"x":12,"z":20,"m":"glass_boro"},{"x":13,"z":0,"m":"frame_steel"},{"x":13,"z":11,"m":"frame_steel"},{"x":13,"z":12,"m":"concrete_light_smooth"},{"x":13,"z":13,"m":"casing_sterile"},{"x":13,"z":14,"m":"casing_sterile"},{"x":13,"z":15,"m":"casing_sterile"},{"x":13,"z":16,"m":"casing_sterile"},{"x":13,"z":17,"m":"concrete_light_smooth"},{"x":13,"z":18,"m":"concrete_light_smooth"},{"x":13,"z":19,"m":"concrete_light_smooth"},{"x":13,"z":20,"m":"frame_steel"},{"x":14,"z":0,"m":"glass_boro"},{"x":14,"z":11,"m":"frame_steel"},{"x":14,"z":12,"m":"concrete_light_smooth"},{"x":14,"z":13,"m":"casing_sterile"},{"x":14,"z":14,"m":"casing_sterile"},{"x":14,"z":15,"m":"casing_sterile"},{"x":14,"z":16,"m":"casing_sterile"},{"x":14,"z":17,"m":"concrete_light_smooth"},{"x":14,"z":18,"m":"concrete_light_smooth"},{"x":14,"z":19,"m":"concrete_light_smooth"},{"x":14,"z":20,"m":"glass_boro"},{"x":15,"z":0,"m":"glass_boro"},{"x":15,"z":11,"m":"frame_steel"},{"x":15,"z":12,"m":"concrete_light_smooth"},{"x":15,"z":13,"m":"casing_sterile"},{"x":15,"z":14,"m":"casing_sterile"},{"x":15,"z":15,"m":"casing_sterile"},{"x":15,"z":16,"m":"casing_sterile"},{"x":15,"z":17,"m":"concrete_light_smooth"},{"x":15,"z":18,"m":"concrete_light_smooth"},{"x":15,"z":19,"m":"concrete_light_smooth"},{"x":15,"z":20,"m":"glass_boro"},{"x":16,"z":0,"m":"glass_boro"},{"x":16,"z":11,"m":"frame_steel"},{"x":16,"z":12,"m":"concrete_light_smooth"},{"x":16,"z":13,"m":"casing_sterile"},{"x":16,"z":14,"m":"casing_sterile"},{"x":16,"z":15,"m":"casing_sterile"},{"x":16,"z":16,"m":"casing_sterile"},{"x":16,"z":17,"m":"concrete_light_smooth"},{"x":16,"z":18,"m":"concrete_light_smooth"},{"x":16,"z":19,"m":"concrete_light_smooth"},{"x":16,"z":20,"m":"glass_boro"},{"x":17,"z":0,"m":"glass_boro"},{"x":17,"z":11,"m":"frame_steel"},{"x":17,"z":12,"m":"concrete_light_smooth"},{"x":17,"z":13,"m":"concrete_light_smooth"},{"x":17,"z":14,"m":"concrete_light_smooth"},{"x":17,"z":15,"m":"concrete_light_smooth"},{"x":17,"z":16,"m":"concrete_light_smooth"},{"x":17,"z":17,"m":"concrete_light_smooth"},{"x":17,"z":18,"m":"concrete_light_smooth"},{"x":17,"z":19,"m":"concrete_light_smooth"},{"x":17,"z":20,"m":"glass_boro"},{"x":18,"z":0,"m":"frame_steel"},{"x":18,"z":1,"m":"glass_boro"},{"x":18,"z":2,"m":"glass_boro"},{"x":18,"z":3,"m":"glass_boro"},{"x":18,"z":4,"m":"frame_steel"},{"x":18,"z":5,"m":"glass_boro"},{"x":18,"z":6,"m":"glass_boro"},{"x":18,"z":7,"m":"glass_boro"},{"x":18,"z":8,"m":"glass_boro"},{"x":18,"z":9,"m":"frame_steel"},{"x":18,"z":10,"m":"glass_boro"},{"x":18,"z":11,"m":"glass_boro"},{"x":18,"z":12,"m":"glass_boro"},{"x":18,"z":13,"m":"frame_steel"},{"x":18,"z":14,"m":"glass_boro"},{"x":18,"z":15,"m":"glass_boro"},{"x":18,"z":16,"m":"glass_boro"},{"x":18,"z":17,"m":"glass_boro"},{"x":18,"z":18,"m":"glass_boro"},{"x":18,"z":19,"m":"frame_steel"},{"x":18,"z":20,"m":"glass_boro"}],[{"x":0,"z":0,"m":"frame_steel"},{"x":0,"z":1,"m":"glass_boro"},{"x":0,"z":2,"m":"glass_boro"},{"x":0,"z":3,"m":"glass_boro"},{"x":0,"z":4,"m":"frame_steel"},{"x":0,"z":5,"m":"glass_boro"},{"x":0,"z":6,"m":"glass_boro"},{"x":0,"z":7,"m":"glass_boro"},{"x":0,"z":8,"m":"glass_boro"},{"x":0,"z":9,"m":"frame_steel"},{"x":0,"z":10,"m":"glass_boro"},{"x":0,"z":11,"m":"glass_boro"},{"x":0,"z":12,"m":"glass_boro"},{"x":0,"z":13,"m":"frame_steel"},{"x":0,"z":14,"m":"glass_boro"},{"x":0,"z":15,"m":"glass_boro"},{"x":0,"z":16,"m":"glass_boro"},{"x":0,"z":17,"m":"glass_boro"},{"x":0,"z":18,"m":"glass_boro"},{"x":0,"z":19,"m":"frame_steel"},{"x":0,"z":20,"m":"glass_boro"},{"x":1,"z":0,"m":"glass_boro"},{"x":1,"z":20,"m":"glass_boro"},{"x":2,"z":0,"m":"glass_boro"},{"x":2,"z":20,"m":"glass_boro"},{"x":3,"z":0,"m":"glass_boro"},{"x":3,"z":20,"m":"glass_boro"},{"x":4,"z":0,"m":"frame_steel"},{"x":4,"z":20,"m":"frame_steel"},{"x":5,"z":0,"m":"glass_boro"},{"x":5,"z":13,"m":"computer_advanced"},{"x":5,"z":20,"m":"glass_boro"},{"x":6,"z":0,"m":"glass_boro"},{"x":6,"z":13,"m":"computer_advanced"},{"x":6,"z":20,"m":"glass_boro"},{"x":7,"z":0,"m":"glass_boro"},{"x":7,"z":13,"m":"computer_advanced"},{"x":7,"z":20,"m":"glass_boro"},{"x":8,"z":0,"m":"glass_boro"},{"x":8,"z":10,"m":"casing_solid_steel"},{"x":8,"z":20,"m":"glass_boro"},{"x":9,"z":0,"m":"glass_boro"},{"x":9,"z":10,"m":"casing_lathe"},{"x":9,"z":20,"m":"glass_boro"},{"x":10,"z":0,"m":"glass_boro"},{"x":10,"z":10,"m":"casing_solid_steel"},{"x":10,"z":20,"m":"glass_boro"},{"x":11,"z":0,"m":"glass_boro"},{"x":11,"z":20,"m":"glass_boro"},{"x":12,"z":0,"m":"glass_boro"},{"x":12,"z":20,"m":"glass_boro"},{"x":13,"z":0,"m":"frame_steel"},{"x":13,"z":20,"m":"frame_steel"},{"x":14,"z":0,"m":"glass_boro"},{"x":14,"z":20,"m":"glass_boro"},{"x":15,"z":0,"m":"glass_boro"},{"x":15,"z":20,"m":"glass_boro"},{"x":16,"z":0,"m":"glass_boro"},{"x":16,"z":20,"m":"glass_boro"},{"x":17,"z":0,"m":"glass_boro"},{"x":17,"z":20,"m":"glass_boro"},{"x":18,"z":0,"m":"frame_steel"},{"x":18,"z":1,"m":"glass_boro"},{"x":18,"z":2,"m":"glass_boro"},{"x":18,"z":3,"m":"glass_boro"},{"x":18,"z":4,"m":"frame_steel"},{"x":18,"z":5,"m":"glass_boro"},{"x":18,"z":6,"m":"glass_boro"},{"x":18,"z":7,"m":"glass_boro"},{"x":18,"z":8,"m":"glass_boro"},{"x":18,"z":9,"m":"frame_steel"},{"x":18,"z":10,"m":"glass_boro"},{"x":18,"z":11,"m":"glass_boro"},{"x":18,"z":12,"m":"glass_boro"},{"x":18,"z":13,"m":"frame_steel"},{"x":18,"z":14,"m":"glass_boro"},{"x":18,"z":15,"m":"glass_boro"},{"x":18,"z":16,"m":"glass_boro"},{"x":18,"z":17,"m":"glass_boro"},{"x":18,"z":18,"m":"glass_boro"},{"x":18,"z":19,"m":"frame_steel"},{"x":18,"z":20,"m":"glass_boro"}],[{"x":0,"z":0,"m":"frame_steel"},{"x":0,"z":1,"m":"concrete_light"},{"x":0,"z":2,"m":"concrete_light"},{"x":0,"z":3,"m":"concrete_light"},{"x":0,"z":4,"m":"concrete_light"},{"x":0,"z":5,"m":"concrete_light"},{"x":0,"z":6,"m":"concrete_light"},{"x":0,"z":7,"m":"concrete_light"},{"x":0,"z":8,"m":"concrete_light"},{"x":0,"z":9,"m":"concrete_light"},{"x":0,"z":10,"m":"concrete_light"},{"x":0,"z":11,"m":"concrete_light"},{"x":0,"z":12,"m":"concrete_light"},{"x":0,"z":13,"m":"concrete_light"},{"x":0,"z":14,"m":"concrete_light"},{"x":0,"z":15,"m":"concrete_light"},{"x":0,"z":16,"m":"concrete_light"},{"x":0,"z":17,"m":"concrete_light"},{"x":0,"z":18,"m":"concrete_light"},{"x":0,"z":19,"m":"frame_steel"},{"x":0,"z":20,"m":"concrete_light"},{"x":1,"z":0,"m":"concrete_light"},{"x":1,"z":10,"m":"frame_steel"},{"x":1,"z":20,"m":"concrete_light"},{"x":2,"z":0,"m":"concrete_light"},{"x":2,"z":10,"m":"frame_steel"},{"x":2,"z":20,"m":"concrete_light"},{"x":3,"z":0,"m":"concrete_light"},{"x":3,"z":10,"m":"frame_steel"},{"x":3,"z":20,"m":"concrete_light"},{"x":4,"z":0,"m":"concrete_light"},{"x":4,"z":10,"m":"frame_steel"},{"x":4,"z":20,"m":"concrete_light"},{"x":5,"z":0,"m":"concrete_light"},{"x":5,"z":10,"m":"frame_steel"},{"x":5,"z":20,"m":"concrete_light"},{"x":6,"z":0,"m":"concrete_light"},{"x":6,"z":10,"m":"frame_steel"},{"x":6,"z":20,"m":"concrete_light"},{"x":7,"z":0,"m":"concrete_light"},{"x":7,"z":10,"m":"frame_steel"},{"x":7,"z":20,"m":"concrete_light"},{"x":8,"z":0,"m":"concrete_light"},{"x":8,"z":10,"m":"casing_lathe"},{"x":8,"z":20,"m":"concrete_light"},{"x":9,"z":0,"m":"concrete_light"},{"x":9,"z":10,"m":"molecular_coil"},{"x":9,"z":20,"m":"concrete_light"},{"x":10,"z":0,"m":"concrete_light"},{"x":10,"z":10,"m":"casing_lathe"},{"x":10,"z":20,"m":"concrete_light"},{"x":11,"z":0,"m":"concrete_light"},{"x":11,"z":10,"m":"frame_steel"},{"x":11,"z":20,"m":"concrete_light"},{"x":12,"z":0,"m":"concrete_light"},{"x":12,"z":10,"m":"frame_steel"},{"x":12,"z":20,"m":"concrete_light"},{"x":13,"z":0,"m":"concrete_light"},{"x":13,"z":10,"m":"frame_steel"},{"x":13,"z":20,"m":"concrete_light"},{"x":14,"z":0,"m":"concrete_light"},{"x":14,"z":10,"m":"frame_steel"},{"x":14,"z":20,"m":"concrete_light"},{"x":15,"z":0,"m":"concrete_light"},{"x":15,"z":10,"m":"frame_steel"},{"x":15,"z":20,"m":"concrete_light"},{"x":16,"z":0,"m":"concrete_light"},{"x":16,"z":10,"m":"frame_steel"},{"x":16,"z":20,"m":"concrete_light"},{"x":17,"z":0,"m":"concrete_light"},{"x":17,"z":10,"m":"frame_steel"},{"x":17,"z":20,"m":"concrete_light"},{"x":18,"z":0,"m":"frame_steel"},{"x":18,"z":1,"m":"concrete_light"},{"x":18,"z":2,"m":"concrete_light"},{"x":18,"z":3,"m":"concrete_light"},{"x":18,"z":4,"m":"concrete_light"},{"x":18,"z":5,"m":"concrete_light"},{"x":18,"z":6,"m":"concrete_light"},{"x":18,"z":7,"m":"concrete_light"},{"x":18,"z":8,"m":"concrete_light"},{"x":18,"z":9,"m":"concrete_light"},{"x":18,"z":10,"m":"concrete_light"},{"x":18,"z":11,"m":"concrete_light"},{"x":18,"z":12,"m":"concrete_light"},{"x":18,"z":13,"m":"concrete_light"},{"x":18,"z":14,"m":"concrete_light"},{"x":18,"z":15,"m":"concrete_light"},{"x":18,"z":16,"m":"concrete_light"},{"x":18,"z":17,"m":"concrete_light"},{"x":18,"z":18,"m":"concrete_light"},{"x":18,"z":19,"m":"frame_steel"},{"x":18,"z":20,"m":"concrete_light"}],[{"x":0,"z":0,"m":"frame_steel"},{"x":0,"z":1,"m":"concrete_light"},{"x":0,"z":2,"m":"concrete_light"},{"x":0,"z":3,"m":"concrete_light"},{"x":0,"z":4,"m":"concrete_light"},{"x":0,"z":5,"m":"concrete_light"},{"x":0,"z":6,"m":"concrete_light"},{"x":0,"z":7,"m":"concrete_light"},{"x":0,"z":8,"m":"concrete_light"},{"x":0,"z":9,"m":"concrete_light"},{"x":0,"z":10,"m":"concrete_light"},{"x":0,"z":11,"m":"concrete_light"},{"x":0,"z":12,"m":"concrete_light"},{"x":0,"z":13,"m":"concrete_light"},{"x":0,"z":14,"m":"concrete_light"},{"x":0,"z":15,"m":"concrete_light"},{"x":0,"z":16,"m":"concrete_light"},{"x":0,"z":17,"m":"concrete_light"},{"x":0,"z":18,"m":"concrete_light"},{"x":0,"z":19,"m":"frame_steel"},{"x":0,"z":20,"m":"casing_solid_steel"},{"x":1,"z":0,"m":"concrete_light"},{"x":1,"z":20,"m":"casing_solid_steel"},{"x":2,"z":0,"m":"concrete_light"},{"x":2,"z":20,"m":"casing_solid_steel"},{"x":3,"z":0,"m":"casing_solid_steel"},{"x":3,"z":20,"m":"casing_solid_steel"},{"x":4,"z":0,"m":"concrete_light"},{"x":4,"z":20,"m":"casing_solid_steel"},{"x":5,"z":0,"m":"concrete_light"},{"x":5,"z":20,"m":"casing_solid_steel"},{"x":6,"z":0,"m":"concrete_light"},{"x":6,"z":20,"m":"casing_solid_steel"},{"x":7,"z":0,"m":"casing_solid_steel"},{"x":7,"z":20,"m":"casing_solid_steel"},{"x":8,"z":0,"m":"concrete_light"},{"x":8,"z":20,"m":"casing_solid_steel"},{"x":9,"z":0,"m":"concrete_light"},{"x":9,"z":20,"m":"casing_solid_steel"},{"x":10,"z":0,"m":"concrete_light"},{"x":10,"z":20,"m":"casing_solid_steel"},{"x":11,"z":0,"m":"casing_solid_steel"},{"x":11,"z":20,"m":"casing_solid_steel"},{"x":12,"z":0,"m":"concrete_light"},{"x":12,"z":20,"m":"casing_solid_steel"},{"x":13,"z":0,"m":"concrete_light"},{"x":13,"z":20,"m":"casing_solid_steel"},{"x":14,"z":0,"m":"concrete_light"},{"x":14,"z":20,"m":"casing_solid_steel"},{"x":15,"z":0,"m":"casing_solid_steel"},{"x":15,"z":20,"m":"casing_solid_steel"},{"x":16,"z":0,"m":"concrete_light"},{"x":16,"z":20,"m":"casing_solid_steel"},{"x":17,"z":0,"m":"concrete_light"},{"x":17,"z":20,"m":"casing_solid_steel"},{"x":18,"z":0,"m":"frame_steel"},{"x":18,"z":1,"m":"concrete_light"},{"x":18,"z":2,"m":"concrete_light"},{"x":18,"z":3,"m":"concrete_light"},{"x":18,"z":4,"m":"concrete_light"},{"x":18,"z":5,"m":"concrete_light"},{"x":18,"z":6,"m":"concrete_light"},{"x":18,"z":7,"m":"concrete_light"},{"x":18,"z":8,"m":"concrete_light"},{"x":18,"z":9,"m":"concrete_light"},{"x":18,"z":10,"m":"concrete_light"},{"x":18,"z":11,"m":"concrete_light"},{"x":18,"z":12,"m":"concrete_light"},{"x":18,"z":13,"m":"concrete_light"},{"x":18,"z":14,"m":"concrete_light"},{"x":18,"z":15,"m":"concrete_light"},{"x":18,"z":16,"m":"concrete_light"},{"x":18,"z":17,"m":"concrete_light"},{"x":18,"z":18,"m":"concrete_light"},{"x":18,"z":19,"m":"frame_steel"},{"x":18,"z":20,"m":"casing_solid_steel"}],[{"x":0,"z":0,"m":"concrete_light_smooth"},{"x":0,"z":1,"m":"concrete_light_smooth"},{"x":0,"z":2,"m":"concrete_light_smooth"},{"x":0,"z":3,"m":"concrete_light_smooth"},{"x":0,"z":4,"m":"concrete_light_smooth"},{"x":0,"z":5,"m":"concrete_light_smooth"},{"x":0,"z":6,"m":"concrete_light_smooth"},{"x":0,"z":7,"m":"concrete_light_smooth"},{"x":0,"z":8,"m":"concrete_light_smooth"},{"x":0,"z":9,"m":"concrete_light_smooth"},{"x":0,"z":10,"m":"concrete_light_smooth"},{"x":0,"z":11,"m":"concrete_light_smooth"},{"x":0,"z":12,"m":"concrete_light_smooth"},{"x":0,"z":13,"m":"concrete_light_smooth"},{"x":0,"z":14,"m":"concrete_light_smooth"},{"x":0,"z":15,"m":"concrete_light_smooth"},{"x":0,"z":16,"m":"concrete_light_smooth"},{"x":0,"z":17,"m":"concrete_light_smooth"},{"x":0,"z":18,"m":"concrete_light_smooth"},{"x":0,"z":19,"m":"concrete_light_smooth"},{"x":0,"z":20,"m":"concrete_light_smooth"},{"x":1,"z":0,"m":"concrete_light_smooth"},{"x":1,"z":1,"m":"concrete_light_smooth"},{"x":1,"z":2,"m":"concrete_light_smooth"},{"x":1,"z":3,"m":"concrete_light_smooth"},{"x":1,"z":4,"m":"concrete_light_smooth"},{"x":1,"z":5,"m":"concrete_light_smooth"},{"x":1,"z":6,"m":"concrete_light_smooth"},{"x":1,"z":7,"m":"concrete_light_smooth"},{"x":1,"z":8,"m":"concrete_light_smooth"},{"x":1,"z":9,"m":"concrete_light_smooth"},{"x":1,"z":10,"m":"concrete_light_smooth"},{"x":1,"z":11,"m":"concrete_light_smooth"},{"x":1,"z":12,"m":"concrete_light_smooth"},{"x":1,"z":13,"m":"concrete_light_smooth"},{"x":1,"z":14,"m":"concrete_light_smooth"},{"x":1,"z":15,"m":"concrete_light_smooth"},{"x":1,"z":16,"m":"concrete_light_smooth"},{"x":1,"z":17,"m":"concrete_light_smooth"},{"x":1,"z":18,"m":"concrete_light_smooth"},{"x":1,"z":19,"m":"concrete_light_smooth"},{"x":1,"z":20,"m":"concrete_light_smooth"},{"x":2,"z":0,"m":"concrete_light_smooth"},{"x":2,"z":1,"m":"concrete_light_smooth"},{"x":2,"z":2,"m":"concrete_light_smooth"},{"x":2,"z":3,"m":"concrete_light_smooth"},{"x":2,"z":4,"m":"concrete_light_smooth"},{"x":2,"z":5,"m":"concrete_light_smooth"},{"x":2,"z":6,"m":"concrete_light_smooth"},{"x":2,"z":7,"m":"concrete_light_smooth"},{"x":2,"z":8,"m":"concrete_light_smooth"},{"x":2,"z":9,"m":"concrete_light_smooth"},{"x":2,"z":10,"m":"concrete_light_smooth"},{"x":2,"z":11,"m":"concrete_light_smooth"},{"x":2,"z":12,"m":"concrete_light_smooth"},{"x":2,"z":13,"m":"concrete_light_smooth"},{"x":2,"z":14,"m":"concrete_light_smooth"},{"x":2,"z":15,"m":"concrete_light_smooth"},{"x":2,"z":16,"m":"concrete_light_smooth"},{"x":2,"z":17,"m":"concrete_light_smooth"},{"x":2,"z":18,"m":"concrete_light_smooth"},{"x":2,"z":19,"m":"concrete_light_smooth"},{"x":2,"z":20,"m":"concrete_light_smooth"},{"x":3,"z":0,"m":"concrete_light_smooth"},{"x":3,"z":1,"m":"concrete_light_smooth"},{"x":3,"z":2,"m":"concrete_light_smooth"},{"x":3,"z":3,"m":"glass_boro"},{"x":3,"z":4,"m":"concrete_light_smooth"},{"x":3,"z":5,"m":"concrete_light_smooth"},{"x":3,"z":6,"m":"concrete_light_smooth"},{"x":3,"z":7,"m":"glass_boro"},{"x":3,"z":8,"m":"concrete_light_smooth"},{"x":3,"z":9,"m":"concrete_light_smooth"},{"x":3,"z":10,"m":"concrete_light_smooth"},{"x":3,"z":11,"m":"glass_boro"},{"x":3,"z":12,"m":"concrete_light_smooth"},{"x":3,"z":13,"m":"concrete_light_smooth"},{"x":3,"z":14,"m":"concrete_light_smooth"},{"x":3,"z":15,"m":"glass_boro"},{"x":3,"z":16,"m":"concrete_light_smooth"},{"x":3,"z":17,"m":"concrete_light_smooth"},{"x":3,"z":18,"m":"concrete_light_smooth"},{"x":3,"z":19,"m":"concrete_light_smooth"},{"x":3,"z":20,"m":"concrete_light_smooth"},{"x":4,"z":0,"m":"concrete_light_smooth"},{"x":4,"z":1,"m":"concrete_light_smooth"},{"x":4,"z":2,"m":"concrete_light_smooth"},{"x":4,"z":3,"m":"concrete_light_smooth"},{"x":4,"z":4,"m":"concrete_light_smooth"},{"x":4,"z":5,"m":"concrete_light_smooth"},{"x":4,"z":6,"m":"concrete_light_smooth"},{"x":4,"z":7,"m":"concrete_light_smooth"},{"x":4,"z":8,"m":"concrete_light_smooth"},{"x":4,"z":9,"m":"concrete_light_smooth"},{"x":4,"z":10,"m":"concrete_light_smooth"},{"x":4,"z":11,"m":"concrete_light_smooth"},{"x":4,"z":12,"m":"concrete_light_smooth"},{"x":4,"z":13,"m":"concrete_light_smooth"},{"x":4,"z":14,"m":"concrete_light_smooth"},{"x":4,"z":15,"m":"concrete_light_smooth"},{"x":4,"z":16,"m":"concrete_light_smooth"},{"x":4,"z":17,"m":"concrete_light_smooth"},{"x":4,"z":18,"m":"concrete_light_smooth"},{"x":4,"z":19,"m":"concrete_light_smooth"},{"x":4,"z":20,"m":"concrete_light_smooth"},{"x":5,"z":0,"m":"concrete_light_smooth"},{"x":5,"z":1,"m":"concrete_light_smooth"},{"x":5,"z":2,"m":"concrete_light_smooth"},{"x":5,"z":3,"m":"concrete_light_smooth"},{"x":5,"z":4,"m":"concrete_light_smooth"},{"x":5,"z":5,"m":"concrete_light_smooth"},{"x":5,"z":6,"m":"concrete_light_smooth"},{"x":5,"z":7,"m":"concrete_light_smooth"},{"x":5,"z":8,"m":"concrete_light_smooth"},{"x":5,"z":9,"m":"grate"},{"x":5,"z":10,"m":"concrete_light_smooth"},{"x":5,"z":11,"m":"concrete_light_smooth"},{"x":5,"z":12,"m":"concrete_light_smooth"},{"x":5,"z":13,"m":"concrete_light_smooth"},{"x":5,"z":14,"m":"concrete_light_smooth"},{"x":5,"z":15,"m":"concrete_light_smooth"},{"x":5,"z":16,"m":"concrete_light_smooth"},{"x":5,"z":17,"m":"concrete_light_smooth"},{"x":5,"z":18,"m":"concrete_light_smooth"},{"x":5,"z":19,"m":"concrete_light_smooth"},{"x":5,"z":20,"m":"concrete_light_smooth"},{"x":6,"z":0,"m":"concrete_light_smooth"},{"x":6,"z":1,"m":"concrete_light_smooth"},{"x":6,"z":2,"m":"concrete_light_smooth"},{"x":6,"z":3,"m":"concrete_light_smooth"},{"x":6,"z":4,"m":"concrete_light_smooth"},{"x":6,"z":5,"m":"concrete_light_smooth"},{"x":6,"z":6,"m":"concrete_light_smooth"},{"x":6,"z":7,"m":"concrete_light_smooth"},{"x":6,"z":8,"m":"concrete_light_smooth"},{"x":6,"z":9,"m":"concrete_light_smooth"},{"x":6,"z":10,"m":"concrete_light_smooth"},{"x":6,"z":11,"m":"concrete_light_smooth"},{"x":6,"z":12,"m":"concrete_light_smooth"},{"x":6,"z":13,"m":"concrete_light_smooth"},{"x":6,"z":14,"m":"concrete_light_smooth"},{"x":6,"z":15,"m":"concrete_light_smooth"},{"x":6,"z":16,"m":"concrete_light_smooth"},{"x":6,"z":17,"m":"concrete_light_smooth"},{"x":6,"z":18,"m":"concrete_light_smooth"},{"x":6,"z":19,"m":"concrete_light_smooth"},{"x":6,"z":20,"m":"concrete_light_smooth"},{"x":7,"z":0,"m":"concrete_light_smooth"},{"x":7,"z":1,"m":"concrete_light_smooth"},{"x":7,"z":2,"m":"concrete_light_smooth"},{"x":7,"z":3,"m":"glass_boro"},{"x":7,"z":4,"m":"concrete_light_smooth"},{"x":7,"z":5,"m":"concrete_light_smooth"},{"x":7,"z":6,"m":"concrete_light_smooth"},{"x":7,"z":7,"m":"glass_boro"},{"x":7,"z":8,"m":"concrete_light_smooth"},{"x":7,"z":9,"m":"concrete_light_smooth"},{"x":7,"z":10,"m":"concrete_light_smooth"},{"x":7,"z":11,"m":"glass_boro"},{"x":7,"z":12,"m":"concrete_light_smooth"},{"x":7,"z":13,"m":"concrete_light_smooth"},{"x":7,"z":14,"m":"concrete_light_smooth"},{"x":7,"z":15,"m":"glass_boro"},{"x":7,"z":16,"m":"concrete_light_smooth"},{"x":7,"z":17,"m":"concrete_light_smooth"},{"x":7,"z":18,"m":"concrete_light_smooth"},{"x":7,"z":19,"m":"concrete_light_smooth"},{"x":7,"z":20,"m":"concrete_light_smooth"},{"x":8,"z":0,"m":"concrete_light_smooth"},{"x":8,"z":1,"m":"concrete_light_smooth"},{"x":8,"z":2,"m":"concrete_light_smooth"},{"x":8,"z":3,"m":"concrete_light_smooth"},{"x":8,"z":4,"m":"concrete_light_smooth"},{"x":8,"z":5,"m":"concrete_light_smooth"},{"x":8,"z":6,"m":"concrete_light_smooth"},{"x":8,"z":7,"m":"concrete_light_smooth"},{"x":8,"z":8,"m":"concrete_light_smooth"},{"x":8,"z":9,"m":"concrete_light_smooth"},{"x":8,"z":10,"m":"concrete_light_smooth"},{"x":8,"z":11,"m":"concrete_light_smooth"},{"x":8,"z":12,"m":"concrete_light_smooth"},{"x":8,"z":13,"m":"concrete_light_smooth"},{"x":8,"z":14,"m":"concrete_light_smooth"},{"x":8,"z":15,"m":"concrete_light_smooth"},{"x":8,"z":16,"m":"concrete_light_smooth"},{"x":8,"z":17,"m":"concrete_light_smooth"},{"x":8,"z":18,"m":"concrete_light_smooth"},{"x":8,"z":19,"m":"concrete_light_smooth"},{"x":8,"z":20,"m":"concrete_light_smooth"},{"x":9,"z":0,"m":"concrete_light_smooth"},{"x":9,"z":1,"m":"concrete_light_smooth"},{"x":9,"z":2,"m":"concrete_light_smooth"},{"x":9,"z":3,"m":"concrete_light_smooth"},{"x":9,"z":4,"m":"concrete_light_smooth"},{"x":9,"z":5,"m":"concrete_light_smooth"},{"x":9,"z":6,"m":"concrete_light_smooth"},{"x":9,"z":7,"m":"frame_steel"},{"x":9,"z":8,"m":"concrete_light_smooth"},{"x":9,"z":9,"m":"concrete_light_smooth"},{"x":9,"z":10,"m":"concrete_light_smooth"},{"x":9,"z":11,"m":"frame_steel"},{"x":9,"z":12,"m":"concrete_light_smooth"},{"x":9,"z":13,"m":"concrete_light_smooth"},{"x":9,"z":14,"m":"concrete_light_smooth"},{"x":9,"z":15,"m":"concrete_light_smooth"},{"x":9,"z":16,"m":"concrete_light_smooth"},{"x":9,"z":17,"m":"concrete_light_smooth"},{"x":9,"z":18,"m":"concrete_light_smooth"},{"x":9,"z":19,"m":"concrete_light_smooth"},{"x":9,"z":20,"m":"concrete_light_smooth"},{"x":10,"z":0,"m":"concrete_light_smooth"},{"x":10,"z":1,"m":"concrete_light_smooth"},{"x":10,"z":2,"m":"concrete_light_smooth"},{"x":10,"z":3,"m":"concrete_light_smooth"},{"x":10,"z":4,"m":"concrete_light_smooth"},{"x":10,"z":5,"m":"concrete_light_smooth"},{"x":10,"z":6,"m":"concrete_light_smooth"},{"x":10,"z":7,"m":"concrete_light_smooth"},{"x":10,"z":8,"m":"concrete_light_smooth"},{"x":10,"z":9,"m":"concrete_light_smooth"},{"x":10,"z":10,"m":"concrete_light_smooth"},{"x":10,"z":11,"m":"concrete_light_smooth"},{"x":10,"z":12,"m":"concrete_light_smooth"},{"x":10,"z":13,"m":"concrete_light_smooth"},{"x":10,"z":14,"m":"concrete_light_smooth"},{"x":10,"z":15,"m":"concrete_light_smooth"},{"x":10,"z":16,"m":"concrete_light_smooth"},{"x":10,"z":17,"m":"concrete_light_smooth"},{"x":10,"z":18,"m":"concrete_light_smooth"},{"x":10,"z":19,"m":"concrete_light_smooth"},{"x":10,"z":20,"m":"concrete_light_smooth"},{"x":11,"z":0,"m":"concrete_light_smooth"},{"x":11,"z":1,"m":"concrete_light_smooth"},{"x":11,"z":2,"m":"concrete_light_smooth"},{"x":11,"z":3,"m":"glass_boro"},{"x":11,"z":4,"m":"concrete_light_smooth"},{"x":11,"z":5,"m":"concrete_light_smooth"},{"x":11,"z":6,"m":"concrete_light_smooth"},{"x":11,"z":7,"m":"glass_boro"},{"x":11,"z":8,"m":"concrete_light_smooth"},{"x":11,"z":9,"m":"concrete_light_smooth"},{"x":11,"z":10,"m":"concrete_light_smooth"},{"x":11,"z":11,"m":"glass_boro"},{"x":11,"z":12,"m":"concrete_light_smooth"},{"x":11,"z":13,"m":"concrete_light_smooth"},{"x":11,"z":14,"m":"concrete_light_smooth"},{"x":11,"z":15,"m":"glass_boro"},{"x":11,"z":16,"m":"concrete_light_smooth"},{"x":11,"z":17,"m":"concrete_light_smooth"},{"x":11,"z":18,"m":"concrete_light_smooth"},{"x":11,"z":19,"m":"concrete_light_smooth"},{"x":11,"z":20,"m":"concrete_light_smooth"},{"x":12,"z":0,"m":"concrete_light_smooth"},{"x":12,"z":1,"m":"concrete_light_smooth"},{"x":12,"z":2,"m":"concrete_light_smooth"},{"x":12,"z":3,"m":"concrete_light_smooth"},{"x":12,"z":4,"m":"concrete_light_smooth"},{"x":12,"z":5,"m":"concrete_light_smooth"},{"x":12,"z":6,"m":"concrete_light_smooth"},{"x":12,"z":7,"m":"concrete_light_smooth"},{"x":12,"z":8,"m":"concrete_light_smooth"},{"x":12,"z":9,"m":"concrete_light_smooth"},{"x":12,"z":10,"m":"concrete_light_smooth"},{"x":12,"z":11,"m":"concrete_light_smooth"},{"x":12,"z":12,"m":"concrete_light_smooth"},{"x":12,"z":13,"m":"concrete_light_smooth"},{"x":12,"z":14,"m":"concrete_light_smooth"},{"x":12,"z":15,"m":"concrete_light_smooth"},{"x":12,"z":16,"m":"concrete_light_smooth"},{"x":12,"z":17,"m":"concrete_light_smooth"},{"x":12,"z":18,"m":"concrete_light_smooth"},{"x":12,"z":19,"m":"concrete_light_smooth"},{"x":12,"z":20,"m":"concrete_light_smooth"},{"x":13,"z":0,"m":"concrete_light_smooth"},{"x":13,"z":1,"m":"concrete_light_smooth"},{"x":13,"z":2,"m":"concrete_light_smooth"},{"x":13,"z":3,"m":"concrete_light_smooth"},{"x":13,"z":4,"m":"concrete_light_smooth"},{"x":13,"z":5,"m":"concrete_light_smooth"},{"x":13,"z":6,"m":"concrete_light_smooth"},{"x":13,"z":7,"m":"concrete_light_smooth"},{"x":13,"z":8,"m":"concrete_light_smooth"},{"x":13,"z":9,"m":"grate"},{"x":13,"z":10,"m":"concrete_light_smooth"},{"x":13,"z":11,"m":"concrete_light_smooth"},{"x":13,"z":12,"m":"concrete_light_smooth"},{"x":13,"z":13,"m":"concrete_light_smooth"},{"x":13,"z":14,"m":"concrete_light_smooth"},{"x":13,"z":15,"m":"concrete_light_smooth"},{"x":13,"z":16,"m":"concrete_light_smooth"},{"x":13,"z":17,"m":"concrete_light_smooth"},{"x":13,"z":18,"m":"concrete_light_smooth"},{"x":13,"z":19,"m":"concrete_light_smooth"},{"x":13,"z":20,"m":"concrete_light_smooth"},{"x":14,"z":0,"m":"concrete_light_smooth"},{"x":14,"z":1,"m":"concrete_light_smooth"},{"x":14,"z":2,"m":"concrete_light_smooth"},{"x":14,"z":3,"m":"concrete_light_smooth"},{"x":14,"z":4,"m":"concrete_light_smooth"},{"x":14,"z":5,"m":"concrete_light_smooth"},{"x":14,"z":6,"m":"concrete_light_smooth"},{"x":14,"z":7,"m":"concrete_light_smooth"},{"x":14,"z":8,"m":"concrete_light_smooth"},{"x":14,"z":9,"m":"concrete_light_smooth"},{"x":14,"z":10,"m":"concrete_light_smooth"},{"x":14,"z":11,"m":"concrete_light_smooth"},{"x":14,"z":12,"m":"concrete_light_smooth"},{"x":14,"z":13,"m":"concrete_light_smooth"},{"x":14,"z":14,"m":"concrete_light_smooth"},{"x":14,"z":15,"m":"concrete_light_smooth"},{"x":14,"z":16,"m":"concrete_light_smooth"},{"x":14,"z":17,"m":"concrete_light_smooth"},{"x":14,"z":18,"m":"concrete_light_smooth"},{"x":14,"z":19,"m":"concrete_light_smooth"},{"x":14,"z":20,"m":"concrete_light_smooth"},{"x":15,"z":0,"m":"concrete_light_smooth"},{"x":15,"z":1,"m":"concrete_light_smooth"},{"x":15,"z":2,"m":"concrete_light_smooth"},{"x":15,"z":3,"m":"glass_boro"},{"x":15,"z":4,"m":"concrete_light_smooth"},{"x":15,"z":5,"m":"concrete_light_smooth"},{"x":15,"z":6,"m":"concrete_light_smooth"},{"x":15,"z":7,"m":"glass_boro"},{"x":15,"z":8,"m":"concrete_light_smooth"},{"x":15,"z":9,"m":"concrete_light_smooth"},{"x":15,"z":10,"m":"concrete_light_smooth"},{"x":15,"z":11,"m":"glass_boro"},{"x":15,"z":12,"m":"concrete_light_smooth"},{"x":15,"z":13,"m":"concrete_light_smooth"},{"x":15,"z":14,"m":"concrete_light_smooth"},{"x":15,"z":15,"m":"glass_boro"},{"x":15,"z":16,"m":"concrete_light_smooth"},{"x":15,"z":17,"m":"concrete_light_smooth"},{"x":15,"z":18,"m":"concrete_light_smooth"},{"x":15,"z":19,"m":"concrete_light_smooth"},{"x":15,"z":20,"m":"concrete_light_smooth"},{"x":16,"z":0,"m":"concrete_light_smooth"},{"x":16,"z":1,"m":"concrete_light_smooth"},{"x":16,"z":2,"m":"concrete_light_smooth"},{"x":16,"z":3,"m":"concrete_light_smooth"},{"x":16,"z":4,"m":"concrete_light_smooth"},{"x":16,"z":5,"m":"concrete_light_smooth"},{"x":16,"z":6,"m":"concrete_light_smooth"},{"x":16,"z":7,"m":"concrete_light_smooth"},{"x":16,"z":8,"m":"concrete_light_smooth"},{"x":16,"z":9,"m":"concrete_light_smooth"},{"x":16,"z":10,"m":"concrete_light_smooth"},{"x":16,"z":11,"m":"concrete_light_smooth"},{"x":16,"z":12,"m":"concrete_light_smooth"},{"x":16,"z":13,"m":"concrete_light_smooth"},{"x":16,"z":14,"m":"concrete_light_smooth"},{"x":16,"z":15,"m":"concrete_light_smooth"},{"x":16,"z":16,"m":"concrete_light_smooth"},{"x":16,"z":17,"m":"concrete_light_smooth"},{"x":16,"z":18,"m":"concrete_light_smooth"},{"x":16,"z":19,"m":"concrete_light_smooth"},{"x":16,"z":20,"m":"concrete_light_smooth"},{"x":17,"z":0,"m":"concrete_light_smooth"},{"x":17,"z":1,"m":"concrete_light_smooth"},{"x":17,"z":2,"m":"concrete_light_smooth"},{"x":17,"z":3,"m":"concrete_light_smooth"},{"x":17,"z":4,"m":"concrete_light_smooth"},{"x":17,"z":5,"m":"concrete_light_smooth"},{"x":17,"z":6,"m":"concrete_light_smooth"},{"x":17,"z":7,"m":"concrete_light_smooth"},{"x":17,"z":8,"m":"concrete_light_smooth"},{"x":17,"z":9,"m":"concrete_light_smooth"},{"x":17,"z":10,"m":"concrete_light_smooth"},{"x":17,"z":11,"m":"concrete_light_smooth"},{"x":17,"z":12,"m":"concrete_light_smooth"},{"x":17,"z":13,"m":"concrete_light_smooth"},{"x":17,"z":14,"m":"concrete_light_smooth"},{"x":17,"z":15,"m":"concrete_light_smooth"},{"x":17,"z":16,"m":"concrete_light_smooth"},{"x":17,"z":17,"m":"concrete_light_smooth"},{"x":17,"z":18,"m":"concrete_light_smooth"},{"x":17,"z":19,"m":"concrete_light_smooth"},{"x":17,"z":20,"m":"concrete_light_smooth"},{"x":18,"z":0,"m":"concrete_light_smooth"},{"x":18,"z":1,"m":"concrete_light_smooth"},{"x":18,"z":2,"m":"concrete_light_smooth"},{"x":18,"z":3,"m":"concrete_light_smooth"},{"x":18,"z":4,"m":"concrete_light_smooth"},{"x":18,"z":5,"m":"concrete_light_smooth"},{"x":18,"z":6,"m":"concrete_light_smooth"},{"x":18,"z":7,"m":"concrete_light_smooth"},{"x":18,"z":8,"m":"concrete_light_smooth"},{"x":18,"z":9,"m":"concrete_light_smooth"},{"x":18,"z":10,"m":"concrete_light_smooth"},{"x":18,"z":11,"m":"concrete_light_smooth"},{"x":18,"z":12,"m":"concrete_light_smooth"},{"x":18,"z":13,"m":"concrete_light_smooth"},{"x":18,"z":14,"m":"concrete_light_smooth"},{"x":18,"z":15,"m":"concrete_light_smooth"},{"x":18,"z":16,"m":"concrete_light_smooth"},{"x":18,"z":17,"m":"concrete_light_smooth"},{"x":18,"z":18,"m":"concrete_light_smooth"},{"x":18,"z":19,"m":"concrete_light_smooth"},{"x":18,"z":20,"m":"concrete_light_smooth"}],[{"x":0,"z":0,"m":"concrete_light_smooth"},{"x":0,"z":1,"m":"concrete_light_smooth"},{"x":0,"z":2,"m":"concrete_light_smooth"},{"x":0,"z":3,"m":"concrete_light_smooth"},{"x":0,"z":4,"m":"concrete_light_smooth"},{"x":0,"z":5,"m":"concrete_light_smooth"},{"x":0,"z":6,"m":"stripe_yellow"},{"x":0,"z":7,"m":"stripe_yellow"},{"x":0,"z":8,"m":"stripe_yellow"},{"x":0,"z":9,"m":"stripe_yellow"},{"x":0,"z":10,"m":"stripe_yellow"},{"x":0,"z":11,"m":"stripe_yellow"},{"x":0,"z":12,"m":"stripe_yellow"},{"x":0,"z":13,"m":"stripe_yellow"},{"x":0,"z":14,"m":"stripe_yellow"},{"x":0,"z":15,"m":"concrete_light_smooth"},{"x":0,"z":16,"m":"concrete_light_smooth"},{"x":0,"z":17,"m":"concrete_light_smooth"},{"x":0,"z":18,"m":"concrete_light_smooth"},{"x":0,"z":19,"m":"concrete_light_smooth"},{"x":0,"z":20,"m":"concrete_light_smooth"},{"x":1,"z":0,"m":"concrete_light_smooth"},{"x":1,"z":20,"m":"concrete_light_smooth"},{"x":2,"z":0,"m":"concrete_light_smooth"},{"x":2,"z":20,"m":"stripe_yellow"},{"x":3,"z":0,"m":"concrete_light_smooth"},{"x":3,"z":20,"m":"stripe_yellow"},{"x":4,"z":0,"m":"concrete_light_smooth"},{"x":4,"z":20,"m":"stripe_yellow"},{"x":5,"z":0,"m":"concrete_light_smooth"},{"x":5,"z":20,"m":"stripe_yellow"},{"x":6,"z":0,"m":"concrete_light_smooth"},{"x":6,"z":20,"m":"stripe_yellow"},{"x":7,"z":0,"m":"concrete_light_smooth"},{"x":7,"z":20,"m":"stripe_yellow"},{"x":8,"z":0,"m":"concrete_light_smooth"},{"x":8,"z":20,"m":"stripe_yellow"},{"x":9,"z":0,"m":"concrete_light_smooth"},{"x":9,"z":20,"m":"stripe_yellow"},{"x":10,"z":0,"m":"concrete_light_smooth"},{"x":10,"z":20,"m":"stripe_yellow"},{"x":11,"z":0,"m":"concrete_light_smooth"},{"x":11,"z":20,"m":"stripe_yellow"},{"x":12,"z":0,"m":"concrete_light_smooth"},{"x":12,"z":20,"m":"stripe_yellow"},{"x":13,"z":0,"m":"concrete_light_smooth"},{"x":13,"z":20,"m":"stripe_yellow"},{"x":14,"z":0,"m":"concrete_light_smooth"},{"x":14,"z":20,"m":"stripe_yellow"},{"x":15,"z":0,"m":"concrete_light_smooth"},{"x":15,"z":20,"m":"stripe_yellow"},{"x":16,"z":0,"m":"concrete_light_smooth"},{"x":16,"z":20,"m":"stripe_yellow"},{"x":17,"z":0,"m":"concrete_light_smooth"},{"x":17,"z":20,"m":"concrete_light_smooth"},{"x":18,"z":0,"m":"concrete_light_smooth"},{"x":18,"z":1,"m":"concrete_light_smooth"},{"x":18,"z":2,"m":"concrete_light_smooth"},{"x":18,"z":3,"m":"concrete_light_smooth"},{"x":18,"z":4,"m":"concrete_light_smooth"},{"x":18,"z":5,"m":"concrete_light_smooth"},{"x":18,"z":6,"m":"stripe_yellow"},{"x":18,"z":7,"m":"stripe_yellow"},{"x":18,"z":8,"m":"stripe_yellow"},{"x":18,"z":9,"m":"stripe_yellow"},{"x":18,"z":10,"m":"stripe_yellow"},{"x":18,"z":11,"m":"stripe_yellow"},{"x":18,"z":12,"m":"stripe_yellow"},{"x":18,"z":13,"m":"stripe_yellow"},{"x":18,"z":14,"m":"stripe_yellow"},{"x":18,"z":15,"m":"concrete_light_smooth"},{"x":18,"z":16,"m":"concrete_light_smooth"},{"x":18,"z":17,"m":"concrete_light_smooth"},{"x":18,"z":18,"m":"concrete_light_smooth"},{"x":18,"z":19,"m":"concrete_light_smooth"},{"x":18,"z":20,"m":"concrete_light_smooth"}]],"blockCount":2096}
+</script>
+<script>
+'use strict';
+/* =====================================================================================
+   1. 纯逻辑核心（不触碰 DOM）
+      —— 无头测试脚本会抽取 [CORE-BEGIN] / [CORE-END] 之间的代码在 Node 里直接跑，
+         所以这一段里不允许出现 document / window / canvas。
+   ===================================================================================== */
+// [CORE-BEGIN]
+
+/* 立方体 6 个面：法线（背面剔除用）、4 个角点偏移（0/1 组合）、基础明暗系数（假想光源在左上前方） */
+var FACE_DIRS = [
+  { n: [ 1, 0, 0], c: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]], shade: 0.82 },  /* +X 右 */
+  { n: [-1, 0, 0], c: [[0,0,0],[0,0,1],[0,1,1],[0,1,0]], shade: 0.62 },  /* -X 左 */
+  { n: [ 0, 1, 0], c: [[0,1,0],[0,1,1],[1,1,1],[1,1,0]], shade: 1.00 },  /* +Y 顶（最亮） */
+  { n: [ 0,-1, 0], c: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]], shade: 0.42 },  /* -Y 底 */
+  { n: [ 0, 0, 1], c: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]], shade: 0.90 },  /* +Z 正面（大门方向） */
+  { n: [ 0, 0,-1], c: [[0,0,0],[0,1,0],[1,1,0],[1,0,0]], shade: 0.70 }   /* -Z 背面 */
+];
+
+/* 立方体 12 条棱（画选中高亮框用） */
+var CUBE_EDGES = [
+  [[0,0,0],[1,0,0]], [[0,1,0],[1,1,0]], [[0,0,1],[1,0,1]], [[0,1,1],[1,1,1]],
+  [[0,0,0],[0,1,0]], [[1,0,0],[1,1,0]], [[0,0,1],[0,1,1]], [[1,0,1],[1,1,1]],
+  [[0,0,0],[0,0,1]], [[1,0,0],[1,0,1]], [[0,1,0],[0,1,1]], [[1,1,0],[1,1,1]]
+];
+
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+/* 解析 #rrggbb / #rgb 颜色，失败时用兜底值；渲染只做整数缩放，颜色串会缓存 */
+function parseHexColor(hex, fallback) {
+  var h = String(hex === undefined || hex === null ? '' : hex).trim();
+  if (h.charAt(0) === '#') { h = h.slice(1); }
+  if (h.length === 3) { h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2); }
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) { return fallback ? fallback.slice() : [136, 136, 136]; }
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/* 明暗缩放 + 透明度 → canvas 颜色串 */
+function shadeColor(rgb, factor, alpha) {
+  var r = clamp(Math.round(rgb[0] * factor), 0, 255);
+  var g = clamp(Math.round(rgb[1] * factor), 0, 255);
+  var b = clamp(Math.round(rgb[2] * factor), 0, 255);
+  var a = (typeof alpha === 'number' && alpha < 1) ? Math.max(0.08, alpha) : 1;
+  return a >= 1 ? 'rgb(' + r + ',' + g + ',' + b + ')' : 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
+var DEG = Math.PI / 180;
+
+/* ------------------------------------------------------------------------------------
+   1.1 数据模型：把 machine-structure.json 变成「扁平体素索引 + 材料表」
+        vox[(y*z + z)*x + x] = 材料下标 + 1（0 = 空气），控制器占一格特殊材料 '~'。
+   ------------------------------------------------------------------------------------ */
+function buildModel(raw) {
+  if (!raw || typeof raw !== 'object') { throw new Error('结构数据不是对象'); }
+  var sizeRaw = raw.size || {};
+  var size = { x: Math.max(1, (sizeRaw.x | 0)), y: Math.max(1, (sizeRaw.y | 0)), z: Math.max(1, (sizeRaw.z | 0)) };
+
+  var matList = [], matIndex = {}, id;
+  var mats = (raw.materials && typeof raw.materials === 'object') ? raw.materials : {};
+  var keys = Object.keys(mats);
+  for (var k = 0; k < keys.length; k++) {
+    id = keys[k];
+    var m = mats[id] || {};
+    matIndex[id] = matList.length;
+    matList.push({
+      id: id,
+      letter: (typeof m.letter === 'string' && m.letter.length) ? m.letter.charAt(0) : '?',
+      block: m.block || '—',
+      registry: m.registry || m.block || '—',
+      java: m.java || '',
+      meta: (typeof m.meta === 'number') ? m.meta : null,
+      nameEn: m.nameEn || id,
+      nameZh: m.nameZh || m.nameEn || id,
+      color: m.color || '#8a8f98',
+      rgb: parseHexColor(m.color, [138, 143, 152]),
+      /* 玻璃类材料用半透明绘制（画家算法本身就是远→近，混色顺序天然正确） */
+      alpha: /glass/i.test(id) ? 0.55 : 1,
+      role: m.role || '',
+      count: 0,
+      isController: false
+    });
+  }
+
+  var total = size.x * size.y * size.z;
+  var vox = new Int16Array(total);
+  var cells = [];
+  var skipped = 0, unknown = 0, dupes = 0, badLayer = 0;
+  var layers = Array.isArray(raw.layers) ? raw.layers : [];
+
+  for (var y = 0; y < layers.length; y++) {
+    if (y >= size.y) { badLayer++; }
+    var layer = Array.isArray(layers[y]) ? layers[y] : [];
+    for (var j = 0; j < layer.length; j++) {
+      var c = layer[j];
+      if (!c) { continue; }
+      var x = (c.x | 0), z = (c.z | 0);
+      if (x < 0 || x >= size.x || y < 0 || y >= size.y || z < 0 || z >= size.z) { skipped++; continue; }
+      var mi = matIndex[c.m];
+      if (mi === undefined) { unknown++; continue; }
+      var i = (y * size.z + z) * size.x + x;
+      if (vox[i] !== 0) { dupes++; continue; }
+      vox[i] = mi + 1;
+      matList[mi].count++;
+      cells.push({ x: x, y: y, z: z, mi: mi });
+    }
+  }
+
+  /* 控制器本体：规格里它占 (9,2,20) 那一格，结构数据中记为空气，这里补成一格特殊方块 */
+  var ctrl = null, ctrlCell = null;
+  var rc = raw.controller;
+  if (rc && typeof rc.x === 'number' && typeof rc.y === 'number' && typeof rc.z === 'number') {
+    var cx = rc.x | 0, cy = rc.y | 0, cz = rc.z | 0;
+    ctrl = { x: cx, y: cy, z: cz };
+    if (cx >= 0 && cx < size.x && cy >= 0 && cy < size.y && cz >= 0 && cz < size.z) {
+      var ci = (cy * size.z + cz) * size.x + cx;
+      if (vox[ci] === 0) {
+        var ctrlIndex = matList.length;
+        matList.push({
+          id: '__controller__', letter: '~', block: '（本机控制器方块）', registry: '（本机控制器方块）', java: '',
+          meta: null,
+          nameEn: raw.nameEn || raw.machine || 'Integrated Machining Center',
+          nameZh: raw.nameZh || '多功能集成加工中心',
+          color: '#e0559c', rgb: parseHexColor('#e0559c', [224, 85, 156]), alpha: 1,
+          role: '控制器本体（结构数据中为空气格，偏移 = HORIZONTAL/VERTICAL/DEPTH_OFFSET）',
+          count: 1, isController: true
+        });
+        vox[ci] = ctrlIndex + 1;
+        ctrlCell = { x: cx, y: cy, z: cz, mi: ctrlIndex };
+      }
+    }
+  }
+
+  return {
+    raw: raw, size: size, matList: matList, matIndex: matIndex, vox: vox, cells: cells,
+    ctrl: ctrl, ctrlCell: ctrlCell, total: total,
+    layerCount: layers.length, skipped: skipped, unknown: unknown, dupes: dupes, badLayer: badLayer
+  };
+}
+
+/* 体素查询（越界一律当空气，所有渲染/拾取都从这里走，天然边界安全） */
+function voxelAt(model, x, y, z) {
+  var s = model.size;
+  if (x < 0 || x >= s.x || y < 0 || y >= s.y || z < 0 || z >= s.z) { return 0; }
+  return model.vox[(y * s.z + z) * s.x + x];
+}
+
+/* 某一格要导出成什么字符：控制器 '~'，空气 '.'，其余用材料字母 */
+function letterAt(model, x, y, z) {
+  var v = voxelAt(model, x, y, z);
+  if (v === 0) { return '.'; }
+  var mat = model.matList[v - 1];
+  return mat ? mat.letter : '?';
+}
+
+/* 每材料块数（按字母） */
+function countByMaterial(model) {
+  var out = [];
+  for (var i = 0; i < model.matList.length; i++) {
+    out.push({ letter: model.matList[i].letter, nameEn: model.matList[i].nameEn,
+               nameZh: model.matList[i].nameZh, id: model.matList[i].id,
+               isController: model.matList[i].isController, count: model.matList[i].count });
+  }
+  return out;
+}
+
+/* 每层块数（不含控制器，和 machine-spec.md 的「本层方块数」对齐） */
+function countByLayer(model) {
+  var out = new Array(model.size.y);
+  for (var y = 0; y < model.size.y; y++) { out[y] = 0; }
+  for (var i = 0; i < model.cells.length; i++) { out[model.cells[i].y]++; }
+  return out;
+}
+
+/* 结构字母表：[y][z] 每项是长度 x 的字符串（列下标即 x），与 machine-spec.md §4 的逐层俯视图一一对应 */
+function buildExportRows(model) {
+  var s = model.size, rows = [];
+  for (var y = 0; y < s.y; y++) {
+    var layerRows = [];
+    for (var z = 0; z < s.z; z++) {
+      var line = '';
+      for (var x = 0; x < s.x; x++) { line += letterAt(model, x, y, z); }
+      layerRows.push(line);
+    }
+    rows.push(layerRows);
+  }
+  return rows;
+}
+
+/* 导出成 Java 源码片段（addShape(piece, transpose(structure_string)) 的输入） */
+function buildExportJava(model) {
+  var rows = buildExportRows(model);
+  var s = model.size;
+  var perLayer = countByLayer(model);
+  var ctrlTxt = model.ctrl ? '(' + model.ctrl.x + ', ' + model.ctrl.y + ', ' + model.ctrl.z + ')' : '（数据中未给出）';
+  var off = (model.raw && model.raw.offsets) ? model.raw.offsets : {};
+  var L = [];
+  L.push('    /** ' + (model.raw.nameZh || '结构') + '（' + (model.raw.nameEn || '') + '）结构字母表');
+  L.push('     *  x = ' + s.x + '（宽，字符串下标即 x）· y = ' + s.y + '（高）· z = ' + s.z + '（深）');
+  L.push('     *  s[y][z]：每个字符串长 ' + s.x + '；\'~\' = 控制器 ' + ctrlTxt + '，\'.\' = 空气，其余字符见 design.md §1 字母表');
+  L.push('     *  addShape(piece, transpose(structure_string))；偏移 HORIZONTAL_OFFSET=' +
+         (typeof off.horizontal === 'number' ? off.horizontal : '-') + ', VERTICAL_OFFSET=' +
+         (typeof off.vertical === 'number' ? off.vertical : '-') + ', DEPTH_OFFSET=' +
+         (typeof off.depth === 'number' ? off.depth : '-'));
+  L.push('     *  结构方块 ' + model.cells.length + ' 块（不含控制器），逐层块数：' +
+         perLayer.map(function (n, i) { return 'y' + i + '=' + n; }).join(', '));
+  L.push('     */');
+  L.push('    private static final String[][] structure_string = new String[][] {');
+  for (var y = 0; y < s.y; y++) {
+    L.push('            { // y = ' + y + '（' + perLayer[y] + ' 块）');
+    for (var z = 0; z < s.z; z++) {
+      L.push('                    "' + rows[y][z] + '", // z = ' + z);
+    }
+    L.push('            },');
+  }
+  L.push('    };');
+  return L.join('\n');
+}
+
+/* 数据指纹：用来比较「磁盘 JSON」和「内联快照」是否一致 */
+function fingerprint(model) {
+  var h = 2166136261;  /* FNV-1a，纯整数运算 */
+  var cells = model.cells;
+  for (var i = 0; i < cells.length; i++) {
+    var c = cells[i];
+    h ^= (c.x * 73856093) ^ (c.y * 19349663) ^ (c.z * 83492791) ^ (c.mi * 2654435761);
+    h = (h * 16777619) >>> 0;
+  }
+  var s = model.size;
+  return s.x + 'x' + s.y + 'x' + s.z + '-' + cells.length + '-' + model.matList.length + '-' + h.toString(16);
+}
+
+/* ------------------------------------------------------------------------------------
+   1.2 可见性 / 面集：切层模式、剖面、材料过滤都收敛成同一个判定函数
+   ------------------------------------------------------------------------------------ */
+function visibilityPredicate(model, opt) {
+  var o = opt || {};
+  var s = model.size;
+  var hidden = o.hidden || null;
+  var mode = o.layerMode || 'all';
+  var layer = (typeof o.layer === 'number') ? (o.layer | 0) : (s.y - 1);
+  var hideFront = !!o.hideFront;
+  var hideRoof = !!o.hideRoof;
+  var frontZ = s.z - 1;        /* 正面（南）墙 = z 最大的一层 */
+  var roofY = s.y - 2;         /* 屋顶 = 最上面两层（y=10/11） */
+  return function (x, y, z) {
+    if (x < 0 || x >= s.x || y < 0 || y >= s.y || z < 0 || z >= s.z) { return false; }
+    var v = model.vox[(y * s.z + z) * s.x + x];
+    if (v === 0) { return false; }
+    if (hidden && hidden.has(v - 1)) { return false; }
+    if (mode === 'only' && y !== layer) { return false; }
+    if (mode === 'below' && y > layer) { return false; }
+    if (hideFront && z === frontZ) { return false; }
+    if (hideRoof && y >= roofY) { return false; }
+    return true;
+  };
+}
+
+/* 生成「需要绘制的面」列表：只有邻居不可见（空气 / 被过滤 / 被剖掉）的面才画 */
+function buildFaces(model, opt) {
+  var visible = visibilityPredicate(model, opt);
+  var faces = [];
+  var ctrlCell = model.ctrlCell;
+  var s = model.size;
+
+  function addCube(x, y, z) {
+    var v = voxelAt(model, x, y, z);
+    if (v === 0) { return; }
+    for (var d = 0; d < FACE_DIRS.length; d++) {
+      var n = FACE_DIRS[d].n;
+      if (visible(x + n[0], y + n[1], z + n[2])) { continue; }
+      faces.push({ x: x, y: y, z: z, d: d, mi: v - 1 });
+    }
+  }
+
+  for (var i = 0; i < model.cells.length; i++) {
+    var c = model.cells[i];
+    if (!visible(c.x, c.y, c.z)) { continue; }
+    addCube(c.x, c.y, c.z);
+  }
+  if (ctrlCell && visible(ctrlCell.x, ctrlCell.y, ctrlCell.z)) {
+    addCube(ctrlCell.x, ctrlCell.y, ctrlCell.z);
+  }
+  /* 越界保护：数据异常时最多只画 60000 个面，宁可少画也不卡死 */
+  if (faces.length > 60000) { faces.length = 60000; }
+  return faces;
+}
+
+/* ------------------------------------------------------------------------------------
+   1.3 相机与投影（orbit 相机：yaw 绕 y 轴、pitch 为仰角）
+   ------------------------------------------------------------------------------------ */
+function makeCamera() {
+  return {
+    target: { x: 9.5, y: 6, z: 10.5 },
+    yaw: 0, pitch: 18 * DEG,
+    dist: 60, orthoHalf: 18, zoom: 1,
+    ortho: false, fovY: 45 * DEG, near: 0.05
+  };
+}
+
+/* 让整栋厂房进画面：按包围盒半径算一个保守距离 */
+function fitCamera(cam, model, w, h) {
+  var s = model.size;
+  cam.target = { x: s.x / 2, y: s.y / 2, z: s.z / 2 };
+  var radius = 0.5 * Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z);
+  var aspect = w / Math.max(1, h);
+  var wide = aspect < 1 ? (1 / aspect) : 1;
+  cam.dist = radius / Math.sin(cam.fovY / 2) * wide * 1.05;
+  cam.orthoHalf = radius * wide * 1.08;
+  cam.zoom = 1;
+}
+
+/* 相机基向量：eye / forward / right / up（俯仰到 ±90° 时也保证 right 非零） */
+function cameraBasis(cam, w, h) {
+  var cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  var dir = { x: cp * Math.sin(cam.yaw), y: sp, z: cp * Math.cos(cam.yaw) };  /* 目标 → 相机 */
+  var dist = cam.dist / Math.max(0.05, cam.zoom);
+  var eye = { x: cam.target.x + dir.x * dist, y: cam.target.y + dir.y * dist, z: cam.target.z + dir.z * dist };
+  var forward = { x: -dir.x, y: -dir.y, z: -dir.z };
+  var rx = -forward.z, ry = 0, rz = forward.x;      /* cross(forward, worldUp=(0,1,0)) */
+  var rl = Math.sqrt(rx * rx + ry * ry + rz * rz);
+  if (rl < 1e-6) { rx = 1; ry = 0; rz = 0; rl = 1; }
+  var right = { x: rx / rl, y: ry / rl, z: rz / rl };
+  var up = {  /* cross(right, forward) */
+    x: right.y * forward.z - right.z * forward.y,
+    y: right.z * forward.x - right.x * forward.z,
+    z: right.x * forward.y - right.y * forward.x
+  };
+  return { eye: eye, forward: forward, right: right, up: up, dist: dist };
+}
+
+/* 世界坐标 → 画布坐标；返回 ok=false 表示该点在相机后方（调用方直接跳过这个面） */
+function projectPoint(cam, basis, w, h, x, y, z) {
+  var dx = x - basis.eye.x, dy = y - basis.eye.y, dz = z - basis.eye.z;
+  var depth = dx * basis.forward.x + dy * basis.forward.y + dz * basis.forward.z;
+  var rx = dx * basis.right.x + dy * basis.right.y + dz * basis.right.z;
+  var uy = dx * basis.up.x + dy * basis.up.y + dz * basis.up.z;
+  if (cam.ortho) {
+    var scale = (h / 2) / Math.max(0.05, cam.orthoHalf / Math.max(0.05, cam.zoom));
+    return { x: w / 2 + rx * scale, y: h / 2 - uy * scale, depth: depth, ok: true };
+  }
+  if (!(depth > cam.near)) { return { x: 0, y: 0, depth: depth, ok: false }; }
+  var f = (h / 2) / Math.tan(cam.fovY / 2);
+  return { x: w / 2 + (rx / depth) * f, y: h / 2 - (uy / depth) * f, depth: depth, ok: true };
+}
+
+/* 屏幕像素 → 世界射线（拾取用；与 projectPoint 严格互为逆运算） */
+function screenToRay(cam, basis, w, h, sx, sy) {
+  var ndcX = (sx / Math.max(1, w)) * 2 - 1;
+  var ndcY = 1 - (sy / Math.max(1, h)) * 2;
+  var tan = Math.tan(cam.fovY / 2);
+  var aspect = w / Math.max(1, h);
+  if (cam.ortho) {
+    var half = cam.orthoHalf / Math.max(0.05, cam.zoom);
+    var right = { x: basis.right.x, y: basis.right.y, z: basis.right.z };
+    var up = { x: basis.up.x, y: basis.up.y, z: basis.up.z };
+    var o = {
+      x: basis.eye.x + right.x * ndcX * half * aspect + up.x * ndcY * half,
+      y: basis.eye.y + right.y * ndcX * half * aspect + up.y * ndcY * half,
+      z: basis.eye.z + right.z * ndcX * half * aspect + up.z * ndcY * half
+    };
+    return { o: o, d: { x: basis.forward.x, y: basis.forward.y, z: basis.forward.z } };
+  }
+  var d = {
+    x: basis.forward.x + basis.right.x * ndcX * tan * aspect + basis.up.x * ndcY * tan,
+    y: basis.forward.y + basis.right.y * ndcX * tan * aspect + basis.up.y * ndcY * tan,
+    z: basis.forward.z + basis.right.z * ndcX * tan * aspect + basis.up.z * ndcY * tan
+  };
+  var l = Math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z) || 1;
+  return { o: { x: basis.eye.x, y: basis.eye.y, z: basis.eye.z }, d: { x: d.x / l, y: d.y / l, z: d.z / l } };
+}
+
+/* 画家算法用：面相对相机的深度（越大越远，先画） */
+function faceDepth(cam, basis, f) {
+  var dx = f.x + 0.5 - basis.eye.x, dy = f.y + 0.5 - basis.eye.y, dz = f.z + 0.5 - basis.eye.z;
+  if (cam.ortho) { return dx * basis.forward.x + dy * basis.forward.y + dz * basis.forward.z; }
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+/* 背面剔除：眼睛在面外侧才可见（正交时用法线 · 视线方向判断） */
+function isFaceVisible(cam, basis, f) {
+  var n = FACE_DIRS[f.d].n;
+  if (cam.ortho) {
+    return (n[0] * basis.forward.x + n[1] * basis.forward.y + n[2] * basis.forward.z) < -1e-6;
+  }
+  var vx = basis.eye.x - (f.x + 0.5), vy = basis.eye.y - (f.y + 0.5), vz = basis.eye.z - (f.z + 0.5);
+  return (n[0] * vx + n[1] * vy + n[2] * vz) > 1e-6;
+}
+
+/* 面 → 4 个屏幕点；任何一角投影失败就整面丢弃（保守，不抛异常） */
+function projectFace(cam, basis, w, h, f) {
+  var corners = FACE_DIRS[f.d].c;
+  var pts = new Array(4);
+  for (var i = 0; i < 4; i++) {
+    var c = corners[i];
+    var p = projectPoint(cam, basis, w, h, f.x + c[0], f.y + c[1], f.z + c[2]);
+    if (!p.ok || !isFinite(p.x) || !isFinite(p.y)) { return null; }
+    pts[i] = p;
+  }
+  return pts;
+}
+
+/* ------------------------------------------------------------------------------------
+   1.4 拾取：格子步进（Amanatides & Woo 的 DDA），只命中「当前可见」的格子
+   ------------------------------------------------------------------------------------ */
+function pickCell(model, opt, ro, rd) {
+  var s = model.size;
+  var visible = visibilityPredicate(model, opt);
+  var o = [ro.x, ro.y, ro.z], d = [rd.x, rd.y, rd.z];
+  var lo = [0, 0, 0], hi = [s.x, s.y, s.z];
+
+  /* 先求射线进入包围盒的参数区间，避免起点在很远的地方空转 */
+  var t0 = 0, t1 = Infinity;
+  for (var i = 0; i < 3; i++) {
+    if (!isFinite(o[i]) || !isFinite(d[i])) { return null; }
+    if (Math.abs(d[i]) < 1e-9) {
+      if (o[i] < lo[i] || o[i] > hi[i]) { return null; }
+    } else {
+      var a = (lo[i] - o[i]) / d[i], b = (hi[i] - o[i]) / d[i];
+      if (a > b) { var t = a; a = b; b = t; }
+      if (a > t0) { t0 = a; }
+      if (b < t1) { t1 = b; }
+    }
+  }
+  if (!(t1 >= t0)) { return null; }
+  var start = Math.max(t0, 0) + 1e-4;
+
+  var px = clamp(o[0] + d[0] * start, 0, s.x - 1e-6);
+  var py = clamp(o[1] + d[1] * start, 0, s.y - 1e-6);
+  var pz = clamp(o[2] + d[2] * start, 0, s.z - 1e-6);
+  var cx = Math.floor(px), cy = Math.floor(py), cz = Math.floor(pz);
+
+  var stepX = d[0] > 0 ? 1 : -1, stepY = d[1] > 0 ? 1 : -1, stepZ = d[2] > 0 ? 1 : -1;
+  var dX = Math.abs(d[0]) < 1e-9 ? 1e-9 : Math.abs(d[0]);
+  var dY = Math.abs(d[1]) < 1e-9 ? 1e-9 : Math.abs(d[1]);
+  var dZ = Math.abs(d[2]) < 1e-9 ? 1e-9 : Math.abs(d[2]);
+  var tDeltaX = 1 / dX, tDeltaY = 1 / dY, tDeltaZ = 1 / dZ;
+  var tMaxX = d[0] > 0 ? (cx + 1 - o[0]) / d[0] : (cx - o[0]) / d[0];
+  var tMaxY = d[1] > 0 ? (cy + 1 - o[1]) / d[1] : (cy - o[1]) / d[1];
+  var tMaxZ = d[2] > 0 ? (cz + 1 - o[2]) / d[2] : (cz - o[2]) / d[2];
+
+  var steps = (s.x + s.y + s.z) * 4 + 64;
+  for (var k = 0; k < steps; k++) {
+    if (cx < 0 || cx >= s.x || cy < 0 || cy >= s.y || cz < 0 || cz >= s.z) { return null; }
+    if (visible(cx, cy, cz)) { return { x: cx, y: cy, z: cz }; }
+    if (tMaxX <= tMaxY && tMaxX <= tMaxZ) { cx += stepX; tMaxX += tDeltaX; }
+    else if (tMaxY <= tMaxZ) { cy += stepY; tMaxY += tDeltaY; }
+    else { cz += stepZ; tMaxZ += tDeltaZ; }
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------------------------
+   1.5 数据自检（全部现场算，不硬编码结论）
+   ------------------------------------------------------------------------------------ */
+function runSelfChecks(model) {
+  var s = model.size, checks = [], i, x, y, z;
+  function add(ok, label, detail) { checks.push({ ok: !!ok, label: label, detail: detail || '' }); }
+
+  /* 1. 包围盒 / 层数 */
+  add(model.skipped === 0 && model.badLayer === 0 && model.dupes === 0,
+      '包围盒与层数',
+      '越界 ' + model.skipped + ' 格，重复 ' + model.dupes + ' 格，layers 长度 ' + model.layerCount + '（size.y=' + s.y + '）');
+
+  /* 2. 未知材料 id */
+  add(model.unknown === 0, '材料 id 全部有定义', '未知材料格数 ' + model.unknown);
+
+  /* 3. 总块数 = 各材料之和 = 每层之和 */
+  var sumMat = 0, sumLayer = 0;
+  for (i = 0; i < model.matList.length; i++) {
+    if (!model.matList[i].isController) { sumMat += model.matList[i].count; }
+  }
+  var perLayer = countByLayer(model);
+  for (i = 0; i < perLayer.length; i++) { sumLayer += perLayer[i]; }
+  add(sumMat === model.cells.length && sumLayer === model.cells.length,
+      '块数自洽',
+      '总 ' + model.cells.length + '（材料求和 ' + sumMat + ' / 逐层求和 ' + sumLayer + '）');
+
+  /* 3b. 与数据里声明的 blockCount 一致 */
+  var declared = (model.raw && typeof model.raw.blockCount === 'number') ? model.raw.blockCount : null;
+  add(declared === null || declared === model.cells.length,
+      '与数据声明的 blockCount 一致',
+      'blockCount = ' + (declared === null ? '未提供' : declared) + '，实测 ' + model.cells.length);
+
+  /* 4. 地基 y=0 整板满铺 */
+  var filled = 0, holes = [];
+  for (x = 0; x < s.x; x++) {
+    for (z = 0; z < s.z; z++) {
+      if (voxelAt(model, x, 0, z) !== 0) { filled++; } else if (holes.length < 6) { holes.push('(' + x + ',0,' + z + ')'); }
+    }
+  }
+  add(filled === s.x * s.z,
+      '地基 y=0 满铺',
+      filled + ' / ' + (s.x * s.z) + (holes.length ? '，空洞如 ' + holes.join(' ') : ''));
+
+  /* 5. 大门洞 (x=8..10, y=2, z=zmax)：两侧为空气，正中是控制器所在格 */
+  var gateOk = true, gateTxt = [];
+  for (x = 8; x <= 10; x++) {
+    var gv = voxelAt(model, x, 2, s.z - 1);
+    var isCtrlCell = !!model.ctrl && model.ctrl.x === x && model.ctrl.y === 2 && model.ctrl.z === s.z - 1;
+    if (isCtrlCell) {
+      if (gv === 0) { gateOk = false; gateTxt.push('x' + x + '=缺控制器'); } else { gateTxt.push('x' + x + '=控制器'); }
+    } else if (gv !== 0) {
+      gateOk = false; gateTxt.push('x' + x + '=实体格');
+    } else { gateTxt.push('x' + x + '=空气'); }
+  }
+  var ctrlOk = !!model.ctrl && model.ctrl.x === 9 && model.ctrl.y === 2 && model.ctrl.z === s.z - 1;
+  add(gateOk && ctrlOk,
+      '大门洞与控制器位置',
+      'y=2, z=' + (s.z - 1) + '：' + gateTxt.join('，') +
+      '；控制器 ' + (model.ctrl ? '(' + model.ctrl.x + ', ' + model.ctrl.y + ', ' + model.ctrl.z + ')' : '缺失'));
+
+  /* 6. 外墙闭合：y=2..9 四周边界除大门洞（x=8..10, y=2, z=zmax）外无空洞 */
+  var holesWall = [], zmax = s.z - 1, xmax = s.x - 1;
+  function isGate(x, y, z) { return y === 2 && z === zmax && x >= 8 && x <= 10; }
+  for (y = 2; y <= 9 && y < s.y; y++) {
+    for (x = 0; x <= xmax; x++) {
+      if (voxelAt(model, x, y, 0) === 0 && !isGate(x, y, 0)) { holesWall.push('(x' + x + ',y' + y + ',z0)'); }
+      if (voxelAt(model, x, y, zmax) === 0 && !isGate(x, y, zmax)) { holesWall.push('(x' + x + ',y' + y + ',z' + zmax + ')'); }
+    }
+    for (z = 1; z < zmax; z++) {
+      if (voxelAt(model, 0, y, z) === 0) { holesWall.push('(x0,y' + y + ',z' + z + ')'); }
+      if (voxelAt(model, xmax, y, z) === 0) { holesWall.push('(x' + xmax + ',y' + y + ',z' + z + ')'); }
+    }
+  }
+  add(holesWall.length === 0,
+      '外墙闭合（y=2..9，除大门洞外）',
+      holesWall.length === 0 ? '四面外墙无空洞'
+        : holesWall.length + ' 处空洞：' + holesWall.slice(0, 6).join(' ') + (holesWall.length > 6 ? ' …' : ''));
+
+  /* 7. 控制器偏移量与坐标一致 */
+  var off = (model.raw && model.raw.offsets) ? model.raw.offsets : {};
+  var offOk = !!model.ctrl && off.horizontal === model.ctrl.x && off.vertical === model.ctrl.y && off.depth === model.ctrl.z;
+  add(offOk, 'HORIZONTAL/VERTICAL/DEPTH_OFFSET 与控制器坐标一致',
+      'offsets = ' + JSON.stringify(off) + '，控制器 = ' + (model.ctrl ? JSON.stringify(model.ctrl) : '—'));
+
+  /* 8. 大门贯通：门内 (9,2,z-3..z-1) 为空气，门外台阶 (9,1,z) 是实体 */
+  var passOk = true, passTxt = [];
+  for (z = 1; z <= 3; z++) {
+    var pz = s.z - 1 - z;
+    if (voxelAt(model, 9, 2, pz) !== 0) { passOk = false; }
+    passTxt.push('(9,2,' + pz + ')=' + (voxelAt(model, 9, 2, pz) === 0 ? '空气' : '实体'));
+  }
+  var stepOk = voxelAt(model, 9, 1, s.z - 1) !== 0;
+  add(passOk && stepOk, '大门贯通 + 门外台阶',
+      passTxt.join(' ') + '；门外 (9,1,' + (s.z - 1) + ')=' + (stepOk ? '实体台阶' : '空气（缺台阶）'));
+
+  /* 9. 仓室可达：背面 z=0 的每个 F（实心钢机制方块）内侧 (x,y,1) 是空气 */
+  var blocked = [];
+  for (i = 0; i < model.cells.length; i++) {
+    var bc = model.cells[i];
+    if (bc.z !== 0 || letterAt(model, bc.x, bc.y, bc.z) !== 'F') { continue; }
+    if (voxelAt(model, bc.x, bc.y, 1) !== 0) { blocked.push('(' + bc.x + ',' + bc.y + ',0)'); }
+  }
+  add(blocked.length === 0, '背面 F 仓室挂点内侧为空气',
+      blocked.length === 0 ? 'z=0 上每个 F 的内侧 (x,y,1) 都是空气' : blocked.length + ' 个被挡住：' + blocked.slice(0, 6).join(' '));
+
+  /* 10. 内部连通：x=1..17 / y=1..9 / z=1..19 的空气格从大门内侧四连通全部可达（无封闭空腔） */
+  var regionSet = new Set(), regionCount = 0;
+  for (y = 1; y <= s.y - 3; y++) {
+    for (z = 1; z <= s.z - 2; z++) {
+      for (x = 1; x <= s.x - 2; x++) {
+        if (voxelAt(model, x, y, z) === 0) { regionSet.add((y * s.z + z) * s.x + x); regionCount++; }
+      }
+    }
+  }
+  var startKey = model.ctrl ? ((model.ctrl.y * s.z + (s.z - 2)) * s.x + model.ctrl.x) : (1 * s.z + 1) * s.x + 1;
+  var seen = new Set(), stack = [];
+  if (regionSet.has(startKey)) { seen.add(startKey); stack.push(startKey); }
+  while (stack.length) {
+    var cur = stack.pop();
+    var cy = Math.floor(cur / (s.z * s.x)), rest = cur % (s.z * s.x);
+    var cz = Math.floor(rest / s.x), cxx = rest % s.x;
+    var nbrs = [
+      cxx + 1 <= s.x - 2 ? cur + 1 : -1, cxx - 1 >= 1 ? cur - 1 : -1,
+      cy + 1 <= s.y - 3 ? cur + s.z * s.x : -1, cy - 1 >= 1 ? cur - s.z * s.x : -1,
+      cz + 1 <= s.z - 2 ? cur + s.x : -1, cz - 1 >= 1 ? cur - s.x : -1
+    ];
+    for (var n = 0; n < nbrs.length; n++) {
+      var k = nbrs[n];
+      if (k >= 0 && regionSet.has(k) && !seen.has(k)) { seen.add(k); stack.push(k); }
+    }
+  }
+  add(regionCount > 0 && seen.size === regionCount, '内部连通（无封闭空腔）',
+      '空腔区空气 ' + regionCount + ' 格，从大门内侧可达 ' + seen.size + ' 格' +
+      (seen.size === regionCount ? '' : '（不可达 ' + (regionCount - seen.size) + ' 格）'));
+
+  return checks;
+}
+
+/* 信息性统计（不是错误）：六面全被实心邻居包住、预览里看不到的方块数 */
+function countBuried(model) {
+  var buried = 0;
+  for (var i = 0; i < model.cells.length; i++) {
+    var c = model.cells[i], exposed = false;
+    for (var d = 0; d < FACE_DIRS.length; d++) {
+      var n = FACE_DIRS[d].n;
+      if (voxelAt(model, c.x + n[0], c.y + n[1], c.z + n[2]) === 0) { exposed = true; break; }
+    }
+    if (!exposed) { buried++; }
+  }
+  return buried;
+}
+
+// [CORE-END]
+
+/* =====================================================================================
+   2. 运行时状态（DOM 相关的部分从这里开始）
+   ===================================================================================== */
+function $(id) { return document.getElementById(id); }
+
+var canvas = $('view');
+var ctx = canvas.getContext('2d');
+var model = null;
+var camera = makeCamera();
+var state = {
+  layerMode: 'below',
+  layer: 11,
+  hideFront: false,
+  hideRoof: false,
+  hidden: new Set(),          /* 被隐藏的材料下标（matList 下标） */
+  hover: null,                /* 悬停拾取到的格子 */
+  picked: null,               /* 左键固定选中的格子 */
+  faces: [],
+  pointer: { x: -1, y: -1, inside: false },
+  drag: null,
+  colorCache: new Map(),
+  fps: 0, lastFrame: 0, needPick: false, pickScheduled: false
+};
+
+/* 页面顶部的读取状态 / 内联快照内容 */
+var loadInfo = { source: 'none', detail: '尚未读取' };
+
+/* =====================================================================================
+   3. 数据加载：fetch → XHR → 内联快照 → 用户手动选择文件
+   ===================================================================================== */
+function readInlineDump() {
+  var el = $('structure-dump');
+  if (!el) { return null; }
+  var txt = (el.textContent || '').trim();
+  if (!txt || txt === 'null') { return null; }
+  try { return JSON.parse(txt); } catch (err) { return null; }
+}
+
+/* XHR 回退路径（file:// 下 Chrome 同样会拒绝，但 FireFox / 本地服务器上可能成功） */
+function xhrLoad(url) {
+  return new Promise(function (resolve) {
+    var req;
+    try { req = new XMLHttpRequest(); } catch (err) { resolve(null); return; }
+    try {
+      req.open('GET', url, true);
+      req.onload = function () {
+        if (req.status === 0 || (req.status >= 200 && req.status < 300)) {
+          try { resolve(JSON.parse(req.responseText)); } catch (err) { resolve(null); }
+        } else { resolve(null); }
+      };
+      req.onerror = function () { resolve(null); };
+      req.send(null);
+    } catch (err) { resolve(null); }
+  });
+}
+
+async function loadStructure() {
+  /* 1) fetch：能读到就用磁盘上的最新数据 */
+  try {
+    var res = await fetch('./machine-structure.json', { cache: 'no-store' });
+    if (res && res.ok) {
+      var raw = await res.json();
+      if (raw) { return { raw: raw, source: 'fetch', detail: 'fetch(./machine-structure.json)：磁盘最新数据' }; }
+    }
+  } catch (err) { /* file:// 下会被 CORS 拦掉，继续往下退 */ }
+
+  /* 2) XHR */
+  var xhrRaw = await xhrLoad('./machine-structure.json');
+  if (xhrRaw) { return { raw: xhrRaw, source: 'xhr', detail: 'XMLHttpRequest(./machine-structure.json)：磁盘最新数据' }; }
+
+  /* 3) 内联快照（保证 file:// 双击打开就有图） */
+  var inlineRaw = readInlineDump();
+  if (inlineRaw) {
+    return {
+      raw: inlineRaw, source: 'inline',
+      detail: 'HTML 内联快照（浏览器在 file:// 下禁止读本地 JSON，改用随文件一起内联的 machine-structure.json 副本）'
+    };
+  }
+  return { raw: null, source: 'none', detail: '三种方式都没拿到数据：请用右侧「手动选择 JSON 文件…」加载 machine-structure.json' };
+}
+
+/* 内联快照和磁盘数据是否同一个结构（只比较指纹，避免整份比对） */
+function sameAsInline(raw) {
+  var dump = readInlineDump();
+  if (!dump) { return null; }
+  try { return fingerprint(buildModel(raw)) === fingerprint(buildModel(dump)); } catch (err) { return null; }
+}
+
+/* =====================================================================================
+   4. 渲染：手写投影 + 画家算法
+   ===================================================================================== */
+function resizeCanvas() {
+  var rect = canvas.getBoundingClientRect();
+  var w = Math.max(1, Math.floor(rect.width));
+  var h = Math.max(1, Math.floor(rect.height));
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
+  if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
+  return { w: w, h: h, dpr: dpr };
+}
+
+/* 面颜色缓存：材料 × 面方向（玻璃再乘 alpha） */
+function faceFill(mi, d) {
+  var key = mi * 8 + d;
+  var hit = state.colorCache.get(key);
+  if (hit !== undefined) { return hit; }
+  var mat = model.matList[mi];
+  if (!mat) { return 'rgb(120,120,120)'; }
+  var s = shadeColor(mat.rgb, FACE_DIRS[d].shade, mat.alpha);
+  state.colorCache.set(key, s);
+  return s;
+}
+
+/* 画一个格子的线框（悬停 / 选中高亮） */
+function strokeCell(cam, basis, w, h, cell, color, lineWidth) {
+  if (!cell) { return; }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+  for (var i = 0; i < CUBE_EDGES.length; i++) {
+    var e = CUBE_EDGES[i];
+    var p0 = projectPoint(cam, basis, w, h, cell.x + e[0][0], cell.y + e[0][1], cell.z + e[0][2]);
+    var p1 = projectPoint(cam, basis, w, h, cell.x + e[1][0], cell.y + e[1][1], cell.z + e[1][2]);
+    if (!p0.ok || !p1.ok) { continue; }
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
+  }
+  ctx.stroke();
+}
+
+/* 左下角的方向指示器：X+ / Y+ / Z+（Z+ 就是正面大门方向） */
+function drawGizmo(basis, w, h) {
+  var ox = 56, oy = h - 56, len = 30;
+  var axes = [
+    { v: [1, 0, 0], label: 'X+', color: '#e08a8a' },
+    { v: [0, 1, 0], label: 'Y+', color: '#8ce08c' },
+    { v: [0, 0, 1], label: 'Z+ 正面', color: '#8cb4e0' }
+  ];
+  ctx.lineWidth = 1.6;
+  ctx.font = '11px Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (var i = 0; i < axes.length; i++) {
+    var a = axes[i];
+    var sx = (a.v[0] * basis.right.x + a.v[1] * basis.right.y + a.v[2] * basis.right.z) * len;
+    var sy = -(a.v[0] * basis.up.x + a.v[1] * basis.up.y + a.v[2] * basis.up.z) * len;
+    ctx.strokeStyle = a.color;
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(ox + sx, oy + sy);
+    ctx.stroke();
+    ctx.fillStyle = a.color;
+    ctx.fillText(a.label, ox + sx * 1.35, oy + sy * 1.35);
+  }
+  ctx.fillStyle = '#6f7a8b';
+  ctx.beginPath();
+  ctx.arc(ox, oy, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function render() {
+  if (!model) { return; }
+  var size = resizeCanvas();
+  var w = size.w, h = size.h;
+  ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
+  ctx.fillStyle = '#1b1f26';
+  ctx.fillRect(0, 0, w, h);
+
+  var basis = cameraBasis(camera, w, h);
+  var faces = state.faces;
+
+  /* 4.1 剔除 + 深度排序（画家算法：远的先画） */
+  var list = [];
+  for (var i = 0; i < faces.length; i++) {
+    var f = faces[i];
+    if (!isFaceVisible(camera, basis, f)) { continue; }
+    list.push({ f: f, depth: faceDepth(camera, basis, f) });
+  }
+  list.sort(function (a, b) { return b.depth - a.depth; });
+
+  /* 4.2 逐面投影绘制；任何一角跑到相机后面就整面跳过 */
+  var edgeLimit = (faces.length <= 20000) ? 7 : 0;
+  ctx.lineJoin = 'bevel';
+  for (var k = 0; k < list.length; k++) {
+    var face = list[k].f;
+    var pts = projectFace(camera, basis, w, h, face);
+    if (!pts) { continue; }
+    var mat = model.matList[face.mi];
+    var big = false;
+    if (edgeLimit > 0 && mat && mat.alpha >= 1) {
+      var dx = pts[0].x - pts[2].x, dy = pts[0].y - pts[2].y;
+      big = (dx * dx + dy * dy) > (edgeLimit * edgeLimit);
+    }
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    ctx.lineTo(pts[1].x, pts[1].y);
+    ctx.lineTo(pts[2].x, pts[2].y);
+    ctx.lineTo(pts[3].x, pts[3].y);
+    ctx.closePath();
+    ctx.fillStyle = faceFill(face.mi, face.d);
+    ctx.fill();
+    if (big) {                     /* 只给够大的面描边，避免远景色块糊成一团 */
+      ctx.strokeStyle = 'rgba(0,0,0,0.20)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  /* 4.3 高亮框 + 方向标 */
+  if (state.hover) { strokeCell(camera, basis, w, h, state.hover, 'rgba(255,208,90,0.95)', 1.6); }
+  if (state.picked) { strokeCell(camera, basis, w, h, state.picked, 'rgba(120,200,255,0.95)', 2); }
+  drawGizmo(basis, w, h);
+
+  /* 4.4 帧率统计 */
+  var now = (window.performance && performance.now) ? performance.now() : Date.now();
+  if (state.lastFrame > 0) {
+    var dt = now - state.lastFrame;
+    if (dt > 0) { state.fps = state.fps ? state.fps * 0.85 + (1000 / dt) * 0.15 : 1000 / dt; }
+  }
+  state.lastFrame = now;
+}
+
+/* 可见性参数变了才重建面集（切层/剖面/过滤/换数据时调用） */
+function rebuildFaces() {
+  if (!model) { return; }
+  state.faces = buildFaces(model, {
+    layerMode: state.layerMode, layer: state.layer,
+    hideFront: state.hideFront, hideRoof: state.hideRoof, hidden: state.hidden
+  });
+}
+
+function refresh() {
+  rebuildFaces();
+  updateHud();
+  updateLayerInfo();
+  render();
+}
+
+/* =====================================================================================
+   5. 交互：orbit 相机 + 悬停拾取
+   ===================================================================================== */
+function zoomBy(factor) {
+  camera.zoom = clamp(camera.zoom * factor, 0.25, 6);
+  render();
+}
+
+/* 平移：把目标点沿相机右/上方向移动，屏幕像素 → 世界单位的换算按当前投影算 */
+function panBy(dxPixels, dyPixels) {
+  var size = { w: Math.max(1, canvas.clientWidth), h: Math.max(1, canvas.clientHeight) };
+  var basis = cameraBasis(camera, size.w, size.h);
+  var worldPerPixel = camera.ortho
+    ? (2 * (camera.orthoHalf / Math.max(0.05, camera.zoom)) / size.h)
+    : (2 * basis.dist * Math.tan(camera.fovY / 2) / size.h);
+  var mx = -dxPixels * worldPerPixel, my = dyPixels * worldPerPixel;
+  camera.target.x += basis.right.x * mx + basis.up.x * my;
+  camera.target.y += basis.right.y * mx + basis.up.y * my;
+  camera.target.z += basis.right.z * mx + basis.up.z * my;
+}
+
+function setView(name) {
+  if (name === 'front') { camera.yaw = 0; camera.pitch = 6 * DEG; }
+  else if (name === 'side') { camera.yaw = -90 * DEG; camera.pitch = 6 * DEG; }
+  else if (name === 'top') { camera.yaw = 0; camera.pitch = 88 * DEG; }
+  else { camera.yaw = 38 * DEG; camera.pitch = 28 * DEG; }
+  render();
+}
+
+/* 重新做一次悬停拾取（在 rAF 里合并多次 pointermove） */
+function schedulePick() {
+  if (state.pickScheduled) { return; }
+  state.pickScheduled = true;
+  window.requestAnimationFrame(function () {
+    state.pickScheduled = false;
+    doPick();
+  });
+}
+
+function doPick() {
+  if (!model) { return; }
+  var el = canvas;
+  var w = Math.max(1, el.clientWidth), h = Math.max(1, el.clientHeight);
+  if (!state.pointer.inside || state.pointer.x < 0 || state.pointer.y < 0) {
+    state.hover = null;
+  } else {
+    var basis = cameraBasis(camera, w, h);
+    var ray = screenToRay(camera, basis, w, h, state.pointer.x, state.pointer.y);
+    state.hover = pickCell(model, viewOptions(), ray.o, ray.d);
+  }
+  showDetail(state.hover || state.picked, !!state.hover);
+  positionTip(state.pointer.x, state.pointer.y);
+  render();
+}
+
+function viewOptions() {
+  return {
+    layerMode: state.layerMode, layer: state.layer,
+    hideFront: state.hideFront, hideRoof: state.hideRoof, hidden: state.hidden
+  };
+}
+
+function bindCanvas() {
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  canvas.addEventListener('pointerdown', function (e) {
+    canvas.setPointerCapture(e.pointerId);
+    state.drag = { id: e.pointerId, button: e.button, x: e.clientX, y: e.clientY, moved: false };
+    canvas.style.cursor = (e.button === 0) ? 'grabbing' : 'move';
+    e.preventDefault();
+  });
+
+  canvas.addEventListener('pointermove', function (e) {
+    var rect = canvas.getBoundingClientRect();
+    state.pointer.x = e.clientX - rect.left;
+    state.pointer.y = e.clientY - rect.top;
+    state.pointer.inside = true;
+
+    var drag = state.drag;
+    if (drag && drag.id === e.pointerId) {
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.x = e.clientX; drag.y = e.clientY;
+      if (Math.abs(dx) + Math.abs(dy) > 1) { drag.moved = true; }
+      if (drag.button === 0) {
+        camera.yaw -= dx * 0.0075;
+        camera.pitch = clamp(camera.pitch + dy * 0.0075, -89.5 * DEG, 89.5 * DEG);
+      } else {
+        panBy(dx, dy);
+      }
+      render();
+      return;
+    }
+    schedulePick();
+  });
+
+  function endDrag(e) {
+    if (state.drag && state.drag.id === e.pointerId) {
+      var wasClick = !state.drag.moved && state.drag.button === 0;
+      state.drag = null;
+      canvas.style.cursor = 'grab';
+      if (wasClick) {           /* 左键单击：固定选中当前悬停的方块 */
+        state.picked = state.hover;
+        showDetail(state.hover || state.picked, false);
+        render();
+      }
+    }
+    if (e.type === 'pointerleave') { state.pointer.inside = false; schedulePick(); }
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave', function (e) { if (!state.drag) { endDrag(e); } });
+
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    zoomBy(Math.exp(-e.deltaY * 0.0016));
+  }, { passive: false });
+}
+
+/* =====================================================================================
+   6. UI：HUD / 详情 / 图例 / 统计 / 导出
+   ===================================================================================== */
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) { e.className = cls; }
+  if (text !== undefined && text !== null) { e.textContent = String(text); }
+  return e;
+}
+
+function updateHud() {
+  if (!model) { return; }
+  var visibleCells = 0;
+  var visible = visibilityPredicate(model, viewOptions());
+  for (var i = 0; i < model.cells.length; i++) {
+    var c = model.cells[i];
+    if (visible(c.x, c.y, c.z)) { visibleCells++; }
+  }
+  state.visibleCells = visibleCells;
+  $('hudSrc').textContent = '数据来源：' + loadInfo.detail;
+  updateHudLine();
+}
+
+/* 每帧更新的一行：可见方块 / 面数 / 帧率 */
+function updateHudLine() {
+  if (!model) { return; }
+  $('hudLine').textContent = '可见方块 ' + state.visibleCells + ' / ' + model.cells.length +
+    '（不含控制器）· 绘制面 ' + state.faces.length + ' · ' + Math.round(state.fps) + ' FPS';
+}
+
+/* 悬停提示气泡 */
+function positionTip(px, py) {
+  var tip = $('tip');
+  if (!state.hover || !model || !state.pointer.inside) { tip.style.display = 'none'; return; }
+  var v = voxelAt(model, state.hover.x, state.hover.y, state.hover.z);
+  var mat = model.matList[v - 1];
+  tip.textContent = '';
+  tip.appendChild(el('div', null, '(' + state.hover.x + ', ' + state.hover.y + ', ' + state.hover.z + ')  ' +
+    (mat ? mat.letter : '?') + ' · ' + (mat ? mat.nameZh : '')));
+  tip.appendChild(el('div', 'k', mat ? (mat.nameEn + ' · ' + regName(mat)) : ''));
+  tip.style.display = 'block';
+  var maxX = Math.max(8, canvas.clientWidth - tip.offsetWidth - 12);
+  var maxY = Math.max(8, canvas.clientHeight - tip.offsetHeight - 12);
+  tip.style.left = clamp(px + 14, 8, maxX) + 'px';
+  tip.style.top = clamp(py + 14, 8, maxY) + 'px';
+}
+
+/* 注册名 + meta：优先用数据里的 registry（可在游戏内核对），block 只是预览用 id */
+function regName(mat) {
+  if (!mat) { return '—'; }
+  var metaTxt = (typeof mat.meta === 'number' && mat.meta >= 0) ? (':' + mat.meta) : '（不限 meta）';
+  return (mat.registry || mat.block || '—') + metaTxt;
+}
+
+/* 详情面板：坐标 / 层 / 字母 / 中英文名 / 注册名 + meta / 构件用途 / 块数 */
+function showDetail(cell, isHover) {
+  var box = $('detail');
+  box.textContent = '';
+  if (!model || !cell) {
+    box.appendChild(el('span', 'note', '把鼠标移到方块上即可查看；左键点击可固定选中。'));
+    return;
+  }
+  var v = voxelAt(model, cell.x, cell.y, cell.z);
+  var mat = model.matList[v - 1];
+  var perLayer = countByLayer(model);
+  var tag = el('span', 'tag' + (isHover ? '' : ' pin'), isHover ? '悬停' : '选中');
+  var head = el('div', 'row');
+  head.appendChild(tag);
+  head.appendChild(el('span', null, '(' + cell.x + ', ' + cell.y + ', ' + cell.z + ')'));
+  box.appendChild(head);
+
+  var kv = el('div', 'kv');
+  function row(k, val, mono) {
+    kv.appendChild(el('div', 'k', k));
+    kv.appendChild(el('div', 'v' + (mono ? '' : ''), val));
+  }
+  row('所在层', 'y = ' + cell.y + '（第 ' + (cell.y + 1) + ' / ' + model.size.y + ' 层，本层 ' + perLayer[cell.y] + ' 块）');
+  row('结构字母', mat ? mat.letter : '?');
+  row('材料 id', mat ? mat.id : '—');
+  row('中文名', mat ? mat.nameZh : '—');
+  row('英文名', mat ? mat.nameEn : '—');
+  row('注册名 + meta', regName(mat));
+  row('Java 引用', (mat && mat.java) ? mat.java : '—');
+  row('预览 id', mat ? mat.block : '—');
+  row('构件用途', mat ? (mat.role || '—') : '—');
+  row('该材料块数', mat ? (mat.count + ' 块') : '—');
+  if (mat && mat.isController) {
+    row('提示', '控制器本体：结构数据里这一格是空气，导出时写作 "~"');
+  }
+  box.appendChild(kv);
+}
+
+/* 材料图例（色块 / 字母 / 中英文名 / 注册名 + meta / 块数），点整行或勾选框都能切换 */
+function buildLegend() {
+  var host = $('mats');
+  host.textContent = '';
+  var list = countByMaterial(model);
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i];
+    if (item.isController) { continue; }             /* 控制器单列在统计里，不进材料过滤列表 */
+    var idx = model.matIndex[item.id];
+    var mat = model.matList[idx];
+    var row = el('label', 'mat' + (state.hidden.has(idx) ? ' off' : ''));
+    row.dataset.mi = String(idx);
+    row.title = mat.nameZh + ' / ' + mat.nameEn + '\n注册名：' + regName(mat) +
+      (mat.java ? '\nJava：' + mat.java : '') + '\n块数：' + mat.count +
+      (mat.count === 0 ? '（当前结构中未使用）' : '');
+    var cb = el('input');
+    cb.type = 'checkbox';
+    cb.checked = !state.hidden.has(idx);
+    cb.dataset.mi = String(idx);
+    var sw = el('span', 'sw');
+    sw.style.background = mat.color;
+    var ch = el('span', 'ch', mat.letter);
+    var nm = el('span', 'nm');
+    nm.appendChild(el('span', null, mat.nameZh + ' '));
+    nm.appendChild(el('i', null, mat.nameEn));
+    var rg = el('span', 'rg', regName(mat));
+    var ct = el('span', 'ct', mat.count === 0 ? '0 ⌀' : mat.count);
+    row.appendChild(cb); row.appendChild(sw); row.appendChild(ch);
+    row.appendChild(nm); row.appendChild(rg); row.appendChild(ct);
+    host.appendChild(row);
+  }
+}
+
+/* 图例的事件只在启动时绑一次（列表本身会随数据重建） */
+function bindLegendEvents() {
+  var host = $('mats');
+  host.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || t.tagName !== 'INPUT') { return; }
+    toggleMaterial(parseInt(t.dataset.mi, 10), t.checked);
+  });
+  host.addEventListener('click', function (e) {
+    /* 点行内空白处也当作切换（点勾选框时交给 change 事件，避免双重切换） */
+    if (e.target && e.target.tagName === 'INPUT') { return; }
+    var row = e.target ? e.target.closest('label.mat') : null;
+    if (!row) { return; }
+    var mi = parseInt(row.dataset.mi, 10);
+    toggleMaterial(mi, state.hidden.has(mi));
+  });
+}
+
+function toggleMaterial(mi, show) {
+  if (!isFinite(mi)) { return; }
+  if (show === undefined) { show = state.hidden.has(mi); }
+  if (show) { state.hidden.delete(mi); } else { state.hidden.add(mi); }
+  var rows = $('mats').children;
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    if (parseInt(row.dataset.mi, 10) !== mi) { continue; }
+    var cb = row.querySelector('input');
+    if (cb) { cb.checked = !!show; }
+    row.classList.toggle('off', !show);
+  }
+  refresh();
+}
+
+function setAllMaterials(show) {
+  state.hidden.clear();
+  if (!show) {
+    for (var i = 0; i < model.matList.length; i++) {
+      if (!model.matList[i].isController) { state.hidden.add(i); }
+    }
+  }
+  buildLegend();
+  refresh();
+}
+
+function invertMaterials() {
+  for (var i = 0; i < model.matList.length; i++) {
+    if (model.matList[i].isController) { continue; }
+    if (state.hidden.has(i)) { state.hidden.delete(i); } else { state.hidden.add(i); }
+  }
+  buildLegend();
+  refresh();
+}
+
+/* 统计面板：总量 / 尺寸 / 控制器与偏移 / 每层块数 / 每材料块数 / 自检结果 */
+function buildStats() {
+  var host = $('stats');
+  host.textContent = '';
+  var perLayer = countByLayer(model);
+  var kv = el('div', 'kv');
+  function row(k, v) { kv.appendChild(el('div', 'k', k)); kv.appendChild(el('div', 'v', v)); }
+  row('结构方块总数', model.cells.length + ' 块（不含控制器）');
+  row('控制器', model.ctrl ? '(' + model.ctrl.x + ', ' + model.ctrl.y + ', ' + model.ctrl.z + ') 共 1 格' : '—');
+  row('合计占用格数', (model.cells.length + (model.ctrlCell ? 1 : 0)) + ' 格 / 包络 ' + model.total + ' 格');
+  row('包络尺寸', model.size.x + ' × ' + model.size.y + ' × ' + model.size.z +
+      '（x 0..' + (model.size.x - 1) + ', y 0..' + (model.size.y - 1) + ', z 0..' + (model.size.z - 1) + '）');
+  var off = (model.raw && model.raw.offsets) ? model.raw.offsets : {};
+  row('偏移量', 'HORIZONTAL=' + off.horizontal + '  VERTICAL=' + off.vertical + '  DEPTH=' + off.depth);
+  row('材料种类', model.matList.length - (model.ctrlCell ? 1 : 0) + ' 种');
+  row('数据指纹', fingerprint(model));
+  host.appendChild(kv);
+
+  host.appendChild(el('h3', null, '每层块数'));
+  host.appendChild(el('div', 'mono', perLayer.map(function (n, i) { return 'y' + i + '=' + n; }).join('  ')));
+
+  var counts = countByMaterial(model).filter(function (m) { return !m.isController; })
+    .sort(function (a, b) { return b.count - a.count; });
+  host.appendChild(el('h3', null, '各材料块数（降序）'));
+  host.appendChild(el('div', 'mono', counts.map(function (m) { return m.letter + ' ' + m.count; }).join('  ')));
+
+  host.appendChild(el('h3', null, '自检（现场从数据算）'));
+  var checks = runSelfChecks(model);
+  var ul = el('ul', 'checks');
+  for (var i = 0; i < checks.length; i++) {
+    var c = checks[i];
+    var li = el('li');
+    li.appendChild(el('span', c.ok ? 'ok' : 'bad', c.ok ? '✓' : '✗'));
+    var txt = el('span');
+    txt.appendChild(el('span', null, c.label + ' — '));
+    txt.appendChild(el('span', 'why', c.detail));
+    li.appendChild(txt);
+    ul.appendChild(li);
+  }
+  host.appendChild(ul);
+  host.appendChild(el('div', 'note', '六面都被实心邻居包住、预览里看不见的方块：' + countBuried(model) +
+    ' 个（结构厚连接处的正常现象，不是错误）。'));
+}
+
+/* 导出面板 */
+function buildExport() {
+  var text = buildExportJava(model);
+  $('exportPre').textContent = text;
+  var rows = model.size.y * model.size.z;
+  $('exportInfo').textContent = '共 ' + rows + ' 行（' + model.size.y + ' 层 × ' + model.size.z +
+    ' 条 z 行），每行 ' + model.size.x + ' 个字符；导出的是完整结构，与切层/过滤无关。';
+  return text;
+}
+
+function selectNodeText(node) {
+  var sel = window.getSelection();
+  if (!sel || !document.createRange) { return false; }
+  var range = document.createRange();
+  range.selectNodeContents(node);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return true;
+}
+
+async function copyExport() {
+  var pre = $('exportPre');
+  var text = pre.textContent || '';
+  if (!text) { return; }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      flashExport('已复制 ' + text.length + ' 个字符到剪贴板。');
+      return;
+    }
+    throw new Error('no clipboard api');
+  } catch (err) {
+    if (selectNodeText(pre)) { flashExport('浏览器不允许自动写剪贴板：文本已选中，请按 Ctrl+C 复制。'); }
+    else { flashExport('浏览器不允许自动写剪贴板，请手动选中文本后按 Ctrl+C。'); }
+  }
+}
+
+var flashTimer = 0;
+/* 在导出说明行上闪一条提示，4 秒后恢复原文 */
+function flashExport(msg) {
+  var info = $('exportInfo');
+  if (!info.dataset.base) { info.dataset.base = info.textContent; }
+  info.textContent = msg;
+  if (flashTimer) { window.clearTimeout(flashTimer); }
+  flashTimer = window.setTimeout(function () { info.textContent = info.dataset.base; }, 4000);
+}
+
+function downloadExport() {
+  var text = $('exportPre').textContent || '';
+  if (!text) { return; }
+  var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = (model.raw.machine || 'structure') + '-structure_string.java.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+  flashExport('已下载 ' + text.length + ' 个字符。');
+}
+
+function updateLayerInfo() {
+  var perLayer = model ? countByLayer(model) : [];
+  $('layerLabel').textContent = 'y = ' + state.layer + (model ? '（' + perLayer[state.layer] + ' 块）' : '');
+  var mode = state.layerMode;
+  $('layerInfo').textContent = (mode === 'only')
+    ? '只看当前层：仅绘制 y = ' + state.layer + ' 一层。'
+    : (mode === 'below'
+      ? '显示当前层以下：绘制 y ≤ ' + state.layer + ' 的所有层。'
+      : '显示全部：12 层全部绘制（此模式下滑块只作定位，不裁剪）。');
+  $('layerSlider').disabled = (mode === 'all');
+}
+
+function bindSidebar() {
+  /* 数据还没到时，所有跟结构有关的按钮直接忽略点击（不抛异常） */
+  function ready() { return model !== null; }
+
+  var viewButtons = document.querySelectorAll('[data-view]');
+  for (var i = 0; i < viewButtons.length; i++) {
+    viewButtons[i].addEventListener('click', function () { if (ready()) { setView(this.dataset.view); } });
+  }
+
+  $('btnOrtho').addEventListener('click', function () {
+    if (!ready()) { return; }
+    camera.ortho = !camera.ortho;
+    this.textContent = '正交投影（当前：' + (camera.ortho ? '正交' : '透视') + '）';
+    this.classList.toggle('on', camera.ortho);
+    render();
+  });
+
+  $('btnReset').addEventListener('click', function () {
+    if (!ready()) { return; }
+    camera = makeCamera();
+    camera.ortho = false;
+    $('btnOrtho').textContent = '正交投影（当前：透视）';
+    $('btnOrtho').classList.remove('on');
+    var size = { w: Math.max(1, canvas.clientWidth), h: Math.max(1, canvas.clientHeight) };
+    fitCamera(camera, model, size.w, size.h);
+    setView('front');
+  });
+
+  var modes = document.querySelectorAll('[data-mode]');
+  for (var m = 0; m < modes.length; m++) {
+    modes[m].addEventListener('click', function () {
+      if (!ready()) { return; }
+      state.layerMode = this.dataset.mode;
+      for (var j = 0; j < modes.length; j++) { modes[j].classList.toggle('on', modes[j] === this); }
+      refresh();
+    });
+  }
+
+  var slider = $('layerSlider');
+  slider.addEventListener('input', function () {
+    if (!ready()) { return; }
+    state.layer = clamp(parseInt(slider.value, 10) || 0, 0, model.size.y - 1);
+    refresh();
+  });
+
+  $('cbHideFront').addEventListener('change', function () { state.hideFront = this.checked; if (ready()) { refresh(); } });
+  $('cbHideRoof').addEventListener('change', function () { state.hideRoof = this.checked; if (ready()) { refresh(); } });
+
+  $('btnAll').addEventListener('click', function () { if (ready()) { setAllMaterials(true); } });
+  $('btnNone').addEventListener('click', function () { if (ready()) { setAllMaterials(false); } });
+  $('btnInvert').addEventListener('click', function () { if (ready()) { invertMaterials(); } });
+
+  $('btnClearSel').addEventListener('click', function () {
+    state.picked = null;
+    if (ready()) { showDetail(state.hover, true); render(); }
+  });
+
+  $('btnGen').addEventListener('click', function () {
+    if (!ready()) { return; }
+    buildExport();
+    $('exportInfo').dataset.base = $('exportInfo').textContent;
+    flashExport('已按当前数据重新生成。');
+  });
+  $('btnCopy').addEventListener('click', function () { if (ready()) { copyExport(); } });
+  $('btnDownload').addEventListener('click', function () { if (ready()) { downloadExport(); } });
+
+  $('btnReload').addEventListener('click', function () { reloadFromDisk(); });
+  $('btnPickFile').addEventListener('click', function () { $('fileInput').click(); });
+  $('fileInput').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) { return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var raw = JSON.parse(String(reader.result));
+        applyStructure(raw, '用户选择的文件：' + f.name);
+      } catch (err) {
+        $('srcInfo').textContent = '解析失败：' + (err && err.message ? err.message : '不是合法 JSON');
+        $('srcInfo').className = 'note err';
+      }
+    };
+    reader.readAsText(f, 'utf-8');
+  });
+}
+
+async function reloadFromDisk() {
+  $('srcInfo').textContent = '正在重新读取 machine-structure.json …';
+  $('srcInfo').className = 'note';
+  var loaded = await loadStructure();
+  if (!loaded.raw) {
+    $('srcInfo').textContent = loaded.detail;
+    $('srcInfo').className = 'note err';
+    return;
+  }
+  applyStructure(loaded.raw, loaded.detail);
+}
+
+/* =====================================================================================
+   7. 启动
+   ===================================================================================== */
+function applyStructure(raw, detail) {
+  var built;
+  try {
+    built = buildModel(raw);
+  } catch (err) {
+    $('srcInfo').textContent = '结构数据不可用：' + (err && err.message ? err.message : '未知错误');
+    $('srcInfo').className = 'note err';
+    return;
+  }
+  model = built;
+  state.hidden = new Set();
+  state.colorCache = new Map();
+  state.hover = null;
+  state.picked = null;
+  state.faces = [];
+
+  /* 数据来源文案（fetch 成功时顺带比对内联快照是否过期） */
+  var txt = detail;
+  if (loadInfo.source !== 'user' && detail.indexOf('内联快照') < 0) {
+    var same = sameAsInline(raw);
+    if (same === true) { txt += '（与内联快照一致）'; }
+    else if (same === false) { txt += '（⚠ 与内联快照不同，页内快照已过期）'; }
+  }
+  loadInfo.detail = txt;
+  $('srcInfo').textContent = txt;
+  $('srcInfo').className = 'note';
+
+  /* 控件范围跟着数据走 */
+  var slider = $('layerSlider');
+  slider.min = '0';
+  slider.max = String(Math.max(0, model.size.y - 1));
+  state.layerMode = 'below';
+  state.layer = model.size.y - 1;
+  slider.value = String(state.layer);
+  var modes = document.querySelectorAll('[data-mode]');
+  for (var i = 0; i < modes.length; i++) {
+    modes[i].classList.toggle('on', modes[i].dataset.mode === state.layerMode);
+  }
+  $('cbHideFront').checked = false;
+  $('cbHideRoof').checked = false;
+  state.hideFront = false;
+  state.hideRoof = false;
+
+  buildLegend();
+  buildStats();
+  buildExport();
+
+  var size = { w: Math.max(1, canvas.clientWidth), h: Math.max(1, canvas.clientHeight) };
+  camera = makeCamera();
+  fitCamera(camera, model, size.w, size.h);
+  setView('front');
+
+  refresh();
+  $('exportInfo').dataset.base = $('exportInfo').textContent;
+}
+
+function boot() {
+  bindCanvas();
+  bindSidebar();
+  bindLegendEvents();
+  window.addEventListener('resize', function () { render(); });
+
+  (async function () {
+    var loaded = await loadStructure();
+    loadInfo.source = loaded.source;
+    if (loaded.raw) {
+      applyStructure(loaded.raw, loaded.detail);
+    } else {
+      loadInfo.detail = loaded.detail;
+      $('srcInfo').textContent = loaded.detail;
+      $('srcInfo').className = 'note err';
+      $('hudLine').textContent = '没有可用的结构数据。';
+    }
+  })();
+}
+
+boot();
+</script>
+<noscript>
+  <div style="padding:16px;color:#e07a7a">此预览页需要 JavaScript 才能渲染 3D 结构。</div>
+</noscript>
+</body>
+</html>

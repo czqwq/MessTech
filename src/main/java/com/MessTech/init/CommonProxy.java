@@ -57,6 +57,16 @@ public class CommonProxy implements IGuiHandler {
         return ForgeDirection.getOrientation((guiId >> 8) & 7);
     }
 
+    /**
+     * Opens the game console's window (see {@code GuiGameConsole}). The console is a purely local
+     * toy - the DOOM engine it runs lives on the client's own machine and it has no inventory, no
+     * tile entity and no server state - so this is a no-op on the server and only implemented by
+     * {@link ClientProxy}.
+     */
+    public void openGameConsole(EntityPlayer player) {
+        // Server side: nothing to do, by design.
+    }
+
     // preInit "Run before anything else. Read your config, create blocks, items, etc, and register them with the
     // GameRegistry." (Remove if not needed)
     public void preInit(FMLPreInitializationEvent event) {

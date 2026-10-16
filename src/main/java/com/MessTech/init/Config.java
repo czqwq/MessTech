@@ -11,6 +11,7 @@ public class Config {
     public static final String GENERAL = "General";
     public static final String REACTOR = "Reactor";
     public static final String VOIDSTAR_BOW = "VoidstarBow";
+    public static final String GAME_CONSOLE = "GameConsole";
     public static final String DEBUG = "Debug";
     public static boolean DEFAULT_BATCH_MODE = true;
     /**
@@ -111,6 +112,68 @@ public class Config {
      * and keeps charging after it.
      */
     public static int VOIDSTAR_BOW_DRAW_TICKS = 80;
+
+    /**
+     * Client-side: the folder the game console (游戏机) keeps everything in. Relative paths are
+     * resolved against Minecraft's own {@code config} folder, so the default lands at
+     * {@code config/messtech/gameconsole}. This is where the IWAD is looked for, where the engine's
+     * own {@code mochadoom.cfg} and savegames go, and where a Freedoom download is unpacked.
+     */
+    public static String GAME_CONSOLE_DIR = "messtech/gameconsole";
+
+    /**
+     * Client-side: an explicit IWAD to run, e.g. {@code DOOM.WAD} or {@code freedoom2.wad}. Empty
+     * (the default) means "use any IWAD found in {@link #GAME_CONSOLE_DIR}", which is what almost
+     * everyone wants.
+     */
+    public static String GAME_CONSOLE_WAD = "";
+
+    /**
+     * Client-side: whether the console may fetch Freedoom Phase 1 from its GitHub release when the
+     * folder holds no IWAD at all. Freedoom is free (a BSD-licensed Doom) and is the only WAD that
+     * may legally be downloaded for the player; nothing commercial is ever fetched or shipped.
+     */
+    public static boolean GAME_CONSOLE_DOWNLOAD_FREEDOOM = true;
+
+    /** Where that download comes from. It is a zip; the console unpacks {@code freedoom1.wad} from it. */
+    public static String GAME_CONSOLE_FREEDOOM_URL = "https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip";
+
+    /**
+     * Client-side: how much of the screen's width the console's window takes, keeping DOOM's
+     * 320x200 shape. The default 0.5 is the "half a screen" the item was asked for; the window is
+     * also capped at 90% of the screen's height so it always fits.
+     */
+    public static float GAME_CONSOLE_SCREEN_FRACTION = 0.5F;
+
+    /**
+     * Client-side: how many threads the engine's true-colour post-processing may use. DOOM renders
+     * at 320x200, which one core manages comfortably; the engine default would be every core in
+     * the machine, competing with Minecraft's own renderer.
+     */
+    public static int GAME_CONSOLE_THREADS = 2;
+
+    /**
+     * Client-side: whether the game console plays DOOM's sound effects. These go through
+     * {@code javax.sound} (Mocha Doom's own mixer), not Minecraft's OpenAL - the two live side by
+     * side on the same sound card - so the engine's volume is what controls them. Off only if the
+     * extra audio device is a problem; the console starts and runs fine without it.
+     */
+    public static boolean GAME_CONSOLE_SOUND = true;
+
+    /**
+     * Client-side: whether the console also plays DOOM's music. DOOM's songs are FM music written
+     * for the OPL2 chip and the WAD carries the matching patch table, so the console emulates that
+     * chip in Java and mixes the result into the same output as the sound effects: nothing to
+     * install, no extra audio device, and no JVM flags on any Java version.
+     */
+    public static boolean GAME_CONSOLE_MUSIC = true;
+
+    /**
+     * Client-side: whether the world freezes while the console's window is open. Off by default -
+     * a toy that stops the world would also freeze every mob and machine around the player for as
+     * long as they played.
+     */
+    public static boolean GAME_CONSOLE_PAUSES_WORLD = false;
 
     public static void synchronizeConfiguration(File configFile) {
         Configuration configuration = new Configuration(configFile);
@@ -222,6 +285,77 @@ public class Config {
             GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI,
             "Open Galacticraft's celestial selection screen (tier 0, Earth only) for a player who crosses the altitude"
                 + " a rocket would leave the atmosphere at while climbing at 256 blocks/s or more.");
+
+        // region Game console
+        GAME_CONSOLE_DIR = configuration.getString(
+            "GAME_CONSOLE_DIR",
+            GAME_CONSOLE,
+            GAME_CONSOLE_DIR,
+            "Client-side: folder the game console keeps its IWAD, engine config, savegames and the translucency cache"
+                + " in. A relative path is resolved against Minecraft's config folder, so the default means"
+                + " <game>/config/messtech/gameconsole.");
+
+        GAME_CONSOLE_WAD = configuration.getString(
+            "GAME_CONSOLE_WAD",
+            GAME_CONSOLE,
+            GAME_CONSOLE_WAD,
+            "Client-side: an explicit IWAD to run (DOOM.WAD, DOOM2.WAD, freedoom1.wad, ...). Leave empty to use any"
+                + " IWAD found in GAME_CONSOLE_DIR.");
+
+        GAME_CONSOLE_DOWNLOAD_FREEDOOM = configuration.getBoolean(
+            "GAME_CONSOLE_DOWNLOAD_FREEDOOM",
+            GAME_CONSOLE,
+            GAME_CONSOLE_DOWNLOAD_FREEDOOM,
+            "Client-side: fetch Freedoom Phase 1 (a free, BSD-licensed Doom) the first time the console is opened and"
+                + " no IWAD is present. Nothing commercial is ever downloaded or shipped; id's own WADs are not"
+                + " distributable, so this is the only automatic source.");
+
+        GAME_CONSOLE_FREEDOOM_URL = configuration.getString(
+            "GAME_CONSOLE_FREEDOOM_URL",
+            GAME_CONSOLE,
+            GAME_CONSOLE_FREEDOOM_URL,
+            "Client-side: where that Freedoom release zip is downloaded from.");
+
+        GAME_CONSOLE_SCREEN_FRACTION = configuration.getFloat(
+            "GAME_CONSOLE_SCREEN_FRACTION",
+            GAME_CONSOLE,
+            GAME_CONSOLE_SCREEN_FRACTION,
+            0.2F,
+            1.0F,
+            "Client-side: fraction of the screen's width the console's window takes, keeping DOOM's 320x200 aspect."
+                + " 0.5 is half the screen; the window is capped at 90% of the height so it always fits.");
+
+        GAME_CONSOLE_THREADS = configuration.getInt(
+            "GAME_CONSOLE_THREADS",
+            GAME_CONSOLE,
+            GAME_CONSOLE_THREADS,
+            1,
+            16,
+            "Client-side: threads the DOOM engine's true-colour post-processing may use. One core is enough for"
+                + " 320x200; the engine's own default is every core in the machine, which fights Minecraft's renderer.");
+
+        GAME_CONSOLE_PAUSES_WORLD = configuration.getBoolean(
+            "GAME_CONSOLE_PAUSES_WORLD",
+            GAME_CONSOLE,
+            GAME_CONSOLE_PAUSES_WORLD,
+            "Client-side: freeze the world while the console's window is open. Off by default, so that playing DOOM"
+                + " does not also stop every mob and machine around the player.");
+
+        GAME_CONSOLE_SOUND = configuration.getBoolean(
+            "GAME_CONSOLE_SOUND",
+            GAME_CONSOLE,
+            GAME_CONSOLE_SOUND,
+            "Client-side: play DOOM's sound effects. They go through javax.sound (the engine's own mixer), not"
+                + " Minecraft's OpenAL, so the console has its own volume next to the game's.");
+
+        GAME_CONSOLE_MUSIC = configuration.getBoolean(
+            "GAME_CONSOLE_MUSIC",
+            GAME_CONSOLE,
+            GAME_CONSOLE_MUSIC,
+            "Client-side: play DOOM's music as well. The songs are FM music written for the OPL2 chip, so the"
+                + " console emulates that chip and mixes the result into the same output as the sound effects.");
+
+        // endregion
 
         // 1.7.10's Configuration has no getDouble overload, so this goes through get(...) and reads the Property.
         MOVED_TOO_QUICKLY_THRESHOLD = configuration

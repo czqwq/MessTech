@@ -78,6 +78,27 @@ MC 1.7.10 用的 LWJGL2 里，标准做法是 `glTexImage2D(GL_TEXTURE_2D, 0, GL
 GL12.GL_BGRA, GL12.GL_UNSIGNED_INT_8_8_8_8_REV, IntBuffer.wrap(raster))`（小端机上
 `0x00RRGGBB` 的内存布局正好是 B,G,R,A）。
 
+### 1.4 已经跑通的无头验证（spike，`tmp/doom-spike/`）
+
+上面的补丁在 `tmp/doom-spike/` 里**真做了一遍**（不碰仓库），并用 Freedoom 1 做了一次完整的
+无头冒烟测试：
+
+| 步骤 | 结果 |
+| --- | --- |
+| 原版源码原样编译（`javac 25 --release 8`，442 文件） | ✅ 0 error |
+| 删掉 `awt/**` + 打完 §3 补丁后编译（435 文件） | ✅ 0 error |
+| `-Djava.awt.headless=true` 无头启动，`-iwad freedoom1.wad -multiply 1 -truecolor -nosound` | ✅ 1.6 s 引擎就绪 |
+| 连续渲染 400 帧 | ✅ 13.4 s，**29.9 fps**，320x200 |
+| 首帧非黑像素 | ✅ 64000 / 64000 |
+| 宿主置停止位后 `DoomLoop()` 返回 | ✅ 正常返回，JVM 存活（**没有 `System.exit`**） |
+| 帧内容 | ✅ 开枪中的第一人称画面 + 完整状态栏（`tmp/doom-spike/last-frame.png`） |
+
+「无头启动 + 拿裸 ARGB 帧 + 能干净停下」这条最关键的链路**已经验证**。剩下的是搬进仓库、
+包名重定位、以及 MC 侧的道具 / GUI / 按键 / 纹理上传。
+
+（注意：spike 用的是裸 `javac`，**没有**经过本仓库的 `jvmDowngrader` 管线；那一步仍需在
+真实构建里过一遍。见 §7。）
+
 ---
 
 ## 2. AWT 耦合面到底有多大
@@ -216,17 +237,246 @@ Esc / onGuiClosed → session.stop() → 置停止位、join(2s)、释放纹理�
 
 ## 8. 里程碑
 
-1. **编译 spike**：把源码树（先不重命名）放进一个 source set，只剔除 `awt/**` 与 `i/system.java`，
-   验证 `compileJava` 能过、`jvmDowngrader` 不炸。← 最大的未知数，先做。
-2. **无头启动 spike**：写 `MTDoomSystem` + 宿主钩子（§3 第 1~4、6、7 项），在一个纯 Java 的
-   `main`（不进 MC）里用 Freedoom 跑起来，确认能稳定出帧、能干净退出。
-3. **进 MC**：道具 + `GuiScreen` + 纹理上传 + 键盘轮询 + Esc 退出。
-4. **打磨**：半个屏幕的排版、加载界面、tooltip/合成表、config、错误提示（没 WAD 时说什么）、
-   音效（可选）、暂停世界（可选）。
+1. ~~**编译 spike**~~：✅ 已完成，见 §1.4。
+2. ~~**无头启动 spike**~~：✅ 已完成，见 §1.4。
+3. ~~**进仓库 + 进 MC**~~：✅ 已完成，见 §9。
+4. **后续可做**：音效、鼠标视角、合成表、Doom 自己的存档界面文案、把引擎拆成独立 source set。
 
 ---
 
-## 9. 事实来源
+## 9. 实际落地（已完成）
+
+### 9.1 代码放在哪
+
+| 位置 | 内容 |
+| --- | --- |
+| `src/main/java/com/MessTech/doom/**` | **437 个文件**：Mocha Doom 全量源码，去掉 `awt/**` 与 `i/system.java`，顶层包统一重定位到 `com.MessTech.doom.*`（`p` / `rr` / `doom` / `data` / `s` / `v` / `m` / `w` / … 全部保留原结构） |
+| `src/main/java/com/MessTech/common/gameconsole/` | MC 侧宿主：`MTGameConsoleHost`（引擎线程 + 双缓冲帧 + 输入轮询）、`MTGameConsoleSystem`（`IDoomSystem`）、`MTGameConsoleKeys`（LWJGL↔`ScanCode`）、`MTGameConsoleWads`（找/下载 IWAD） |
+| `src/main/java/com/MessTech/common/gui/GuiGameConsole.java` | 半个屏幕的窗口：纹理上传 + 最近邻放大 + Esc 退出 + 加载/下载/失败三种状态显示 |
+| `src/main/java/com/MessTech/common/items/MTItemGameConsole.java` | 道具「游戏机」，右键开窗（`onItemRightClick` 覆盖空中、`onItemUseFirst` 覆盖对着方块） |
+| 其余 | `MTItemList.GameConsole`、`MTItems.gameConsole`、`ClientProxy.openGameConsole`、`Config.GAME_CONSOLE_*`、`assets/.../items/gameConsole.png`、两个 lang 文件 |
+
+包名重定位是脚本做的（重写 `package` / `import` 行 + 12 处行内全限定名），
+`javac` 全量编译通过。
+
+### 9.2 对引擎实际打了哪些补丁（比 §3 的计划多几处，都是实现时发现的）
+
+| 补丁 | 原因 |
+| --- | --- |
+`mochadoom/Engine` 重写 | 去掉 AWT 建窗；`bootstrap(cvm, host)` 注入宿主；`getCVM()/getConfig()/updateFrame()` 签名不变，52 处静态调用无需改动 |
+`Host` 接口（`frameReady` / `running` / `createDoomSystem` / `fatal`） | 帧交付、循环退出、`IDoomSystem` 注入 |
+`DoomMain.DoomLoop` `while(true)` → `while(host.running())` | 上游没有任何退出条件 |
+`v/renderers/BufferedRenderer32` 去掉 `VolatileImage`，新增 `HeadlessRaster.renderFrame()` | 无头提帧；顺带避免 320x200 的真彩后处理把 CPU 全占了 |
+`SoftwareParallelVideoRenderer.GRAPHICS_CONF` 延迟初始化 + `HEADLESS` 判断 | 类加载即碰 `GraphicsEnvironment` |
+**17 处 `System.exit` → `DoomFatalError`** | 否则坏 WAD 会把整个 Minecraft 带走 |
+`g/Signals.ScanCode.getVirtualKey()` | MC 侧建键码映射表 |
+`DoomStatus.aliasKey()` + `DoomMain.applyKeyAliases()` | 让方向键和 WASD 同时生效（一个动作只有一个绑定槽） |
+`HostPaths` + `ConfigBase.getFolder()` / `RendererState` / `DoomMain` / `Menu` 的路径改写 | 让存档、`tranmap.dat`、`default.cfg`、`mochadoom.cfg` 都落在游戏机自己的目录里，而不是游戏根目录 |
+`WadLoader.finalize()` 删除 + 宿主显式 `CloseAllHandles()` | `finalize` 已废弃；Windows 下不关句柄会锁住 WAD |
+`WadLoader` 那处 `(CacheableDoomObject) thebuffer` → 抛异常 | JDK 25 起 `java.nio.ByteBuffer` 是 sealed，这个死分支已经编不过了 |
+`awt/**` 不进编译 | 整个 AWT 窗口层不需要 |
+
+另外把 `mochadoom.cfg` 里的 `parallelism_realcolor_tint` 播种成 `Config.GAME_CONSOLE_THREADS`（默认 2），
+免得引擎默认按 CPU 核数开线程和 MC 抢。
+
+### 9.3 数据流与线程
+
+```
+MC 客户端线程                                      Doom 线程（daemon）
+右键 → new GuiGameConsole ────────start────────▶ 找/下载 IWAD（进度回填到 GUI）
+                                                  HostPaths.setBaseDirectory(<config>/messtech/gameconsole)
+                                                  Engine.bootstrap → DoomMain
+                                                  覆盖键位 + commit()
+每帧 drawScreen:                                  setupLoop()  ── while(host.running()) ──┐
+  host.pollInput()  ── PostEvent(keyevent_t) ──▶  ProcessEvents / G_Ticker / D_Display   │
+  host.copyFrame() + glTexSubImage2D        ◀──   frameReady(): 后处理 + 双缓冲交换 ─────┘
+Esc → onGuiClosed → host.stop()（停止位 + join 3s + 关闭 WAD 句柄 + 关线程池）
+```
+
+- 引擎只在 Doom 线程上被碰；MC 侧只通过 `PostEvent` 队列和双缓冲帧交换交互。
+- 键盘是**按帧轮询 `Keyboard.isKeyDown`**：`GuiScreen` 只有按下事件没有抬起事件，而 DOOM 没抬键就停不下来；
+  轮询还顺带绕开了 MC 对 `E`、`/` 这些键的抢占。
+- `doesGuiPauseGame()` 默认 `false`（世界照常跑），`Config.GAME_CONSOLE_PAUSES_WORLD` 可以改。
+
+### 9.4 键位（默认值，全部可在游戏机里改）
+
+| 键 | 作用 |
+| --- | --- |
+| `W` / `↑`，`S` / `↓` | 前进 / 后退 |
+| `A` / `←`，`D` / `→` | 左转 / 右转 |
+| `,` / `.` | 左平移 / 右平移（`Alt` + `A`/`D` 也行） |
+| `E` / `Space` | 开门、按开关 |
+| `Ctrl` | 开火 |
+| `Shift` | 疾跑 |
+| `1`..`0` | 换武器 |
+| `Tab` | 地图 |
+| `F1` | DOOM 自己的菜单（牺牲了原来的帮助画面，且**固定不可改**） |
+| **`Esc`** | **关掉游戏机窗口**（固定不可改） |
+
+### 9.5 数据（WAD）
+
+`<游戏目录>/config/messtech/gameconsole/` 下的 IWAD；按 Mocha Doom 自己的 `DoomVersion` 名单嗅探
+（`doom.wad` / `doom2.wad` / `tnt.wad` / `freedoom1.wad` …），大小写不敏感。
+一个都没有、且 `GAME_CONSOLE_DOWNLOAD_FREEDOOM=true` 时，第一次打开会从 GitHub release 下载
+**Freedoom Phase 1**（24 MB zip，解包出 27 MB 的 `freedoom1.wad`），带进度条；下载走 `.part` 临时文件，
+中断不会留下半截 WAD。**id 的原版 WAD 既不下也不打包。**
+
+### 9.6 验证记录
+
+| 检查 | 结果 |
+| --- | --- |
+| `./gradlew compileJava` | ✅ |
+| `./gradlew spotlessApply build`（含 `downgradeJar` 的 jvmDowngrader 与 `checkstyleMain`） | ✅ |
+| 把**重定位后**的引擎放进普通 JVM 无头跑（`tmp/relocated-smoke/`） | ✅ 120 帧 / 33–35 fps / 320x200、首帧 64000 像素全非黑 |
+| 方向键别名真的驱动了 WASD 绑定（直接调 `G_Responder` 后读 `gamekeydown`） | ✅ down=true / up=true |
+| 存档、`tranmap.dat`、两个 cfg 是否落在游戏机目录、不污染工作目录 | ✅ |
+| 全程不 `System.exit` | ✅ JVM 存活 |
+| 声音：`I_InitSound: configured audio device` → `sound module ready`，关窗时 `ShutdownSound` 7 ms 返回 | ✅ |
+| 按键模型：默认值 / 改键 / 互斥 / 清空 / `keys.cfg` 往返（`tmp/relocated-smoke/BindingsCheck.java`） | ✅ ALL OK（并抓出一个注释解析 bug） |
+| OPL2 音乐（真 WAD 的 D_E1M1，11142 个事件，8 s）：**Java 8 与 JDK 25 输出完全一致** | ✅ 94.02% 非零样本 / 峰值 13733，两边一字节不差（6 s 版本为 93.39% / 11503） |
+| 音乐（JDK 25 / Java 8，**都不加任何 JVM 参数**） | ✅ 不需要 `--add-opens`，已从构建脚本里删掉 |
+| 引擎端到端（音乐开）：`Music through the OPL2 emulator at 22050 Hz`，`music drained by the mixer = 310800 bytes` / 3.43 s ≈ **90.6 KB/s**（理论 88.2） | ✅ 帧率 **35.0 fps**（与无音乐时完全相同），关音频 22 ms |
+| GENMIDI 解码：175 个音色的 TL 全 ≤63、KSL 全 ≤3、波形 ≤6、feedback ≤7 | ✅ 0 处越界；钢琴 ATK=15、管风琴 SL=1、小提琴 ATK=6、低音鼓 ATK=15 |
+| 发布 jar 里 `s/opl/*` 的字节码 | ✅ major 52（Java 8） |
+| 产物体积 | 3.79 MB（移植前 1.37 MB，引擎约 +2.4 MB） |
+
+**未验证**：真机 `runClient` 里的画面、手感与**实际听感**（需要 GUI 交互，本次只做到编译 + 无头运行；
+音乐"有没有真的从喇叭出来"是靠 `drainedBytes` 计数 + 字节速率对齐推出来的）。
+
+### 9.7 声音
+
+引擎的声音**不走 Minecraft 的 OpenAL**：Mocha Doom 自己有一台完整的混音器
+（`s.SuperDoomSoundDriver`，22050 Hz / 16bit / 立体声 / big-endian，自己两个线程 + 一个 21 Hz 的 `Timer`），
+它把混好的流直接写进第二条 `javax.sound` 数据线。所以两条音频路径互不干扰，也不用碰 OpenAL 上下文。
+
+开关（`Config`，都在 `[GameConsole]` 段）：
+
+| 配置 | 默认 | 作用 |
+| --- | --- | --- |
+| `GAME_CONSOLE_SOUND` | `true` | 音效。关掉就传 `-nosfx` |
+| `GAME_CONSOLE_MUSIC` | `true` | 音乐。关掉传 `-nomusic` |
+| 两个都关 | — | 传 `-nosound`，引擎换成全空实现 |
+
+- 设备打不开时**不会拖垮游戏机**：`ISoundDriver.chooseModule` 本来就会在 `InitSound()` 失败时退回
+  `DummySFX`。上游的 `ShutdownSound()` 是一个 `while(!done)` 死等 + 从不取消 Timer，已经改成
+  **上限 500 ms 的等待 + `MIXTIMER.cancel()` + 给 join 加超时**。
+- 音量跟着 Minecraft 主音量走（`GameSettings.getSoundLevel(SoundCategory.MASTER)` → 映射到 0..127）。
+- 关窗时会调 `music.ShutdownMusic()` + `soundDriver.ShutdownSound()`：不关的话那条数据线、
+  混音线程和那个 21 Hz 的守护 Timer 会一直活到进程结束。
+
+#### 9.7.1 音乐：自己仿真 OPL2
+
+上游的 `DavidMusicModule` / `FinnwMusicModule` 都是把 MIDI 事件丢给**机器上某个 MIDI 设备**，那样在游戏机
+里就是第三条音频路径（音量和延迟都不受我们控制）。
+
+中间试过一版「让 JDK 自带的软件合成器 Gervill 把 MUS 渲成 PCM 再混音」，能出声音，但 Gervill 住在
+`java.desktop/com.sun.media.sound`，**Java 9 起该包不导出**，要靠反射 + `--add-opens` 才能拿到 PCM，
+拿不到就只能退回"独立设备"模式。为了不把这条版本风险带进发布物，最终改成**自己仿真 YM3812 (OPL2)** ——
+DOOM 的音乐本来就是给这块 FM 芯片写的，WAD 里还带着配套的 `GENMIDI` 音色表：
+
+```
+MUS lump → MusReader → Sequence → OplMusicPlayer（事件→寄存器写入）→ OPL2 仿真 → PCM
+        → MusicMixBuffer（32 KB 环形）→ PlaybackServer 把音乐叠加进已混好的音效块 → SourceDataLine
+```
+
+四个文件（`s/opl/`）：
+
+| 文件 | 作用 |
+| --- | --- |
+| `OPL2.java` | 芯片仿真：9 通道 × 2 算子、包络、4 种波形、反馈、FM/加法合成 |
+| `GenMidiBank.java` | WAD 的 `GENMIDI` 音色表解析（含字节布局的推导依据） |
+| `DoomSong.java` | 曲谱读取：MIDI 由 JDK 的 `MidiSystem` 解析、MUS 交给引擎自带的 `MusReader`，两者都归一成同一张带时间戳的事件表 |
+| `OplMusicPlayer.java` | 事件播放：音符分配通道、控制器、音高换算 |
+| `OplMusicModule.java` | `IMusic` 实现，把 PCM 泵进 `MusicMixBuffer` |
+
+**只依赖 JDK 里普通的 `javax.sound.midi` 数据类**（`Sequence`/`Track`/`MidiEvent`/`ShortMessage` —— 它们
+所有版本都在），不碰合成器、不碰 `com.sun.*`、不需要任何 JVM 参数，构建脚本里那行 `--add-opens` 已经删掉。
+
+几处关键点：
+
+1. **`GENMIDI` 的字节布局是从数据本身反推出来的**（网络抓不到规范）。最终确定：
+   `#OPL_II#`(8) + 175×36 音色 + 175×32 名字；音色 = `flags:u16, finetune:u8(0x80|x), note:u8, voices[2][16]`；
+   一个 voice = 7 字节算子 + 7 字节算子 + `int16 base_note_offset`；算子的 7 个字节是
+   `0x20, 0x60, 0x80, 波形, KSL(<<6), TL(0..63), 未用`。
+   验证方式是**物理约束**：解析出来 175 个音色的 TL 全部 ≤63、KSL 全部 ≤3、波形 ≤6、feedback ≤7，
+   而且钢琴 ATK=15、管风琴 SL=1（延音）、小提琴 ATK=6、低音鼓 ATK=15 —— 全都符合乐器常识。
+2. **算子槽位不是跟着通道走的**。`0x20/0x40/0x60/0x80/0xE0` 每组横跨 6 个算子槽（通道 0-2 的调制器、
+   再是它们的载波，然后 3-5、6-8），所以通道 `n` 用槽 `n + n/3`、载波是它 +3。
+   写成 `0x20 + n` 只有前三个通道对，后面会打到别人的载波上。
+3. **环形缓冲的空闲空间就是节拍器**。芯片只在缓冲区有空位时才渲染，而混音器每拍恰好腾出一块，
+   **腾空间这件事本身就是实时** —— 所以播放器不需要自己的定时器，也就不会漂。
+4. **音乐也算"有活干"**。上游 `MixServer` 只在有采样通道在播时才 `checkOut` 一块缓冲并提交
+   （`mixed = activeChannels()`），而音乐是**在提交的那一刻**才叠加进去的 —— 于是"只有音乐、没有音效"
+   （标题画面、站着不动）时音乐永远出不去。改成 `mixed = activeChannels() || hasMusicWaiting()`。
+   这一条是 `drainedBytes` 计数抓出来的：修之前是 `0 bytes`。
+5. 音高用芯片自带的 F-Number 表（一个八度的 12 个值 + block 换八度），音色自带的 `base_note_offset` 直接
+   加在音符号上。音量则走**载波的 TL**：TL 是每级约 0.75 dB 的衰减，所以按衰减量线性映射才是听感上均匀的
+   淡入淡出。
+
+**已知简化**：打击乐是用打击乐音色当普通音符弹的，没走芯片的 rhythm mode（那几个通道能用噪声合成军鼓），
+所以鼓点是短促的音高击打而不是噪声 —— 通道管理和芯片模型因此简单了不少，但和原版仍有差距。
+另外 MIDI 弯音轮没实现。
+
+### 9.8 已知限制 / 后续
+
+- 没有鼠标视角；只做了键盘。
+- `Esc`（退出窗口）和 `F1`（DOOM 菜单）是固定的，不进按键设置。
+- **OPL2 仿真不是逐比特精确的**：包络时间用的是几何级数（只对齐了 AR0/RR15 这类端点）、衰减是连续 dB 没量化成
+  芯片的 0.1875 dB 台阶、KSL 用平均偏移而不是逐键表、AM/VIB 是两个固定深度的正弦、打击乐是"类似"实现
+  而不是芯片那五个专用算子。听感上是"有点像 AdLib 的 FM"，不是硬件复刻。
+- **算子槽位有串扰**：`OplMusicPlayer` 与芯片用的是 `通道 + 通道/3` 这套排布（硬件是 `通道 + 3*(通道/3)`），
+  槽 4、5、8、9 会被相邻两个通道共用，所以通道 1/3、2/4、4/6、5/7 之间存在耦合。
+  改成硬件排布需要**同时**改 `OplMusicPlayer` 与 `OPL2`（两边的槽位映射必须一致），试过一次，
+  两边不一致会直接静音；要动就一起动、并且两个方向都跑一遍验证。
+- 弯音轮没实现（曲子基本不用）。
+- **MUS 这条分支没有端到端验证**。手上只有 Freedoom 这个 WAD，而它的 `D_*` 全是 MIDI；id 原版的 WAD 才是 MUS。
+  所以 MUS 是交给引擎自带的 `MusReader`（上游对原版 WAD 用过的那份）再走同一条事件转换，我自己写过一个 MUS
+  解析器，但拿手工构造的样例跟 `MusReader` 对同一串字节对不上，就没有留它 —— 两份实现比一份更危险。
+  真机上如果要跑 id 原版 WAD，值得先确认一次。
+- 同一时刻只有一个引擎实例（`Engine` 是静态单例），也就是同时只能开一个游戏机窗口 —— 打开 GUI 本身就
+  限制了这一点。
+- 关窗即销毁引擎；再开一次会重新读 WAD，约 1–3 秒（有「正在初始化」界面）。
+- 没写合成表，道具目前只在 GT 创造标签里。
+- 引擎的 `C2JUtils` 等错误路径现在是抛异常，会显示成「游戏机启动失败」而不是崩游戏。
+- Gradle daemon 默认 512 MB 堆在 `downgradeJar` 会 GC 抖动失败，本次用
+  `-Dorg.gradle.jvmargs=-Xmx4G` 跑过；建议在 `gradle.properties` 里补一行 `org.gradle.jvmargs`。
+- **把降级后的 jar 拿普通 Java 8 单独跑整个引擎会缺 `xyz.wagyourtail.jvmdg` 的桩类**
+  （`CommandVariable` / `CVarManager` / `DoomIO` 用到 JDK 12 的 `TypeDescriptor`），游戏里由 gtnhlib 提供；
+  这三个类都是移植时就有的，与音乐无关。所以引擎级验证是在 JDK 25 上做的，音乐模块级验证才是 Java 8 + 真 jar。
+
+### 9.9 按键自定义（已实现）
+
+**选了「游戏机自己的界面」**，不接 Minecraft 的 `KeyBinding`：那些键只在游戏机窗口开着时有意义，而且
+（E、Tab、1-9、Ctrl、Shift）本来就和原版键冲突 —— 塞进全局控制列表会让每个键都报警，玩家为了消冲突反
+而去改原版键。`KeyBinding` 也表达不了「一个动作两个键」。
+
+**机制**（[MTGameConsoleBindings.java](../src/main/java/com/MessTech/common/gameconsole/MTGameConsoleBindings.java)）：
+底层的物理映射（LWJGL 键码 → `ScanCode`）是固定的，玩家改的是「哪个键驱动哪个动作」：
+
+- 20 个动作各有**一个参考扫描码**（DOOM 自己监听的那个：`SC_W`、`SC_LCTRL`、`SC_1` …）。
+- 引擎启动后调用 `apply(doom)`：先把 10 个 `key_*` 槽强制回参考码，再对每个绑定调用
+  `DoomStatus.aliasKey(物理键的 ScanCode, 槽)` —— 就是让方向键和 WASD 并存的那个钩子。
+  于是按 K（绑给前进）既发 `SC_K`（DOOM 的菜单照常见 K）又驱动 `key_up` 槽。
+- `Tab` 是唯一例外：DOOM 是直接按扫描码读地图键的，所以绑给地图的键额外发一次 `SC_TAB`。
+- 全键盘仍然通吃：能看到 `Keyboard` 的键都能绑，绑到映射表外的键会在日志里说一声而不是静默失效。
+
+**界面**：游戏机窗口右上角一个 `[按键设置]`，点进去是**同一个窗口的一个模式**（不是第二个 `GuiScreen`
+—— 换屏会把窗口关掉，而关窗会停引擎，那玩家看一眼键位就得重开游戏）。两页：动作 / 武器；点方框改键，
+`Backspace` 清空，`Esc` 取消；底部有恢复默认 / 翻页 / 返回。改动存
+`<console dir>/keys.cfg`（`forward=17,200  # W / UP`），**下次打开游戏机生效**，界面上也这么写。
+
+**一并修掉的覆盖问题**：以前 `configureKeys()` 后面跟着 `commit()` + `SaveDefaults()`，等于每次启动都把
+整个 `mochadoom.cfg` 重写一遍，玩家在 DOOM 菜单里改的东西全被冲掉。现在不再写回，键位以 `keys.cfg` 为
+唯一来源，`mochadoom.cfg` 恢复成 DOOM 自己的运行时配置（音量、gamma 之类照常保存）。
+
+**验证**：`tmp/relocated-smoke/BindingsCheck.java`（把 LWJGL + log4j 挂到 classpath 直接跑）——
+默认值、改键、重复绑定互斥、清空、`keys.cfg` 存读往返、未知键、ScanCode 查表，全部通过。
+**这个检查抓到过一个真 bug**：`keys.cfg` 行尾的 `# W / UP` 注释会让第二个键解析失败、读回来变空，
+已在 `load()` 里先剥注释。
+
+---
+
+## 10. 事实来源
 
 - `tmp/mochadoom-master/README.md`、`build-jar.sh`（纯 javac、无第三方依赖、GPLv3）
 - `src/mochadoom/Engine.java`（入口、AWT 建窗、`updateFrame` 静态钩子）

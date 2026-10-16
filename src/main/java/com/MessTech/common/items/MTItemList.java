@@ -87,6 +87,8 @@ public enum MTItemList {
     MTModuleParallel_UMV,
     MTModuleParallel_UXV,
     MTModuleParallel_MAX,
+    /** The game console (游戏机), an item that runs a copy of DOOM in a window of its own. */
+    GameConsole,
     /** The Ultimate Pattern Terminal part (终极样板编码终端). */
     UltimatePatternTerminal;
 

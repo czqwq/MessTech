@@ -49,6 +49,7 @@ import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
 import com.MessTech.common.machine.hatch.MTReactorCoolantInputHatch;
 
 import appeng.api.AEApi;
+import cpw.mods.fml.common.registry.GameRegistry;
 import goodgenerator.items.GGMaterial;
 import goodgenerator.loader.Loaders;
 import gregtech.api.casing.Casings;
@@ -80,6 +81,21 @@ import tectech.thing.CustomItemList;
 public class GTRecipes {
 
     public static void loadRecipes() {
+        GameRegistry.addShapedRecipe(
+            MTItemList.GameConsole.get(1),
+            "IGI",
+            "APA",
+            "IYI",
+            'A',
+            Blocks.wooden_button,
+            'G',
+            Blocks.glass_pane,
+            'P',
+            ItemList.Cover_Screen.get(1),
+            'Y',
+            Items.redstone,
+            'I',
+            GTOreDictUnificator.get(OrePrefixes.plate, Materials.Iron, 1));
         GTValues.RA.stdBuilder()
             .metadata(RESEARCH_ITEM, GTOreDictUnificator.get(OrePrefixes.wireGt12, Materials.SuperconductorLuV, 1))
             .metadata(SCANNING, new Scanning(10 * MINUTES, RECIPE_ZPM))

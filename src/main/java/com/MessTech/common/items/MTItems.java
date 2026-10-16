@@ -107,6 +107,9 @@ public final class MTItems {
     /** The Ultimate Pattern Terminal (终极样板编码终端) as an AE cable part item. */
     public static final ItemUltimatePatternTerminal ultimatePatternTerminal = new ItemUltimatePatternTerminal();
 
+    /** The game console (游戏机): right click opens a window running a copy of DOOM. */
+    public static final MTItemGameConsole gameConsole = new MTItemGameConsole();
+
     private MTItems() {}
 
     public static void registerItems() {
@@ -116,7 +119,9 @@ public final class MTItems {
         GameRegistry.registerItem(piggy, "MTItemPiggy");
         GameRegistry.registerItem(voidstarBow, "VoidstarBow");
         GameRegistry.registerItem(ultimatePatternTerminal, "UltimatePatternTerminal");
+        GameRegistry.registerItem(gameConsole, "GameConsole");
         MTItemList.UltimatePatternTerminal.set(new ItemStack(ultimatePatternTerminal, 1));
+        MTItemList.GameConsole.set(new ItemStack(gameConsole, 1));
         // The fuel rods extend GT's GTGenericItem, whose constructor already calls
         // GameRegistry.registerItem(this, "gt.<unlocalized>") (the same path GT's own rods use), so they must
         // not be registered here a second time.
