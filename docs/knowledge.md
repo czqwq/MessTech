@@ -730,12 +730,45 @@ MTMultiMachineBase<T>
   drops the machine back to mode 0 - the array is what mode 1 exists for.
 - Binding in mode 0: a controller-slot circuit (1-11) selects one active pool; with the controller slot empty,
   each input bus circuit slot can bind that bus to its own pool so several pools run simultaneously.
+- **Programmable pattern hatches** (可编程仓室: Programmable-Hatches' 编程样板输入总成 MK.III /
+  编程样板输入总线) are `IDualInputHatch` implementations, and GT's `MTEMultiBlockBase#addInputBusToMachineList`
+  routes every `IDualInputHatch` into `mDualInputHatches`, **never** into `mInputBusses`. The thread scheduler has
+  to read `mDualInputHatches` as well or such a hatch is invisible and every thread reports 空闲 while
+  `checkProcessing()` still returns SUCCESSFUL on its one-second cycle. Each `IDualInputInventory` counts as its own
+  input source (`DualInputBinding`): one buffer per AE pattern, carrying its own unwrapped circuit next to the
+  pattern's items, so one hatch feeds several pools at once. That circuit is a **zero-sized integrated circuit** -
+  `BufferedDualInputHatch.DualInvBuffer#programLocal` unwraps the pattern's programming circuit into the buffer, and
+  the buffer exposes it through `getItemInputs()`; a buffer's own marker wins over the hatch-wide one
+  (`getDualHatchCircuitNumber` takes the hatch's first exposed pattern circuit), so a buffer whose pattern carries no
+  circuit follows its hatch's first one and only a hatch exposing no circuit at all feeds no pool. Circuit markers
+  are filtered out of the ingredient list (they select the recipe page, they are not consumables).
+- Consumption from a programmable hatch **is** the stack decrement: `getItemInputs()` hands out the hatch's live
+  buffer stacks (`ItemStackG`/`FluidTankG` are the buffer's own objects, not copies), so `depleteThreadItems`
+  shrinks the buffer's own stack and the hatch refills it when the AE job pushes the pattern again. This mirrors
+  GT's own pipeline, which consumes the stacks a dual hatch hands out the same way (`GTRecipe::consumeInput`). Fluid
+  from the same buffer is drained the same way, in `depleteThreadFluid`. Calling `removeResource` on top of that
+  would deduct twice.
 - `checkProcessing()` keeps mode 0 on a one-second GT cycle and calls the thread scheduler
   inside the standard `checkRecipe()` wrapper, so `startRecipeProcessing()` / `endRecipeProcessing()`
   are active for ME input buses/hatches. `lEUt` is set from running task totals so GT drains energy
   normally.
-- Input-bus circuit numbers are snapshotted in `onPostTick` before GT recipe processing starts,
-  because ME buses move their circuit to a virtual offset during recipe processing.
+- Input-bus circuit numbers are snapshotted in `onPostTick` (`duringProcessing = false`) **and** at the top of
+  `checkProcessing()` (`duringProcessing = true`). The phase matters: an ME input bus keeps its circuit in
+  `getCircuitSlot() + SLOT_COUNT` while `startRecipeProcessing()` is active and in `getCircuitSlot()` outside it, and
+  the stocked items take over the low slots inside the window - reading the wrong one binds the bus to an arbitrary
+  AE item instead of its circuit. The second refresh runs inside the window because `checkRecipe()` is final and
+  calls `startRecipeProcessing()` first, which is the only phase in which GT's own compressed/quantum input bus
+  publishes its circuit at all. The `onPostTick` pass stays because the board-fluid helpers call
+  `getThreadInputBuses()` outside a recipe check.
+- **Renamed items are matched the way GT matches them**: `inputSatisfies` ignores NBT exactly when the recipe is not
+  NBT sensitive and the ingredient is not one of the three items GT always compares by NBT - the IC2 universal fluid
+  cell, the GT data stick and the data orb (`GTRecipe#shouldCheckNBT`, mirrored from `MTParallelHelper`). So an item
+  renamed by the Forming Press with a Mold (Name) - which writes `display.Name` into the stack - satisfies the
+  recipe's tag-free input, while a data stick still has to hold the right data. Without this the recipe lookup still
+  matched, but the machine's own pre-consumption check rejected it and the thread silently reported 空闲. The
+  consumption side has to hand the bus its **own** stack (`findThreadResourceInBus` returns it, `depleteThreadItems`
+  passes `found.copy()` to `removeResource`), because GT's removal compares with NBT and the recipe's tag-free copy of
+  a renamed item would match nothing.
 - Each thread currently runs one active recipe at a time.
 - Board Processor uses per-thread internal immersion tanks (`BoardTankState`), not direct recipe fluid depletion: one
   tank per legal immersion fluid, **five** since GT5U 5.09.54.183 added UU-Matter (`MTEBoardProcessorModule#LEGAL_FLUIDS`

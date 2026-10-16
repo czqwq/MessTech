@@ -4,6 +4,7 @@ import static com.gtnewhorizon.structurelib.structure.StructureUtility.ofBlock;
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
 import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_FRONT_NANOCHIP_ASSEMBLY_COMPLEX;
 import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_FRONT_NANOCHIP_ASSEMBLY_COMPLEX_ACTIVE;
+import static gregtech.api.util.GTRecipe.GTppRecipeHelper;
 import static gregtech.api.util.GTStructureUtility.ofFrame;
 
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,12 +52,14 @@ import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 import goodgenerator.items.GGMaterial;
 import gregtech.api.casing.Casings;
 import gregtech.api.enums.HatchElement;
+import gregtech.api.enums.ItemList;
 import gregtech.api.enums.Materials;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.interfaces.tileentity.RecipeMapWorkable;
 import gregtech.api.logic.ProcessingLogic;
+import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatchInput;
 import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
 import gregtech.api.modularui2.GTGuiTextures;
@@ -72,7 +76,10 @@ import gregtech.api.util.GTWaila;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.api.util.shutdown.ShutDownReasonRegistry;
+import gregtech.common.tileentities.machines.IDualInputHatch;
+import gregtech.common.tileentities.machines.IDualInputInventory;
 import gregtech.common.tileentities.machines.MTEHatchInputBusME;
+import ic2.core.Ic2Items;
 import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 import mcp.mobius.waila.overlay.tooltiprenderers.TTRenderStack;
@@ -478,6 +485,11 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         }
 
         consumeAstralArrayFromBuses();
+        // The circuit snapshot is retaken here, not only in onPostTick: checkRecipe() is final and runs
+        // startRecipeProcessing() first, so this is the only point in the tick where a hatch that publishes its
+        // circuit just for the recipe check - GT's own compressed/quantum input bus - has it visible. The slot
+        // moves with the phase for those buses, hence the `true`.
+        refreshInputBusCircuits(true);
 
         if (machineMode == MODE_ONE_STEP_CIRCUIT_POOL) {
             if (!astralArrayUnlocked) {
@@ -569,23 +581,21 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
 
         int circuit = thread.getCircuitNumber();
         ArrayList<MTEHatchInputBus> buses = getThreadInputBuses(circuit);
-        if (buses.isEmpty()) return CheckRecipeResultRegistry.NO_RECIPE;
+        ArrayList<DualInputBinding> dualInputs = getThreadDualInputs(circuit);
+        if (buses.isEmpty() && dualInputs.isEmpty()) return CheckRecipeResultRegistry.NO_RECIPE;
 
         ArrayList<ItemStack> items = new ArrayList<>();
         for (MTEHatchInputBus bus : buses) {
-            IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
-            int circuitSlot = getBusCircuitSlotDuringProcessing(bus);
-            for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
-                if (i == circuitSlot) continue;
-                ItemStack stack = busTile.getStackInSlot(i);
-                if (stack != null) items.add(stack);
-            }
+            appendBusItems(items, bus);
+        }
+        for (DualInputBinding binding : dualInputs) {
+            items.addAll(binding.items);
         }
         if (items.isEmpty()) return CheckRecipeResultRegistry.NO_RECIPE;
 
         // Fluid isolation follows GT5U's color model: only fluid hatches whose color matches the
         // thread's input-bus colors (plus uncolored hatches) are visible to this thread.
-        ArrayList<FluidStack> fluidStacks = getThreadFluidStacks(buses);
+        ArrayList<FluidStack> fluidStacks = getThreadFluidStacks(buses, dualInputs);
 
         GTRecipe recipe = recipeMap.findRecipeQuery()
             .items(items.toArray(new ItemStack[0]))
@@ -630,27 +640,34 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             fluidStacks.toArray(new FluidStack[0]),
             items.toArray(new ItemStack[0]));
         long powerParallel = powerRoom / perUnitEUt;
-        int parallel = (int) Math.max(1, Math.min(machineCap, Math.min(inputParallel, powerParallel)));
+        // A fractional inputParallel means the inputs cannot even cover one copy, so the machine must not round up
+        // to one: the simulations below check each recipe input against its own scaled amount and would pass while
+        // the commit silently consumes only what is there, leaving the task short of its ingredients.
+        int parallel = inputParallel < 1 ? 0
+            : (int) Math.max(1, Math.min(machineCap, Math.min(inputParallel, powerParallel)));
 
         if (parallel <= 0 || powerParallel <= 0) {
             // If nothing else is running and even one copy cannot be powered, report insufficient power.
-            if (currentEUt == 0) {
+            if (currentEUt == 0 && inputParallel >= 1) {
                 return CheckRecipeResultRegistry.insufficientPower(perUnitEUt);
             }
             return CheckRecipeResultRegistry.NO_RECIPE;
         }
 
         // Simulate first so we do not partially consume inputs if one slot is short.
+        // A renamed item (GT's Forming Press + Mold (Name)) carries a display-name NBT tag, so the comparison
+        // follows GT's own NBT contract: ignored unless the recipe or the ingredient demands it (see inputSatisfies).
+        boolean ignoreNbt = !recipe.isNBTSensitive;
         if (recipe.mInputs != null) {
             for (ItemStack input : recipe.mInputs) {
-                if (input != null && !depleteThreadItem(buses, scaleItem(input, parallel), true)) {
+                if (input != null && !hasThreadResource(buses, dualInputs, scaleItem(input, parallel), ignoreNbt)) {
                     return CheckRecipeResultRegistry.NO_RECIPE;
                 }
             }
         }
         if (recipe.mFluidInputs != null) {
             for (FluidStack input : recipe.mFluidInputs) {
-                if (input != null && !depleteThreadFluid(buses, scaleFluid(input, parallel), true)) {
+                if (input != null && !depleteThreadFluid(buses, dualInputs, scaleFluid(input, parallel), true)) {
                     return CheckRecipeResultRegistry.NO_RECIPE;
                 }
             }
@@ -659,12 +676,14 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         // Commit consumption.
         if (recipe.mInputs != null) {
             for (ItemStack input : recipe.mInputs) {
-                if (input != null) depleteThreadItem(buses, scaleItem(input, parallel), false);
+                if (input != null) {
+                    depleteThreadItems(buses, dualInputs, scaleItem(input, parallel), ignoreNbt);
+                }
             }
         }
         if (recipe.mFluidInputs != null) {
             for (FluidStack input : recipe.mFluidInputs) {
-                if (input != null) depleteThreadFluid(buses, scaleFluid(input, parallel), false);
+                if (input != null) depleteThreadFluid(buses, dualInputs, scaleFluid(input, parallel), false);
             }
         }
 
@@ -683,11 +702,20 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    private void refreshInputBusCircuits() {
+    /**
+     * Snapshots every input bus's circuit number.
+     * <p>
+     * The circuit's slot depends on the phase of the tick, which is why {@code duringProcessing} is passed in: an ME
+     * input bus keeps its circuit in virtual slot {@code getCircuitSlot() + SLOT_COUNT} while
+     * {@code startRecipeProcessing()} is active and in {@code getCircuitSlot()} outside that window, and the stocked
+     * items take over the low slots inside it. Reading the wrong one returns an arbitrary AE item instead of the
+     * circuit, which would bind every pool to the wrong bus - or to none at all.
+     */
+    private void refreshInputBusCircuits(boolean duringProcessing) {
         inputBusCircuitNumbers.clear();
         for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
             if (bus == null) continue;
-            int circuitSlot = bus.getCircuitSlot();
+            int circuitSlot = duringProcessing ? getBusCircuitSlotDuringProcessing(bus) : bus.getCircuitSlot();
             ItemStack circuitStack = bus.getBaseMetaTileEntity()
                 .getStackInSlot(circuitSlot);
             int circuit = circuitStack != null && GTUtility.isAnyIntegratedCircuit(circuitStack)
@@ -757,30 +785,145 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         return bus.getCircuitSlot();
     }
 
-    private boolean depleteThreadItem(ArrayList<MTEHatchInputBus> buses, ItemStack stack, boolean simulate) {
+    /**
+     * One programmable pattern hatch's inventory plus the circuit that selects the pool it feeds.
+     * <p>
+     * A hatch of this family ({@code IDualInputHatch}, e.g. Programmable-Hatches' 编程样板输入总成 MK.III)
+     * holds one buffer per AE pattern, and each buffer carries its own unwrapped circuit next to the
+     * pattern's items. GT never puts such a hatch into {@code mInputBusses} - its
+     * {@code addInputBusToMachineList} routes every {@code IDualInputHatch} into {@code mDualInputHatches} -
+     * so the thread scheduler has to look there as well, otherwise the hatch is invisible to the machine
+     * and every thread reports 空闲.
+     */
+    private static final class DualInputBinding {
+
+        private final IDualInputInventory inventory;
+        /** The hatch's own item stacks, shared with its buffer so consuming them is the consumption. */
+        private final ArrayList<ItemStack> items;
+
+        private DualInputBinding(IDualInputInventory inventory, ArrayList<ItemStack> items) {
+            this.inventory = inventory;
+            this.items = items;
+        }
+    }
+
+    /**
+     * The programmable hatch buffers that feed {@code circuit}'s pool.
+     * <p>
+     * This deliberately does not care whether the controller slot selected the pool: with a controller circuit
+     * {@code getThreadInputBuses} hands the selected pool <b>every</b> input bus, so a buffer whose circuit is the
+     * selected pool has to contribute too - otherwise a machine driven by the controller slot would still ignore
+     * every programmable hatch.
+     */
+    private ArrayList<DualInputBinding> getThreadDualInputs(int circuit) {
+        return getDualInputsForCircuit(circuit);
+    }
+
+    private void appendBusItems(ArrayList<ItemStack> items, MTEHatchInputBus bus) {
+        IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
+        if (busTile == null) return;
+        int circuitSlot = getBusCircuitSlotDuringProcessing(bus);
+        for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
+            if (i == circuitSlot) continue;
+            ItemStack stack = busTile.getStackInSlot(i);
+            if (stack != null) items.add(stack);
+        }
+    }
+
+    /**
+     * Whether some slot of the thread's sources can cover {@code stack}.
+     *
+     * @param ignoreNbt NBT is ignored exactly when the recipe is not NBT sensitive, which is GT's own rule
+     *                  ({@code GTRecipe.isNBTSensitive}). Without it a renamed item - GT's Forming Press with
+     *                  a Mold (Name) writes {@code display.Name} into the stack - can never satisfy the
+     *                  recipe's tag-free input even though the recipe lookup matched it.
+     */
+    private boolean hasThreadResource(ArrayList<MTEHatchInputBus> buses, ArrayList<DualInputBinding> dualInputs,
+        ItemStack stack, boolean ignoreNbt) {
         if (stack == null) return false;
         for (MTEHatchInputBus bus : buses) {
-            if (!hasThreadResourceInBus(bus, stack)) continue;
-            if (simulate) return true;
-            // Existing per-bus removal. For ME buses the override handles the recipe-processing virtual
-            // slots; for normal buses the inherited method also skips the circuit slot correctly.
-            return bus.removeResource(stack, stack.stackSize) != null;
+            if (hasThreadResourceInBus(bus, stack, ignoreNbt)) return true;
+        }
+        for (DualInputBinding binding : dualInputs) {
+            for (ItemStack slotStack : binding.items) {
+                if (inputSatisfies(stack, slotStack, !ignoreNbt) && slotStack.stackSize >= stack.stackSize) {
+                    return true;
+                }
+            }
         }
         return false;
     }
 
-    private boolean hasThreadResourceInBus(MTEHatchInputBus bus, ItemStack stack) {
-        IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
-        int circuitSlot = getBusCircuitSlotDuringProcessing(bus);
-        for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
-            if (i == circuitSlot) continue;
-            ItemStack slotStack = busTile.getStackInSlot(i);
-            if (slotStack != null && GTUtility.areStacksEqual(stack, slotStack)
-                && slotStack.stackSize >= stack.stackSize) {
+    /**
+     * Consumes {@code stack} from the thread's sources. A bus is asked to remove the resource itself, but it
+     * is handed the bus's <b>own</b> stack: GT's removal compares with NBT, so passing the recipe's tag-free
+     * copy of a renamed item would find nothing and silently consume nothing.
+     */
+    private boolean depleteThreadItems(ArrayList<MTEHatchInputBus> buses, ArrayList<DualInputBinding> dualInputs,
+        ItemStack stack, boolean ignoreNbt) {
+        if (stack == null) return false;
+        for (MTEHatchInputBus bus : buses) {
+            ItemStack found = findThreadResourceInBus(bus, stack, ignoreNbt);
+            if (found == null) continue;
+            // Existing per-bus removal. For ME buses the override handles the recipe-processing virtual
+            // slots; for normal buses the inherited method also skips the circuit slot correctly.
+            return bus.removeResource(found.copy(), stack.stackSize) != null;
+        }
+        for (DualInputBinding binding : dualInputs) {
+            for (ItemStack slotStack : binding.items) {
+                if (!inputSatisfies(stack, slotStack, !ignoreNbt) || slotStack.stackSize < stack.stackSize) {
+                    continue;
+                }
+                // These stacks are the hatch's own buffer contents (GT's own processing pipeline consumes
+                // them the same way: it decrements the stack the hatch handed out). The hatch settles the
+                // difference against its AE network when its recipe processing ends, so this IS the
+                // consumption - calling removeResource here as well would deduct the items twice.
+                slotStack.stackSize -= stack.stackSize;
                 return true;
             }
         }
         return false;
+    }
+
+    private ItemStack findThreadResourceInBus(MTEHatchInputBus bus, ItemStack stack, boolean ignoreNbt) {
+        IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
+        if (busTile == null) return null;
+        int circuitSlot = getBusCircuitSlotDuringProcessing(bus);
+        for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
+            if (i == circuitSlot) continue;
+            ItemStack slotStack = busTile.getStackInSlot(i);
+            if (inputSatisfies(stack, slotStack, !ignoreNbt) && slotStack.stackSize >= stack.stackSize) {
+                return slotStack;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasThreadResourceInBus(MTEHatchInputBus bus, ItemStack stack, boolean ignoreNbt) {
+        return findThreadResourceInBus(bus, stack, ignoreNbt) != null;
+    }
+
+    /**
+     * Whether {@code other} satisfies {@code stack} for a recipe whose NBT the machine may ignore.
+     * <p>
+     * NBT is ignored exactly when the recipe is not NBT sensitive and the sought stack is not one of the three
+     * items GT always matches by NBT - the IC2 universal fluid cell, the GT data stick and the data orb
+     * ({@code GTRecipe#shouldCheckNBT}, which {@code MTParallelHelper} reproduces for the other MessTech
+     * machines). Without this a renamed item - GT's Forming Press with a Mold (Name) writes {@code display.Name}
+     * into the stack - can never satisfy the recipe's tag-free input even though the recipe lookup matched it,
+     * while a data stick could be replaced by one holding something else.
+     */
+    private static boolean inputSatisfies(ItemStack sought, ItemStack other, boolean nbtSensitive) {
+        if (other == null) return false;
+        if (!nbtSensitive && !alwaysMatchNbt(sought)) return GTUtility.areStacksEqual(sought, other, true);
+        return GTUtility.areStacksEqual(sought, other, false);
+    }
+
+    private static boolean alwaysMatchNbt(ItemStack stack) {
+        if (!GTppRecipeHelper || stack == null) return false;
+        return GTUtility.areStacksEqual(stack, Ic2Items.FluidCell.copy(), true)
+            || GTUtility.areStacksEqual(stack, ItemList.Tool_DataStick.get(1L), true)
+            || GTUtility.areStacksEqual(stack, ItemList.Tool_DataOrb.get(1L), true);
     }
 
     private Set<Byte> getThreadColors(ArrayList<MTEHatchInputBus> buses) {
@@ -804,15 +947,125 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         return result;
     }
 
-    private ArrayList<FluidStack> getThreadFluidStacks(ArrayList<MTEHatchInputBus> buses) {
-        Set<Byte> colors = getThreadColors(buses);
-        if (colors.isEmpty()) return getStoredFluids();
-
+    private ArrayList<FluidStack> getThreadFluidStacks(ArrayList<MTEHatchInputBus> buses,
+        ArrayList<DualInputBinding> dualInputs) {
         ArrayList<FluidStack> fluids = new ArrayList<>();
-        for (Byte color : colors) {
-            fluids.addAll(getStoredFluidsForColor(Optional.of(color)));
+        Set<Byte> colors = getThreadColors(buses);
+        if (colors.isEmpty()) {
+            fluids.addAll(getStoredFluids());
+        } else {
+            for (Byte color : colors) {
+                fluids.addAll(getStoredFluidsForColor(Optional.of(color)));
+            }
+        }
+
+        // A programmable hatch owns its pattern's fluid, so its buffer's fluid is what the pool bound to its
+        // circuit may see. getStoredFluids() above does not know about these hatches.
+        for (DualInputBinding binding : dualInputs) {
+            for (FluidStack fluid : getDualFluids(binding)) {
+                fluids.add(fluid);
+            }
         }
         return fluids;
+    }
+
+    /**
+     * The still-valid programmable hatches on this machine. {@code GTUtility.filterValidMTEs} cannot take the
+     * list because {@link IDualInputHatch} is not a {@code MetaTileEntity} subclass - GT's own
+     * {@code MTEMultiBlockBase} drops invalid entries the same way.
+     */
+    private ArrayList<IDualInputHatch> validDualInputHatches() {
+        ArrayList<IDualInputHatch> valid = new ArrayList<>();
+        for (IDualInputHatch hatch : mDualInputHatches) {
+            if (hatch == null) continue;
+            if (hatch instanceof MetaTileEntity mte && !mte.isValid()) continue;
+            valid.add(hatch);
+        }
+        return valid;
+    }
+
+    /**
+     * The circuit a programmable hatch carries for all of its buffers: the first pattern circuit it exposes.
+     * <p>
+     * A pattern hatch unwraps the programming circuit of the AE pattern it is running and puts the target
+     * integrated circuit into the buffer next to the pattern's items (Programmable-Hatches'
+     * {@code BufferedDualInputHatch.DualInvBuffer#programLocal}), which is why the circuit shows up in
+     * {@link IDualInputInventory#getItemInputs()} as a zero-sized stack - the form GT uses for every recipe
+     * selector. A buffer's own marker always wins over this hatch-wide one, so several patterns can feed
+     * several pools from a single hatch.
+     */
+    private int getDualHatchCircuitNumber(IDualInputHatch hatch) {
+        for (Iterator<? extends IDualInputInventory> it = hatch.inventories(); it.hasNext();) {
+            int circuit = getDualInventoryCircuitNumber(it.next());
+            if (circuit > 0) return circuit;
+        }
+        // GT's crafting input buffer keeps the ghost circuit among its shared slots instead of in a buffer, so a
+        // hatch that exposes no pattern circuit at all is still usable through the circuit the player set there.
+        ItemStack[] shared = hatch.getSharedItems();
+        if (shared != null) {
+            for (ItemStack stack : shared) {
+                if (GTUtility.isAnyIntegratedCircuit(stack) && stack.getItemDamage() > 0) {
+                    return stack.getItemDamage();
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static int getDualInventoryCircuitNumber(IDualInputInventory inventory) {
+        if (inventory == null) return -1;
+        ItemStack[] inputs = inventory.getItemInputs();
+        if (inputs == null) return -1;
+        for (ItemStack stack : inputs) {
+            if (GTUtility.isAnyIntegratedCircuit(stack) && stack.getItemDamage() > 0) return stack.getItemDamage();
+        }
+        return -1;
+    }
+
+    private static ArrayList<FluidStack> getDualFluids(DualInputBinding binding) {
+        ArrayList<FluidStack> fluids = new ArrayList<>();
+        if (binding == null || binding.inventory == null) return fluids;
+        FluidStack[] stored = binding.inventory.getFluidInputs();
+        if (stored == null) return fluids;
+        for (FluidStack fluid : stored) {
+            if (fluid != null && fluid.amount > 0) fluids.add(fluid);
+        }
+        return fluids;
+    }
+
+    /** Every dual-input inventory whose circuit feeds {@code circuit}'s pool, regardless of its items. */
+    private ArrayList<DualInputBinding> getDualInputsForCircuit(int circuit) {
+        ArrayList<DualInputBinding> result = new ArrayList<>();
+        for (IDualInputHatch hatch : validDualInputHatches()) {
+            int hatchCircuit = getDualHatchCircuitNumber(hatch);
+            for (Iterator<? extends IDualInputInventory> it = hatch.inventories(); it.hasNext();) {
+                IDualInputInventory inventory = it.next();
+                if (inventory == null) continue;
+                int inventoryCircuit = getDualInventoryCircuitNumber(inventory);
+                int bindingCircuit = inventoryCircuit > 0 ? inventoryCircuit : hatchCircuit;
+                if (bindingCircuit != circuit) continue;
+                result.add(new DualInputBinding(inventory, getDualItems(inventory)));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * The inventory's consumable items: its own stacks, shared with the hatch's buffer, minus the pattern's
+     * circuit marker. A marker is a zero-sized integrated circuit - an input the recipe page needs to be
+     * <i>selected</i>, never an item the machine should try to consume.
+     */
+    private static ArrayList<ItemStack> getDualItems(IDualInputInventory inventory) {
+        ArrayList<ItemStack> items = new ArrayList<>();
+        if (inventory == null) return items;
+        ItemStack[] inputs = inventory.getItemInputs();
+        if (inputs == null) return items;
+        for (ItemStack stack : inputs) {
+            if (stack == null || stack.stackSize <= 0) continue;
+            if (GTUtility.isAnyIntegratedCircuit(stack)) continue;
+            items.add(stack);
+        }
+        return items;
     }
 
     private ArrayList<MTEHatchInput> getBoardFluidHatches(WorkThread thread) {
@@ -836,7 +1089,10 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     private ArrayList<FluidStack> getBoardFluidStacks(WorkThread thread) {
         ArrayList<MTEHatchInputBus> buses = getThreadInputBuses(thread.getCircuitNumber());
         if (!buses.isEmpty()) {
-            return getThreadFluidStacks(buses);
+            // No programmable-hatch buffers here on purpose: the immersion tank can only be filled through
+            // getBoardFluidHatches(), which is built from mInputHatches, so listing dual-hatch fluid would only
+            // add entries the tank can never reach.
+            return getThreadFluidStacks(buses, new ArrayList<>());
         }
 
         int controller = getControllerCircuitNumber();
@@ -863,17 +1119,26 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         return total;
     }
 
-    private boolean depleteThreadFluid(ArrayList<MTEHatchInputBus> buses, FluidStack fluid, boolean simulate) {
+    private boolean depleteThreadFluid(ArrayList<MTEHatchInputBus> buses, ArrayList<DualInputBinding> dualInputs,
+        FluidStack fluid, boolean simulate) {
         if (fluid == null) return false;
-        ArrayList<MTEHatchInput> hatches = getThreadFluidHatches(buses);
-        if (hatches.isEmpty()) return false;
 
         FluidStack remaining = fluid.copy();
-        for (MTEHatchInput hatch : hatches) {
+        for (MTEHatchInput hatch : getThreadFluidHatches(buses)) {
             FluidStack drained = hatch.drain(ForgeDirection.UNKNOWN, remaining, !simulate);
             if (drained == null || drained.amount <= 0 || drained.getFluid() != fluid.getFluid()) continue;
             if (drained.amount >= remaining.amount) return true;
             remaining.amount -= drained.amount;
+        }
+
+        // A programmable hatch's fluid lives in its own buffer, and the hatch settles the difference against
+        // its AE network when its recipe processing ends - so shrinking the buffer's own stack is the drain.
+        for (DualInputBinding binding : dualInputs) {
+            for (FluidStack stored : getDualFluids(binding)) {
+                if (!stored.isFluidEqual(fluid) || stored.amount < remaining.amount) continue;
+                if (!simulate) stored.amount -= remaining.amount;
+                return true;
+            }
         }
         return remaining.amount <= 0;
     }
@@ -1265,7 +1530,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         if (aBaseMetaTileEntity.isServerSide()) {
-            refreshInputBusCircuits();
+            refreshInputBusCircuits(false);
         }
         if (aBaseMetaTileEntity.isServerSide() && aTick % 20 == 0) {
             for (WorkThread thread : getThreads()) {
@@ -1573,6 +1838,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.wirecutter"))
             .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.details"))
+            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.details.renamed"))
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.details.hint"))
             .addStructureInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.3"))
             .toolTipFinisher();

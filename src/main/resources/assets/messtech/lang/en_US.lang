@@ -343,7 +343,7 @@ machine.nanoscale.tooltip.desc=§7All-in-one NAC component processing machine: c
 machine.nanoscale.tooltip.flavour=§7Eleven processes share one hall - the only worry is plugging the programming circuit into the wrong slot
 machine.nanoscale.tooltip.selection.header=§6Mode selection:
 machine.nanoscale.tooltip.selection.circuit=§7· Mode 0 (multi-thread, default): a programming circuit §b1..11§7 in the controller slot runs only that pool, leaving the others idle
-machine.nanoscale.tooltip.selection.multimode=§7· With an empty controller slot, each input bus circuit selects the pool it feeds, so several pools run in parallel
+machine.nanoscale.tooltip.selection.multimode=§7· With an empty controller slot, the circuit slot of each input bus and the circuit carried by each pattern buffer of a §eProgrammable Crafting Input Buffer MK.III§7 or a §eProgrammable Crafting Input Bus§7 select the pools they feed, so several pools run in parallel
 machine.nanoscale.tooltip.selection.pool=§7· Mode 1 (one-step circuit pool, needs the Astral Array unlock): every thread stops and the machine's main thread runs, with the pool picked by a circuit §b1..6§7 in an input bus circuit slot
 machine.nanoscale.tooltip.selection.modes1=§7· Circuit §b1§7 Conversion / §b2§7 Assembly Matrix / §b3§7 SMD Processor / §b4§7 Board Processor / §b5§7 Etching Array / §b6§7 Cutting Chamber
 machine.nanoscale.tooltip.selection.modes2=§7· Circuit §b7§7 Wire Tracer / §b8§7 Superconductor Splitter / §b9§7 Optical Organizer / §b10§7 Encasement Wrapper / §b11§7 Biological Coordinator
@@ -395,6 +395,7 @@ mt.recipe.nanoscale.opticalorganizer=Nano-Scale Foundry: Optical Organizer
 mt.recipe.nanoscale.encasementwrapper=Nano-Scale Foundry: Encasement Wrapper
 mt.recipe.nanoscale.biologicalcoordinator=Nano-Scale Foundry: Biological Coordinator
 mt.recipe.nanoscale.onestepcircuitpool=Nano-Scale Foundry: One-Step Circuit Pool
+mt.recipe.boses_crafting_array=Bose-Einstein Condensate Matter Aggregation Array
 
 # --- Dimensionally Brick Furnace ---
 machine.dbbfurnace.name=Dimensionally Brick Furnace

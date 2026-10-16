@@ -29,7 +29,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - MTInventoryInputBusME / MTInventoryInputHatchME
   - MTWirelessVacuumConveyorInput / MTWirelessVacuumConveyorOutput
   - MTWirelessBeamlineInput / MTWirelessBeamlineOutput / MTWirelessBeamlineAdvancedOutput
-  - MTNanoScaleFoundry and the one-step circuit pool
+  - MTNanoScaleFoundry and the one-step circuit pool (incl. programmable pattern hatches and renamed items)
   - SpaceModule Infinity machines (pump / miner / assembler)
   - Space apiary modules (太空蜂箱, MK-I..MK-IV)
   - Blocks
