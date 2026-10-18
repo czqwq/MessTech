@@ -93,7 +93,8 @@ public class PatternImportHandler extends ServerboundPacket {
     public void handleServer(EntityPlayerMP player) {
         final NBTTagCompound payload = cells;
         ServerThreadUtil.addScheduledTask(() -> {
-            // The terminal opens AE's own container, so the part is what identifies the target here.
+            // The terminal is opened with this mod's ContainerUltimatePatternTerminal; the part check keeps the same
+            // write path away from AE's own pattern terminals, whose container this is a subclass of.
             if (player.openContainer instanceof ContainerPatternTerm c
                 && c.getPatternTerminal() instanceof PartUltimatePatternTerminal) {
                 writeIntoGrid(c, payload);

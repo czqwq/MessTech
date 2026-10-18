@@ -29,19 +29,6 @@ public enum Mixins {
             .addTargetMod(TargetMod.SPICE_OF_LIFE)),
 
     /**
-     * Makes AE's extended pattern terminal classes carry the Ultimate Pattern Terminal's eight input pages: the
-     * container takes the page count from that part and the GUI's private scroll bar is widened from AE's hardcoded two
-     * pages to that count. Both mixins check the container's part first, so AE's own extended pattern terminal (and
-     * AE2FC's fluid one, and any addon's) keeps AE's own two pages and AE's own scroll range.
-     */
-    ULTIMATE_PATTERN_TERMINAL(new MixinClass("MixinContainerPatternTermEx").setClass("MixinContainerPatternTermEx")
-        .setPhase(Phase.LATE)
-        .addTargetMod(TargetMod.APPLIED_ENERGISTICS2),
-        new MixinClass("MixinGuiPatternTermEx").setClass("MixinGuiPatternTermEx")
-            .setPhase(Phase.LATE)
-            .addTargetMod(TargetMod.APPLIED_ENERGISTICS2)),
-
-    /**
      * Raises the ceiling of vanilla's "moved too quickly!" server-side speed check
      * ({@code NetHandlerPlayServer#processPlayer}) from {@code Config.MOVED_TOO_QUICKLY_THRESHOLD}. The target is a
      * vanilla class, so there is no mod to gate on and the mixin is always applied - values at or below vanilla's

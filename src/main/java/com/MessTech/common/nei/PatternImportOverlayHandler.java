@@ -40,7 +40,8 @@ public class PatternImportOverlayHandler implements IOverlayHandler {
 
     @Override
     public void overlayRecipe(GuiContainer firstGui, IRecipeHandler recipe, int recipeIndex, boolean maxTransfer) {
-        // The terminal's container is AE's own on the client, so the GUI is what identifies it.
+        // NEI looks the overlay handler up by the GUI's exact class; the container behind it is this mod's own, but
+        // the GUI class is what identifies this terminal here.
         if (!(firstGui instanceof GuiUltimatePatternTerminal)) return;
 
         final NBTTagCompound cells = new NBTTagCompound();

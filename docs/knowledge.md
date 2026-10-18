@@ -851,8 +851,11 @@ MTMultiMachineBase<T>
   place a current peak shows up.
 
 ### Ultimate Pattern Terminal (终极样板编码终端)
-- An AE **cable part**, not a block: `PartUltimatePatternTerminal extends PartPatternTerminalEx` (AE's extended
-  pattern terminal) and `ItemUltimatePatternTerminal` is its `IPartItem`. The item is placed with AE's own
+- An AE **cable part**, not a block: `PartUltimatePatternTerminal extends PartPatternTerminal` and implements
+  `IPatternTerminalEx` itself - AE's extended pattern terminal is only a behavior template for it now: the
+  `GUI_PATTERN_TERMINAL_EX` bridge, the forced processing mode, `exPatternTerminalCall`'s orientation pick, the NBT
+  keys and the GUI icon are copied from AE's `PartPatternTerminalEx` into this part (the GTNL bullet below says why it
+  must not extend that class). `ItemUltimatePatternTerminal` is its `IPartItem`. The item is placed with AE's own
   `ApiPart#placeBus`, so the part attaches to a cable bus on the clicked side and AE's `BusRenderer` draws it in the
   inventory; there is no block and no tile entity of this mod - the part's host tile is AE's cable bus. It takes a
   channel, pulls blank patterns out of the network and writes AE's own encoded pattern item back, exactly like AE's
@@ -862,33 +865,45 @@ MTMultiMachineBase<T>
 - The one deliberate difference from AE's part is the **input** grid: 4x4 x `INPUT_PAGES` (8) = 128 cells instead of
   AE's 4x4 x 2 = 32, which is what the Nano-Scale Foundry one-step circuit pool (up to 54 item plus 54 fluid
   inputs) needs. The
-  **outputs** keep AE's own 4x4 x 2 = 32 cells and AE's own placement. The inverted flag and the active page are kept
-  on the part instead of using AE's fields, because `PartPatternTerminalEx#setInverted` clears every input cell past
-  what the inverted layout shows and this terminal has four times as many.
-- Two mixins teach AE's own extended pattern terminal classes about that page count
-  (`Mixins.ULTIMATE_PATTERN_TERMINAL`, both gated on the `appliedenergistics2` mod). Both ask the same question first -
-  is the container's part a `PartUltimatePatternTerminal` - because both classes are shared with every other extended
-  pattern terminal (AE's own, AE2FC's fluid one, any addon's):
-  - `MixinContainerPatternTermEx` answers `getPatternInputPages` with that part's own count. AE inlines the constant
-    `PartPatternTerminalEx.exPatternInputsPages` (= 2) into that method, so a part subclass cannot change it, and
-    `GuiPatternTerm#initVirtualSlots` sizes the whole virtual input grid from that answer; every other terminal still
-    gets AE's two pages.
-  - `MixinGuiPatternTermEx` redirects the one `GuiScrollbar#setRange(0, 1, 1)` in AE's GUI constructor to that page
-    count, so the private `processingScrollBar` (AE hardwires it to two pages) can reach all eight. The redirect fires
-    for whichever `GuiPatternTermEx` is being built, so for anything but this terminal it hands AE's own call straight
-    back (`bar.setRange(min, max, pageSize)`); without that guard AE's own terminal's scroll range would be
-    *recomputed* by this mod, which only happens to match today because AE's container answers the same two pages.
-  Note the corollary: sneak-clicking this terminal takes AE's own path (`super.onPartActivate`), so it opens AE's own
-  `GuiPatternTermEx` on this mod's container - AE's GUI, this terminal's eight pages.
-- `GuiUltimatePatternTerminal extends GuiPatternTermEx` owns the input arrangement: AE's own loop over the
-  container's page count, with the inverted single column's row index wrapped (`activePage % rows`, because eight
-  pages do not fit AE's four rows). The outputs are AE's own loop unchanged, and the background, item list, view
-  cells, buttons, scroll bar and all of the syncing stay AE's code path.
+  **outputs** keep AE's own 4x4 x 2 = 32 cells and AE's own placement. The inverted flag and the active page live in
+  this part's own fields, so nothing is thrown away when the layout flips: AE's `PartPatternTerminalEx#setInverted`
+  would clear every input cell past the collapsed layout, and this terminal's grid is four times as large.
+- The part deliberately does **not** extend AE's `PartPatternTerminalEx`, and that keeps other mods'
+  `instanceof PartPatternTerminalEx` gates away from it. GT-Not-Leisure's processing-pattern capacity feature
+  (`enableProcessingPatternCapacityMixin`, on by default) resizes the `crafting`/`output` `IAEStackInventory` of
+  **every** `PartPatternTerminalEx` to its own `16 x multiplier` cells when the container is constructed - and limits
+  the saved NBT to the same count. That shrank this terminal's 128-cell input grid to 32 while the GUI still laid out
+  its eight pages, so drawing page three threw
+  `ArrayIndexOutOfBoundsException: Index 32 out of bounds for length 32` (`IAEStackInventory#getAEStackInSlot` behind
+  a virtual pattern slot). A plain `PartPatternTerminal` is not seen by that resize; GTNL's other pattern-terminal
+  mixins (container/GUI page counts) stay harmless here because this mod's own container and GUI override the page
+  counts in subclasses, and mixins on AE's classes only touch AE's own class bodies.
+- The GUI and container are this mod's own, not mixins on AE's shared classes (the old
+  `MixinContainerPatternTermEx` / `MixinGuiPatternTermEx` pair and the `Mixins.ULTIMATE_PATTERN_TERMINAL` group are
+  gone):
+  - `GuiUltimatePatternTerminal` is a whole copy of AE rv3-beta-1080-GTNH's `GuiPatternTermEx` (it still
+    `extends GuiPatternTerm`): background, item list, view cells, buttons, invert button, scroll bar and page
+    syncing are that class' code. The copy owns the two things AE's GUI cannot be told by subclassing - the private
+    `processingScrollBar` range (now the container's page count, eight pages) and the client-side container class it
+    constructs.
+  - `ContainerUltimatePatternTerminal extends ContainerPatternTermEx` answers **both** page counts from the part
+    (AE inlines the constants `PartPatternTerminalEx.exPatternInputsPages` = 2 / `exPatternOutputPages` = 2 into its
+    methods, so the overrides are the clean way). The outputs stay at 2, but answering them too keeps another mod's
+    page-count mixin (GTNL's, for one) from changing what the GUI lays out. Both sides construct the container:
+    `CommonProxy` for the server, the GUI for the client. Everything else - sync handlers, pattern slots, the
+    virtual-slot write path - is AE's own code.
+  Netting: this mod no longer patches any shared AE class for this terminal, so AE's own extended pattern terminal
+  (and AE2FC's fluid one, and any addon's) cannot be affected by it.
+- `GuiUltimatePatternTerminal` also owns the inverted input arrangement: AE's own loop over the container's page
+  count, with the inverted single column's row index wrapped (`activePage % rows`, because eight pages do not fit
+  AE's four rows). The outputs keep AE's loop unchanged.
 - The terminal opens through Forge instead of AE's `GuiBridge`: the bridge maps a container class to a GUI class by
   name, so a new terminal cannot be added to it without touching AE's own. `PartUltimatePatternTerminal#onPartActivate`
-  packs its side into the bits above `GUI_ULTIMATE_PATTERN_TERMINAL` (20) and calls `player.openGui`;
+  packs its side into the bits above `GUI_ULTIMATE_PATTERN_TERMINAL` (20) and calls `player.openGui` for every click,
+  sneaking included - AE's own GUI/container path is no longer taken, because it would report AE's two input pages
+  and show only a quarter of this terminal's grid;
   `CommonProxy`/`ClientProxy` resolve the part back from the cable bus with `Platform.getPartFromTE` and hand the
-  server AE's own `ContainerPatternTermEx`, with the `ContainerOpenContext` a GUI opened through Forge's
+  server `ContainerUltimatePatternTerminal`, with the `ContainerOpenContext` a GUI opened through Forge's
   `IGuiHandler` has to set itself (AE only fills it in `Platform#openGUI`, and without it AE's middle-click "how
   many to craft" path on the blank pattern slot NPEs). The inherited `getGui(player)` is consulted first, so the
   craft permission stays AE's own check.

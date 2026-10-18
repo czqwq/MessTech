@@ -9,6 +9,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 import com.MessTech.common.block.MTBlocks;
 import com.MessTech.common.command.MTCommand;
 import com.MessTech.common.command.MTGoUpFlight;
+import com.MessTech.common.container.ContainerUltimatePatternTerminal;
 import com.MessTech.common.entity.MTEntityDEBlast;
 import com.MessTech.common.entity.MTEntityPiggy;
 import com.MessTech.common.entity.MTEntityVoidstarArrow;
@@ -26,7 +27,6 @@ import com.MessTech.common.util.MTKillBase;
 
 import appeng.api.parts.IPart;
 import appeng.container.ContainerOpenContext;
-import appeng.container.implementations.ContainerPatternTermEx;
 import appeng.util.Platform;
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -148,7 +148,9 @@ public class CommonProxy implements IGuiHandler {
         context.setZ(z);
         context.setSide(side);
 
-        final ContainerPatternTermEx container = new ContainerPatternTermEx(player.inventory, terminal);
+        final ContainerUltimatePatternTerminal container = new ContainerUltimatePatternTerminal(
+            player.inventory,
+            terminal);
         container.setOpenContext(context);
         return container;
     }

@@ -1,38 +1,219 @@
 package com.MessTech.common.gui;
 
+import net.minecraft.client.gui.GuiButton;
 import net.minecraft.entity.player.InventoryPlayer;
 
+import org.lwjgl.input.Mouse;
+
+import com.MessTech.common.container.ContainerUltimatePatternTerminal;
+import com.MessTech.common.parts.PartUltimatePatternTerminal;
+
+import appeng.api.config.PatternSlotConfig;
+import appeng.api.config.Settings;
 import appeng.api.storage.ITerminalHost;
-import appeng.client.gui.implementations.GuiPatternTermEx;
-import appeng.client.gui.slots.VirtualMEPatternSlot;
+import appeng.client.gui.implementations.GuiPatternTerm;
 import appeng.client.gui.slots.VirtualMEPhantomSlot;
-import appeng.container.implementations.ContainerPatternTermEx;
+import appeng.client.gui.widgets.GuiImgButton;
+import appeng.client.gui.widgets.GuiScrollbar;
+import appeng.core.AppEng;
+import appeng.core.localization.ColorUtils;
+import appeng.core.localization.GuiText;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
  * GUI of the Ultimate Pattern Terminal.
  * <p>
- * It <em>is</em> AE's extended pattern terminal GUI ({@link GuiPatternTermEx}), background, item list, buttons, scroll
- * bar and all; the one thing it owns is the arrangement of the input grid, which has
- * {@link com.MessTech.common.parts.PartUltimatePatternTerminal#INPUT_PAGES} pages instead of AE's two. The page count
- * itself comes from the container, which AE's own {@code ContainerPatternTermEx} is taught to take from the part by
- * {@code MixinContainerPatternTermEx}; the scroll bar that reaches those pages is unscrambled by
- * {@code MixinGuiPatternTermEx}. The outputs keep AE's own loop.
+ * This is AE's extended pattern terminal GUI copied whole from Applied Energistics 2 rv3-beta-1080-GTNH
+ * ({@code appeng.client.gui.implementations.GuiPatternTermEx}, LGPL-3.0): background, item list, view cells, buttons,
+ * the virtual pattern slots, the invert button and the page scroll bar are that class' code. Copying it instead of
+ * extending it is what retired {@code MixinGuiPatternTermEx} and {@code MixinContainerPatternTermEx} - the two things
+ * AE's GUI cannot be told by subclassing, its private scroll bar range and its client-side container, are now chosen
+ * here directly, and no other mod's extended pattern terminal is touched any more.
  * <p>
- * The only deviation from AE's arrangement is the inverted input grid: it is a single four cell column whose row the
- * active page picks, and this terminal has eight pages for AE's four rows, so that index is wrapped. Everything else -
- * including the page change itself - is AE's own code path.
+ * The one deliberate difference from AE's class is the input page count: this terminal has
+ * {@link PartUltimatePatternTerminal#INPUT_PAGES} pages of 4x4 input cells instead of AE's two, and the scroll bar is
+ * widened to reach them. Everything else, including the page change itself, is AE's own code path.
+ * <p>
+ * The inverted (single input column) layout is also AE's, except that the active page is wrapped over the four rows of
+ * that column ({@code activePage % rows}); eight pages do not fit AE's four rows. The outputs keep AE's own loop.
  */
 @SideOnly(Side.CLIENT)
-public class GuiUltimatePatternTerminal extends GuiPatternTermEx {
+public class GuiUltimatePatternTerminal extends GuiPatternTerm {
 
-    /** AE keeps its container private, and the GUI has to read the page counts back out of it. */
-    private final ContainerPatternTermEx container;
+    private final ContainerUltimatePatternTerminal container;
+    private GuiImgButton invertBtn;
+    private final GuiScrollbar processingScrollBar = new GuiScrollbar();
 
-    public GuiUltimatePatternTerminal(InventoryPlayer ip, ITerminalHost host) {
-        super(ip, host);
-        this.container = (ContainerPatternTermEx) this.inventorySlots;
+    public GuiUltimatePatternTerminal(final InventoryPlayer inventoryPlayer, final ITerminalHost te) {
+        // AE's own GUI constructor hardcodes new ContainerPatternTermEx(...) here; this mod's container answers the
+        // terminal's input page count instead (see ContainerUltimatePatternTerminal), so the virtual input grid is
+        // sized from the part.
+        super(inventoryPlayer, te, new ContainerUltimatePatternTerminal(inventoryPlayer, te));
+        this.container = (ContainerUltimatePatternTerminal) this.inventorySlots;
+
+        this.container.invertedSync.onClientChange((oldValue, newValue) -> {
+            if (oldValue != newValue) {
+                this.updateSlotVisibility();
+            }
+        });
+        this.container.activePageSync.onClientChange((oldValue, newValue) -> {
+            if (oldValue != newValue) {
+                this.updateSlotVisibility();
+            }
+        });
+
+        this.setReservedSpace(81);
+
+        // AE hardcodes the two pages of its own terminal into this call; this terminal asks its container instead, so
+        // the page count lives in one place (the part).
+        processingScrollBar.setHeight(70)
+            .setWidth(7)
+            .setLeft(6)
+            .setRange(0, Math.max(0, this.container.getPatternInputPages() - 1), 1);
+        processingScrollBar.setTexture(AppEng.MOD_ID, "guis/pattern3.png", 242, 0);
+    }
+
+    @Override
+    protected void actionPerformed(final GuiButton btn) {
+        super.actionPerformed(btn);
+
+        if (this.invertBtn == btn) {
+            container.invertedSync.set(!container.invertedSync.get());
+            this.updateSlotVisibility();
+        }
+    }
+
+    @Override
+    public void initGui() {
+        super.initGui();
+
+        invertBtn = new GuiImgButton(
+            this.guiLeft + 87,
+            this.guiTop + this.ySize - 145,
+            Settings.ACTIONS,
+            container.invertedSync.get() ? PatternSlotConfig.C_4_16 : PatternSlotConfig.C_16_4);
+        invertBtn.setHalfSize(true);
+        this.buttonList.add(this.invertBtn);
+
+        processingScrollBar.setTop(this.ySize - 164);
+        this.updateSlotVisibility();
+    }
+
+    @Override
+    protected int getInputSlotOffsetX() {
+        return 15;
+    }
+
+    @Override
+    protected int getInputSlotOffsetY() {
+        return 32;
+    }
+
+    @Override
+    protected int getOutputSlotOffsetX() {
+        return 58;
+    }
+
+    @Override
+    protected int getOutputSlotOffsetY() {
+        return 32;
+    }
+
+    @Override
+    protected void drawTitle() {
+        this.fontRendererObj.drawString(
+            GuiText.PatternTerminalEx.getLocal(),
+            8,
+            this.ySize - 96 + 2 - this.getReservedSpace(),
+            ColorUtils.guiTextColorGray.getColor());
+        this.processingScrollBar.draw(this);
+    }
+
+    @Override
+    protected String getBackground() {
+        return container.invertedSync.get() ? "guis/pattern4.png" : "guis/pattern3.png";
+    }
+
+    @Override
+    public void drawScreen(final int mouseX, final int mouseY, final float btn) {
+        final int offset = container.invertedSync.get() ? 18 * -3 : 0;
+
+        doubleBtn.xPosition = this.guiLeft + 88 + offset;
+        clearBtn.xPosition = doubleBtn.xPosition;
+        invertBtn.xPosition = doubleBtn.xPosition;
+
+        substitutionsEnabledBtn.xPosition = this.guiLeft + 98 + offset;
+        substitutionsDisabledBtn.xPosition = substitutionsEnabledBtn.xPosition;
+        beSubstitutionsEnabledBtn.xPosition = substitutionsEnabledBtn.xPosition;
+        beSubstitutionsDisabledBtn.xPosition = substitutionsEnabledBtn.xPosition;
+
+        clearBtn.yPosition = this.guiTop + this.ySize - 165;
+        substitutionsEnabledBtn.yPosition = clearBtn.yPosition;
+        substitutionsDisabledBtn.yPosition = clearBtn.yPosition;
+
+        doubleBtn.yPosition = this.guiTop + this.ySize - 155;
+        beSubstitutionsEnabledBtn.yPosition = doubleBtn.yPosition;
+        beSubstitutionsDisabledBtn.yPosition = doubleBtn.yPosition;
+
+        invertBtn.yPosition = this.guiTop + this.ySize - 145;
+
+        processingScrollBar.setCurrentScroll(container.activePageSync.get());
+
+        super.drawScreen(mouseX, mouseY, btn);
+    }
+
+    @Override
+    protected void mouseClicked(final int xCoord, final int yCoord, final int btn) {
+        final int currentScroll = this.processingScrollBar.getCurrentScroll();
+        this.processingScrollBar.click(this, xCoord - this.guiLeft, yCoord - this.guiTop);
+
+        super.mouseClicked(xCoord, yCoord, btn);
+
+        if (currentScroll != this.processingScrollBar.getCurrentScroll()) {
+            changeActivePage();
+        }
+    }
+
+    @Override
+    protected void mouseClickMove(final int x, final int y, final int c, final long d) {
+        final int currentScroll = this.processingScrollBar.getCurrentScroll();
+        this.processingScrollBar.clickMove(y - this.guiTop);
+        super.mouseClickMove(x, y, c, d);
+
+        if (currentScroll != this.processingScrollBar.getCurrentScroll()) {
+            changeActivePage();
+        }
+    }
+
+    @Override
+    public void handleMouseInput() {
+        super.handleMouseInput();
+
+        final int wheel = Mouse.getEventDWheel();
+
+        if (wheel != 0) {
+            final int x = Mouse.getEventX() * this.width / this.mc.displayWidth;
+            final int y = this.height - Mouse.getEventY() * this.height / this.mc.displayHeight;
+
+            if (this.processingScrollBar.contains(x - this.guiLeft, y - this.guiTop)) {
+                final int currentScroll = this.processingScrollBar.getCurrentScroll();
+                this.processingScrollBar.wheel(wheel);
+
+                if (currentScroll != this.processingScrollBar.getCurrentScroll()) {
+                    changeActivePage();
+                }
+            }
+        }
+    }
+
+    private void changeActivePage() {
+        container.activePageSync.set(this.processingScrollBar.getCurrentScroll());
+        this.updateSlotVisibility();
+    }
+
+    public void onUpdateInvertedOrActivePage() {
+        updateSlotVisibility();
     }
 
     @Override
@@ -48,7 +229,7 @@ public class GuiUltimatePatternTerminal extends GuiPatternTermEx {
             for (int y = 0; y < inputRows; y++) {
                 for (int x = 0; x < inputCols; x++) {
                     final int slotIndex = x + y * inputCols + page * (inputCols * inputRows);
-                    final VirtualMEPatternSlot slot = this.craftingSlots[slotIndex];
+                    final VirtualMEPhantomSlot slot = this.craftingSlots[slotIndex];
 
                     slot.setHidden(
                         inverted ? y != Math.floorMod(activePage, inputRows) || page > 0 : page != activePage);
