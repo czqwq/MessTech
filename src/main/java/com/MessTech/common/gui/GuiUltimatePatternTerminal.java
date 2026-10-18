@@ -36,7 +36,11 @@ import cpw.mods.fml.relauncher.SideOnly;
  * widened to reach them. Everything else, including the page change itself, is AE's own code path.
  * <p>
  * The inverted (single input column) layout is also AE's, except that the active page is wrapped over the four rows of
- * that column ({@code activePage % rows}); eight pages do not fit AE's four rows. The outputs keep AE's own loop.
+ * that column ({@code activePage % rows}); eight pages do not fit AE's four rows. The output side is the one place
+ * that does not stay AE's loop: the eight input pages are grouped four per output page, so the normal layout's
+ * four-cell output column walks all 32 output cells in order (pages 0-3 show outputs 0-15, pages 4-7 show outputs
+ * 16-31) and the inverted layout's 16-cell output page stays on output page 0 for input pages 0-3 and on output page
+ * 1 for pages 4-7. AE's own two-page loop would wrap page 4 back to the first page's outputs.
  */
 @SideOnly(Side.CLIENT)
 public class GuiUltimatePatternTerminal extends GuiPatternTerm {
@@ -219,11 +223,12 @@ public class GuiUltimatePatternTerminal extends GuiPatternTerm {
     @Override
     protected void updateSlotVisibility() {
         final boolean inverted = this.container.invertedSync.get();
-        final int activePage = this.container.activePageSync.get();
+        final int inputPages = this.container.getPatternInputPages();
+        // The part clamps the page it stores, but a stale sync value must not index outside the grid either.
+        final int activePage = Math.max(0, Math.min(this.container.activePageSync.get(), inputPages - 1));
 
         final int inputRows = this.container.getPatternInputsHeigh();
         final int inputCols = this.container.getPatternInputsWidth();
-        final int inputPages = this.container.getPatternInputPages();
 
         for (int page = 0; page < inputPages; page++) {
             for (int y = 0; y < inputRows; y++) {
@@ -243,15 +248,21 @@ public class GuiUltimatePatternTerminal extends GuiPatternTerm {
         final int outputCols = this.container.getPatternOutputsWidth();
         final int outputPages = this.container.getPatternOutputPages();
 
+        // The input pages are grouped over the output pages (8 over 2 here): four input pages share one output page.
+        // The normal layout shows one four-cell output row per input page, so the page-in-group is also the output
+        // row; the inverted layout shows the whole 16-cell output page. Both modes therefore walk page 0-3 over
+        // output page 0 and page 4-7 over output page 1, instead of wrapping back to output page 0 after a few pages.
+        final int inputPagesPerOutputPage = Math.max(1, inputPages / Math.max(1, outputPages));
+        final int outputPage = Math.min(outputPages - 1, activePage / inputPagesPerOutputPage);
+        final int outputRow = Math.min(outputRows - 1, activePage % inputPagesPerOutputPage);
+
         for (int page = 0; page < outputPages; page++) {
             for (int y = 0; y < outputRows; y++) {
                 for (int x = 0; x < outputCols; x++) {
                     final int slotIndex = x + y * outputCols + page * (outputCols * outputRows);
                     final VirtualMEPhantomSlot slot = this.outputSlots[slotIndex];
 
-                    slot.setHidden(
-                        !inverted ? y != Math.floorMod(activePage, outputRows) || page != 0
-                            : page != Math.floorMod(activePage, outputPages));
+                    slot.setHidden(!inverted ? y != outputRow || page != outputPage : page != outputPage);
 
                     slot.setX((inverted ? getOutputSlotOffsetX() : 112) + 18 * (!inverted ? 0 : x));
                     slot.setY(this.rows * 18 + getOutputSlotOffsetY() + 18 * (!inverted ? x : y));

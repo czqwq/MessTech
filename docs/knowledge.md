@@ -894,9 +894,13 @@ MTMultiMachineBase<T>
     virtual-slot write path - is AE's own code.
   Netting: this mod no longer patches any shared AE class for this terminal, so AE's own extended pattern terminal
   (and AE2FC's fluid one, and any addon's) cannot be affected by it.
-- `GuiUltimatePatternTerminal` also owns the inverted input arrangement: AE's own loop over the container's page
-  count, with the inverted single column's row index wrapped (`activePage % rows`, because eight pages do not fit
-  AE's four rows). The outputs keep AE's loop unchanged.
+- `GuiUltimatePatternTerminal` also owns the input arrangement: AE's own loop over the container's page count, with
+  the inverted single column's row index wrapped (`activePage % rows`, because eight pages do not fit AE's four
+  rows). The outputs are the one place that does **not** stay AE's loop: the eight input pages are grouped four per
+  output page, so the normal layout's four-cell output column walks all 32 output cells in order (pages 0-3 show
+  outputs 0-15, pages 4-7 show outputs 16-31) and the inverted layout's 16-cell output page stays on output page 0
+  for input pages 0-3 and on output page 1 for pages 4-7. AE's own loop wraps page 4 back to the first page's
+  outputs (`activePage % outputRows` / `% outputPages`), which is the "Page 4 shows page 1's output" bug.
 - The terminal opens through Forge instead of AE's `GuiBridge`: the bridge maps a container class to a GUI class by
   name, so a new terminal cannot be added to it without touching AE's own. `PartUltimatePatternTerminal#onPartActivate`
   packs its side into the bits above `GUI_ULTIMATE_PATTERN_TERMINAL` (20) and calls `player.openGui` for every click,
