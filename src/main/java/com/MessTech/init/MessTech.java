@@ -3,6 +3,7 @@ package com.MessTech.init;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.MessTech.common.recipe.ExtraRecipes;
 import com.MessTech.common.recipe.GTRecipes;
 
 import cpw.mods.fml.common.Mod;
@@ -13,6 +14,7 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
+import gregtech.api.enums.Mods;
 
 @Mod(
     modid = MessTech.MODID,
@@ -67,6 +69,9 @@ public class MessTech {
     @Mod.EventHandler
     public void completeInit(FMLLoadCompleteEvent event) {
         GTRecipes.loadRecipes();
+        if (Mods.Computronics.isModLoaded() && Mods.Thaumcraft.isModLoaded() && Mods.Avaritia.isModLoaded()) {
+            ExtraRecipes.loadReplacementRecipes();
+        }
     }
 
     @Mod.EventHandler
