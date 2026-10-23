@@ -728,38 +728,29 @@ MTMultiMachineBase<T>
   supported.
 - `onWireCutterRightClick` refuses to take the Astral Array out while mode 1 is running, and a successful extraction
   drops the machine back to mode 0 - the array is what mode 1 exists for.
-- Binding in mode 0: a controller-slot circuit (1-11) selects one active pool; with the controller slot empty,
-  each input bus circuit slot can bind that bus to its own pool so several pools run simultaneously.
-- **Programmable pattern hatches** (可编程仓室: Programmable-Hatches' 编程样板输入总成 MK.III /
-  编程样板输入总线) are `IDualInputHatch` implementations, and GT's `MTEMultiBlockBase#addInputBusToMachineList`
-  routes every `IDualInputHatch` into `mDualInputHatches`, **never** into `mInputBusses`. The thread scheduler has
-  to read `mDualInputHatches` as well or such a hatch is invisible and every thread reports 空闲 while
-  `checkProcessing()` still returns SUCCESSFUL on its one-second cycle. Each `IDualInputInventory` counts as its own
-  input source (`DualInputBinding`): one buffer per AE pattern, carrying its own unwrapped circuit next to the
-  pattern's items, so one hatch feeds several pools at once. That circuit is a **zero-sized integrated circuit** -
-  `BufferedDualInputHatch.DualInvBuffer#programLocal` unwraps the pattern's programming circuit into the buffer, and
-  the buffer exposes it through `getItemInputs()`; a buffer's own marker wins over the hatch-wide one
-  (`getDualHatchCircuitNumber` takes the hatch's first exposed pattern circuit), so a buffer whose pattern carries no
-  circuit follows its hatch's first one and only a hatch exposing no circuit at all feeds no pool. Circuit markers
-  are filtered out of the ingredient list (they select the recipe page, they are not consumables).
-- Consumption from a programmable hatch **is** the stack decrement: `getItemInputs()` hands out the hatch's live
-  buffer stacks (`ItemStackG`/`FluidTankG` are the buffer's own objects, not copies), so `depleteThreadItems`
-  shrinks the buffer's own stack and the hatch refills it when the AE job pushes the pattern again. This mirrors
-  GT's own pipeline, which consumes the stacks a dual hatch hands out the same way (`GTRecipe::consumeInput`). Fluid
-  from the same buffer is drained the same way, in `depleteThreadFluid`. Calling `removeResource` on top of that
-  would deduct twice.
+- Binding in mode 0 is **per input source**: each input bus is bound by its own circuit slot, and each pattern buffer
+  of a programmable hatch by the circuit it carries. There is no machine-wide pool selector - the controller slot does
+  not select a pool - so several pools run simultaneously and items cannot cross between pools.
+- **Programmable hatches** (e.g. Programmable-Hatches' pattern input hatches) are `IDualInputHatch` implementations,
+  and GT routes every `IDualInputHatch` into `mDualInputHatches`, **never** into `mInputBusses`. The thread scheduler
+  must read `mDualInputHatches` as well or such a hatch is invisible. Each `IDualInputInventory` is its own input
+  source (`DualInputBinding`): one buffer per AE pattern carrying its own unwrapped circuit next to the pattern's
+  items, so one hatch feeds several pools. The circuit is a zero-sized integrated circuit
+  (`BufferedDualInputHatch.DualInvBuffer#programLocal`); a buffer's own marker wins over the hatch-wide one, which
+  falls back to the hatch's shared (ghost) circuit slot. Circuit markers are filtered out of the ingredient list.
+- Consumption from a programmable hatch **is** the stack decrement: `getItemInputs()` hands out the buffer's live
+  stacks, so `depleteThreadItems` shrinks them and the hatch refills them when the AE job pushes the pattern again -
+  the same way GT's own pipeline consumes a dual hatch's stacks. Calling `removeResource` on top would deduct twice.
+  Fluid from the same buffer is drained the same way, and the Board Processor's immersion tank also drains it.
 - `checkProcessing()` keeps mode 0 on a one-second GT cycle and calls the thread scheduler
   inside the standard `checkRecipe()` wrapper, so `startRecipeProcessing()` / `endRecipeProcessing()`
   are active for ME input buses/hatches. `lEUt` is set from running task totals so GT drains energy
   normally.
-- Input-bus circuit numbers are snapshotted in `onPostTick` (`duringProcessing = false`) **and** at the top of
-  `checkProcessing()` (`duringProcessing = true`). The phase matters: an ME input bus keeps its circuit in
-  `getCircuitSlot() + SLOT_COUNT` while `startRecipeProcessing()` is active and in `getCircuitSlot()` outside it, and
-  the stocked items take over the low slots inside the window - reading the wrong one binds the bus to an arbitrary
-  AE item instead of its circuit. The second refresh runs inside the window because `checkRecipe()` is final and
-  calls `startRecipeProcessing()` first, which is the only phase in which GT's own compressed/quantum input bus
-  publishes its circuit at all. The `onPostTick` pass stays because the board-fluid helpers call
-  `getThreadInputBuses()` outside a recipe check.
+- Input-bus circuit numbers are snapshotted in `onPostTick` (`duringProcessing = false`) and at the top of
+  `checkProcessing()` (`duringProcessing = true`), because an ME bus only exposes its circuit while the recipe check
+  is active and its slot moves to the second-to-last virtual position (`getSizeInventory() - 2`) - GT's fixed 16+2
+  layout and variable-size ME bus subclasses both satisfy that. Reading the wrong slot binds the bus to an arbitrary
+  AE item or to no pool at all.
 - **Renamed items are matched the way GT matches them**: `inputSatisfies` ignores NBT exactly when the recipe is not
   NBT sensitive and the ingredient is not one of the three items GT always compares by NBT - the IC2 universal fluid
   cell, the GT data stick and the data orb (`GTRecipe#shouldCheckNBT`, mirrored from `MTParallelHelper`). So an item
@@ -775,6 +766,8 @@ MTMultiMachineBase<T>
   is the source; UU-Matter's impurity is UU-Amplifier). The type list, the fluid each type takes and the impurity it
   turns into all live in `MTNanoScaleFoundry`'s `BOARD_TANK_FLUIDS` / `boardTankFluid` / `boardTankImpurity`, and the
   GUI's tank grid and Waila both read `getBoardTankTypeCount()`, so the next fluid is one table entry plus its GUI row.
+  The tank is filled by draining fluid hatches, and it also drains the pattern buffers bound to the Board pool, so a
+  pattern that carries its own immersion fluid can feed it.
 - Waila sends per-thread name/index/active/progress/EU/parallel, the first task's output item names/counts, the board
   tanks and `isSneaking` (the same flag AE's `WirelessDataProvider` uses for its connected-device list). Collapsed the
   body prints **one** machine-wide progress bar - the sum over the running threads through GT's
