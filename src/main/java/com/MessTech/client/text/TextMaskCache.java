@@ -127,11 +127,13 @@ public class TextMaskCache {
             OpenGlHelper
                 .glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
             OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240, 240);
+            int previousAntialiasing = AngelicaTextAdapter.beginSharpMask(font);
             EffectTextRenderer.beginCapture();
             try {
                 font.drawString(text, 0, 0, 0xFFFFFFFF, false);
             } finally {
                 EffectTextRenderer.endCapture();
+                AngelicaTextAdapter.endSharpMask(previousAntialiasing);
             }
             writeGlyphTextureMetrics(font, text, width, height, padding, resolution);
             return new Mask(target, width, height, padding, resolution);

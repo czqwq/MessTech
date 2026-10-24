@@ -66,7 +66,7 @@ public final class MTMagicCircleRenderer {
      * ({@link Config#VOIDSTAR_BOW_DRAW_TICKS}, four seconds by default), so the whole unfold lands inside a charge.
      */
     private static int fullDrawTicks() {
-        return Math.max(1, Config.VOIDSTAR_BOW_DRAW_TICKS);
+        return Math.max(1, Config.voidstarbow.VOIDSTAR_BOW_DRAW_TICKS);
     }
 
     /** Distance in front of the eye. */

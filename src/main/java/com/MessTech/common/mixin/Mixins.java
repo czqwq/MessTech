@@ -28,7 +28,8 @@ public enum Mixins {
 
     /**
      * Raises the ceiling of vanilla's "moved too quickly!" server-side speed check
-     * ({@code NetHandlerPlayServer#processPlayer}) from {@code Config.MOVED_TOO_QUICKLY_THRESHOLD}. The target is
+     * ({@code NetHandlerPlayServer#processPlayer}) from {@code Config.general.MOVED_TOO_QUICKLY_THRESHOLD}. The target
+     * is
      * vanilla, so there is no mod to gate on and the mixin always applies - values at or below vanilla's 100.0 hand the
      * constant straight back. See {@code MixinNetHandlerPlayServer_MovedTooQuickly} for why it coexists with
      * Hodgepodge's own mixin on the same constant instead of replacing it.

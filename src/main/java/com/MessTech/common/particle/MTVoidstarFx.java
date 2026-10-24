@@ -208,7 +208,7 @@ public final class MTVoidstarFx {
         double upZ = rightX * directionY;
 
         int sparks = (int) Math.min(IMPACT_TUNNEL_SPARKS, Math.max(6.0D, length * IMPACT_TUNNEL_SPARKS_PER_BLOCK));
-        double radius = Config.VOIDSTAR_BOW_TUNNEL_RADIUS;
+        double radius = Config.voidstarbow.VOIDSTAR_BOW_TUNNEL_RADIUS;
 
         for (int i = 0; i < sparks; i++) {
             double along = world.rand.nextDouble();

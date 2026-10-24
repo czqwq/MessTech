@@ -1383,12 +1383,14 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             }
         }
         if (world != null && !world.isRemote) {
-            // IC2 clamps to protection/reactorExplosionPowerLimit (45); Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT is
+            // IC2 clamps to protection/reactorExplosionPowerLimit (45);
+            // Config.machines.reactor.REACTOR_IC2_EXPLOSION_POWER_LIMIT is
             // that
             // number here, mapped onto MTExplosionDE's Draconic Evolution scale, whose maximum is twice DE's own full
             // reactor (2 x 20 = 40).
-            float ic2Limit = Math.max(1.0F, Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT);
-            float dePower = Math.min(boomPower, ic2Limit) / ic2Limit * Config.REACTOR_EXPLOSION_DE_POWER_LIMIT;
+            float ic2Limit = Math.max(1.0F, Config.machines.reactor.REACTOR_IC2_EXPLOSION_POWER_LIMIT);
+            float dePower = Math.min(boomPower, ic2Limit) / ic2Limit
+                * Config.machines.reactor.REACTOR_EXPLOSION_DE_POWER_LIMIT;
             MTProcessHandler.addProcess(new MTExplosionDE(world, centerX, centerY, centerZ, dePower));
         }
     }

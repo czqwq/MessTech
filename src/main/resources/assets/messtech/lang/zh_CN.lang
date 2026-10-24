@@ -599,9 +599,9 @@ messtech.itemEffect.universium=宇宙素
 messtech.itemEffect.sixPhasedCopper=六相铜
 
 # --- 混沌终焉·虚无贯星弓 ---
-# 弓名直接挂着 magnetar（磁星场线）文字特效的标记：§{mg} 是短名，末尾 §r 收尾，
+# 弓名直接挂着 magnetar（磁星场线）文字特效的标记：§[mg] 是短名，末尾 §r 收尾，
 # 见 docs/text-fx/ 与 common/text/effect/TextEffectFormat。任何用字体绘制这条名字的地方都会生效。
-item.messtech.voidstarBow.name=§{mg}混沌终焉·虚无贯星弓§r
+item.messtech.voidstarBow.name=§[mg]混沌终焉·虚无贯星弓§r
 messtech.voidstarBow.tooltip.charge=§7· §6蓄力：§7满蓄力需要 §b%1$s 秒§7，期间在你面前展开一座 §d魔法阵§7，展开时四角再依次炸开四座小魔法阵
 messtech.voidstarBow.tooltip.flight=§7· §6飞行：§7箭矢保持 §b绝对直线§7 且几乎不下坠，一路拖出 §d混沌火花
 messtech.voidstarBow.tooltip.pierce=§7· §6命中：§7把挡路的方块整条 §c炸穿§7并 §b继续往里钻§7，直到射程用尽或撞上钻不开的东西
@@ -692,6 +692,8 @@ machine.module.waila.speed=§7耗时减免: §b%s
 machine.module.waila.eu=§7耗电减免: §a%s
 machine.module.waila.parallel=§7并行: §e%s
 Material.chaosmatter=混乱物质
+# 彩虹小扳手的主材质：只挂名字和配色，GT 工具提示里显示成「彩虹 lvl 325」。
+Material.rainbowwrench=彩虹
 
 # --- /messtech 指令 (MTCommand / MTGoUpFlight)。占位符依次是速度、持续秒数、配置阈值：
 # 第三条只在 MOVED_TOO_QUICKLY_THRESHOLD 低于本次速度的平方时出现，因为原版 moved too quickly 检查
@@ -911,3 +913,41 @@ machine.essentiahatch.me.gui.clear=§e清除标记
 machine.essentiahatch.me.gui.no_aspect=无
 machine.essentiahatch.me.tooltip.capacity=§7容量：§b%s§7 源质
 machine.essentiahatch.me.tooltip.max_input=§7单次最大输入数量：§b%s
+
+# --- 彩虹小扳手 (MTRainbowWrench / ToolRainbowWrench)。GT 工具的物品名/介绍键是「gt.<unlocalized>.<meta>.name」，
+# 这里 unlocalized 是 metatool.messtech、meta 是偶数工具 ID 100。数值：耐久 Int.MAX、等级 325、挖掘速度 999。
+gt.metatool.messtech.100.name=彩虹小扳手
+gt.metatool.messtech.100.tooltip=按住左键以拆卸机器
+
+# --- 配置界面。键名由 Config.java 里的 @Config.LangKeyPattern 生成（"%mod.config.%cat.%field"，小写）；
+# 字段的 tooltip 键是在后面加 ".tooltip"。
+messtech.config.general=通用
+messtech.config.general.default_batch_mode=默认批处理模式
+messtech.config.general.piggy_tumbles_wearer=小猪人偶随佩戴者翻滚
+messtech.config.general.text_effects=文字特效
+messtech.config.general.galacticraft_fast_ascent_opens_space_gui=高速上升时打开星系界面
+messtech.config.general.moved_too_quickly_threshold=“移动过快”检测上限
+messtech.config.machines=机器
+messtech.config.machines.enable_one_batch_calculator=启用单批计算器
+messtech.config.machines.enable_one_batch_calculator.tooltip=跳过并行计算：同一批输入总线里所有能匹配的材料会在一次运行里全部消耗。\nEU/t 变为正常并行整批总耗电 ÷ 并行数，时长按同一数值放大，因此总耗电不变。\n机器的并行上限与按电量计算的并行限制被无视；无损保护和 int 时长上限仍然生效。\n无线模式机器需要电网能一次性付清整轮耗电。
+messtech.config.reactor=反应堆
+messtech.config.reactor.reactor_explosion_de_power_limit=爆炸 DE 功率上限
+messtech.config.reactor.reactor_ic2_explosion_power_limit=爆炸 IC2 功率上限
+messtech.config.voidstarbow=虚无贯星弓
+messtech.config.voidstarbow.voidstar_bow_breaks_blocks=破坏方块
+messtech.config.voidstarbow.voidstar_bow_annihilates_living=湮灭生物
+messtech.config.voidstarbow.voidstar_bow_heals_shooter=治疗射手
+messtech.config.voidstarbow.voidstar_bow_de_power=DE 模式爆炸功率
+messtech.config.voidstarbow.voidstar_bow_tunnel_radius=隧道半径
+messtech.config.voidstarbow.voidstar_bow_tunnel_length=隧道长度
+messtech.config.voidstarbow.voidstar_bow_draw_ticks=满蓄力 tick
+messtech.config.gameconsole=游戏机
+messtech.config.gameconsole.game_console_dir=游戏机目录
+messtech.config.gameconsole.game_console_wad=指定 IWAD
+messtech.config.gameconsole.game_console_download_freedoom=自动下载 Freedoom
+messtech.config.gameconsole.game_console_freedoom_url=Freedoom 下载地址
+messtech.config.gameconsole.game_console_screen_fraction=窗口宽度占比
+messtech.config.gameconsole.game_console_threads=渲染线程数
+messtech.config.gameconsole.game_console_sound=音效
+messtech.config.gameconsole.game_console_music=音乐
+messtech.config.gameconsole.game_console_pauses_world=打开窗口时暂停世界

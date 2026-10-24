@@ -43,7 +43,7 @@ import cpw.mods.fml.relauncher.SideOnly;
  * <li><b>Release heals the archer</b> to full ({@link Config#VOIDSTAR_BOW_HEALS_SHOOTER}), server side, in the arrow
  * branch - a shot that never happens (draw too weak, no arrow) heals nothing; kills use {@link MTBowKill}.</li>
  * <li>Always glinting ({@link #hasEffect}); the name wears the {@code magnetar} text effect: its lang entry carries the
- * inline {@code §{mg}} marker (see {@code docs/text-fx/}), so every place the font draws the name gets the field-line
+ * inline {@code §[mg]} marker (see {@code docs/text-fx/}), so every place the font draws the name gets the field-line
  * shader - no tooltip handler involved.</li>
  * </ul>
  * Icons are three 16-frame strips ({@code bow/voidstarBow_standby}, {@code _pulling_0/1/2}), an animated enchanted
@@ -123,7 +123,7 @@ public class MTItemVoidstarBow extends ItemBow {
     public IIcon getIcon(ItemStack stack, int pass, EntityPlayer player, ItemStack usingItem, int useRemaining) {
         if (usingItem != null && usingItem.getItem() == this) {
             int drawn = usingItem.getMaxItemUseDuration() - useRemaining;
-            int fullDraw = Math.max(1, Config.VOIDSTAR_BOW_DRAW_TICKS);
+            int fullDraw = Math.max(1, Config.voidstarbow.VOIDSTAR_BOW_DRAW_TICKS);
             if (drawn >= PULL_FULL_FRACTION * fullDraw) return icons[3];
             if (drawn > PULL_MID_FRACTION * fullDraw) return icons[2];
             if (drawn > 0) return icons[1];
@@ -241,7 +241,7 @@ public class MTItemVoidstarBow extends ItemBow {
 
         // Vanilla's curve over this bow's own draw length instead of twenty ticks: arrow speed and tunnel range read
         // the result. See Config#VOIDSTAR_BOW_DRAW_TICKS.
-        float draw = (float) drawn / Math.max(1, Config.VOIDSTAR_BOW_DRAW_TICKS);
+        float draw = (float) drawn / Math.max(1, Config.voidstarbow.VOIDSTAR_BOW_DRAW_TICKS);
         draw = (draw * draw + draw * 2.0F) / 3.0F;
 
         // Vanilla's floor: a barely drawn bow does not fire at all.
@@ -277,7 +277,7 @@ public class MTItemVoidstarBow extends ItemBow {
 
             // Release hands back everything the charge cost: a real heal of the difference, not a health assignment, so
             // it goes through the game's heal path (Forge heal event, healing effects) and never exceeds the maximum.
-            if (Config.VOIDSTAR_BOW_HEALS_SHOOTER) {
+            if (Config.voidstarbow.VOIDSTAR_BOW_HEALS_SHOOTER) {
                 player.heal(Math.max(0.0F, player.getMaxHealth() - player.getHealth()));
             }
         }
@@ -311,7 +311,7 @@ public class MTItemVoidstarBow extends ItemBow {
             tooltip.add(StatCollector.translateToLocal("messtech.voidstarBow.tooltip.pierce"));
         }
         tooltip.add(StatCollector.translateToLocal("messtech.voidstarBow.tooltip.kill"));
-        if (Config.VOIDSTAR_BOW_HEALS_SHOOTER) {
+        if (Config.voidstarbow.VOIDSTAR_BOW_HEALS_SHOOTER) {
             tooltip.add(StatCollector.translateToLocal("messtech.voidstarBow.tooltip.heal"));
         }
         tooltip.add(StatCollector.translateToLocal("messtech.voidstarBow.tooltip.detail"));
@@ -322,7 +322,7 @@ public class MTItemVoidstarBow extends ItemBow {
      * decimal otherwise.
      */
     private static String drawnSeconds() {
-        int ticks = Math.max(1, Config.VOIDSTAR_BOW_DRAW_TICKS);
+        int ticks = Math.max(1, Config.voidstarbow.VOIDSTAR_BOW_DRAW_TICKS);
         if (ticks % 20 == 0) {
             return Integer.toString(ticks / 20);
         }
@@ -331,7 +331,7 @@ public class MTItemVoidstarBow extends ItemBow {
 
     /** The configured DE power as the tooltip shows it, like {@link #drawnSeconds()}. */
     private static String dePowerText() {
-        float power = Config.VOIDSTAR_BOW_DE_POWER;
+        float power = Config.voidstarbow.VOIDSTAR_BOW_DE_POWER;
         if (power == (float) (int) power) {
             return Integer.toString((int) power);
         }

@@ -19,6 +19,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - MTGeneratorMultiBase
   - ParallelismAcrossMultiMachineBase
   - CalculateMultiMachineBase / MTComputingCenter
+  - MTParallelHelper / one batch calculation (`Config.machines.ENABLE_ONE_BATCH_CALCULATOR`)
 - Machines
   - MTDTPF
   - MTNQDAFReactor
@@ -43,7 +44,9 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - Chaos Matter (混乱物质): GT material registration and the stacked-renderer look
 - 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`): magic-circle charge FX, straight penetrating
   arrow, tunnel blast, true kill (`MTKillBase` / `MTBowKill`), the DE sub-mode (`MTExplosionDE` + `MTEntityDEBlast` /
-  `MTDEBlastRenderer`) and the `magnetar` text-effect name (inline `§{mg}` in its lang entry)
+  `MTDEBlastRenderer`) and the `magnetar` text-effect name (inline `§[mg]` in its lang entry)
+- 彩虹小扳手 (`MTRainbowWrench` / `ToolRainbowWrench` / `MTRainbow`): GT5U `MetaGeneratedTool` wrench registration,
+  pinned stats (durability Int.MAX / harvest level 325 / mining speed 999), animated item icon, creative/NEI NBT fix-up
 - Galacticraft hook: 高速上升自动开星系 GUI (`MTGalacticraftSpaceHandler`)
 - Vanilla "moved too quickly" 上限 (`MixinNetHandlerPlayServer_MovedTooQuickly`)
 - `/messtech GoUp [秒数]` (`MTCommand` / `MTGoUpFlight`)
@@ -128,7 +131,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - `common/text/effect/*`（标记语法/解析/预设）+ `client/text/*`（布局、遮罩缓存、渲染器、Angelica 兼容）
   + `client/text/effect/*`（`TextShader` / `ShaderTextEffect` / 8 个内置效果）+ `assets/messtech/shaders/text/`
 - 8 个原创 frag（`datafall` / `eventhorizon` / `inkbloom` / `magnetar` / `resonance` / `beamcut` /
-  `cipher` / `petalfall`），契约见同目录设计稿；`Config.TEXT_EFFECTS` 总开关，`/messtechfx` 游戏内预览
+  `cipher` / `petalfall`），契约见同目录设计稿；`Config.general.TEXT_EFFECTS` 总开关，`/messtechfx` 游戏内预览
 - 预览：同目录 `preview.html`（单文件、`file://` 可开，主预览 + 图鉴卡片实时渲染）
 
 ## Verification

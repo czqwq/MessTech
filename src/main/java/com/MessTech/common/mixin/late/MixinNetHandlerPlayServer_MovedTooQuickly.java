@@ -40,7 +40,7 @@ public class MixinNetHandlerPlayServer_MovedTooQuickly {
 
     @ModifyConstant(method = "processPlayer", constant = @Constant(doubleValue = 100.0D, ordinal = 0))
     private double messTech$movedTooQuicklyThreshold(double original) {
-        final double configured = Config.MOVED_TOO_QUICKLY_THRESHOLD;
+        final double configured = Config.general.MOVED_TOO_QUICKLY_THRESHOLD;
         return configured > original ? configured : original;
     }
 }

@@ -23,8 +23,8 @@ public final class TextEffects {
 
     /**
      * Opens an inline effect until the next declaration or {@code §r}. Example:
-     * {@code §{datafall;colors=#22E0C0;speed=1.2}text§r}. The compact form accepts aliases and short names:
-     * {@code &{df}}, {@code &{df;#22E0C0;2}}.
+     * {@code §[datafall;colors=#22E0C0;speed=1.2]text§r}. The compact form accepts aliases and short names:
+     * {@code &[df]}, {@code &[df;#22E0C0;2]}.
      */
     public static String format(TextEffectStyle style) {
         Objects.requireNonNull(style, "style");
@@ -48,7 +48,7 @@ public final class TextEffects {
         }
         if (style.speed() != 1) result.append(";speed=")
             .append(style.speed());
-        return result.append('}')
+        return result.append(']')
             .toString();
     }
 
@@ -77,7 +77,7 @@ public final class TextEffects {
 
     public static String escapeLiteral(String text) {
         return Objects.requireNonNull(text, "text")
-            .replace("\u2063", "\u2063\u2063");
+            .replace("\u2064", EffectTextParser.ESCAPE);
     }
 
     public static String plainText(String text) {

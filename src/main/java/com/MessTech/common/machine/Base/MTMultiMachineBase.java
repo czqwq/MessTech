@@ -593,7 +593,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     @Override
     public boolean getDefaultBatchMode() {
         if (!supportsBatchMode()) return false;
-        return Config.DEFAULT_BATCH_MODE;
+        return Config.general.DEFAULT_BATCH_MODE;
     }
 
     @Override

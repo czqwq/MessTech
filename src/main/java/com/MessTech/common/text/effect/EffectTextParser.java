@@ -9,28 +9,50 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-/** Scans effect declarations and native formatting without depending on client classes. */
+/**
+ * Scans effect declarations and native formatting without depending on client classes.
+ * <p>
+ * The marker alphabet is deliberately disjoint from other marker-using mods: U+2064 and a square-bracket inline form
+ * here, where the other renderer uses U+2063 and a brace form. Each renderer then claims exactly its own text, so two
+ * effect systems can coexist on the same kind of string. Keep the two inline openers and the scoped markers in sync
+ * with {@link TextEffectFormat}.
+ */
 public final class EffectTextParser {
 
-    public static final String OPEN = "\u2063[mt:";
-    public static final String CLOSE = "\u2063[/mt]\u2063";
-    public static final String END = "]\u2063";
+    public static final String OPEN = "\u2064[mt:";
+    public static final String CLOSE = "\u2064[/mt]\u2064";
+    public static final String END = "]\u2064";
+    /** A literal marker character in visible text is doubled, exactly like a native formatting escape. */
+    public static final String ESCAPE = "\u2064\u2064";
 
     private EffectTextParser() {}
 
     public static boolean containsMarkers(String text) {
-        return text != null && (text.indexOf('\u2063') >= 0 || text.contains(TextEffectFormat.INLINE_OPEN)
-            || text.contains(TextEffectFormat.AMP_INLINE_OPEN));
+        if (text == null) return false;
+        return text.contains(OPEN) || text.contains(CLOSE)
+            || text.contains(TextEffectFormat.INLINE_OPEN)
+            || text.contains(TextEffectFormat.AMP_INLINE_OPEN);
     }
 
     public static boolean containsMarkers(CharSequence text, int start, int end) {
         if (text instanceof String value && start == 0 && end == value.length()) return containsMarkers(value);
         for (int i = start; i < end; i++) {
             char character = text.charAt(i);
-            if (character == '\u2063'
-                || (character == '\u00a7' || character == '&') && i + 1 < end && text.charAt(i + 1) == '{') return true;
+            if (character == '\u2064') {
+                if (startsWith(text, i, end, OPEN) || startsWith(text, i, end, CLOSE)) return true;
+            } else if ((character == '\u00a7' || character == '&') && i + 1 < end && text.charAt(i + 1) == '[') {
+                return true;
+            }
         }
         return false;
+    }
+
+    private static boolean startsWith(CharSequence text, int offset, int end, String prefix) {
+        if (offset + prefix.length() > end) return false;
+        for (int i = 0; i < prefix.length(); i++) {
+            if (text.charAt(offset + i) != prefix.charAt(i)) return false;
+        }
+        return true;
     }
 
     public static Parsed parse(String text) {
@@ -45,7 +67,8 @@ public final class EffectTextParser {
             if (!Objects.equals(style, token.style())) flush(runs, run, style);
             style = token.style();
             run.append(token.text());
-            plain.append(token.text());
+            // The plain projection answers getTextWithoutFormattingCodes: native codes go, only visible text stays.
+            if (!token.formattingCode()) plain.append(token.text());
         }
         flush(runs, run, style);
         return new Parsed(plain.toString(), List.copyOf(runs));
@@ -96,9 +119,9 @@ public final class EffectTextParser {
         public Token next() {
             while (position < source.length()) {
                 int start = position;
-                if (source.startsWith("\u2063\u2063", start)) {
+                if (source.startsWith(ESCAPE, start)) {
                     position += 2;
-                    return new Token("\u2063", style, formatting, start, position, false);
+                    return new Token("\u2064", style, formatting, start, position, false);
                 }
                 if (source.startsWith(CLOSE, start)) {
                     if (!scopes.isEmpty()) style = scopes.pop()
@@ -111,7 +134,7 @@ public final class EffectTextParser {
                     || source.startsWith(TextEffectFormat.AMP_INLINE_OPEN, start);
                 if (scoped || inline) {
                     String prefix = scoped ? OPEN : TextEffectFormat.INLINE_OPEN;
-                    String terminator = scoped ? END : "}";
+                    String terminator = scoped ? END : "]";
                     int end = headerEnd(source, start + prefix.length(), terminator);
                     String header = end < 0 ? "" : source.substring(start + prefix.length(), end);
                     TextEffectStyle declared = end < 0 ? null

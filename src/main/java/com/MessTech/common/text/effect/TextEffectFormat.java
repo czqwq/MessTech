@@ -4,8 +4,13 @@ package com.MessTech.common.text.effect;
 public final class TextEffectFormat {
 
     public static final String NAMESPACE = "messtech";
-    public static final String INLINE_OPEN = "\u00a7{";
-    public static final String AMP_INLINE_OPEN = "&{";
+    /**
+     * Inline declaration openers. Deliberately a square-bracket form rather than a brace form, and the scoped marker
+     * uses U+2064 rather than U+2063: that alphabet belongs to the other marker-based text renderer in the pack, and
+     * a disjoint alphabet lets both claim only their own strings instead of fighting over every marker on screen.
+     */
+    public static final String INLINE_OPEN = "\u00a7[";
+    public static final String AMP_INLINE_OPEN = "&[";
     public static final int MAX_HEADER_LENGTH = 512;
 
     private static final java.util.Map<String, String> ALIASES = new java.util.HashMap<>();

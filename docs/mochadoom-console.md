@@ -228,7 +228,7 @@ Esc / onGuiClosed → session.stop() → 置停止位、join(2s)、释放纹理�
 | `src/main/java/com/MessTech/common/gameconsole/` | MC 侧宿主：`MTGameConsoleHost`（引擎线程 + 双缓冲帧 + 输入轮询）、`MTGameConsoleSystem`（`IDoomSystem`）、`MTGameConsoleKeys`（LWJGL↔`ScanCode`）、`MTGameConsoleWads`（找/下载 IWAD） |
 | `src/main/java/com/MessTech/common/gui/GuiGameConsole.java` | 半屏窗口：纹理上传 + 最近邻放大 + Esc 退出 + 加载/下载/失败三态 |
 | `src/main/java/com/MessTech/common/items/MTItemGameConsole.java` | 道具「游戏机」，右键开窗（`onItemRightClick` 覆盖空中、`onItemUseFirst` 覆盖对块） |
-| 其余 | `MTItemList.GameConsole`、`MTItems.gameConsole`、`ClientProxy.openGameConsole`、`Config.GAME_CONSOLE_*`、`assets/.../items/gameConsole.png`、两个 lang 文件 |
+| 其余 | `MTItemList.GameConsole`、`MTItems.gameConsole`、`ClientProxy.openGameConsole`、`Config.gameconsole.GAME_CONSOLE_*`、`assets/.../items/gameConsole.png`、两个 lang 文件 |
 
 包名重定位是脚本做的（重写 `package` / `import` 行 + 12 处行内全限定名），`javac` 全量编译通过。
 
@@ -249,7 +249,7 @@ Esc / onGuiClosed → session.stop() → 置停止位、join(2s)、释放纹理�
 `WadLoader` 的 `(CacheableDoomObject) thebuffer` → 抛异常 | JDK 25 起 `java.nio.ByteBuffer` 是 sealed，这死分支编不过 |
 `awt/**` 不进编译 | AWT 窗口层不需要 |
 
-另外把 `mochadoom.cfg` 的 `parallelism_realcolor_tint` 播种成 `Config.GAME_CONSOLE_THREADS`（默认 2），免得引擎
+另外把 `mochadoom.cfg` 的 `parallelism_realcolor_tint` 播种成 `Config.gameconsole.GAME_CONSOLE_THREADS`（默认 2），免得引擎
 默认按 CPU 核数开线程和 MC 抢。
 
 ### 9.3 数据流与线程
@@ -265,7 +265,7 @@ Esc → onGuiClosed → host.stop()（停止位 + join 3s + 关闭 WAD 句柄 + 
 
 - 引擎只在 Doom 线程上被碰；MC 侧只经 `PostEvent` 队列 + 双缓冲帧交换。
 - 键盘**按帧轮询 `Keyboard.isKeyDown`**（理由见 §4）：`GuiScreen` 没有抬起事件，DOOM 没抬键停不下来。
-- `doesGuiPauseGame()` 默认 `false`（世界照常跑），`Config.GAME_CONSOLE_PAUSES_WORLD` 可改。
+- `doesGuiPauseGame()` 默认 `false`（世界照常跑），`Config.gameconsole.GAME_CONSOLE_PAUSES_WORLD` 可改。
 
 ### 9.4 键位（默认值，全部可在游戏机里改）
 

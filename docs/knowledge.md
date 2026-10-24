@@ -153,6 +153,28 @@ MTMultiMachineBase<T>
   cycle may pick a different recipe, outputs accumulate.
 - `setWirelessCycleNum(int)` sets `cycleNum`; validation inherited (`getUserEU` + `addEUToGlobalEnergyMap`).
 
+### MTParallelHelper / one batch calculation (`Config.machines.ENABLE_ONE_BATCH_CALCULATOR`)
+- `MTProcessingLogic#createParallelHelper` builds the mod's fork of GT's `ParallelHelper` (`MTParallelHelper`, the
+  GT++ fork with private redeclared fields - see `docs/GT5U-NOTES.md` §11). Every machine that runs recipes through
+  `MTProcessingLogic` goes through it: DTPF, Assembly Factory, LPF, DBB Furnace, BosesCraftingArray, Chemical Twister,
+  Nano-Scale Foundry mode 1, MachineTemplate and the other `MTMultiMachineBase` subclasses. Generators
+  (`MTGeneratorMultiBase`: MTReactor / MTNQDAFReactor / MTLargeEssentiaGenerator) override `checkProcessing` and start
+  runs through `startGenerating`, and the space modules use GT's own `ParallelHelper`/`ProcessingLogic` - neither
+  reaches this helper.
+- `Config.machines.ENABLE_ONE_BATCH_CALCULATOR` (default **false**, config screen → Machines, title "Enable One Batch
+  Calculator" / 启用单批计算器) turns the whole batch into one long run. The machine's parallel cap and the
+  power-based parallel limit (`availableEUt / recipeEUt`) are ignored; the parallel count becomes everything the
+  input buses hold, still capped by void protection (when the machine has it on) and by the `int` tick limit
+  (`(Integer.MAX_VALUE - 1) / recipe.mDuration`). The old 128-tick batch mode extra-parallel logic is skipped.
+- The calculation runs at that real parallel count (same overclock level a normal batch would get), then
+  `MTProcessingLogic#applyRecipe` divides the EU/t by the count (ceil) and `getDurationMultiplierDouble()` multiplies
+  the duration by it. Total EU is therefore the same as a normal run - only the draw per tick drops and the run gets
+  longer. Recipes without consumed inputs skip one batch mode (nothing to batch).
+- `MTProcessingLogic#applyRecipe` is a copy of GT5U 5.09.54.205's method with only that division added. It must run
+  before `onRecipeStart`, because wireless machines bill `calculatedEut * duration` in one lump
+  (`MTDTPF#startWirelessRecipe`, `MTWirelessMultiMachineBase#wirelessModeProcessOnce`); a wireless machine therefore
+  needs the whole run's EU in the network before it starts.
+
 ### CalculateMultiMachineBase / MTComputingCenter
 - `CalculateMultiMachineBase<T>` extends `MTMultiMachineBase<T>`; adds uncertainty, data input/output, racks
   (`MTHatchRack`), holders and wireless computation output hatch lists.
@@ -231,7 +253,7 @@ MTMultiMachineBase<T>
 - **A locked slot with a full durability component is never pre-emptively output** (P21): only an already damaged
   component is salvaged before a predicted-destroying cycle; a fresh one dying next cycle = wrong layout, so swapping
   cannot help -> soft-stop instead of eating inputs.
-- **Explosion limit is a config** (`Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT`, default 45 = IC2's
+- **Explosion limit is a config** (`Config.machines.reactor.REACTOR_IC2_EXPLOSION_POWER_LIMIT`, default 45 = IC2's
   `protection/reactorExplosionPowerLimit`, was hardcoded `45.0F`): clamps summed component influence before the DE
   power scale (`REACTOR_EXPLOSION_DE_POWER_LIMIT`, 40). `explodeReactor()` also clears every page's heat
   (controller TE + heat store survive `explodeMultiblock()` for the rest of the tick) and settles the accumulated
@@ -869,6 +891,15 @@ MTMultiMachineBase<T>
     (`PatternImportHandler#writeCell`/`#readCell`, like NotEnoughEnergistics in
     `ItemUtils#writeItemStackToNBT`/`#loadItemStackFromNBT`). AE's NBT unaffected: size in the long `Cnt`, `Count` 0 on
     purpose.
+13. Config is `com.MessTech.init.Config`, GTNHLib's annotation config (`com.gtnewhorizon.gtnhlib.config`): the nested
+    classes are the categories (`general`, `machines` with the `reactor` subcategory, `voidstarbow`, `gameconsole`) and
+    the Java field names **are** the `.cfg` property names, so renaming a field breaks existing configs. Reference
+    options as `Config.<category>.<FIELD>` (e.g. `Config.machines.ENABLE_ONE_BATCH_CALCULATOR`). It is registered in
+    `CommonProxy#preInit`; the in-game screen is `@Mod(guiFactory = "com.MessTech.client.gui.config.MTGuiFactory")` +
+    `MTGuiClientConfig` (GTNHLib `SimpleGuiConfig`). Titles come from `@Config.LangKeyPattern("%mod.config.%cat.%field")`
+    and the `messtech.config.<category>.<field>` keys, which **must be localized in both** lang files (categories, every
+    field title, and `.tooltip` when a comment override is wanted). The old top-level `[reactor]` category is now
+    `[machines.reactor]`, so a pre-migration config's reactor values reset to their defaults once.
 
 ## Known pending / open items
 
@@ -1116,7 +1147,7 @@ MTMultiMachineBase<T>
     `EventPriority.LOWEST` (all handlers done, a cancel visible), `onRenderWorldLast` pops a leftover push at the end of
     the world render - no leak.
   - The pig keeps its own tumble, so the two compose; pinning it to the head would mean dropping the transform in
-    `MTDynamicItemHelper#renderOnHead`. Client-side switch `Config.PIGGY_TUMBLES_WEARER` (on).
+    `MTDynamicItemHelper#renderOnHead`. Client-side switch `Config.general.PIGGY_TUMBLES_WEARER` (on).
 - Textures `assets/messtech/textures/items/pigs/pig*.png` from the GT5U material icons
   (`assets/gregtech/textures/items/materialicons/...`): in-painted to full coverage, tinted with the material colour,
   multiplied by the pig's shading plus a fake top/bottom bevel.
@@ -1403,7 +1434,7 @@ MTMultiMachineBase<T>
   `worldserver.tick()` at 696 vs `networkTick()` at 730) while `PlayerTickEvent.END` fires inside `EntityPlayer#onUpdate` -
   either order leaves exactly one tick seeing the crossing. `player.motionY` is the server-side impulse the explosion
   applied to the `EntityPlayerMP`.
-- Off switch `Config.GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI` (category `General`, default `true`).
+- Off switch `Config.general.GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI` (category `General`, default `true`).
 - **Caveat for non-host players:** `NetHandlerPlayServer#processPlayer` (`build/rfg/minecraft-src`) rejects a reported
   move when `max(|dx|, |motionX|)^2 + max(|dy|, |motionY|)^2 + max(|dz|, |motionZ|)^2 > 100` **and** the player is not
   the single-player host, teleporting to `lastPos`. 12.8 格/tick clears it alone: the integrated-server host flies, a
@@ -1416,7 +1447,7 @@ MTMultiMachineBase<T>
   `//BUGFIX: min -> max, grabs the highest distance`），所以 `processPlayer` 的平方距离是"客户端上报位移"与"实体自身
   motion"**逐轴取大者**（见 `build/rfg/minecraft-src/.../NetHandlerPlayServer.java:341-347`，阈值在同方法 347 行）。
   Forge 无开关，本地 528 个 GTNH 模组 jar 也没别的模组改这行。
-- 阈值由本 mod 的 late mixin `MixinNetHandlerPlayServer_MovedTooQuickly` 抬高：`Config.MOVED_TOO_QUICKLY_THRESHOLD`
+- 阈值由本 mod 的 late mixin `MixinNetHandlerPlayServer_MovedTooQuickly` 抬高：`Config.general.MOVED_TOO_QUICKLY_THRESHOLD`
   （category `General`，**默认 `2000.0`**），**只升不降**（`configured > original` 才用配置值，设成 100 及以下等于
   关闭）。配置值在 `processPlayer` **运行时**读，不是收集时用 `setApplyIf` 判定，所以与 GTNHMixins 何时收集 late
   mixin 列表无关（本 mod 配置要到 `preInit` 才读）。
@@ -1468,11 +1499,11 @@ MTMultiMachineBase<T>
   `.modeName.*`. A block GUI takes the click first (`ItemInWorldManager#activateBlockOrUseItem` ->
   `onBlockActivated`): switch while aiming at air.
 - **DE mode's one explosion**: first block contact calls `MTExplosionDE` (DE's reactor explosion port) on that block with
-  `Config.VOIDSTAR_BOW_DE_POWER` - default **20**, DE's full reactor, {@code 2 + fuelFraction * 18} (2 empty, 20 full),
+  `Config.voidstarbow.VOIDSTAR_BOW_DE_POWER` - default **20**, DE's full reactor, {@code 2 + fuelFraction * 18} (2 empty, 20 full),
   a 200 block radius - then removes the arrow. No tunnel: nothing blasted, nothing drilled, the whole difference to pierce
   mode. A shot hitting nothing still detonates when its flight ticks run out (never vanishes after 600 blocks); an entity
   hit ignores the mode and still goes through `MTBowKill`.
-- **Draw = `Config.VOIDSTAR_BOW_DRAW_TICKS` ticks, 80 by default (four seconds)** against vanilla's one.
+- **Draw = `Config.voidstarbow.VOIDSTAR_BOW_DRAW_TICKS` ticks, 80 by default (four seconds)** against vanilla's one.
   `onPlayerStoppedUsing` keeps vanilla's curve (`f = (f*f + 2f)/3`, the `f < 0.1` floor, cap 1) and only divides by the
   configured length instead of `20.0F`, so arrow speed (`1.2 + 1.8 * draw`), the `isCritical` mark and the circle's unfold
   stretch with it; the firing minimum stays the same fifth (~0.7 s). Four seconds is what the charge effect was designed
@@ -1493,7 +1524,7 @@ MTMultiMachineBase<T>
     `itemStackIn.getItem().getIcon(itemStackIn, pass, this, itemInUse, itemInUseCount)` (line 2070) - Forge's player
     sensitive `Item#getIcon(ItemStack, int, EntityPlayer, ItemStack, int)`, which `MTItemVoidstarBow` overrides with
     vanilla's cut-offs (>= 18 ticks `_pulling_2`, > 13 `_pulling_1`, > 0 `_pulling_0`) kept as *fractions* (90%, 65%) of
-    `Config.VOIDSTAR_BOW_DRAW_TICKS`. It is handed the *player's* `itemInUse`, so others see the pull too:
+    `Config.voidstarbow.VOIDSTAR_BOW_DRAW_TICKS`. It is handed the *player's* `itemInUse`, so others see the pull too:
     `EntityOtherPlayerMP#onUpdate` (lines 86-96) rebuilds it from the "eating" flag `EntityPlayer#setItemInUse` sets server
     side (`EntityPlayer.java:2183`).
 - **The glint**: `Item#hasEffect(ItemStack)` returns `true`, so the purple enchantment glint is drawn wherever the bow
@@ -1564,7 +1595,7 @@ MTMultiMachineBase<T>
   - Never pickable (`canBePickedUp = 0`). Aim, speed, muzzle, last blast point and stuck counter go to NBT: an arrow saved
     mid-air by a chunk unload resumes on the same line without re-blasting its tunnel.
 - **The tunnel** (`MTExplosionTunnel#blast`, server side; the client learns of it from block change packets and deaths):
-  blocks whose centre is within `Config.VOIDSTAR_BOW_TUNNEL_RADIUS` (default **6.0** = thirteen by thirteen; 0.5 = the
+  blocks whose centre is within `Config.voidstarbow.VOIDSTAR_BOW_TUNNEL_RADIUS` (default **6.0** = thirteen by thirteen; 0.5 = the
   line's single column, 1.5 = three by three, 2.5 = five by five) of a blast piece are destroyed, and every living thing
   within that radius dies by `MTBowKill`.
   - One block steps, each opening only a `ceil(radius)` cube around the point reached - not the segment's bounding box,
@@ -1592,18 +1623,18 @@ MTMultiMachineBase<T>
     - Size counts as well as position: reach = `radius + max(width, height) / 2`, so half a horse or boss inside is caught.
     - Already dead or dying (`isDead` or health <= 0) is skipped - an entity at zero health whose death path never ran
       cannot be killed by a second call either.
-  - **Letting go heals the archer to full** (`Config.VOIDSTAR_BOW_HEALS_SHOOTER`, default **true**,
+  - **Letting go heals the archer to full** (`Config.voidstarbow.VOIDSTAR_BOW_HEALS_SHOOTER`, default **true**,
     `MTItemVoidstarBow#onPlayerStoppedUsing`): `player.heal(max - current)`, a real heal of the difference, so the heal path
     runs (Forge heal event included) and the archer cannot pass their maximum. In the same `!world.isRemote` branch that
     spawns the arrow, so a failed shot (draw too weak, no arrow) heals nothing.
   - A player's shot posts `BlockEvent.BreakEvent` per block and leaves it standing if a protection mod cancels it; the
     vanilla "block destroyed" effect (`World#playAuxSFX` id 2001, what `Explosion` sends per block) goes out only within 12
     blocks of the impact - one packet per block over a long tunnel is what makes big explosions lag.
-  - A piece longer than `Config.VOIDSTAR_BOW_TUNNEL_LENGTH` (default **128** blocks) keeps its far end, drops the near one:
+  - A piece longer than `Config.voidstarbow.VOIDSTAR_BOW_TUNNEL_LENGTH` (default **128** blocks) keeps its far end, drops the near one:
     the wall the arrow is pressed against is what the player looks at. Per piece, so only a first-block shot that far is
     affected.
-  - `Config.VOIDSTAR_BOW_BREAKS_BLOCKS` (default **true**, category `VoidstarBow`) turns block destruction off - the arrow
-    still flies straight and trails, it just stops at the wall. Per pass: `Config.VOIDSTAR_BOW_ANNIHILATES_LIVING` (default
+  - `Config.voidstarbow.VOIDSTAR_BOW_BREAKS_BLOCKS` (default **true**, category `VoidstarBow`) turns block destruction off - the arrow
+    still flies straight and trails, it just stops at the wall. Per pass: `Config.voidstarbow.VOIDSTAR_BOW_ANNIHILATES_LIVING` (default
     **true**) turns the true kill off, so a server can have the tunnel without the living, or the kills without the damage.
 - **Particles** (`MTEntityFXVoidstar`, `MTVoidstarFx`): three sparks along the step just taken (at 3 blocks per tick one per
   position would be a dotted line), a small burst at the face of every drilled block, the big one at the end - flash at the
@@ -1617,15 +1648,17 @@ MTMultiMachineBase<T>
     unlit cave; `noClip` on, sparks hang in the tunnel being dug.
   - Cheap on purpose (7 sparks): a shot into a mountain triggers it every few ticks.
 - **The name wears the `magnetar` text effect** (`docs/text-fx/`): the lang entry itself carries the inline marker -
-  `item.messtech.voidstarBow.name=§{mg}混沌终焉·虚无贯星弓§r` (`mg` is the short name, `§r` closes it), in both
+  `item.messtech.voidstarBow.name=§[mg]混沌终焉·虚无贯星弓§r` (`mg` is the short name, `§r` closes it), in both
   `zh_CN.lang` and `en_US.lang`. Effect text is ordinary text, so no Java hook and no `AnimatedTooltipHandler` is
   involved: whatever draws the name with the font - the tooltip's first line (`ItemStack#getTooltip` takes
   `getDisplayName()`), the inventory label, a chat item link - gets the field-line shader.
-  - Markers are inline declarations (`§{name...}`) or the private-use scoped form, so
-    `EnumChatFormatting#getTextWithoutFormattingCodes` (patched by `MixinEnumChatFormatting_TextEffect`) strips them
+  - Markers are inline declarations (`§[name...]`) or the scoped form built from U+2064. Both alphabets are
+    deliberately disjoint from the other marker-based text renderer in the pack (it uses U+2063 and the brace form),
+    so the two systems claim only their own strings and can be installed together.
+  - `EnumChatFormatting#getTextWithoutFormattingCodes` (patched by `MixinEnumChatFormatting_TextEffect`) strips them
     wherever vanilla wants unformatted text: search, command parsing, NEI lookups. A renamed stack shows the NBT custom
     name instead; put the same marker in the custom name to keep the effect.
-  - If the effect stops showing up: check `Config.TEXT_EFFECTS`, and that
+  - If the effect stops showing up: check `Config.general.TEXT_EFFECTS`, and that
     `assets/messtech/shaders/text/magnetar.frag.glsl` is packed; the renderer falls back to plain text (first palette
     colour) when the shader or the mask cannot be used.
   - The old `STARFIELD` name animation is no longer registered on the bow. `MTStarfieldText` / `MTStarfieldTextRenderer`
@@ -1656,3 +1689,49 @@ MTMultiMachineBase<T>
   (`tmp/chaosbow/gen_voidstar_textures.py`, `tmp/chaosbow/gen_voidstar_ysm_circles.py`) and the shell loops are not part of
   the build. The Yes Steve Model pack is not a dependency: its JSON files only supplied the layout, timing and spin rates
   (read with the throwaway `tmp/chaosbow/inspect_ysm*.py`).
+
+## 彩虹小扳手 (Rainbow Wrench) - GT5U tool / wrench registration
+
+A GT5U tool item with an animated rainbow icon and three pinned numbers (耐久 `Integer.MAX_VALUE`、等级 325、挖掘速度
+999). It is the reference for how this repo registers a **tool** rather than a machine/item:
+
+- **Item**: `com.MessTech.common.items.MTRainbowWrench extends gregtech.api.items.MetaGeneratedTool` (`gt.metatool.messtech`,
+  tool ID 100). One item hosts all tool IDs, like GT's `MetaGeneratedTool01`; `addTool(ID, name, tooltip, IToolStats,
+  ToolDictNames.craftingToolWrench)` creates the entry, `GregTechAPI.registerWrench(stack)` puts it on
+  `GregTechAPI.sWrenchList` (machine right-click wrenching, tool-box slot, pipe overlay, maintenance hatch).
+  `MetaGeneratedTool` is created once from `MTItems` (`rainbowWrench`, static field, i.e. our preInit) and the item is
+  registered by `GTGenericItem`'s constructor - not by `MTItems.registerItems()`.
+- **Rendering comes for free**: GT's client init registers `MetaGeneratedToolRenderer` for every
+  `MetaGeneratedTool.sInstances` entry (`gregtech/common/GTClient.java`), so no `IItemRenderer` is needed. The icon is
+  `IToolStats#getIcon` -> `Textures.ItemIcons.custom("messtech", "tools/rainbowWrench")`, and `getRGBa` returns white so
+  the art is untinted.
+- **Icon asset**: `assets/messtech/textures/items/tools/rainbowWrench.png` is a vertical strip of 7 frames of 16x16 with
+  a `.mcmeta` (`frametime: 2` = 100 ms/frame, the source GIF's delay; 7 frames = one turn/hue cycle). The frames were
+  split from `tmp/wrench.gif` by `tmp/gen_wrench_complete.ps1`; the finished PNG is a placeholder **with the GIF's grey
+  backdrop still opaque** - the art itself is expected to be re-cut with an alpha channel later (same command regenerates
+  the strip from full-resolution frames in `tmp/wrench_icon_complete/`).
+- **Stats**: `com.MessTech.common.items.tools.ToolRainbowWrench extends gregtech.common.tools.ToolWrench` inherits the
+  whole wrench behaviour (dismantle machines, rotate blocks/pipes, AE2/IC2 wrenchables, 3 modes) and only overrides:
+  `getBaseQuality() = 325`, `getSpeedMultiplier() = 999`, `getIcon`/`getRGBa`. GT computes the tooltip values as
+  `harvest level = getBaseQuality() + material.mToolQuality` and `mining speed = getSpeedMultiplier() *
+  material.mToolSpeed`, so the material must contribute **0** and **1.0**.
+- **Material**: `com.MessTech.common.material.MTRainbow` - a `MaterialBuilder` material registered in an
+  `IMaterialHandler` from the `@Mod` constructor (same timing as Chaos Matter), with `setTool(Integer.MAX_VALUE, 0,
+  1.0F)` and **no** `add*Items()` calls, so no ingots/dusts are generated. It exists only as the stack's NBT
+  `PrimaryMaterial` (tooltip's material name, "彩虹 lvl 325"). Its `mMetaItemSubID` stays -1 (nothing is generated).
+- **Durability `Integer.MAX_VALUE`**: GT derives `GT.ToolStats.MaxDamage` as `100 * material durability * multiplier`, so
+  only the stack NBT can hold the exact number. `MTRainbowWrench#prepareStack` writes the primary/secondary material,
+  `MaxDamage = Integer.MAX_VALUE`, `Damage = 0` and `Mode = 0` when missing (idempotent, no writes afterwards).
+- **Why `isItemStackUsable` is overridden**: `MetaGeneratedTool#getSubItems` is final and always feeds the creative tab
+  (NEI follows) the bare stack plus a **Neutronium**-material copy - neither carries the Rainbow material. That method is
+  the hook that sees both (it is called by `getSubItems`, by `getToolWithStats`, and by `getToolStats` before every
+  tooltip/render), and GT already uses it for NBT fix-up (enchantments), so `prepareStack` runs there. Result: both
+  creative entries, NEI's copies and every stack later held read the intended stats. There is deliberately **no crafting
+  recipe** - the wrench is a creative/NEI item for now; `MTRainbowWrench#createStack()` builds the proper stack if a
+  recipe or command is ever added.
+- **Text**: lang keys are GT's meta-tool shape `gt.metatool.messtech.100.name` / `.tooltip` (see `zh_CN.lang`:
+  `彩虹小扳手`, `按住左键以拆卸机器`) plus `Material.rainbowwrench` (the material's internal name is `RainbowWrench`,
+  namespaced so it cannot collide with another addon's material); the tooltip's 耐久/等级/伤害/挖掘速度 lines are GT's
+  own (`gt.item.desc.*`), nothing custom is added.
+- **Verification**: `gradlew compileJava` (and `spotlessApply`), no runtime-only hooks. Gotchas that cost the most time
+  are in `docs/GT5U-NOTES.md` §13 ("Registering an addon GT tool/wrench").

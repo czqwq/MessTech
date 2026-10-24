@@ -3,26 +3,19 @@ package com.MessTech.common.mixin.early;
 import net.minecraft.client.gui.FontRenderer;
 
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL20;
-import org.objectweb.asm.Opcodes;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.MessTech.client.text.DeferredTextEffects;
 import com.MessTech.client.text.EffectTextRenderer;
-import com.MessTech.client.text.compat.AngelicaTextAdapter;
 import com.MessTech.client.text.compat.FontBatchBridge;
 import com.MessTech.common.text.effect.EffectTextParser;
 import com.gtnewhorizons.angelica.client.font.BatchingFontRenderer;
-import com.gtnewhorizons.angelica.config.FontConfig;
-import com.gtnewhorizons.angelica.glsm.GLStateManager;
 
 /**
  * Angelica's font renderer batches glyphs into shared buffers. Effect text has to pause that batch before it can own
@@ -31,7 +24,12 @@ import com.gtnewhorizons.angelica.glsm.GLStateManager;
  * <p>
  * This is an <b>early</b> mixin on purpose: Angelica's coremod constructs the font renderer during launch, so a late
  * config would find the target class already loaded. The class lives in the early config's client list; without
- * Angelica (or on a dedicated server) the target is never loaded and the mixin simply stays inactive.
+ * Angelica (or on a dedicated server) the target is never loaded and the mixin stays inactive.
+ * <p>
+ * Only injection kinds that compose with another mod patching the same methods are used here: HEAD/RETURN injections
+ * and one {@code @ModifyArg}. The sharp mask coverage is forced by {@code AngelicaTextAdapter} writing the config
+ * value for the duration of a capture instead of a {@code @Redirect} on the same field read, because two mods
+ * redirecting one instruction would make whichever applies second fail to find its target.
  */
 @Mixin(value = BatchingFontRenderer.class, remap = false)
 public abstract class MixinBatchingFontRenderer_TextEffect implements FontBatchBridge {
@@ -44,17 +42,6 @@ public abstract class MixinBatchingFontRenderer_TextEffect implements FontBatchB
 
     @Shadow
     private static BatchingFontRenderer arenaOwner;
-
-    @Shadow
-    @Final
-    private int fontShaderId;
-
-    @Shadow
-    @Final
-    private int AAMode;
-
-    @Shadow
-    private int fontAAModeLast;
 
     @Shadow
     private void flushBatch() {}
@@ -130,36 +117,8 @@ public abstract class MixinBatchingFontRenderer_TextEffect implements FontBatchB
         remap = false,
         require = 1)
     private int mt$compositeMaskCoverage(int destinationAlpha) {
-        // Bold glyph copies must add coverage rather than erase the translucent edges of the previous one.
+        // Bold glyph copies must add coverage rather than erase the translucent edges of the previous one. Multiple
+        // @ModifyArg handlers on one call compose, so another mod's own tweak here is kept.
         return EffectTextRenderer.isCapturing() ? GL11.GL_ONE_MINUS_SRC_ALPHA : destinationAlpha;
-    }
-
-    @Redirect(
-        method = "setupFontDrawState",
-        at = @At(
-            value = "FIELD",
-            target = "Lcom/gtnewhorizons/angelica/config/FontConfig;fontAAMode:I",
-            opcode = Opcodes.GETSTATIC),
-        remap = false,
-        require = 3)
-    private int mt$sharpMaskCoverage() {
-        // Keep the comparison, the cached mode and the uniform consistent across the three reads in that method.
-        return EffectTextRenderer.isCapturing() && !AngelicaTextAdapter.usesCustomFont(underlying) ? 0
-            : FontConfig.fontAAMode;
-    }
-
-    @Inject(method = "flushBatch", at = @At("RETURN"))
-    private void mt$restoreFontAntialiasing(CallbackInfo ci) {
-        int configuredMode = FontConfig.fontAAMode;
-        if (!EffectTextRenderer.isCapturing() || fontAAModeLast == configuredMode) return;
-        // The shader is shared by every font instance, while Angelica caches the mode per instance.
-        int previousProgram = GLStateManager.glGetInteger(GL20.GL_CURRENT_PROGRAM);
-        GLStateManager.glUseProgram(fontShaderId);
-        try {
-            GLStateManager.glUniform1i(AAMode, configuredMode);
-            fontAAModeLast = configuredMode;
-        } finally {
-            GLStateManager.glUseProgram(previousProgram);
-        }
     }
 }

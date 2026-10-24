@@ -56,7 +56,7 @@ public class MTGalacticraftSpaceHandler {
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        if (!Config.GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI) return;
+        if (!Config.general.GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI) return;
         if (!(event.player instanceof EntityPlayerMP player)) return;
         // Overworld only, by Galacticraft's own field, so a pack that moves the Overworld off 0 still works.
         if (player.dimension != ConfigManagerCore.idDimensionOverworld) return;

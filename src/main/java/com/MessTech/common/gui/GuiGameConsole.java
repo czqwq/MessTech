@@ -107,7 +107,7 @@ public class GuiGameConsole extends GuiScreen {
 
     @Override
     public void initGui() {
-        int width = Math.max(160, (int) (this.width * Config.GAME_CONSOLE_SCREEN_FRACTION));
+        int width = Math.max(160, (int) (this.width * Config.gameconsole.GAME_CONSOLE_SCREEN_FRACTION));
         int height = (int) Math.round(width / ASPECT);
 
         final int maxHeight = (int) (this.height * 0.9D);
@@ -128,7 +128,7 @@ public class GuiGameConsole extends GuiScreen {
      */
     @Override
     public boolean doesGuiPauseGame() {
-        return Config.GAME_CONSOLE_PAUSES_WORLD;
+        return Config.gameconsole.GAME_CONSOLE_PAUSES_WORLD;
     }
 
     @Override
@@ -397,7 +397,7 @@ public class GuiGameConsole extends GuiScreen {
         }
 
         if (state == MTGameConsoleHost.State.FAILED) {
-            final String help = "\u00A77把 doom.wad 或 freedoom1.wad 放进 \u00A7f" + Config.GAME_CONSOLE_DIR
+            final String help = "\u00A77把 doom.wad 或 freedoom1.wad 放进 \u00A7f" + Config.gameconsole.GAME_CONSOLE_DIR
                 + " \u00A77后重开游戏机";
             for (final Object line : this.fontRendererObj
                 .listFormattedStringToWidth(help, Math.max(40, panelWidth - 24))) {

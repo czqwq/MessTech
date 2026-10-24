@@ -98,7 +98,7 @@ public class EffectTextRenderer implements IResourceManagerReloadListener {
                 break;
             }
         }
-        if (!styled || !Config.TEXT_EFFECTS) {
+        if (!styled || !Config.general.TEXT_EFFECTS) {
             for (DrawRun run : layout.runs()) drawPlain(font, run.text(), x + run.x(), y + run.y(), color, shadow);
             return endX(font, layout, x, shadow);
         }

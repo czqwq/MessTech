@@ -448,7 +448,7 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
                     MathHelper.floor_double(hitX),
                     MathHelper.floor_double(hitY),
                     MathHelper.floor_double(hitZ),
-                    Config.VOIDSTAR_BOW_DE_POWER));
+                    Config.voidstarbow.VOIDSTAR_BOW_DE_POWER));
         }
 
         setDead();

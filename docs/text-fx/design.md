@@ -11,14 +11,16 @@
 | 写法 | 说明 |
 |---|---|
 | `TextEffects.apply(text, TextEffects.DATAFALL)` | 代码里最省事：自动加作用域标记 |
-| `§{datafall}文字§r` | 手写作用域：到 `§r` 或本行结束 |
-| `§{magnetar;1.4;25edcc,e0fffa}文字` | `id;速度;颜色表`（进度 1 = 原速，颜色最多 8 个 24 位 RGB 十六进制） |
-| `&{df}文字` / `&{df;#25edcc,#4785ff;2}` | 紧凑内联式，支持短名 |
+| `§[datafall]文字§r` | 手写内联：到 `§r` 或本行结束 |
+| `§[magnetar;1.4;#25edcc,#e0fffa]文字` | `id;速度;颜色表`（进度 1 = 原速，颜色最多 8 个 24 位 RGB 十六进制） |
+| `&[df]文字` / `&[df;#25edcc,#4785ff;2]` | 紧凑内联式，支持短名 |
 
 - 短名：`df` `eh` `ib` `mg` `rs` `bc` `cp` `pf`；完整 id 为 `messtech:<name>`。
+- 标记字符刻意与其他文字特效模组错开：作用域标记用 U+2064（不是 U+2063），内联用方括号 `§[` / `&[`（不是花括号
+  `§{` / `&{`）。这样两个特效系统可以同时装在同一个包里而不会互相认领对方的文本——各自只处理自己的标记。
 - 颜色表会覆盖效果默认 4 色（`palette[0..]`）；`§x` / `§g` / `§u` 等原生颜色码与加粗、斜体、下划线照常生效。
 - 需要「无格式文本」的场合（物品搜索、`getTextWithoutFormattingCodes` 等）会自动剥掉标记。
-- 现成用例：弓名直接写在 lang 里（`item.messtech.voidstarBow.name=§{mg}混沌终焉·虚无贯星弓§r`），字体画到它的
+- 现成用例：弓名直接写在 lang 里（`item.messtech.voidstarBow.name=§[mg]混沌终焉·虚无贯星弓§r`），字体画到它的
   地方（tooltip 首行、物品栏、聊天物品链接）都会走磁星场线着色器，不需要额外的 tooltip 钩子。
 
 ## 2. 渲染管线
@@ -88,7 +90,7 @@ coremod 在启动阶段就构造字体渲染器，放在 late 配置会报 `Mixi
 
 - 布局缓存 256 条、遮罩缓存 256 张且总量 4 M 像素，超出按 LRU 释放；不换字体/字号/文字时命中缓存。
 - 每个特效文字段：一次遮罩捕获（命中则零成本）+ 一到两次包围盒大小的 shader 四边形（阴影 + 亮部）。
-- `Config.TEXT_EFFECTS`（默认开，`General` 分类）：关闭时同一段文字仍按第一色板颜色显示纯文本，标记不会漏字。
+- `Config.general.TEXT_EFFECTS`（默认开，`General` 分类）：关闭时同一段文字仍按第一色板颜色显示纯文本，标记不会漏字。
 - 缺 GLSL、无 FBO、Angelica 字体没有可暂停的批处理、着色器编译失败等情况都会退回纯文本，不崩客户端。
 
 ## 6. 加一个效果
@@ -97,3 +99,19 @@ coremod 在启动阶段就构造字体渲染器，放在 late 配置会报 `Mixi
 2. `TextEffects` 加一个预设常量，`TextEffectFormat` 加短名（可选）。
 3. `BuiltinTextEffects.register()` 加一行：预设 + 默认色板。
 4. 需要的话补 lang（`messtech.text_effect.<id>` 和 `.sample`）与 `MTTextEffectCommand` 的 id 表。
+
+## 7. 与其它文字特效模组共存
+
+同一个包里装两套“用标记驱动字体渲染”的模组时，冲突只来自两处，这里都已避开：
+
+- **标记字母表**：作用域标记的隐形字符用 U+2064（对方多用 U+2063），内联用 `§[` / `&[`（对方多用 `§{` / `&{`）。
+  `EffectTextParser.containsMarkers` 也只认真实的前缀，不认“任意 U+2063 / 花括号”，所以两边各自只认领自己的文本；
+  对方的 `getTextWithoutFormattingCodes` 补丁也不会去剥我们的标记。
+- **mixin 注入种类**：FontRenderer / GuiNewChat / GuiTextField / 聊天框剥离 / NEI 输入框全部只用 HEAD·RETURN
+  `@Inject`、`@ModifyArg`、`@ModifyVariable` 和 MixinExtras `@WrapOperation`，这几类可以叠加；**不用 `@Redirect`**。
+  唯一需要改 Angelica 字形抗锯齿的地方（`AngelicaTextAdapter#beginSharpMask`）改成在遮罩捕获期间临时写
+  `FontConfig.fontAAMode`，而不是 `@Redirect` 那三次字段读取——两个 `@Redirect` 撞同一条指令时后应用的那个会
+  找不到目标，是硬崩溃。
+
+两套系统各自持有自己的布局/遮罩缓存/渲染器/资源重载监听，互不共享静态状态；同一行文字里同时出现两套标记的
+情况极少，遇到时先认领的一方会把它当成普通可见字符，不做跨系统组合。

@@ -71,13 +71,14 @@ public final class MTExplosionTunnel {
     public static void blast(World world, Entity source, Entity projectile, double fromX, double fromY, double fromZ,
         double toX, double toY, double toZ) {
         if (world == null || world.isRemote) return;
-        if (!Config.VOIDSTAR_BOW_BREAKS_BLOCKS && !Config.VOIDSTAR_BOW_ANNIHILATES_LIVING) return;
+        if (!Config.voidstarbow.VOIDSTAR_BOW_BREAKS_BLOCKS && !Config.voidstarbow.VOIDSTAR_BOW_ANNIHILATES_LIVING)
+            return;
 
         double deltaX = toX - fromX, deltaY = toY - fromY, deltaZ = toZ - fromZ;
         double length = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
         if (length < 1.0E-4D) return;
 
-        double maxLength = Config.VOIDSTAR_BOW_TUNNEL_LENGTH;
+        double maxLength = Config.voidstarbow.VOIDSTAR_BOW_TUNNEL_LENGTH;
         if (length > maxLength) {
             // Keep the far end: the wall the arrow hit stays the centre of the effect.
             double keep = maxLength / length;
@@ -91,9 +92,9 @@ public final class MTExplosionTunnel {
         }
 
         double lengthSquared = length * length;
-        double radius = Config.VOIDSTAR_BOW_TUNNEL_RADIUS;
+        double radius = Config.voidstarbow.VOIDSTAR_BOW_TUNNEL_RADIUS;
 
-        if (Config.VOIDSTAR_BOW_ANNIHILATES_LIVING) {
+        if (Config.voidstarbow.VOIDSTAR_BOW_ANNIHILATES_LIVING) {
             annihilateLiving(
                 world,
                 source,
@@ -108,7 +109,7 @@ public final class MTExplosionTunnel {
                 radius);
         }
 
-        if (Config.VOIDSTAR_BOW_BREAKS_BLOCKS) {
+        if (Config.voidstarbow.VOIDSTAR_BOW_BREAKS_BLOCKS) {
             destroyBlocks(world, source, fromX, fromY, fromZ, deltaX, deltaY, deltaZ, length, lengthSquared, radius);
         }
     }

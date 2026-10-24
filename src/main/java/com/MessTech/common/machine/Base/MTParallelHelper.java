@@ -16,6 +16,7 @@ import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
 
 import com.MessTech.common.util.MTItemID;
+import com.MessTech.init.Config;
 
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.ItemList;
@@ -59,6 +60,8 @@ public class MTParallelHelper extends ParallelHelper {
     private boolean batchMode;
     private boolean calculateOutputs;
     private boolean built;
+    /** Set when Config.machines.ENABLE_ONE_BATCH_CALCULATOR turned the whole recipe batch into one long run. */
+    private boolean oneBatchMode;
     private double durationMultiplier;
     /** Modifier applied on the recipe eut (useful for GT++ machines) */
     private float eutModifier = 1;
@@ -217,10 +220,18 @@ public class MTParallelHelper extends ParallelHelper {
         if (!built) {
             throw new IllegalStateException("Tried to get duration multiplier before building");
         }
-        if (batchMode && durationMultiplier > 0) {
+        if ((oneBatchMode || batchMode) && durationMultiplier > 0) {
             return durationMultiplier;
         }
         return 1;
+    }
+
+    /**
+     * @return true when the last {@link #build()} calculated the recipe as one batch: EU/t divided by the parallel
+     *         count, duration multiplied by it, see {@link #determineParallel()}.
+     */
+    public boolean isOneBatchMode() {
+        return oneBatchMode;
     }
 
     /**
@@ -314,21 +325,40 @@ public class MTParallelHelper extends ParallelHelper {
             return;
         }
 
+        // One batch mode: take everything the input buses hold in one run, see the config's comment. Recipes
+        // without any consumed input have nothing to batch, so they keep the normal path.
+        final boolean oneBatch = Config.machines.ENABLE_ONE_BATCH_CALCULATOR && hasConsumableInputs();
+
         // Save maxParallel before the under-one-tick overclock correction
         int originalMaxParallel = maxParallel;
         calculator.setParallel(originalMaxParallel);
 
-        // With a custom supplier use the old under-one-tick method, otherwise the multiplier
-        if (calculator.hasDurationUnderOneTickSupplier()) {
-            if (calculator.getDurationUnderOneTickSupplier() < 1) {
-                maxParallel = GTUtility.safeInt((long) (maxParallel / calculator.getDurationUnderOneTickSupplier()), 0);
+        if (oneBatch) {
+            // "Ignore parallel": the cap is whatever the current inputs can pay for, not the machine's parallel cap.
+            int candidate = (int) maxParallelCalculator.calculate(recipe, Integer.MAX_VALUE, fluidInputs, itemInputs);
+            if (candidate <= 0) {
+                result = CheckRecipeResultRegistry.INTERNAL_ERROR;
+                return;
             }
+            // The duration is multiplied by the parallel count, so the run has to stay below the int tick limit. The
+            // calculator can only shorten a recipe (speed bonus <= 1 on every MT machine), which makes the unscaled
+            // recipe duration a safe upper bound.
+            candidate = Math.min(candidate, Math.max(1, (Integer.MAX_VALUE - 1) / Math.max(1, recipe.mDuration)));
+            maxParallel = candidate;
         } else {
-            maxParallel = GTUtility.safeInt((long) (maxParallel * calculator.calculateMultiplierUnderOneTick()), 0);
+            // With a custom supplier use the old under-one-tick method, otherwise the multiplier
+            if (calculator.hasDurationUnderOneTickSupplier()) {
+                if (calculator.getDurationUnderOneTickSupplier() < 1) {
+                    maxParallel = GTUtility
+                        .safeInt((long) (maxParallel / calculator.getDurationUnderOneTickSupplier()), 0);
+                }
+            } else {
+                maxParallel = GTUtility.safeInt((long) (maxParallel * calculator.calculateMultiplierUnderOneTick()), 0);
+            }
         }
 
         int maxParallelBeforeBatchMode = maxParallel;
-        if (batchMode) {
+        if (batchMode && !oneBatch) {
             maxParallel = GTUtility.safeInt((long) maxParallel * batchModifier, 1);
         }
 
@@ -379,8 +409,15 @@ public class MTParallelHelper extends ParallelHelper {
 
         maxParallelBeforeBatchMode = Math.min(maxParallel, maxParallelBeforeBatchMode);
 
-        int actualMaxParallel = tRecipeEUt > 0 ? (int) Math.min(maxParallelBeforeBatchMode, availableEUt / tRecipeEUt)
-                                    : maxParallelBeforeBatchMode;
+        final int actualMaxParallel;
+        if (oneBatch) {
+            // "Ignore parallel": no power-based parallel cap. The base recipe cost was checked above, and the batch
+            // itself is paid for by the longer duration instead of a higher EU/t.
+            actualMaxParallel = maxParallelBeforeBatchMode;
+        } else {
+            actualMaxParallel = tRecipeEUt > 0 ? (int) Math.min(maxParallelBeforeBatchMode, availableEUt / tRecipeEUt)
+                                               : maxParallelBeforeBatchMode;
+        }
         if (recipeCheck != null) {
             currentParallel = recipeCheck.checkRecipeInputs(true, actualMaxParallel, itemInputs, fluidInputs);
         } else {
@@ -405,11 +442,21 @@ public class MTParallelHelper extends ParallelHelper {
             return;
         }
 
-        calculator.setParallel(Math.min(currentParallel, originalMaxParallel))
-                  .calculate();
+        if (oneBatch) {
+            // The batch is calculated at its real parallel count, so the overclock level matches a normal run. The
+            // EU/t is then divided back down by the same count in MTProcessingLogic#applyRecipe and the duration is
+            // multiplied back up through getDurationMultiplierDouble().
+            calculator.setParallel(currentParallel)
+                      .calculate();
+            durationMultiplier = currentParallel;
+            oneBatchMode = true;
+        } else {
+            calculator.setParallel(Math.min(currentParallel, originalMaxParallel))
+                      .calculate();
+        }
 
         // Batch mode: how many extra parallels fit under MAX_BATCH_MODE_TICK_TIME
-        if (batchMode && currentParallel > 0 && calculator.getDuration() < MAX_BATCH_MODE_TICK_TIME) {
+        if (batchMode && !oneBatch && currentParallel > 0 && calculator.getDuration() < MAX_BATCH_MODE_TICK_TIME) {
             int tExtraParallels;
             double batchMultiplierMax = MAX_BATCH_MODE_TICK_TIME / calculator.getDuration();
             final int maxExtraParallels = (int) Math.floor(
@@ -437,6 +484,17 @@ public class MTParallelHelper extends ParallelHelper {
             }
         }
         result = CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    /** @return true if the recipe consumes at least one item or fluid, i.e. if one batch mode has something to batch. */
+    private boolean hasConsumableInputs() {
+        for (ItemStack stack : recipe.mInputs) {
+            if (stack != null && stack.stackSize > 0) return true;
+        }
+        for (FluidStack stack : recipe.mFluidInputs) {
+            if (stack != null && stack.amount > 0) return true;
+        }
+        return false;
     }
 
     /**

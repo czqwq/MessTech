@@ -61,11 +61,11 @@ public class MTCommand extends CommandBase {
             // The flight only survives if the vanilla "moved too quickly!" ceiling is above the square of the speed it
             // holds (the check compares squared per-tick distances), so warn instead of yanking the player back down.
             final double needed = MTGoUpFlight.SPEED * MTGoUpFlight.SPEED;
-            if (Config.MOVED_TOO_QUICKLY_THRESHOLD < needed) {
+            if (Config.general.MOVED_TOO_QUICKLY_THRESHOLD < needed) {
                 sender.addChatMessage(
                     new ChatComponentTranslation(
                         "command.messtech.goup.threshold.low",
-                        String.format("%.1f", Config.MOVED_TOO_QUICKLY_THRESHOLD),
+                        String.format("%.1f", Config.general.MOVED_TOO_QUICKLY_THRESHOLD),
                         String.format("%.1f", needed)));
             }
 

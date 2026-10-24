@@ -94,6 +94,39 @@ public final class AngelicaTextAdapter {
             && (TesrBatchRenderer.INSTANCE.hasPendingGeometry() || ModelPartBatcher.INSTANCE.isActive());
     }
 
+    /**
+     * Forces sharp glyph coverage for the duration of a bitmap-font mask capture: the mask wants the crisp atlas, not
+     * the antialiasing the user configured for on-screen text.
+     * <p>
+     * This writes Angelica's config value around the draw instead of redirecting its read of the value: another mod
+     * patching the same method would make whichever {@code @Redirect} applies second fail to find its target, while a
+     * temporarily changed value is simply read by everyone. Angelica notices the change on its next flush and updates
+     * its shader uniform (and its per-instance cache) itself.
+     *
+     * @param font the font about to rasterise the mask
+     * @return the previous mode for {@link #endSharpMask(int)}, or -1 when nothing was changed
+     */
+    public static int beginSharpMask(FontRenderer font) {
+        return Loader.isModLoaded(MODID) ? forceSharpMask(font) : -1;
+    }
+
+    public static void endSharpMask(int previous) {
+        if (previous >= 0) restoreSharpMask(previous);
+    }
+
+    @Optional.Method(modid = MODID)
+    private static int forceSharpMask(FontRenderer font) {
+        if (usesCustomFont(font)) return -1;
+        int previous = FontConfig.fontAAMode;
+        FontConfig.fontAAMode = 0;
+        return previous;
+    }
+
+    @Optional.Method(modid = MODID)
+    private static void restoreSharpMask(int previous) {
+        FontConfig.fontAAMode = previous;
+    }
+
     public static void beginForeignDraw() {
         if (Loader.isModLoaded(MODID)) beginAngelicaDraw();
     }

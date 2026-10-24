@@ -102,6 +102,12 @@ public final class MTItems {
     /** The Voidstar Piercer (混沌终焉·虚无贯星弓): a bow whose arrows blast a tunnel through everything they fly into. */
     public static final MTItemVoidstarBow voidstarBow = new MTItemVoidstarBow();
 
+    /**
+     * The Rainbow Wrench (彩虹小扳手): a GT tool item - see {@link MTRainbowWrench} for the pinned stats and the animated
+     * icon. Like the fuel rods it is registered by its GT base class' constructor, not by {@link #registerItems()}.
+     */
+    public static final MTRainbowWrench rainbowWrench = new MTRainbowWrench();
+
     /** The Ultimate Pattern Terminal (终极样板编码终端) as an AE cable part item. */
     public static final ItemUltimatePatternTerminal ultimatePatternTerminal = new ItemUltimatePatternTerminal();
 
@@ -127,6 +133,6 @@ public final class MTItems {
         MTItemList.MTEssentiaUpgrade.set(new ItemStack(essentiaUpgrade, 1));
         // The fuel rods extend GT's GTGenericItem, whose constructor already calls
         // GameRegistry.registerItem(this, "gt.<unlocalized>") (as GT's own rods do), so they must not be registered
-        // here a second time.
+        // here a second time. Same for the Rainbow Wrench (MetaGeneratedTool -> GTGenericItem).
     }
 }

@@ -55,7 +55,7 @@ public final class MTGameConsoleWads {
 
     /** The console's own folder: WAD, engine config, savegames and the translucency cache. */
     public static File runtimeDirectory() {
-        final String configured = Config.GAME_CONSOLE_DIR;
+        final String configured = Config.gameconsole.GAME_CONSOLE_DIR;
         final File dir = new File(configured);
         if (dir.isAbsolute()) {
             return dir;
@@ -88,7 +88,7 @@ public final class MTGameConsoleWads {
             return existing;
         }
 
-        if (!Config.GAME_CONSOLE_DOWNLOAD_FREEDOOM) {
+        if (!Config.gameconsole.GAME_CONSOLE_DOWNLOAD_FREEDOOM) {
             return null;
         }
 
@@ -96,7 +96,7 @@ public final class MTGameConsoleWads {
     }
 
     private static File configuredIwad(final File dir) {
-        final String name = Config.GAME_CONSOLE_WAD;
+        final String name = Config.gameconsole.GAME_CONSOLE_WAD;
         if (name == null || name.trim()
             .isEmpty()) {
             return null;
@@ -139,7 +139,7 @@ public final class MTGameConsoleWads {
     public static File downloadFreedoom(final File dir, final Progress progress) {
         final File target = new File(dir, FREEDOOM_IWAD);
         final File partial = new File(dir, FREEDOOM_IWAD + ".part");
-        final String url = Config.GAME_CONSOLE_FREEDOOM_URL;
+        final String url = Config.gameconsole.GAME_CONSOLE_FREEDOOM_URL;
 
         MessTech.LOG.info("Game console: downloading Freedoom from {}", url);
         HttpURLConnection connection = null;

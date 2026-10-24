@@ -16,7 +16,8 @@ import cpw.mods.fml.common.gameevent.TickEvent;
  * <p>
  * The Galacticraft hook fires at {@code motionY >= 256 / 20 = 12.8} blocks/tick; {@link #SPEED} is 14.0 (280 blocks/s),
  * above that even after a tick of vanilla decay ({@code (14 - 0.08) * 0.98 = 13.64}), with a square of 196 against
- * {@code Config.MOVED_TOO_QUICKLY_THRESHOLD}'s 2000. The move is {@link EntityPlayerMP#setPositionAndUpdate}, not
+ * {@code Config.general.MOVED_TOO_QUICKLY_THRESHOLD}'s 2000. The move is {@link EntityPlayerMP#setPositionAndUpdate},
+ * not
  * vanilla
  * physics: 1.7.10's client is authoritative, so a server-side {@code motionY} alone is overwritten by the next
  * {@code C03PacketPlayer}, whereas this clears {@code hasMoved} and sends {@code S08PacketPlayerPosLook} (carrying

@@ -25,6 +25,8 @@ import com.MessTech.common.recipe.MTVendingMachineRecipes;
 import com.MessTech.common.recipe.RecipeMessFood;
 import com.MessTech.common.thaumcraft.MTThaumcraftResearch;
 import com.MessTech.common.util.MTKillBase;
+import com.gtnewhorizon.gtnhlib.config.ConfigException;
+import com.gtnewhorizon.gtnhlib.config.ConfigurationManager;
 
 import appeng.api.parts.IPart;
 import appeng.container.ContainerOpenContext;
@@ -70,7 +72,11 @@ public class CommonProxy implements IGuiHandler {
     }
 
     public void preInit(FMLPreInitializationEvent event) {
-        Config.synchronizeConfiguration(event.getSuggestedConfigurationFile());
+        try {
+            ConfigurationManager.registerConfig(Config.class);
+        } catch (ConfigException e) {
+            throw new RuntimeException("Failed to register the MessTech configuration", e);
+        }
         MTNetwork.register();
         NetworkRegistry.INSTANCE.registerGuiHandler(MessTech.instance, this);
         MTItems.registerItems();

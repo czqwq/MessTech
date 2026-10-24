@@ -179,7 +179,7 @@ Reference: `MTETranscendentPlasmaMixer` (`gregtech/common/tileentities/machines/
 * **Always end `createTooltip()` with `.toolTipFinisher()`** — it alone builds the arrays (`iArray`/`sArray`/`hArray`); without it `getStructureDescription()` (= `getTooltip().getStructureHint()`) is `null` and BlockRenderer6343's NEI preview (`GTGuiMultiblockHandler.findHints`) crashes with `NullPointerException: Cannot read the array length` (MTDTPF, 2026-08-21).
 * **`getMaxParallelRecipes()` > 0**: `ParallelHelper.determineParallel()` bails on `maxParallel <= 0` — recipe matches, machine never starts (no progress, empty GUI); MTDTPF 0 → 1.
 * **No absurd caps (millions)**: O(parallel) loops (`ParallelHelper.calculateChancedOutputMultiplier`: `for roll < parallel`, plus output splitting) freeze the game without a crash/log; `availableEUt / recipeEUt` + input counts limit for real.
-* **`MTParallelHelper` re-declares `ParallelHelper`'s fields as privates** (GT++ fork) → inherited methods read never-assigned parent fields. `copyInputs()` runs when consumption is off (`if (!consume) copyInputs();`), wireless MTDTPF does that — no input bus → parent `null` → every-tick `NullPointerException: Cannot read the array length because "this.itemInputs" is null` (`ParallelHelper.copyInputs`, `MTDTPF$1.createParallelHelper` → `setConsumption(false)`); now overridden to clone its own arrays. Still broken, recorded (fixing changes balance): `setMaxParallelCalculator`/`setInputConsumer` write parent fields = no-ops on the fork (its `determineParallel` reads its own); `setEUtModifier(float)` dead — GT5U takes a `double`, so `euModifier` never reaches `determineParallel` → parallels use the undiscounted `recipe.mEUt`. New consumption-disabling machine or state-touching `ParallelHelper` method → check the fork.
+* **`MTParallelHelper` re-declares `ParallelHelper`'s fields as privates** (GT++ fork) → inherited methods read never-assigned parent fields. `copyInputs()` runs when consumption is off (`if (!consume) copyInputs();`), wireless MTDTPF does that — no input bus → parent `null` → every-tick `NullPointerException: Cannot read the array length because "this.itemInputs" is null` (`ParallelHelper.copyInputs`, `MTDTPF$1.createParallelHelper` → `setConsumption(false)`); now overridden to clone its own arrays. Still broken, recorded (fixing changes balance): `setMaxParallelCalculator`/`setInputConsumer` write parent fields = no-ops on the fork (its `determineParallel` reads its own); `setEUtModifier(float)` dead — GT5U takes a `double`, so `euModifier` never reaches `determineParallel` → parallels use the undiscounted `recipe.mEUt`. New consumption-disabling machine or state-touching `ParallelHelper` method → check the fork. The one batch mode (`Config.machines.ENABLE_ONE_BATCH_CALCULATOR`) has its own early path in `determineParallel()` (parallel cap and power-based cap ignored, `calculator.setParallel(currentParallel)` used directly) and `MTProcessingLogic#applyRecipe` (the GT method copied with the EU/t divided by the parallel count) - see `knowledge.md` §MTParallelHelper.
 * **`IVoidable.canDumpItemToME/canDumpFluidToME` live in `MTMultiMachineBase`** → every MessTech multiblock is `IVoidable` regardless of the active GT5U `MTEMultiBlockBase`; mirrors upstream (`tmp/GT5-Unofficial-master/.../MTEMultiBlockBase.java` ~line 3194/3218) incl. `hasPhysicalSpace()`/`getCheckMode()`. IDE conflict → re-import Gradle (`GTUtility.FluidId` is `public abstract static class` in `GTUtility.java`).
 
 ## 11.5 Nano Computing Center (`MTComputingCenter`)
@@ -285,6 +285,38 @@ ONE path (the loader calls `AuthorDynamic.registerOn(...)`, never a second inlin
   normal processing unless copied into a real map.
 * `WirelessNetworkManager`: `processInitialSettings` (owner UUID), `getUserEU`, `addEUToGlobalEnergyMap`; validate
   first (`checkWirelessPower`/`validateWirelessPowerForRecipe`), then `startWirelessRecipe` (deducts + consumes).
+* **Registering an addon GT tool/wrench** (the 彩虹小扳手 pattern; files under `gregtech/api/items/MetaGeneratedTool.java`,
+  `gregtech/api/interfaces/IToolStats.java`, `gregtech/common/tools/ToolWrench.java`,
+  `gregtech/common/items/MetaGeneratedTool01.java`, `gregtech/common/GTClient.java`):
+  * item: `extends MetaGeneratedTool`, constructor `super("metatool.<name>")`. `GTGenericItem`'s constructor already calls
+    `GameRegistry.registerItem(this, "gt." + unlocalized, GregTech.ID)` - do **not** register it again. GT's client init
+    then registers `MetaGeneratedToolRenderer` for every `MetaGeneratedTool.sInstances` entry, so rendering needs no
+    `IItemRenderer` registration.
+  * tool type: `addTool(aID, name, tooltip, IToolStats, ToolDictNames...)`; `aID` must be **even** (`aID + 1` is the
+    "empty"/discharged state, names are auto-added). `addTool` also registers the ore-dict name (pass
+    `ToolDictNames.craftingToolWrench`); `GregTechAPI.registerWrench(stack)` (or `registerCrowbar`, ...) adds it to
+    `GregTechAPI.sWrenchList`, which gates machine right-click wrenching (`BaseMetaTileEntity`/`BaseMetaPipeEntity`), the
+    tool-box slot, the pipe overlay and maintenance hatches. `GTItemIterator` skips every `GTGenericItem`, so no
+    auto-classification can fight the explicit registration.
+  * stats are per tool type on `IToolStats`, not per stack: mining speed = `getSpeedMultiplier() * material.mToolSpeed`,
+    harvest level = `getBaseQuality() + material.mToolQuality` (`mToolQuality` is a **byte**), durability =
+    `100 * material.mDurability * getMaxDurabilityMultiplier()` stored as `GT.ToolStats.MaxDamage` (NBT, **long**). Exact
+    values therefore need the material for the neutral parts and, for the durability, writing the stack NBT.
+  * `getSubItems` is final and always adds the bare stack plus a **Neutronium**-material copy to the creative tab (NEI
+    follows). To give those the intended stats the only hook is `isItemStackUsable(ItemStack)` (non-final; GT already
+    uses it for enchantment fix-up): normalise the `GT.ToolStats` NBT there, idempotently. Getter/tooltip/render paths all
+    pass through `getToolStats` -> `isItemStackUsable` first.
+  * icon: `IToolStats#getIcon(isToolHead, stack)` returns an `IIconContainer`, e.g.
+    `Textures.ItemIcons.custom(domain, path)` for `assets/<domain>/textures/items/<path>.png` - no `getIconFromDamage`
+    (it is final and returns null). The container must be created **before** GT's item icon load:
+    `ItemIntegratedCircuit#registerIcons` consumes `GregTechAPI.sGTItemIconload` once `GregTechAPI.sPostloadFinished` is
+    set, i.e. during the client item-atlas load - creating the container in preInit is fine, doing it lazily at render
+    time is too late. Animated item textures work there: vertical frame strip + `.mcmeta` `{"animation":{"frametime":N}}`
+    (N in ticks; 2 = 100 ms), `TextureAtlasSprite` updates the UVs each tick, and `getRGBa` is the tint
+    (`{255,255,255,255}` = untinted).
+  * carrier material without items: `MaterialBuilder` in an `IMaterialHandler` added from the `@Mod` constructor (same
+    timing as Chaos Matter - `Materials.init()` runs in GT's preInit). A material with `mMetaItemSubID == -1` and no
+    `add*Items()` call generates nothing and only supplies the NBT `PrimaryMaterial` name.
 
 ## 14. MessTech's IC2/GT fuel rods (Transcendent Metal)
 
@@ -400,10 +432,10 @@ ONE path (the loader calls `AuthorDynamic.registerOn(...)`, never a second inlin
   it. `>= 0.5F` water removal and `>= 0.4F` wood/leaves/cloth ignition stay (never touch a casing/hatch).
 * Explosion power = **IC2's number remapped onto the Draconic Evolution scale**: `explodeReactor()` mirrors IC2's
   `explode()` (start at 10, add each component's `influenceExplosion`, multiply the `0 < influence < 1` ones into
-  `boomMod`, then `* hem * boomMod`), clamps to `Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT` (default 45, IC2's
+  `boomMod`, then `* hem * boomMod`), clamps to `Config.machines.reactor.REACTOR_IC2_EXPLOSION_POWER_LIMIT` (default 45, IC2's
   `protection/reactorExplosionPowerLimit`; was a hardcoded `45.0F`; IC2's ini still **not** read - no IC2
   dependency/mixin, the option only lets a pack change it), and the blast is `MTExplosionDE`:
-  `dePower = min(boomPower, ic2Limit) / ic2Limit * Config.REACTOR_EXPLOSION_DE_POWER_LIMIT` (default 40, `Reactor`
+  `dePower = min(boomPower, ic2Limit) / ic2Limit * Config.machines.reactor.REACTOR_EXPLOSION_DE_POWER_LIMIT` (default 40, `Reactor`
   category, floored at 1). `explodeMultiblock()` + `doExplosion(GTValues.V[8])` on the access hatches remove the
   machine first; then every page's heat is cleared **on purpose** (the controller TE + heat store outlive
   `explodeMultiblock()` for the rest of the tick), after settling the cycle's EU/t (`mPendingOutput`) so a

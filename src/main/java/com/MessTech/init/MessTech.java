@@ -20,6 +20,7 @@ import gregtech.api.enums.Mods;
     modid = MessTech.MODID,
     version = com.MessTech.init.Tags.VERSION,
     name = "MessTech",
+    guiFactory = "com.MessTech.client.gui.config.MTGuiFactory",
     acceptedMinecraftVersions = "[1.7.10]",
     dependencies = "required-after:gregtech; required-after:tectech; required-after:structurelib; required-after:AppleCore; required-after:Thaumcraft")
 public class MessTech {
@@ -36,9 +37,10 @@ public class MessTech {
 
     public MessTech() {
         instance = this;
-        // The material must be handed to GT here: Materials.init() runs in GT's own preInit, before this mod's, and
+        // The materials must be handed to GT here: Materials.init() runs in GT's own preInit, before this mod's, and
         // IMaterialHandler#onMaterialsInit is only ever called from inside it.
         com.MessTech.common.material.MTChaosMatter.register();
+        com.MessTech.common.material.MTRainbow.register();
     }
 
     @Mod.EventHandler

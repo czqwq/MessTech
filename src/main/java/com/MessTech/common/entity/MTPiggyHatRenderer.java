@@ -125,7 +125,7 @@ public final class MTPiggyHatRenderer {
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onRenderPlayerPre(RenderPlayerEvent.Pre event) {
-        if (!Config.PIGGY_TUMBLES_WEARER || event.isCanceled()) return;
+        if (!Config.general.PIGGY_TUMBLES_WEARER || event.isCanceled()) return;
 
         EntityPlayer player = event.entityPlayer;
         ItemStack helmet = wornPiggy(player);

@@ -83,7 +83,7 @@ public final class MTGameConsoleHost implements Engine.Host {
     /** Prepares the folder, then boots the engine on its own daemon thread. */
     public static MTGameConsoleHost start() {
         final File dir = MTGameConsoleWads.runtimeDirectory();
-        final MTGameConsoleHost host = new MTGameConsoleHost(dir, Config.GAME_CONSOLE_THREADS);
+        final MTGameConsoleHost host = new MTGameConsoleHost(dir, Config.gameconsole.GAME_CONSOLE_THREADS);
         final Thread t = new Thread(host::run, "MessTech-GameConsole");
         t.setDaemon(true);
         host.thread = t;
@@ -220,13 +220,13 @@ public final class MTGameConsoleHost implements Engine.Host {
         // Audio is javax.sound, not Minecraft's OpenAL: the engine mixes its own 22050 Hz stream into a second data
         // line,
         // alongside the game. A device or MIDI synth that fails to open falls back to the engine's dummy drivers.
-        if (!Config.GAME_CONSOLE_SOUND) {
+        if (!Config.gameconsole.GAME_CONSOLE_SOUND) {
             args.add("-nosfx");
         }
-        if (!Config.GAME_CONSOLE_MUSIC) {
+        if (!Config.gameconsole.GAME_CONSOLE_MUSIC) {
             args.add("-nomusic");
         }
-        if (!Config.GAME_CONSOLE_SOUND && !Config.GAME_CONSOLE_MUSIC) {
+        if (!Config.gameconsole.GAME_CONSOLE_SOUND && !Config.gameconsole.GAME_CONSOLE_MUSIC) {
             args.add("-nosound");
         }
         return args;
