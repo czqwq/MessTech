@@ -21,9 +21,8 @@ import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
 
 /**
- * Inventory renderer for {@link MTNACComponentItem}. Mirrors GT5U's fake CircuitComponent renderer:
- * unprocessed components show their real item plus the NAC overlay, processed components show their
- * dedicated processed texture.
+ * Inventory renderer for {@link MTNACComponentItem}, mirroring GT5U's fake CircuitComponent renderer: unprocessed
+ * components show their real item plus the NAC overlay, processed components their dedicated processed texture.
  */
 @SideOnly(Side.CLIENT)
 public class MTNACComponentItemRenderer implements IItemRenderer {

@@ -18,109 +18,81 @@ import com.MessTech.common.machine.hatch.MTReactorHeatHatch;
 import ic2.core.item.reactor.ItemReactorPlating;
 
 /**
- * Per-page heat state of {@link MTReactor}: the heat value itself, the meltdown countdown, and the passive cooling and
- * fluid heat exchange that the reactor cycle drives.
+ * Per-page heat state of {@link MTReactor}: heat, meltdown countdown, passive cooling, fluid heat exchange.
  * <p>
- * <b>Why this is not a plain array any more.</b> The heat used to live in an {@code int[]} indexed by the global page
- * order over all access hatches, where that order came from sorting the hatches by their block coordinates. Adding,
- * removing or moving a single access hatch therefore renumbered every following page, so stored heat silently migrated
- * from one hatch's page to another hatch's page. Pages are now anchored on the coordinates of the access hatch that
- * owns them ({@link #key}), which makes the mapping independent of how many hatches exist or where they are.
+ * Pages are keyed by hatch coordinates ({@link #key}), so adding, removing or moving a hatch cannot renumber other
+ * pages or migrate stored heat - a global page order did exactly that.
  * <p>
- * Two safety nets live here as well:
- * <ul>
- * <li>{@link #onCapacityChanged(int)} rescales the stored heat whenever the ceiling changes (a heat control hatch was
- * added, removed, or swapped for another tier). Without it a reactor carrying 900,000 HU under a UHV hatch detonated on
- * the first cycle after that hatch was replaced by an EV one, because the heat effect check is a plain
- * {@code heat / maxHeat} ratio.</li>
- * <li>{@link #tick()} runs the meltdown countdown: heat at or above the ceiling no longer detonates immediately, it
- * arms a {@value #MELTDOWN_COUNTDOWN_TICKS} tick timer that {@link #resetCountdown()} cancels when the heat is brought
- * back under the ceiling. The countdown is a wall-clock deadline (an absolute game tick, not a per-page counter),
- * because a page is only visited once per cycle and counting "per visit" stretched the grace window to 30 s x page
- * count. It therefore keeps running while the machine is switched off - that is what makes "get the heat back under the
- * ceiling within 30 seconds" a real instruction instead of a race the player always loses.</li>
- * </ul>
+ * {@link #onCapacityChanged(int)} rescales stored heat when the ceiling changes (otherwise 900,000 HU under a UHV hatch
+ * detonated once an EV hatch replaced it: the check is a plain {@code heat / maxHeat} ratio). {@link #tick()} runs the
+ * meltdown countdown - heat at or above the ceiling arms a {@value #MELTDOWN_COUNTDOWN_TICKS} tick timer that
+ * {@link #resetCountdown()} cancels once heat is back under. Its deadline is an absolute game tick, not a per-page
+ * counter (a page is visited once per cycle: per-visit counting stretched the window to 30 s x page count), and keeps
+ * running while the machine is off.
  */
 public final class MTReactorHeatSystem {
 
     /** Ticks between two IC2 reactor cycles. */
     public static final int CYCLE_TICKS = 20;
-    /** Meltdown countdown: 30 seconds of grace before a page that is at or over its ceiling detonates. */
+    /** Meltdown countdown: 30 s of grace before a page at or over its ceiling detonates. */
     public static final int MELTDOWN_COUNTDOWN_TICKS = 600;
-    /** Pages the heat store can hold. The structure offers at most 25 access-hatch positions with 8 pages each. */
+    /** Pages the heat store can hold: 25 access-hatch positions x 8 pages each. */
     public static final int MAX_PAGES = 256;
     /** Upper bound of the heat bonus one reactor plating may contribute. */
     private static final int MAX_HEAT_BONUS_PER_ITEM = 100_000;
     /**
-     * Coolant (mB) needed to carry away one unit of buffered component heat. MessTech's own ratio: IC2 converts through
-     * {@code huOutputModifier}, this port runs the loop straight at 1 mB of coolant per 1 HU, which makes the required
-     * feed rate directly readable as "as much coolant per second as the core makes heat per second".
-     * <p>
-     * <b>Keep this at 1, or adjust the caller.</b> {@code MTReactor#releaseCoolantHeat()} passes the mB it actually
-     * exchanged straight into {@link #coolByCoolant(long)}, whose parameter is buffered-heat units. The two only match
-     * while this constant is 1; moving it to IC2's own x2 would need that call site to divide by it.
+     * Coolant (mB) per unit of buffered component heat: 1 mB per 1 HU here (IC2 converts through
+     * {@code huOutputModifier}), so the feed rate reads as "as much coolant per second as the core makes heat per
+     * second". <b>Keep this at 1, or adjust the caller:</b> {@code MTReactor#releaseCoolantHeat()} passes the mB it
+     * exchanged into {@link #coolByCoolant(long)}, whose parameter is buffered-heat units, so IC2's x2 would need that
+     * call site to divide by it.
      */
     public static final int COOLANT_PER_BUFFER_UNIT = 1;
 
     /**
-     * Hard cap of the heat store. The UIV heat control hatch asks for {@code Integer.MAX_VALUE}, which is not usable as
-     * a real ceiling: every heat effect compares {@code heat / maxHeat}, and with a 2.1e9 ceiling no reachable amount
-     * of
-     * heat drives that ratio anywhere near the 40% / 70% / 85% / 100% thresholds, so a UIV hatch silently switched the
-     * whole risk model off. This cap stays far above anything one 9x6 page's components can produce (IC2's largest heat
-     * storage item is well under 100,000) while keeping every threshold reachable.
+     * Hard cap of the heat store. The UIV heat control hatch asks for {@code Integer.MAX_VALUE}, unusable as a
+     * ceiling: heat effects compare {@code heat / maxHeat}, and at 2.1e9 the 40% / 70% / 85% / 100% thresholds are
+     * unreachable, so a UIV hatch silently switched the risk model off. This cap is still far above what one 9x6 page
+     * can produce (IC2's largest heat storage item is under 100,000).
      */
     public static final int MAX_HEAT_CAPACITY = 50_000_000;
 
-    /** Numeric value of the lowest supported heat control hatch tier ({@link MTReactorHeatHatch#MIN_TIER}). */
+    /** Lowest supported heat control hatch tier ({@link MTReactorHeatHatch#MIN_TIER}). */
     private static final int MIN_TIER = MTReactorHeatHatch.MIN_TIER;
 
     /**
-     * Passive cooling in HU per second per heat control hatch tier, indexed by {@code tier - MIN_TIER} (EV..UIV).
-     * <p>
-     * The rate of every real tier is exactly that tier's own heat ceiling per 2400 ticks, i.e. {@code ceiling / 120}
-     * HU/s, so a full ceiling of heat bleeds off in two minutes: {@code 10,000 / 120 = 83.3} for EV, and so on. Two
-     * minutes is slow enough that the hatch cannot out-cool a running reactor, and fast enough that shutting the
-     * machine down is a real way to save a reactor that is on its way to a meltdown. The values below are rounded to
-     * whole HU/s ({@code round(ceiling / 120)}), which for the seven real tiers reproduces that rule to within one
-     * HU/s.
-     * <p>
-     * The UIV entry is deliberately decoupled from the rule: that hatch's ceiling is 50,000,000, so {@code ceiling /
-     * 120} would be 416,667 HU/s, and following the rule literally would make the top hatch cool faster than the
-     * reactor can possibly produce heat. 200,000 HU/s instead drains the whole 50,000,000 in 250 s, which is the
-     * reasonable-time answer for a hatch whose practical ceiling nobody reaches.
+     * Passive cooling in HU/s per heat control hatch tier, indexed by {@code tier - MIN_TIER} (EV..UIV): a real tier's
+     * rate is its heat ceiling per 2400 ticks ({@code ceiling / 120} HU/s, a full ceiling in two minutes), e.g.
+     * {@code 10,000 / 120 = 83.3} for EV, rounded to whole HU/s. UIV is decoupled on purpose: at its 50,000,000 ceiling
+     * {@code ceiling / 120} would be 416,667 HU/s, faster than the reactor can produce heat; it uses 200,000 HU/s
+     * instead (the whole 50,000,000 in 250 s).
      */
     private static final long[] PASSIVE_COOLING_PER_SECOND = { 83, 167, 417, 833, 1_667, 4_167, 8_333, 200_000 };
 
-    /** Only pages carrying at least this fraction of the hottest page's heat take part in the passive bleed-off. */
+    /** Only pages with at least this fraction of the hottest page's heat are bled passively. */
     private static final float PASSIVE_COOLING_SHARE_THRESHOLD = 0.05F;
 
     private final MTReactor reactor;
-    /** Heat per page, keyed by the owning access hatch. */
     private final Map<ChunkCoordinates, int[]> pageHeat = new HashMap<>();
     /** Meltdown countdown per page, keyed by hatch coordinates plus page index. */
     private final Map<String, ArmedPage> armedPages = new HashMap<>();
 
-    /** The ceiling currently in effect, as reported by {@link MTReactor#getReactorHeatCapacity()}. */
+    /** Ceiling in effect, from {@link MTReactor#getReactorHeatCapacity()}. */
     private int capacity = MTReactorHeatHatch.DEFAULT_HEAT_CAPACITY;
-    /** What the reactor components ask for through {@link #setMaxHeat}: the largest per-page value seen. */
+    /** Largest per-page value the components ask for through {@link #setMaxHeat}. */
     private int componentBonus;
-    /** Per-page plating bonus, mirroring {@link #pageHeat}: a page is an independent reactor grid. */
+    /** Per-page plating bonus, mirroring {@link #pageHeat}. */
     private final Map<ChunkCoordinates, int[]> pageBonus = new HashMap<>();
 
-    /** Heat the components emitted during the current cycle through {@link #addEmitHeat(int)}. */
+    /** Heat the components emitted this cycle via {@link #addEmitHeat(int)}. */
     private int emittedHeat;
-    /** How much of {@link #emittedHeat} the fluid loop already carried away this cycle. */
+    /** How much of {@link #emittedHeat} the coolant already carried away. */
     private int coolantExchangedHeat;
-    /** True once the controller switched the reactor into fluid (wet) mode. */
     private boolean fluidMode;
-    /** Fractional HU of passive cooling accumulated across ticks; see {@link #applyPassiveCooling()}. */
     private double coolingProgress;
-    /** Last tick value seen by {@link #refreshCountdownClock(long)}, used to detect a restarted tick counter. */
+    /** Last tick seen by {@link #refreshCountdownClock(long)}; detects a restarted counter. */
     private long lastNow = -1L;
-    /**
-     * Tick counter of the last {@link #loadNBTData}, used to re-anchor reloaded countdowns onto the running counter.
-     */
+    /** Tick counter of the last {@link #loadNBTData}, which reloaded countdowns re-anchor onto. */
     private long loadNow = -1L;
 
     public MTReactorHeatSystem(MTReactor reactor) {
@@ -131,16 +103,13 @@ public final class MTReactorHeatSystem {
         return owner == null ? null : owner.mtReactorKey();
     }
 
-    // region Capacity
-
-    /** The ceiling currently in effect. */
     public int getCapacity() {
         return capacity;
     }
 
     /**
-     * Heat ceiling including the plating contribution, clamped to the supported range. This is the value components see
-     * as {@code getMaxHeat()}, and therefore the value the explosion threshold uses.
+     * Heat ceiling including the plating contribution, clamped: what components see as {@code getMaxHeat()}, hence the
+     * explosion threshold.
      */
     public int getEffectiveMaxHeat() {
         long sum = (long) capacity + componentBonus;
@@ -149,20 +118,15 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * Reactor plating's {@code setMaxHeat(getMaxHeat() + maxHeatAdd)} call, resolved as an absolute target.
-     * <p>
-     * Each plating of a page passes its own {@code getMaxHeat() + maxHeatAdd}, so the largest value in the page is the
-     * ceiling the page ends up with: {@code capacity + largest plating bonus}. Taking the maximum instead of applying
-     * the calls in order keeps the result independent of the component layout.
-     * <p>
-     * The bonus is tracked per page ({@link #setPageMaxHeat}) because a 9x6 page is an independent reactor grid: a page
-     * with four platings must not raise the ceiling of a page without any.
+     * Reactor plating's {@code setMaxHeat(getMaxHeat() + maxHeatAdd)}, resolved as an absolute target: the largest
+     * value becomes the page's ceiling ({@code capacity + largest plating bonus}), tracked per page
+     * ({@link #setPageMaxHeat}) because a 9x6 page is an independent reactor grid.
      */
     public void setMaxHeat(PageOwner owner, int page, int newMaxHeat) {
         setPageMaxHeat(owner, page, newMaxHeat - capacity);
     }
 
-    /** Records a plating's heat bonus for one page, ignoring anything outside the item bound. */
+    /** Records a plating's heat bonus for one page, clamped to the item bound. */
     public void setPageMaxHeat(PageOwner owner, int page, int bonus) {
         if (owner == null || bonus <= 0) return;
         if (bonus > MAX_HEAT_BONUS_PER_ITEM) bonus = MAX_HEAT_BONUS_PER_ITEM;
@@ -184,8 +148,8 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * Clears the plating bonuses of one page before its heat pass re-collects them. Called per page and not per cycle,
-     * so a plating removed from page 3 stops contributing to page 3 while page 4 keeps its own.
+     * Clears one page's plating bonuses before its heat pass re-collects them; per page, not per cycle, so a plating
+     * removed from page 3 stops contributing there while page 4 keeps its own.
      */
     public void resetPageBonus(PageOwner owner, int page) {
         int[] bonuses = pageBonus.get(key(owner));
@@ -193,25 +157,20 @@ public final class MTReactorHeatSystem {
         bonuses[page] = 0;
     }
 
-    /** Plating bonus of one page. */
     public int getPageBonus(PageOwner owner, int page) {
         int[] bonuses = pageBonus.get(key(owner));
         if (bonuses == null || page < 0 || page >= bonuses.length) return 0;
         return bonuses[page];
     }
 
-    /** Ceiling of one page, i.e. the hatch ceiling plus that page's own plating bonus. */
     public int getPageMaxHeat(PageOwner owner, int page) {
         return getMaxHeatWithBonus(getPageBonus(owner, page));
     }
 
     /**
-     * Called whenever the heat control hatch of the structure may have changed. Rescales every page's heat by the ratio
-     * of the new to the old ceiling and clears any running meltdown countdown.
-     * <p>
-     * Rescaling rather than clamping is what makes installing or removing the hatch a proportional operation: a reactor
-     * at 90% of a 1,000,000 ceiling ends up at 90% of the new ceiling instead of either detonating (clamping leaves it
-     * over the new ceiling, which the heat effect check reads as {@code power >= 1.0}) or losing its heat entirely.
+     * Called whenever the structure's heat control hatch may have changed: rescales every page's heat by the ratio of
+     * new to old ceiling and clears running countdowns. Rescale rather than clamp: 90% of a 1,000,000 ceiling stays 90%
+     * of the new one, while clamping leaves the heat over the ceiling (the check reads {@code power >= 1.0}).
      */
     public void onCapacityChanged(int newCapacity) {
         int clamped = Math.max(1, Math.min(newCapacity, MAX_HEAT_CAPACITY));
@@ -225,30 +184,26 @@ public final class MTReactorHeatSystem {
                 heat[i] = (int) Math.min(clamped, heatBefore * (long) clamped / oldCapacity);
             }
         }
-        // Changing the ceiling is a player action; the meltdown has to be given its full grace period again.
+        // Changing the ceiling is a player action: give the meltdown its full grace period again.
         armedPages.clear();
         if (reactor != null) reactor.markDirty();
     }
 
-    // endregion
-
-    // region Page heat access
-
-    /** Heat of one page. Returns 0 for a hatch that was never written. */
+    /** Heat of one page; 0 if the hatch was never written. */
     public int getPageHeat(PageOwner owner, int page) {
         int[] heat = pageHeat.get(key(owner));
         if (heat == null || page < 0 || page >= heat.length) return 0;
         return heat[page];
     }
 
-    /** Writes the heat of one page, creating the per-hatch array on first use. */
+    /** Writes one page's heat, creating the per-hatch array on first use. */
     public void setPageHeat(PageOwner owner, int page, int value) {
         int[] heat = lookupOrCreate(owner);
         if (heat == null || page < 0 || page >= heat.length) return;
         heat[page] = value;
     }
 
-    /** Adds to the heat of one page and returns the resulting value, like IC2's {@code IReactor#addHeat}. */
+    /** Adds to one page's heat and returns the result, like IC2's {@code IReactor#addHeat}. */
     public int addPageHeat(PageOwner owner, int page, int amount) {
         int[] heat = lookupOrCreate(owner);
         if (heat == null || page < 0 || page >= heat.length) return 0;
@@ -256,7 +211,6 @@ public final class MTReactorHeatSystem {
         return heat[page];
     }
 
-    /** Heat of the hottest page. */
     public int getHottestHeat() {
         int hottest = 0;
         for (int[] heat : pageHeat.values()) {
@@ -267,19 +221,19 @@ public final class MTReactorHeatSystem {
         return Math.max(hottest, 0);
     }
 
-    /** Ceiling shown next to the hottest heat value, never below 1 so the GUI cannot divide by zero. */
+    /** Ceiling shown next to the hottest heat, never below 1 (the GUI divides by it). */
     public int getHottestMaxHeat() {
         return Math.max(1, getEffectiveMaxHeat());
     }
 
-    /** Heat percentage of the hottest page. Computed in {@code double} so a large ceiling cannot overflow. */
+    /** Heat percentage of the hottest page, computed in {@code double} to avoid overflow. */
     public int getHottestHeatPercent() {
         return (int) Math.round(getHottestHeat() * 100.0D / getHottestMaxHeat());
     }
 
     /**
-     * Drops the heat of hatches that are no longer part of the structure, so a removed hatch cannot hand its heat to a
-     * hatch that later occupies the same coordinates with a different page layout.
+     * Drops the heat of hatches no longer in the structure, so a removed hatch cannot hand its heat to a later hatch
+     * at the same coordinates with a different page layout.
      */
     public void retainOnly(Iterable<? extends PageOwner> alive) {
         Map<ChunkCoordinates, PageOwner> current = new HashMap<>();
@@ -311,7 +265,7 @@ public final class MTReactorHeatSystem {
         if (changed && reactor != null) reactor.markDirty();
     }
 
-    /** Forgets the countdowns that belong to one block position, e.g. after its hatch changed or was removed. */
+    /** Forgets the countdowns of one block position (hatch changed or removed). */
     private void dropArmedPagesOf(ChunkCoordinates key) {
         String prefix = key.posX + "," + key.posY + "," + key.posZ + "#";
         armedPages.keySet()
@@ -330,11 +284,7 @@ public final class MTReactorHeatSystem {
         return heat;
     }
 
-    // endregion
-
-    // region Meltdown countdown
-
-    /** Ticks left until the first armed page detonates, or 0 while nothing is counting down. */
+    /** Ticks left until the first armed page detonates; 0 when nothing is armed. */
     public int getCountdownTicks() {
         int left = 0;
         for (ArmedPage armed : armedPages.values()) {
@@ -355,14 +305,14 @@ public final class MTReactorHeatSystem {
         return !armedPages.isEmpty();
     }
 
-    /** 0.0 (armed) .. 1.0 (detonating) progress of the countdown, for the GUI/Waila alarm. */
+    /** 0.0 (armed) .. 1.0 (detonating) countdown progress, for the GUI/Waila alarm. */
     public float getCountdownProgress() {
         int ticks = getCountdownTicks();
         if (ticks <= 0) return 0.0F;
         return 1.0F - Math.min(1.0F, (float) ticks / MELTDOWN_COUNTDOWN_TICKS);
     }
 
-    /** Cancels every running countdown: the player did something, or all heat came back down. */
+    /** Cancels every running countdown: a player action, or all heat came back down. */
     public void resetCountdown() {
         if (!armedPages.isEmpty()) {
             armedPages.clear();
@@ -371,10 +321,8 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * (Re-)arms the countdown of one page, i.e. the page is at or over its ceiling right now. The deadline is an
-     * absolute game tick instead of a per-page counter, because a page is only visited once per full cycle: counting
-     * "20 ticks per visit" made the grace window stretch to 30 s x page count, so a large reactor effectively got no
-     * grace at all.
+     * (Re-)arms one page's countdown, i.e. the page is at or over its ceiling; the deadline is an absolute game tick
+     * (see the class comment).
      *
      * @param now the current game tick
      */
@@ -387,30 +335,22 @@ public final class MTReactorHeatSystem {
         if (reactor != null) reactor.markDirty();
     }
 
-    /** Drops the countdown of one page once it is back under its ceiling. */
+    /** Drops one page's countdown once it is back under its ceiling. */
     public void clearCountdown(PageOwner owner, int page) {
         if (armedPages.remove(armedKey(owner, page)) != null && reactor != null) reactor.markDirty();
     }
 
     /**
-     * Keeps the countdowns' idea of "now" up to date; call once per game tick. Two things have to be handled:
-     * <p>
-     * <b>A restored save.</b> {@link #saveNBTData} stores the remaining ticks, not an absolute deadline, because the
-     * machine's tick counter is not persisted. The first call after {@link #loadNBTData} therefore re-anchors every
-     * restored deadline onto the counter the machine is really running on; {@code loadNow} makes that happen exactly
-     * once. Without it, a countdown saved with 300 ticks left would be measured against a counter value that no longer
-     * means anything.
-     * <p>
-     * <b>A restarted counter.</b> Even outside a data load the counter can be reset (a tile entity re-initialisation
-     * that is not preceded by {@code readFromNBT}), and a deadline that outlived that reset would count from the old
-     * counter and turn a 30 second window into a much longer one. The counter is monotonic in every other case, so a
-     * backwards jump is treated as a reset and every deadline is shifted by the same amount, preserving the window
-     * each page had left.
+     * Keeps the countdowns' "now" up to date; call once per game tick. {@link #saveNBTData} stores remaining ticks,
+     * not a deadline, and the counter can reset (a save load, or a tile entity re-initialisation not preceded by
+     * {@code readFromNBT}): a restored deadline is re-anchored on the first tick after {@link #loadNBTData}
+     * ({@code loadNow}, once), and a backwards jump in the otherwise monotonic counter shifts every deadline by the
+     * same amount.
      */
     public void refreshCountdownClock(long now) {
         if (loadNow >= 0) {
             // First tick after a data load: the countdowns came back as pending amounts (see loadNBTData), so anchor
-            // them onto the counter the machine is really running on instead of onto the value they were saved with.
+            // them onto the counter the machine is really running on.
             for (ArmedPage armed : armedPages.values()) {
                 armed.deadline = now + Math.max(1L, armed.deadline - loadNow);
                 armed.now = now;
@@ -427,10 +367,7 @@ public final class MTReactorHeatSystem {
         }
     }
 
-    /**
-     * Lists the pages whose grace window has run out, and forgets them - the caller is expected to detonate exactly
-     * these pages and nothing else.
-     */
+    /** Lists the pages whose grace window ran out and forgets them; the caller detonates these. */
     public List<ArmedPage> takeExpiredCountdowns(long now) {
         if (armedPages.isEmpty()) return Collections.emptyList();
         List<ArmedPage> expired = null;
@@ -452,11 +389,6 @@ public final class MTReactorHeatSystem {
         return key == null ? null : (key.posX + "," + key.posY + "," + key.posZ + "#" + page);
     }
 
-    // endregion
-
-    // region Passive cooling
-
-    /** Passive cooling per second granted by the installed heat control hatch tier. */
     public long getPassiveCoolingPerSecond() {
         int tier = reactor == null ? MIN_TIER : reactor.getHeatControlTier();
         int index = tier - MIN_TIER;
@@ -466,14 +398,11 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * Bleeds heat off every page that carries a meaningful fraction of the hottest page's heat, so the loop stays a
-     * no-op for the empty pages of a large structure. This runs whether or not the reactor produces energy: it is the
-     * only way an already hot reactor can be brought back down.
-     * <p>
-     * Called once per game tick. The per-tick amount is {@code getPassiveCoolingPerSecond() / 20}, which is fractional
-     * for every tier (EV: 83/20 = 4.15 HU), so the fraction is accumulated instead of truncated. Truncating it was a
-     * real bug: {@code floor(83/20)} is 4 HU/tick, i.e. 80 HU/s, and every tier from EV to ZPM would have cooled at
-     * an identical 4 HU/tick because the floor swallowed the difference between them.
+     * Bleeds heat off every page carrying a meaningful fraction of the hottest page's heat, so the loop is a no-op for
+     * a large structure's empty pages; it runs whether or not the reactor produces energy, since it is the only way an
+     * already hot reactor comes back down. Once per game tick it applies {@code getPassiveCoolingPerSecond() / 20},
+     * fractional for every tier (EV: 83/20 = 4.15 HU), so the fraction is accumulated rather than truncated
+     * (truncating made EV..ZPM all cool at 4 HU/tick).
      *
      * @return true when any page's heat changed
      */
@@ -481,7 +410,7 @@ public final class MTReactorHeatSystem {
         return applyPassiveCooling();
     }
 
-    /** Accumulates this tick's fraction of the cooling rate and applies whole HU once a full unit is available. */
+    /** Accumulates this tick's cooling fraction, applying whole HU when available. */
     private boolean applyPassiveCooling() {
         double perSecond = getPassiveCoolingPerSecond();
         if (perSecond <= 0 || pageHeat.isEmpty()) return false;
@@ -494,10 +423,9 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * Removes {@code amount} HU in total from the hottest pages of the structure, never dropping a page below zero.
-     * Page selection follows the same rule as the meltdown countdown: it only regards a page as "hot" when its share
-     * of the hottest page exceeds {@link #PASSIVE_COOLING_SHARE_THRESHOLD}, so the empty pages of a large structure do
-     * not silently absorb the whole cooling budget.
+     * Removes {@code amount} HU in total from the hottest pages, never dropping a page below zero. As with the meltdown
+     * countdown, a page only counts as "hot" when its share of the hottest page exceeds
+     * {@link #PASSIVE_COOLING_SHARE_THRESHOLD}, so a large structure's empty pages do not absorb the budget.
      */
     private boolean removeHeat(int amount) {
         if (pageHeat.isEmpty()) return false;
@@ -520,11 +448,9 @@ public final class MTReactorHeatSystem {
         return changed;
     }
 
-    // endregion
-
     /**
-     * Largest plating bonus found in a page snapshot. The prediction needs the page's real ceiling <b>before</b> it
-     * runs, because a page carrying platings must not be predicted to melt down against the bare hatch ceiling.
+     * Largest plating bonus in a page snapshot; the prediction needs the real ceiling <b>before</b> a page runs, so
+     * platings are not missing from it.
      */
     public int collectPlatingBonus(ItemStack[] pageItems) {
         if (pageItems == null) return 0;
@@ -536,14 +462,11 @@ public final class MTReactorHeatSystem {
         return best;
     }
 
-    /** Ceiling of a page for which the plating bonus is already known. */
     public int getMaxHeatWithBonus(int bonus) {
         long sum = (long) capacity + Math.max(0, Math.min(bonus, MAX_HEAT_BONUS_PER_ITEM));
         return (int) Math.min(Math.max(1L, sum), MAX_HEAT_CAPACITY);
     }
 
-    // region Fluid (wet) mode
-    /** True when the controller's fluid reactor mode is enabled. */
     public boolean isFluidMode() {
         return fluidMode;
     }
@@ -565,13 +488,10 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * IC2's fluid exchange for one page tick: the coolant takes as much buffered heat as it can carry, and whatever is
-     * left over goes back onto the core as {@code overflow = leftover / 2} (IC2's {@code addHeat(huOutput / 2)}).
-     * <p>
-     * The result is returned as a pair on purpose. The earlier signature returned only the overflow while reading the
-     * buffered amount from the internal counter - which the caller had to clear to keep one page's buffer from leaking
-     * into the next page's exchange. That order made the exchange always absorb nothing and silently discard the heat
-     * the coolant could not take. Both numbers are computed here, before anything is cleared.
+     * IC2's fluid exchange for one page tick: the coolant takes as much buffered heat as it can carry, the leftover
+     * goes back onto the core as {@code overflow = leftover / 2} (IC2's {@code addHeat(huOutput / 2)}). Both numbers
+     * are computed here, before anything is cleared, because clearing the counter first made the exchange absorb
+     * nothing and discard the heat the coolant could not take.
      *
      * @param coolantAcceptedUnits buffered-heat units the coolant taken this tick can absorb
      */
@@ -581,18 +501,17 @@ public final class MTReactorHeatSystem {
         return new CoolantExchange(absorbed, (pending - absorbed) / 2);
     }
 
-    /** Clears the per-cycle fluid accounting; call once per page tick after the exchange. */
+    /** Clears the per-cycle fluid accounting; call once per page tick, after the exchange. */
     public void resetCycleEmitHeat() {
         emittedHeat = 0;
         coolantExchangedHeat = 0;
     }
 
-    /** Coolant (mB) needed to carry away one unit of buffered component heat. */
     public static long coolantForHeat(long heat) {
         return Math.max(0L, heat) * COOLANT_PER_BUFFER_UNIT;
     }
 
-    /** Outcome of one fluid exchange: how much the coolant took, and what has to go back onto the core. */
+    /** One fluid exchange: what the coolant took and what goes back onto the core. */
     public static final class CoolantExchange {
 
         /** Buffered component heat the coolant absorbed this tick. */
@@ -605,10 +524,6 @@ public final class MTReactorHeatSystem {
             this.overflow = overflow;
         }
     }
-
-    // endregion
-
-    // region Persistence
 
     public void saveNBTData(NBTTagCompound aNBT) {
         NBTTagList list = new NBTTagList();
@@ -625,10 +540,9 @@ public final class MTReactorHeatSystem {
         aNBT.setInteger("mtReactorComponentBonus", componentBonus);
         aNBT.setBoolean("mtReactorFluidMode", fluidMode);
 
-        // A running meltdown is persisted as its *remaining* ticks, never as an absolute deadline: the machine's tick
-        // counter restarts, so an absolute value would be meaningless after a reload. Saving the remainder also means
-        // an unloaded reactor does not quietly serve its grace window while nobody is looking - it resumes exactly
-        // where it stopped.
+        // A running meltdown is persisted as its *remaining* ticks, never an absolute deadline: the tick counter
+        // restarts, so an absolute value would be meaningless after a reload, and an unloaded reactor resumes exactly
+        // where it stopped instead of serving its grace window unseen.
         NBTTagList armedList = new NBTTagList();
         for (ArmedPage armed : armedPages.values()) {
             NBTTagCompound armedTag = new NBTTagCompound();
@@ -645,11 +559,8 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * Restores the heat store.
-     * <p>
-     * The countdowns come back as <b>pending</b>, not as deadlines: the tick counter they were measured against does
-     * not survive a load, so {@link #refreshCountdownClock(long)} anchors them onto the counter the machine actually
-     * starts with (see {@link #loadNow}).
+     * Restores the heat store. Countdowns come back as <b>pending</b> amounts, not deadlines, because their counter
+     * does not survive a load; {@link #refreshCountdownClock(long)} anchors them (see {@link #loadNow}).
      */
     public void loadNBTData(NBTTagCompound aNBT) {
         pageHeat.clear();
@@ -689,9 +600,8 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * Tells the heat store which tick the machine's counter is at while its data is being loaded, so countdowns
-     * restored from NBT can be anchored onto the running counter on the next tick. Called by {@code MTReactor} from its
-     * own {@code loadNBTData}, which knows the tick value; the heat store cannot look it up itself.
+     * Tells the heat store the machine's tick value while its data loads, so restored countdowns can be anchored next
+     * tick; {@code MTReactor} calls it from {@code loadNBTData}, which knows the value.
      */
     public void setLoadClock(long now) {
         loadNow = now;
@@ -707,21 +617,16 @@ public final class MTReactorHeatSystem {
         coolantExchangedHeat = 0;
     }
 
-    // endregion
-
     /** One page's running meltdown countdown. */
     public static final class ArmedPage {
 
-        /** Coordinates of the access hatch that owns the page. */
         public final ChunkCoordinates owner;
         public final int page;
         /**
-         * Absolute tick of the machine's own counter at which the page detonates. Not final: the counter restarts when
-         * the chunk is loaded, and {@link #refreshCountdownClock(long)} shifts the deadline by the same amount so the
-         * remaining grace window survives the reload.
+         * Absolute tick of the machine's counter at which the page detonates; not final, because the counter restarts
+         * on chunk load and {@link #refreshCountdownClock(long)} shifts the deadline by the same amount.
          */
         private long deadline;
-        /** Current game tick, refreshed by {@link #refreshCountdownClock(long)}. */
         private long now;
 
         ArmedPage(ChunkCoordinates owner, int page, long deadline, long now) {
@@ -733,8 +638,8 @@ public final class MTReactorHeatSystem {
     }
 
     /**
-     * The view of an access hatch the heat store needs. Implemented by
-     * {@code MTReactorAccessHatch}, so the heat system does not have to depend on the hatch class directly.
+     * The view of an access hatch the heat store needs, implemented by {@code MTReactorAccessHatch} so the heat system
+     * does not depend on the hatch class.
      */
     public interface PageOwner {
 

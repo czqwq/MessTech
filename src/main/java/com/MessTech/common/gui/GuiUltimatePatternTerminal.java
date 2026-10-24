@@ -22,25 +22,21 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * GUI of the Ultimate Pattern Terminal.
+ * GUI of the Ultimate Pattern Terminal: AE's extended pattern terminal GUI copied whole from Applied Energistics 2
+ * rv3-beta-1080-GTNH ({@code appeng.client.gui.implementations.GuiPatternTermEx}, LGPL-3.0). Copying rather than
+ * extending is what retired {@code MixinGuiPatternTermEx} / {@code MixinContainerPatternTermEx}: the two things AE's
+ * GUI cannot be told by subclassing, its private scroll bar range and its client-side container, are chosen here
+ * directly, and no other mod's extended pattern terminal is touched.
  * <p>
- * This is AE's extended pattern terminal GUI copied whole from Applied Energistics 2 rv3-beta-1080-GTNH
- * ({@code appeng.client.gui.implementations.GuiPatternTermEx}, LGPL-3.0): background, item list, view cells, buttons,
- * the virtual pattern slots, the invert button and the page scroll bar are that class' code. Copying it instead of
- * extending it is what retired {@code MixinGuiPatternTermEx} and {@code MixinContainerPatternTermEx} - the two things
- * AE's GUI cannot be told by subclassing, its private scroll bar range and its client-side container, are now chosen
- * here directly, and no other mod's extended pattern terminal is touched any more.
+ * One deliberate difference: {@link PartUltimatePatternTerminal#INPUT_PAGES} pages of 4x4 input cells instead of AE's
+ * two, with the scroll bar widened to reach them; everything else, the page change included, is AE's own code path.
+ * The inverted (single input column) layout is AE's too, except that the active page wraps over that column's four
+ * rows ({@code activePage % rows}) - eight pages do not fit AE's four rows.
  * <p>
- * The one deliberate difference from AE's class is the input page count: this terminal has
- * {@link PartUltimatePatternTerminal#INPUT_PAGES} pages of 4x4 input cells instead of AE's two, and the scroll bar is
- * widened to reach them. Everything else, including the page change itself, is AE's own code path.
- * <p>
- * The inverted (single input column) layout is also AE's, except that the active page is wrapped over the four rows of
- * that column ({@code activePage % rows}); eight pages do not fit AE's four rows. The output side is the one place
- * that does not stay AE's loop: the eight input pages are grouped four per output page, so the normal layout's
- * four-cell output column walks all 32 output cells in order (pages 0-3 show outputs 0-15, pages 4-7 show outputs
- * 16-31) and the inverted layout's 16-cell output page stays on output page 0 for input pages 0-3 and on output page
- * 1 for pages 4-7. AE's own two-page loop would wrap page 4 back to the first page's outputs.
+ * Only the output side leaves AE's loop: the input pages are grouped four per output page, so the normal layout's
+ * four-cell output column walks all 32 output cells in order and the inverted layout's 16-cell output page stays on
+ * output page 0 for input pages 0-3 and on page 1 for pages 4-7. AE's two-page loop would wrap page 4 back to the
+ * first page's outputs.
  */
 @SideOnly(Side.CLIENT)
 public class GuiUltimatePatternTerminal extends GuiPatternTerm {
@@ -50,9 +46,8 @@ public class GuiUltimatePatternTerminal extends GuiPatternTerm {
     private final GuiScrollbar processingScrollBar = new GuiScrollbar();
 
     public GuiUltimatePatternTerminal(final InventoryPlayer inventoryPlayer, final ITerminalHost te) {
-        // AE's own GUI constructor hardcodes new ContainerPatternTermEx(...) here; this mod's container answers the
-        // terminal's input page count instead (see ContainerUltimatePatternTerminal), so the virtual input grid is
-        // sized from the part.
+        // AE's GUI constructor hardcodes new ContainerPatternTermEx(...) here; this mod's container answers the
+        // terminal's input page count instead (see ContainerUltimatePatternTerminal).
         super(inventoryPlayer, te, new ContainerUltimatePatternTerminal(inventoryPlayer, te));
         this.container = (ContainerUltimatePatternTerminal) this.inventorySlots;
 
@@ -69,8 +64,7 @@ public class GuiUltimatePatternTerminal extends GuiPatternTerm {
 
         this.setReservedSpace(81);
 
-        // AE hardcodes the two pages of its own terminal into this call; this terminal asks its container instead, so
-        // the page count lives in one place (the part).
+        // AE hardcodes its own terminal's two pages into this call; the page count lives in one place (the part).
         processingScrollBar.setHeight(70)
             .setWidth(7)
             .setLeft(6)
@@ -248,10 +242,9 @@ public class GuiUltimatePatternTerminal extends GuiPatternTerm {
         final int outputCols = this.container.getPatternOutputsWidth();
         final int outputPages = this.container.getPatternOutputPages();
 
-        // The input pages are grouped over the output pages (8 over 2 here): four input pages share one output page.
-        // The normal layout shows one four-cell output row per input page, so the page-in-group is also the output
-        // row; the inverted layout shows the whole 16-cell output page. Both modes therefore walk page 0-3 over
-        // output page 0 and page 4-7 over output page 1, instead of wrapping back to output page 0 after a few pages.
+        // Input pages are grouped four per output page (8 over 2 here): the normal layout's four-cell output row is
+        // the page-in-group, the inverted layout shows the whole 16-cell output page, so both walk pages 0-3 over
+        // output page 0 and pages 4-7 over page 1 instead of wrapping back to page 0.
         final int inputPagesPerOutputPage = Math.max(1, inputPages / Math.max(1, outputPages));
         final int outputPage = Math.min(outputPages - 1, activePage / inputPagesPerOutputPage);
         final int outputRow = Math.min(outputRows - 1, activePage % inputPagesPerOutputPage);

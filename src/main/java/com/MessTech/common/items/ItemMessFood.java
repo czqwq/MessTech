@@ -18,11 +18,9 @@ import squeek.applecore.api.food.FoodValues;
 import squeek.applecore.api.food.IEdible;
 
 /**
- * A food made by throwing several foods into a crafting grid.
- * <p>
- * The ordered list of ingredients is stored in the item's NBT, so two mess foods are only the same
- * food when they were made from exactly the same ingredients in exactly the same order. Its hunger
- * value is the sum of the hunger values of all ingredients.
+ * A food made by throwing several foods into a crafting grid. The ordered ingredient list lives in the item's NBT, so
+ * two mess foods are the same food only for exactly the same ingredients in the same order; hunger is the sum of the
+ * ingredients' hunger values.
  */
 public class ItemMessFood extends ItemFood implements IEdible {
 
@@ -33,7 +31,7 @@ public class ItemMessFood extends ItemFood implements IEdible {
     public static ItemMessFood INSTANCE;
 
     public ItemMessFood() {
-        // The values passed here are never used; every value is computed from the stored ingredients.
+        // Never used: every value is computed from the stored ingredients.
         super(0, 0F, false);
         setUnlocalizedName("messtech.messFood");
         setTextureName("messtech:food");
@@ -42,9 +40,6 @@ public class ItemMessFood extends ItemFood implements IEdible {
         INSTANCE = this;
     }
 
-    /**
-     * @return the ordered ingredient list of the given mess food, or an empty list for anything else.
-     */
     public static List<ItemStack> getIngredients(ItemStack stack) {
         return MessFoodHelper.getIngredients(stack);
     }
@@ -105,7 +100,7 @@ public class ItemMessFood extends ItemFood implements IEdible {
     @Override
     @SideOnly(Side.CLIENT)
     public void getSubItems(Item item, CreativeTabs tab, List<ItemStack> list) {
-        // Show one example in the creative tab so the item can be inspected without crafting it.
+        // One example in the creative tab, so the item can be inspected without crafting it.
         ItemStack example = MessFoodHelper.createStack(new ItemStack(Items.apple), new ItemStack(Items.bread));
         if (example != null) list.add(example);
     }

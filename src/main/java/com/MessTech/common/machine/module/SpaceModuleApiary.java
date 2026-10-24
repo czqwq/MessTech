@@ -36,26 +36,23 @@ import tectech.thing.metaTileEntity.multi.base.render.TTRenderedExtendedFacingTe
 
 /**
  * Space apiary modules: Space Elevator modules that run Forestry bees without an apiary, modelled on TST's
- * {@code TST_SpaceApiary} and GT5's own Mega Industrial Apiary.
+ * {@code TST_SpaceApiary} and GT5's Mega Industrial Apiary.
  * <p>
- * Four tiers (MK-I .. MK-IV), one class each below. A tier decides three things: the {@code tTier} it runs on (which is
- * both its input voltage and the {@code t} term of the apiary production formula, see
- * {@link MTBeeSimulator#voltageTierExact(int)}), the parallel ceiling, and how many bees it can hold. The numbers are
- * TST's, with the tiers re-seated on this GT5U's voltage table - TST asks for tiers 18 and 25 on its last two modules,
- * which {@code GTValues.V} (16 entries) cannot hold.
+ * Four tiers (MK-I .. MK-IV), one class each below. The tier sets {@code tTier} (input voltage and the {@code t} term
+ * of the apiary production formula, see {@link MTBeeSimulator#voltageTierExact(int)}), the parallel ceiling and the
+ * bee slot count. The numbers are TST's, re-seated on this GT5U's table: TST asks for tiers 18 and 25, which
+ * {@code GTValues.V} (16 entries) cannot hold.
  * <p>
- * Power comes from the GT wireless network like the other MessTech space modules, at one amp of the module's own tier
- * per parallel per cycle. Liquid DNA, which TST optionally consumes, is not used here.
- * <p>
- * Bees are not consumed: a queen put into the module keeps working, which is what the apiary does and what makes the
- * bee slots meaningful. The GUI that edits those slots is {@code SpaceModuleApiaryGui}.
+ * Power comes from the GT wireless network, one amp of the module's tier per parallel per cycle; liquid DNA (TST
+ * consumes it optionally) is not used. Bees are not consumed - a queen put in keeps working, which makes the bee
+ * slots meaningful; the GUI is {@code SpaceModuleApiaryGui}.
  */
 public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceModuleApiary> {
 
     /** Ticks one run takes - TST's {@code SpaceApiaryCycleTime}. */
     public static final int CYCLE_TICKS = 100;
 
-    /** Highest parallel a module of this tier may be set to. */
+    /** Highest parallel this tier may be set to. */
     private final int maxParallel;
 
     /** The bees this module runs. Queens, never consumed. */
@@ -75,12 +72,11 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         this.beeSlots = new ItemStack[aBeeSlots];
     }
 
-    /** @return the parallel ceiling of this tier, 256 at MK-I up to {@code Integer.MAX_VALUE} at MK-IV. */
     public int getMaxParallel() {
         return maxParallel;
     }
 
-    /** @return the bee slots, for the GUI to edit and for {@link #checkProcessing_EM()} to run. */
+    /** @return the bee slots, edited by the GUI and run by {@link #checkProcessing_EM()}. */
     public ItemStack[] getBeeSlots() {
         return beeSlots;
     }
@@ -92,14 +88,13 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         return Math.max(1, Math.min(getWirelessParallel(), maxParallel));
     }
 
-    /** The whole run happens at once, so the tick-batched output display of the base must stay out of the way. */
+    /** The whole run happens at once: no tick-batched output display. */
     @Override
     protected boolean usesTickBatchedOutputs() {
         return false;
     }
 
-    // The apiary does not use the tick-batched framework of the base - it overrides checkProcessing_EM directly - so
-    // the three hooks stay unused. They are abstract on the base and have to be answered anyway.
+    // Unused: checkProcessing_EM is overridden directly, but the abstract tick-batch hooks still have to be answered.
     @Override
     protected int getBatchTaskCount() {
         return 0;
@@ -118,7 +113,7 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
     @Override
     public @NotNull CheckRecipeResult checkProcessing_EM() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
-        // Like the other space modules, the apiary only runs while its elevator has it mounted.
+        // Like the other space modules: only run while mounted on the elevator.
         if (!isMountedOnFormedElevator()) return CheckRecipeResultRegistry.NO_RECIPE;
 
         takeBeesFromInputs();
@@ -137,7 +132,7 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         }
         costingEU = cost;
         costingEUText = String.valueOf(cost);
-        // The wireless network was charged in one lump; keep the machine from draining its own energy hatches too.
+        // The network was charged in one lump; don't drain its energy hatches too.
         lEUt = 0;
 
         mOutputItems = runBees(parallel);
@@ -191,21 +186,17 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         return out.toArray(new ItemStack[0]);
     }
 
-    /**
-     * The apiary uses {@link SpaceModuleApiaryGui}, which adds the bee slot grid to the shared space-module GUI.
-     */
+    /** {@link SpaceModuleApiaryGui}: the shared space-module GUI plus the bee slot grid. */
     @Override
     protected SpaceModuleInfinityGui getGui() {
         return new SpaceModuleApiaryGui(this);
     }
 
     /**
-     * @return {@code null}, because the apiary runs bees and not a recipe pool.
-     *         <p>
-     *         That is what TST does as well: its {@code TST_SpaceApiary} extends {@code TileEntityModuleBase}, which
-     *         never overrides {@code getRecipeMap()}, and GT5U's own {@code MTEMultiBlockBase#getRecipeMap()} returns
-     *         {@code null} by default. The multiblock GUI is written for that default - {@code MTEMultiBlockBaseGui}
-     *         never dereferences the map - so a module without recipes simply reports none.
+     * @return {@code null}: the apiary runs bees, not a recipe pool. TST does the same ({@code TST_SpaceApiary} extends
+     *         {@code TileEntityModuleBase}, which never overrides {@code getRecipeMap()}) and
+     *         {@code MTEMultiBlockBaseGui}
+     *         never dereferences it.
      */
     @Override
     protected RecipeMap<?> getRecipeMapImpl() {
@@ -230,8 +221,7 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
         if (!checkPiece("main", 0, 1, 0, errors)) return;
-        // Which motor tier is needed is a property of the module, so the shortfall is reported here rather than
-        // folded into the structure lookup.
+        // The needed motor tier is a module property, so the shortfall is reported here, not in the structure lookup.
         if (!isMountedOnFormedElevator()) {
             addElevatorError(errors, getNeedElevatorLevel());
             return;
@@ -254,12 +244,10 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
     }
 
     /**
-     * The structure build used by the NEI structure preview (and by StructureLib's autoplace): it has to build through
-     * {@link #survivalBuildPiece} like the other space modules do. Delegating to {@code super} instead finds no
-     * implementation up the chain - neither {@code TileEntityModuleBase} nor GT's multiblock bases override the
-     * {@link ISurvivalBuildEnvironment} variant - so it falls into StructureLib's interface default, which cannot serve
-     * the fake player the preview uses and answers "-2 not supported". The preview then builds nothing and shows only
-     * the controller.
+     * The build used by the NEI structure preview and StructureLib's autoplace: it must go through
+     * {@link #survivalBuildPiece}. {@code super} finds no implementation up the chain ({@code TileEntityModuleBase},
+     * GT's bases), so it lands in StructureLib's interface default, which cannot serve the preview's fake player and
+     * answers "-2 not supported", leaving only the controller.
      */
     @Override
     public int survivalConstruct(ItemStack stackSize, int elementBudget, ISurvivalBuildEnvironment env) {
@@ -415,7 +403,7 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
         }
     }
 
-    /** MK-IV: the top table entry (tier 15), no parallel ceiling, 128 bee slots, needs an elevator motor tier 4. */
+    /** MK-IV: top table entry (tier 15), no parallel ceiling, 128 bee slots, needs an elevator motor tier 4. */
     public static class MK4 extends SpaceModuleApiary {
 
         public MK4(int aID, String aName, String aNameRegional) {

@@ -17,6 +17,8 @@ import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDBBFurnace;
 import com.MessTech.common.machine.MTDTPF;
 import com.MessTech.common.machine.MTHugeChemicalReactor;
+import com.MessTech.common.machine.MTLargeEssentiaGenerator;
+import com.MessTech.common.machine.MTLargeProcessingFactory;
 import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.MTNanoScaleFoundry;
 import com.MessTech.common.machine.MTReactor;
@@ -55,13 +57,12 @@ public class MTMachineLoader {
                 MT_ID,
                 "Dimensionally Transcendent Plasma Fusion Computer",
                 translateToLocal("machine.dtpf.name")).getStackForm(1L));
-        // 注册实时动画作者行(gtnhlib AnimatedTooltipHandler 在渲染时逐帧求值,同 GT5U LoaderMetaTileEntities 的做法)
+        // 注册实时动画作者行(gtnhlib AnimatedTooltipHandler 渲染时逐帧求值,同 GT5U LoaderMetaTileEntities)
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTDTPF.get(1));
 
         MTEHatchRack.run();
-        // Register the rack components into our own Computing Center NEI list (independent from GT5U's QC list).
+        // Rack components go into our own Computing Center NEI list, independent of GT5U's QC list.
         MTRecipeMaps.populateComputingCenterFakeRecipes();
-        // Register an independent Assembly Line NEI list for the Assembly Factory.
         MTRecipeMaps.populateAssFactoryAssemblyLineRecipes();
 
         MTItemList.MTComputingCenter.set(
@@ -99,8 +100,8 @@ public class MTMachineLoader {
                 "Space Module Assembler Infinity",
                 translateToLocal("machine.spacemoduleassembler.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleAssemblerInfinity.get(1));
-        // Space apiary modules: four tiers, one class each (see SpaceModuleApiary). They sit on tiers 10/12/14/15, i.e.
-        // UEV/UIV/MAX/top, because GTValues.V only has 16 entries - TST's own tier 18 and 25 cannot be used here.
+        // Space apiary modules: four tiers, one class each (see SpaceModuleApiary), on tiers 10/12/14/15
+        // (UEV/UIV/MAX/top) - GTValues.V has only 16 entries, so TST's tiers 18 and 25 cannot be used here.
         MTItemList.SpaceModuleApiaryMK1.set(
             new SpaceModuleApiary.MK1(
                 MT_ID + 73,
@@ -158,8 +159,8 @@ public class MTMachineLoader {
                 translateToLocal("machine.wirelessvacuum.output.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTWirelessVacuumConveyorOutput.get(1));
 
-        // Wireless particle beam hatches: dye colour is the channel, 1:1 (one output + one input per colour),
-        // no beamline pipes. The filtered variant keeps GT5U's particle blacklist GUI.
+        // Wireless particle beam hatches: dye colour = channel, 1:1 per colour, no beamline pipes; the filtered
+        // variant keeps GT5U's particle blacklist GUI.
         MTItemList.MTWirelessBeamlineInput.set(
             new MTWirelessBeamlineInput(
                 MT_ID + 70,
@@ -200,6 +201,17 @@ public class MTMachineLoader {
             .set(new MTReactor(MT_ID + 15, "MTReactor", translateToLocal("machine.mtreactor.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTReactor.get(1));
 
+        // GT++/GoodGenerator ports: the Large Processing Factory and the Large Essentia Generator.
+        MTItemList.MTLargeProcessingFactory.set(
+            new MTLargeProcessingFactory(MT_ID + 36, "Large Processing Factory", translateToLocal("machine.lpf.name"))
+                .getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTLargeProcessingFactory.get(1));
+
+        MTItemList.MTLargeEssentiaGenerator.set(
+            new MTLargeEssentiaGenerator(MT_ID + 37, "LargeEssentiaGenerator", translateToLocal("machine.leg.name"))
+                .getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTLargeEssentiaGenerator.get(1));
+
         // Reactor access hatches: one variant per tier, EV (1 page) through UIV (8 pages).
         for (int i = 0; i < MTItemList.REACTOR_ACCESS_HATCHES.length; i++) {
             int tier = MTReactorAccessHatch.MIN_TIER + i;
@@ -228,10 +240,9 @@ public class MTMachineLoader {
             AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), item.get(1));
         }
 
-        // Reactor coolant pair for the fluid ("wet") mode. One variant each at EV by design (plumbing, not a tier
-        // gate; see the hatch classes for the 128,000 mB tank and the 1 mB : 1 HU ratio), so they are built here
-        // rather than in a tier loop. The IDs come from the free slots around the reactor family: MT_ID + 32 directly
-        // after the heat hatches, and MT_ID + 35 because MT_ID + 33 is MTChemicalTwister and MT_ID + 34 is
+        // Reactor coolant pair for the fluid ("wet") mode: one variant each at EV by design (plumbing, not a tier gate;
+        // the hatch classes have the 128,000 mB tank and the 1 mB : 1 HU ratio), so no tier loop. IDs from free slots:
+        // MT_ID + 32 after the heat hatches, MT_ID + 35 because MT_ID + 33 is MTChemicalTwister and MT_ID + 34 is
         // MTHugeChemicalReactor.
         MTItemList.MTReactorCoolantInputHatch.set(
             new MTReactorCoolantInputHatch(
@@ -260,12 +271,11 @@ public class MTMachineLoader {
                 MT_ID + 34,
                 "MTHugeChemicalReactor",
                 translateToLocal("machine.hugechemicalreactor.name")).getStackForm(1L));
-        // Its brand line carries the modular look instead of an author name, see MTModuleProjectText.
+        // Its brand line is the modular look instead of an author name, see MTModuleProjectText.
         brandAsModuleProject(MTItemList.MTHugeChemicalReactor);
 
-        // Module hatches: speed, EU discount and parallel control, one variant per tier IV..MAX.
-        // IDs are handed out per family so a tier can be added without shifting the other families.
-        // These carry no author name either: their brand line is the modular look, see brandAsModuleProject.
+        // Module hatches: speed, EU discount and parallel control, one variant per tier IV..MAX. IDs go out per family
+        // so a tier can be added without shifting the others; no author name - the brand line is the modular look.
         for (int i = 0; i < MTItemList.SPEED_MODULES.length; i++) {
             int tier = IMTModule.MIN_TIER + i;
             String tierName = GTValues.VN[tier];
@@ -305,10 +315,9 @@ public class MTMachineLoader {
             brandAsModuleProject(item);
         }
 
-        // Transcendent Metal fuel rods: GT items rather than MessTech machines, and their damage value is the fuel
-        // state (0..99), so every state has to match - hence the wildcard damage, exactly like the piggy. Their line
-        // is the "Add by:" brand line with no author name, and the word wears the tooltip animation that matches
-        // their sprite: MTFuelRodItemRenderer tumbles the icon the same way the animation tumbles the letters.
+        // Transcendent Metal fuel rods: GT items, not MessTech machines; their damage value is the fuel state (0..99),
+        // hence the wildcard damage matching every state, exactly like the piggy. Their "Add by:" line has no author
+        // name; the word wears the sprite-matching animation (MTFuelRodItemRenderer tumbles the icon likewise).
         for (ItemStack rod : new ItemStack[] {
             new ItemStack(MTItems.rodTranscendentMetal, 1, OreDictionary.WILDCARD_VALUE),
             new ItemStack(MTItems.rodTranscendentMetal2, 1, OreDictionary.WILDCARD_VALUE),
@@ -323,18 +332,16 @@ public class MTMachineLoader {
                 AuthorDynamic.TRANSCENDENT_METAL);
         }
 
-        // Populate after the machine item list is set so the NEI handler can reference the catalyst.
+        // Populate after the machines are set so the NEI handler can reference the catalyst.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();
         MTRecipeMaps.populateOneStepCircuitPoolRecipes();
     }
 
     /**
      * Gives a registered machine the modular brand line, {@code Add by: ModularProject}, in the look of
-     * {@link com.MessTech.common.util.MTModuleProjectText}: a rack of modules powered up one by one, with the chip row
-     * of {@code MTModuleProjectTextRenderer} under the letters.
-     * <p>
-     * It stands where the author line of such a machine would otherwise be - {@link AuthorDynamic#registerOn} - so a
-     * machine that is itself modular goes without an author name and names the rack instead.
+     * {@link com.MessTech.common.util.MTModuleProjectText}: modules powered up one by one, chip row of
+     * {@code MTModuleProjectTextRenderer} under the letters. It stands where {@link AuthorDynamic#registerOn} would put
+     * the author, so a modular machine names the rack.
      *
      * @param item a machine whose stack has already been set
      */

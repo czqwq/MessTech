@@ -42,8 +42,7 @@ public class SpaceModulePumpInfinityGui extends SpaceModuleInfinityGui {
 
     @Override
     protected Flow createLeftPanelGapRow(ModularPanel parent, PanelSyncManager syncManager) {
-        // Pump has no standalone parallel button on the left; all recipe settings live in the
-        // right-side Edit Parameters panel.
+        // Pump has no standalone parallel button; all recipe settings live in the right-side Edit Parameters panel.
         return Flow.row()
             .fullWidth()
             .height(getTextBoxToInventoryGap());

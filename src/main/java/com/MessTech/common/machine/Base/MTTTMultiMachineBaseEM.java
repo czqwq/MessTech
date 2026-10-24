@@ -22,30 +22,21 @@ public abstract class MTTTMultiMachineBaseEM extends TTMultiblockBase implements
     }
 
     /**
-     * No more machine error
+     * Maintenance is disabled on every override below, so no machine error can occur.
      */
     @Override
     public boolean doRandomMaintenanceDamage() {
         return true;
     }
 
-    /**
-     * No more machine error
-     */
     @Override
     public void checkMaintenance() {}
 
-    /**
-     * No more machine error
-     */
     @Override
     public boolean getDefaultHasMaintenanceChecks() {
         return false;
     }
 
-    /**
-     * No more machine error
-     */
     @Override
     public final boolean shouldCheckMaintenance() {
         return false;

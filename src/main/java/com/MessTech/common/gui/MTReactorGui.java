@@ -26,13 +26,11 @@ import gregtech.api.modularui2.GTGuiTextures;
 import gregtech.api.util.GTUtility;
 
 /**
- * Controller GUI for the nuclear reactor.
- * <p>
- * The default terminal text widget is replaced on purpose: only the reactor status numbers are shown, without the
- * recipe progress bar and without the machine work progress. The lines come from the controller's own state:
- * the core heat and its ceiling, the three-state meltdown report ({@code stable} / {@code N cycles} / countdown
- * running, plus a red countdown alarm while one runs), rated vs actually injected EU/t with a dynamo shortfall
- * warning, the fluid (wet) mode with its passive cooling, and the per-page heat map.
+ * Controller GUI for the nuclear reactor. The default terminal text widget is replaced on purpose: only reactor status
+ * numbers, without the recipe progress bar and the machine work progress - core heat and its ceiling, the three-state
+ * meltdown report ({@code stable} / {@code N cycles} / countdown running, plus a red countdown alarm), rated vs
+ * actually injected EU/t with a dynamo shortfall warning, fluid (wet) mode with its passive cooling, and the per-page
+ * heat map.
  */
 public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
 
@@ -71,8 +69,8 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
     }
 
     /**
-     * The controller's per-page heat percentages as the {@code long[]} {@link LongArraySyncValue} needs. The order is
-     * the controller's: hatch by hatch, page by page (`MTReactor#getPageHeatPercents`).
+     * The controller's per-page heat percentages as the {@code long[]} {@link LongArraySyncValue} needs, in the
+     * controller's order: hatch by hatch, page by page (`MTReactor#getPageHeatPercents`).
      */
     private long[] pageHeatPercents() {
         int[] percents = multiblock.getPageHeatPercents();
@@ -150,8 +148,8 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
                 line(
                     () -> StatCollector
                         .translateToLocalFormatted("machine.mtreactor.gui.heat_percent", heatPercent.getValue())))
-            // The alarm line only exists while a page is actually counting down, so the terminal stays short in the
-            // normal case and cannot be mistaken for a decoration.
+            // Only shown while a page is counting down: the terminal stays short in the normal case, and the line reads
+            // as an alarm rather than as decoration.
             .child(
                 IKey.dynamic(
                     () -> EnumChatFormatting.RED.toString() + EnumChatFormatting.BOLD
@@ -189,8 +187,8 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
                 line(
                     () -> StatCollector
                         .translateToLocalFormatted("machine.mtreactor.gui.cooling", cooling.getLongValue())))
-            // Only meaningful in fluid mode: it is the component heat the coolant loop has not carried away yet, and
-            // whatever of it the loop does not take ends up on the core.
+            // Fluid mode only: the component heat the coolant loop has not carried away yet, and whatever of it the
+            // loop does not take ends up on the core.
             .child(
                 IKey.dynamic(
                     () -> StatCollector
@@ -215,8 +213,8 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
                 .fullWidth()
                 .marginBottom(2)
                 .setEnabledIf(w -> missingLocked.getBoolValue() || lowLocked.getBoolValue()))
-            // Without this the terminal only held the generic "incomplete structure" line, so a missing access or
-            // heat control hatch was never listed. It is the same widget the GT base GUI adds to its own terminal.
+            // Without this the terminal only showed the generic "incomplete structure" line, so a missing access or
+            // heat control hatch was never listed; it is the widget the GT base GUI adds to its own terminal.
             .child(createStructureErrorWidget(syncManager));
     }
 
@@ -230,8 +228,7 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
 
     /**
      * Every reactor shutdown reason is a {@code SimpleShutDownReason.ofCritical(id)} whose text lives in the GT5U
-     * namespace under that id ({@code ExtraShutdownReason}); MessTech defines those keys in its own lang files because
-     * the reasons are its own.
+     * namespace under that id ({@code ExtraShutdownReason}); MessTech defines those keys in its own lang files.
      */
     @Override
     protected String getToolTipForReason(String key) {
@@ -244,7 +241,7 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
 
     /**
      * The reactor's locked-component and coolant stops do not disable the machine (they resume by themselves once the
-     * situation is fixed), so the default {@code !isAllowedToWork} gate must be relaxed for our reasons.
+     * situation is fixed), so the default {@code !isAllowedToWork} gate is relaxed for our reasons.
      */
     @Override
     protected boolean shouldShutdownReasonBeDisplayed(String shutdownString) {
@@ -256,7 +253,7 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
         return super.shouldShutdownReasonBeDisplayed(shutdownString);
     }
 
-    // A reactor has no recipes, so the default void/input-separation/batch/recipe-lock buttons are meaningless.
+    // A reactor has no recipes, so the default void/separation/batch/recipe-lock buttons are meaningless.
     @Override
     protected boolean shouldDisplayVoidExcess() {
         return false;
@@ -310,7 +307,7 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
     /**
      * The per-page heat map as one line. The terminal is a flat list of text lines, so the pages are joined with the
      * {@code gui.heatmap.entry} pattern and capped at {@link #HEATMAP_MAX_ENTRIES} entries plus a {@code +N} tail - a
-     * 25 hatch structure would otherwise put 200 entries into one widget. The order is the controller's
+     * 25 hatch structure would otherwise put 200 entries into one widget. Order is the controller's
      * ({@code MTReactor#getPageHeatPercents}: hatch by hatch, page by page).
      */
     private static String heatMapText(LongArraySyncValue pageHeat) {

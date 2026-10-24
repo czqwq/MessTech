@@ -20,32 +20,28 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * MessTech's own animated tooltip handler: the gtnhlib {@code AnimatedTooltipHandler} idea - a supplier per
- * {@link ItemStack}, re-evaluated once per frame - extended by the renderer half an animated line may carry.
+ * MessTech's own animated tooltip handler: a supplier per {@link ItemStack}, re-evaluated once per frame, plus the
+ * renderer half an animated line may carry.
  * <p>
- * gtnhlib's handler can only add <b>strings</b> to a tooltip, so an animation that has to touch the letters
- * themselves (rotate them, blend them) has nowhere to run. This handler keeps the same registration shape and
- * additionally remembers an {@link MTTextAnimation} per line; when a tooltip of a stack with such a line is about
- * to be drawn, it takes the drawing over through gtnhlib's {@code RenderTooltipEvent#alternativeRenderer} - which
- * NEI honours as well, so it works in the inventory and in the NEI panels alike - draws the tooltip exactly the
- * way vanilla does and then calls the {@link MTTextRenderer} of every line the animation belongs to.
+ * gtnhlib's {@code AnimatedTooltipHandler} adds only <b>strings</b>, leaving an animation that must touch the letters
+ * themselves (rotate, blend) nowhere to run. This handler remembers an {@link MTTextAnimation} per line and, for a
+ * stack that has one, takes the drawing over through gtnhlib's {@code RenderTooltipEvent#alternativeRenderer} (NEI
+ * honours it too), draws the tooltip like vanilla, then calls the {@link MTTextRenderer} of every line the animation
+ * belongs to.
  * <p>
- * The drawing follows vanilla's {@code drawHoveringText}: the same box, the same line positions. NEI specific
- * layout of the same tooltip - its paging for tooltips taller than the screen, and its {@code TIP_LINE} drawable
- * lines (recipe widgets, bookmarks) - is therefore not reproduced for a decorated stack; keep rendered animations
- * on stacks whose tooltips are plain text, which is what machine tooltips are.
+ * Positions follow vanilla's {@code drawHoveringText}, so NEI's own layout (paging for tall tooltips, {@code TIP_LINE}
+ * drawables) is <b>not</b> reproduced for a decorated stack: keep rendered animations on plain-text tooltips, as
+ * machine tooltips are.
  * <p>
- * Registration is common code (the machine loader decorates its items on both sides), only the drawing is client
- * side, which is why the animation is a separate object from its renderer: see {@link MTTextAnimation}.
+ * Registration is common code, drawing is client side, hence animation and renderer are separate objects
+ * ({@link MTTextAnimation}).
  */
 public final class MTAnimatedTooltipHandler {
 
     /**
-     * One registered line: the supplier that produces it and, optionally, the animation it wears.
-     * <p>
-     * A name entry ({@link #addItemNameAnimation}) is the one kind that adds no line of its own: its supplier only
-     * says what the item's own name line looks like, so the renderer of its animation can be attached to that line
-     * while the tooltip keeps exactly the lines it had.
+     * One registered line: the supplier that produces it and, optionally, the animation it wears. A name entry
+     * ({@link #addItemNameAnimation}) adds no line of its own - its supplier only says what the item's name line looks
+     * like, so the animation's renderer attaches to that line and the tooltip keeps the lines it had.
      */
     private static final class Entry {
 
@@ -69,13 +65,11 @@ public final class MTAnimatedTooltipHandler {
     private static Map<MTTextAnimation, MTTextRenderer> renderers;
 
     /**
-     * The renderer map, built on first use rather than in the static initializer.
-     * <p>
-     * FML's {@code SideTransformer} deletes a {@code @SideOnly(Side.CLIENT)} field from the class on a dedicated
-     * server, but it only removes fields and methods - never the {@code <clinit>} that assigns them. A client-only
-     * field with an initializer therefore kills the server in {@code <clinit>} with
-     * {@code NoSuchFieldError: RENDERERS}. {@link #background()} is lazy for the same reason: the nested class it
-     * creates would be loaded by {@code <clinit>} too.
+     * The renderer map, built on first use rather than in the static initializer: FML's {@code SideTransformer}
+     * deletes a {@code @SideOnly(Side.CLIENT)} field on a dedicated server but never the {@code <clinit>} that assigns
+     * it, so a client-only field with an initializer kills the server with {@code NoSuchFieldError: RENDERERS}.
+     * {@link #background()} is lazy for the same reason: the nested class it creates would be loaded by
+     * {@code <clinit>} too.
      */
     @SideOnly(Side.CLIENT)
     private static Map<MTTextAnimation, MTTextRenderer> renderers() {
@@ -107,20 +101,17 @@ public final class MTAnimatedTooltipHandler {
      * Adds one line to the tooltip of the given stack, re-evaluated once per frame.
      *
      * @param stack the stack to decorate; {@code OreDictionary.WILDCARD_VALUE} as its damage covers every variant
-     * @param line  the line, normally a {@link Supplier} that returns a fresh frame on every call; a supplier may
-     *              return several lines separated by {@code '\n'}
+     * @param line  normally a {@link Supplier} returning a fresh frame per call; may return several lines separated
+     *              by {@code '\n'}
      */
     public static void addItemTooltip(ItemStack stack, Supplier<String> line) {
         addItemTooltip(stack, line, null);
     }
 
     /**
-     * Adds one line that wears the given animation to the tooltip of the given stack.
-     * <p>
-     * The line is drawn with the font like any other, and the renderer registered for the animation (see
-     * {@link #registerRenderer}) is drawn over it afterwards.
+     * Adds one line that wears the given animation. It is drawn with the font like any other, then the renderer
+     * registered for the animation (see {@link #registerRenderer}) is drawn over it.
      *
-     * @param stack     the stack to decorate; {@code OreDictionary.WILDCARD_VALUE} as its damage covers every variant
      * @param line      the finished line, formatting codes included; animated lines normally come from an
      *                  {@link MTTextAnimation} (see {@link AuthorDynamic#register})
      * @param animation the animation the line wears, {@code null} for a plain line
@@ -135,20 +126,16 @@ public final class MTAnimatedTooltipHandler {
     /**
      * Puts an animation on the item's <b>own name line</b>, without adding a line of its own.
      * <p>
-     * A tooltip's first line is the item's display name, drawn by vanilla before any handler sees the tooltip, so an
-     * animation cannot be attached to it by adding a line: the handler recognises the line a renderer belongs to by
-     * its <b>visible text</b> (see {@link #rendererFor}), so an entry whose supplier answers with the name of the
-     * item is enough to make the name wear the animation. The entry is not appended to the tooltip, which is the
-     * difference to {@link #addAnimatedText} - the name is already there, and adding it a second time would show
-     * the item twice.
-     * <p>
-     * The supplier is evaluated on every frame, so it should return the name as the item displays it (the lang key
-     * for a plain item, {@code ItemStack#getDisplayName} for one that can be renamed in an anvil).
+     * The first tooltip line is the display name, drawn by vanilla before any handler sees the tooltip, so the
+     * animation is attached by text: a renderer's line is found by its <b>visible text</b> (see {@link #rendererFor}),
+     * so a supplier answering with the item's name is enough. The entry is not appended - the difference to
+     * {@link #addAnimatedText}, since adding the name again would show the item twice. The supplier runs every frame,
+     * so return the name as the item displays it (the lang key, or {@code ItemStack#getDisplayName} for one renameable
+     * in an anvil).
      *
-     * @param stack     the item whose name wears the animation; {@code OreDictionary.WILDCARD_VALUE} as its damage
-     *                  covers every variant
-     * @param name      the item's name line, i.e. the name the tooltip shows; formatting codes are allowed and are
-     *                  ignored when the line is matched
+     * @param stack     the item whose name wears the animation; {@code OreDictionary.WILDCARD_VALUE} covers every
+     *                  variant
+     * @param name      the name the tooltip shows; formatting codes are allowed and ignored when matching
      * @param animation the animation the name wears, e.g. {@link MTStarfieldText#INSTANCE}
      */
     public static void addItemNameAnimation(ItemStack stack, Supplier<String> name, MTTextAnimation animation) {
@@ -159,16 +146,12 @@ public final class MTAnimatedTooltipHandler {
     }
 
     /**
-     * Adds one free standing line that wears the given animation - no author formatting, no prefix - which is what
-     * an animated word on its own needs.
-     * <p>
-     * The line is the animated text alone: the animation's frame of {@code text.get()}, so the supplier is
-     * evaluated again on every frame (hand it {@code () -> StatCollector.translateToLocal(...)} to stay live
-     * across a resource pack reload).
+     * Adds one free standing line that wears the given animation - no author formatting, no prefix. The line is the
+     * animation's frame of {@code text.get()}, re-evaluated every frame (hand it
+     * {@code () -> StatCollector.translateToLocal(...)} to stay live across a resource pack reload).
      *
-     * @param stack     the stack to decorate; {@code OreDictionary.WILDCARD_VALUE} as its damage covers every variant
-     * @param text      the text to animate, formatting codes allowed; a supplier may return several lines
-     *                  separated by {@code '\n'}
+     * @param text      the text to animate, formatting codes allowed; a supplier may return several lines separated
+     *                  by {@code '\n'}
      * @param animation the animation the line wears, e.g. {@link AuthorDynamic#TRANSCENDENT_METAL}
      */
     public static void addAnimatedText(ItemStack stack, Supplier<String> text, MTTextAnimation animation) {
@@ -176,16 +159,14 @@ public final class MTAnimatedTooltipHandler {
     }
 
     /**
-     * Adds one free standing line made of a static prefix and an animated word, the way the MessTech and PigTech
-     * brand lines are built: the prefix is copied into every frame verbatim, so it never changes width or colour,
-     * and only the word after it wears the animation. "Add by: NuclearTech" is one of these.
+     * Adds one free standing line of a static prefix and an animated word, the shape of the MessTech and PigTech
+     * brand lines: the prefix is copied into every frame verbatim, so it never changes width or colour, and only the
+     * word wears the animation ("Add by: NuclearTech" is one of these).
      *
-     * @param stack     the stack to decorate; {@code OreDictionary.WILDCARD_VALUE} as its damage covers every variant
-     * @param prefix    the static text in front of the animation, normally the translated {@code messTech.addBy};
-     *                  {@code null} or empty leaves it out, and {@link MTPigTechText#PREFIX_SEPARATOR} is put
-     *                  between it and the word
-     * @param text      the word to animate, formatting codes allowed; a supplier may return several lines
-     *                  separated by {@code '\n'}
+     * @param prefix    the static text in front, normally the translated {@code messTech.addBy}; {@code null} or empty
+     *                  leaves it out, {@link MTPigTechText#PREFIX_SEPARATOR} goes between it and the word
+     * @param text      the word to animate, formatting codes allowed; a supplier may return several lines separated
+     *                  by {@code '\n'}
      * @param animation the animation the word wears, e.g. {@link AuthorDynamic#TRANSCENDENT_METAL}
      */
     public static void addAnimatedText(ItemStack stack, Supplier<String> prefix, Supplier<String> text,
@@ -200,11 +181,9 @@ public final class MTAnimatedTooltipHandler {
     }
 
     /**
-     * Registers the renderer an animation is drawn with.
-     * <p>
-     * Client side only: this is where the drawing lives, while the animation itself can be registered from common
-     * code. Registering the same animation twice replaces its renderer, and an animation without a renderer is
-     * drawn as its plain strings.
+     * Registers the renderer an animation is drawn with; client side only, while the animation itself can be
+     * registered from common code. Registering again replaces the renderer; without one, an animation is drawn as its
+     * plain strings.
      *
      * @param animation the animation to draw
      * @param renderer  the renderer that draws it, {@code null} removes the animation's renderer
@@ -236,7 +215,7 @@ public final class MTAnimatedTooltipHandler {
 
     /**
      * Takes the drawing of a tooltip over when one of its lines wears a rendered animation, so the renderer can be
-     * drawn on top of the finished font. A tooltip without such a line is left completely alone.
+     * drawn on top of the finished font; a tooltip without such a line is left alone.
      */
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
@@ -261,9 +240,9 @@ public final class MTAnimatedTooltipHandler {
     }
 
     /**
-     * Draws a tooltip the way vanilla's {@code GuiScreen#drawHoveringText} does - background, border and one line
-     * of shadowed font per line - and calls the renderer of every line that wears one afterwards, so the effect is
-     * an overlay on the finished font.
+     * Draws a tooltip the way vanilla's {@code GuiScreen#drawHoveringText} does - background, border, one line of
+     * shadowed font per line - then calls the renderer of every line that wears one, so the effect is an overlay on
+     * the finished font.
      */
     @SideOnly(Side.CLIENT)
     private static void renderTooltip(RenderTooltipEvent event, List<String> lines, List<Entry> entries) {
@@ -311,9 +290,9 @@ public final class MTAnimatedTooltipHandler {
     }
 
     /**
-     * Finds the renderer of the line: the entry whose animation has a renderer and whose visible text is the
-     * visible text of the drawn line. Matching the text rather than a position keeps the overlay on its own line
-     * even when another mod (NEI inserts its second display name at index 1, for instance) has moved the lines.
+     * Finds the renderer of the line: the entry whose animation has a renderer and whose visible text equals that of
+     * the drawn line. Matching text rather than position keeps the overlay on its own line even when another mod moved
+     * the lines (NEI inserts its second display name at index 1, for instance).
      */
     @SideOnly(Side.CLIENT)
     private static MTTextRenderer rendererFor(List<Entry> entries, String line) {
@@ -334,7 +313,7 @@ public final class MTAnimatedTooltipHandler {
 
     /**
      * The vanilla tooltip box. {@code Gui#drawGradientRect} is protected, so it is reached through a subclass of
-     * {@code Gui} instead of a static helper.
+     * {@code Gui} rather than a static helper.
      */
     @SideOnly(Side.CLIENT)
     private static final class Background extends Gui {

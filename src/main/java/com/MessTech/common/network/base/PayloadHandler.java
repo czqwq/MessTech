@@ -12,8 +12,7 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 
 /**
  * The FML side of the packet framework, ported unchanged from GT-Not-Leisure's
- * {@code com.science.gtnl.common.packet.base.PayloadHandler} (client-bound half dropped, MessTech only talks
- * upwards).
+ * {@code com.science.gtnl.common.packet.base.PayloadHandler} (client-bound half dropped: MessTech only talks upwards).
  */
 public final class PayloadHandler {
 

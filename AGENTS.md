@@ -1,5 +1,7 @@
 # Agent notes (MessTech)
 
+> **本文件保持简洁**：只写必须遵守的规则和必要索引，不写废话、不展开细节；详细内容一律放 `docs/`。
+
 Process rules for anyone working in this repo - human or agent. The detailed, per-feature knowledge lives in
 `docs/`, indexed below.
 
@@ -32,13 +34,16 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - MTNanoScaleFoundry and the one-step circuit pool (incl. programmable pattern hatches and renamed items)
   - SpaceModule Infinity machines (pump / miner / assembler)
   - Space apiary modules (太空蜂箱, MK-I..MK-IV)
+  - MTLargeProcessingFactory (LPF, GT++ port) / MTLargeEssentiaGenerator (LEG, GoodGenerator port, incl. the ME
+    essentia input hatch and the `essentia_cell` structure sub-channel)
+  - Thaumcraft research tab (混乱科技 / MessTech): `MTThaumcraftResearch`, essentia hatch, LEG upgrade items
   - Blocks
 - GT5U API knowledge
 - Own-code conventions
 - Chaos Matter (混乱物质): GT material registration and the stacked-renderer look
 - 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`): magic-circle charge FX, straight penetrating
   arrow, tunnel blast, true kill (`MTKillBase` / `MTBowKill`), the DE sub-mode (`MTExplosionDE` + `MTEntityDEBlast` /
-  `MTDEBlastRenderer`) and the starfield tooltip name
+  `MTDEBlastRenderer`) and the `magnetar` text-effect name (inline `§{mg}` in its lang entry)
 - Galacticraft hook: 高速上升自动开星系 GUI (`MTGalacticraftSpaceHandler`)
 - Vanilla "moved too quickly" 上限 (`MixinNetHandlerPlayServer_MovedTooQuickly`)
 - `/messtech GoUp [秒数]` (`MTCommand` / `MTGoUpFlight`)
@@ -119,6 +124,13 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - 9.6 验证记录（`spotlessApply build`、无头 120 帧、别名生效、音频初始化/收尾、按键模型自检、
   音乐在 Java 8 / JDK 25 两种模式下的证据、引擎端到端 85.5 KB/s）
 
+### `docs/text-fx/design.md` - 文字动态特效（字体级 shader 渲染管线）
+- `common/text/effect/*`（标记语法/解析/预设）+ `client/text/*`（布局、遮罩缓存、渲染器、Angelica 兼容）
+  + `client/text/effect/*`（`TextShader` / `ShaderTextEffect` / 8 个内置效果）+ `assets/messtech/shaders/text/`
+- 8 个原创 frag（`datafall` / `eventhorizon` / `inkbloom` / `magnetar` / `resonance` / `beamcut` /
+  `cipher` / `petalfall`），契约见同目录设计稿；`Config.TEXT_EFFECTS` 总开关，`/messtechfx` 游戏内预览
+- 预览：同目录 `preview.html`（单文件、`file://` 可开，主预览 + 图鉴卡片实时渲染）
+
 ## Verification
 
 - **Run the checks once, at the end - not after every edit.** A change that is still in progress does not have to
@@ -137,7 +149,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   `docs/GT5U-NOTES.md` § 0 - it lists what is already decompiled on disk, notably
   `build/rfg/minecraft-src/java/` for Forge + vanilla `net.minecraft.*` / `cpw.mods.fml.*` and
   `tmp/GT5-Unofficial-beta3/` for the GT5U **5.09.54.133 snapshot** (note: the compile dependency is resolved
-  from the `gtnhVersion` manifest in `dependencies.gradle` and is newer - 5.09.54.183 as of 2.9.0-RC-1 - so check
+  from the `gtnhVersion` manifest in `dependencies.gradle` and is newer - 5.09.54.205 as of 2.9.0-RC-2 - so check
   version-sensitive APIs against the resolved jar and see `tmp/Compare.md` for what moved); (2) the rest of `tmp/`; (3) only if
   neither has it, unpack or decompile the jar from the gradle cache. Do not start at (3).
 - When a check *is* asked for, prefer the narrowest thing that proves the change; do not sweep the whole

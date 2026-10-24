@@ -14,16 +14,16 @@ import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.MetaTileEntity;
 
 /**
- * Speed module: multiplies the duration of the recipes of the machine it is built into.
+ * Speed module: multiplies the recipe duration of the machine it is built into.
  * <p>
- * The values are MessTech's own fixed table, see {@link MTModuleValues#speedBonus(int)}: IV runs recipes at 0.95x
- * the duration and MAX at 0.01x, i.e. 100x as fast.
+ * MessTech's own fixed table, see {@link MTModuleValues#speedBonus(int)}: 0.95x duration at IV, 0.01x at MAX (100x as
+ * fast).
  */
 public class MTModuleSpeedHatch extends MTModuleHatchBase {
 
     private static final Set<MTModuleType> TYPES = Collections.unmodifiableSet(EnumSet.of(MTModuleType.SPEED_BONUS));
 
-    /** Decal of this module, {@code assets/messtech/textures/blocks/ModuleHatch/OVERLAY_SpeedController.png}. */
+    /** Decal: {@code assets/messtech/textures/blocks/ModuleHatch/OVERLAY_SpeedController.png}. */
     private static final String OVERLAY_PATH = "ModuleHatch/OVERLAY_SpeedController";
 
     public MTModuleSpeedHatch(int aID, String aName, String aNameRegional, int aTier) {

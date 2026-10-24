@@ -24,36 +24,34 @@ import gregtech.api.render.TextureFactory;
 import gregtech.api.util.GTUtility;
 
 /**
- * Cold-coolant port of {@code MTReactor}'s fluid ("wet") mode. IC2's coolant goes in here, the same amount of hot
- * coolant leaves through {@link MTReactorHotCoolantOutputHatch}, and the pair is what lets a page be cooled without a
- * single coolant cell.
+ * Cold-coolant port of {@code MTReactor}'s fluid ("wet") mode: IC2 coolant in, the same amount of hot coolant out
+ * through
+ * {@link MTReactorHotCoolantOutputHatch}.
  * <p>
- * <b>It is a through-put, not a heat sink.</b> The conversion is MessTech's own 1 mB of coolant per 1 HU of buffered
- * component heat ({@code MTReactorHeatSystem#coolantForHeat}) - <em>not</em> IC2's x2 factor - and the hot coolant that
- * leaves is the same amount. A page of quad rods emits roughly 24,000 HU/s, so a wet reactor only stays cool while
- * coolant keeps arriving and someone keeps taking the hot coolant away; with the feed cut the loop simply cools
- * nothing and the core keeps the heat.
+ * <b>Through-put, not a heat sink:</b> 1 mB coolant per 1 HU of buffered component heat
+ * ({@code MTReactorHeatSystem#coolantForHeat}), MessTech's own ratio, <em>not</em> IC2's x2. A page of quad rods emits
+ * ~24,000 HU/s, so the loop stays cool only while coolant arrives and hot coolant leaves; without feed it cools nothing
+ * and the core keeps the heat.
  * <p>
- * <b>Tier.</b> Deliberately a single variant at EV: it is plumbing, not a tier gate, and EV's
- * {@code 8000 * 2^4 = 128,000 mB} tank already holds twice the 64,000 mB one full cycle can ask for. Nothing in the
- * reactor structure compares this hatch's tier (the heat control hatch is the tier gate), so the same hatch fits a
- * UIV controller.
+ * <b>Tier:</b> one EV variant on purpose (plumbing, not a tier gate); EV's {@code 8000 * 2^4 = 128,000 mB} tank holds
+ * twice
+ * the 64,000 mB one cycle asks for. No structure check compares this tier (the heat control hatch is the gate), so it
+ * fits
+ * a UIV controller.
  * <p>
- * <b>Texture.</b> Base texture = multiblock casing, with GT's own fluid input pipe overlay kept so the port is
- * recognisable as a fluid input from the outside. The dedicated MessTech coolant decal is still pending, so the
- * existing {@code hatch/Hatch_Reactor_Temp_Control} panel stands in for it - replace {@link #OVERLAY_PATH} once the
- * coolant art exists.
+ * <b>Texture:</b> multiblock casing + GT's fluid input pipe overlay. The coolant decal is pending, so
+ * {@code hatch/Hatch_Reactor_Temp_Control} stands in - replace {@link #OVERLAY_PATH} once it exists.
  */
 public class MTReactorCoolantInputHatch extends MTEHatchInput {
 
-    /** Fixed tier of this hatch (EV). See the class comment for why it is not a tier family. */
+    /** Fixed tier (EV); the class comment says why it is not a tier family. */
     public static final int TIER = 4;
 
-    /** Registry name of IC2's cold coolant, see {@code ic2.core.init.BlocksItems#registerIC2fluid}. */
+    /** Registry name of IC2's cold coolant ({@code ic2.core.init.BlocksItems#registerIC2fluid}). */
     public static final String COOLANT_FLUID_NAME = "ic2coolant";
 
     private static final String OVERLAY_DOMAIN = "messtech";
-    /** Decal path relative to {@code textures/blocks}, matching {@code Textures.BlockIcons.custom}. */
+    /** Decal path relative to {@code textures/blocks} ({@code Textures.BlockIcons.custom}). */
     private static final String OVERLAY_PATH = "hatch/Hatch_Reactor_Temp_Control";
 
     private static IIconContainer sCoolantOverlay;
@@ -72,23 +70,23 @@ public class MTReactorCoolantInputHatch extends MTEHatchInput {
     }
 
     /**
-     * The IC2 coolant, or {@code null} while no fluid is registered under that name (a pack without IC2 fluids). Every
+     * The IC2 coolant, or {@code null} while nothing is registered under that name (a pack without IC2 fluids). Every
      * look-up goes through the registry and is null checked, so such a pack gets a hatch that accepts nothing instead
-     * of a crash while the class loads.
+     * of
+     * crashing at class load.
      */
     public static Fluid getCoolantFluid() {
         return FluidRegistry.getFluid(COOLANT_FLUID_NAME);
     }
 
-    /** True when the given fluid is IC2's cold coolant. */
     public static boolean isCoolant(Fluid fluid) {
         Fluid coolant = getCoolantFluid();
         return coolant != null && fluid == coolant;
     }
 
     /**
-     * The coolant filter is fixed: this hatch is the reactor's coolant port and anything else in the tank would just be
-     * in the way. It cannot be switched off (see {@link #onScrewdriverRightClick}).
+     * The coolant filter is fixed: this is the reactor's coolant port and anything else would just be in the way. It
+     * cannot be switched off (see {@link #onScrewdriverRightClick}).
      */
     @Override
     public boolean isFluidInputAllowed(FluidStack aFluid) {
@@ -96,9 +94,8 @@ public class MTReactorCoolantInputHatch extends MTEHatchInput {
     }
 
     /**
-     * The GT input hatch's screwdriver switch would toggle {@code disableFilter} and announce that the filter is off
-     * while {@link #isFluidInputAllowed} keeps rejecting every other fluid - a lie. The hatch therefore answers with
-     * the real state instead of toggling anything.
+     * GT's screwdriver switch would toggle {@code disableFilter} and announce the filter is off while
+     * {@link #isFluidInputAllowed} keeps rejecting every other fluid - a lie. So report the real state, toggle nothing.
      */
     @Override
     public void onScrewdriverRightClick(ForgeDirection side, EntityPlayer aPlayer, float aX, float aY, float aZ,
@@ -108,21 +105,17 @@ public class MTReactorCoolantInputHatch extends MTEHatchInput {
 
     // region Coolant API used by MTReactor's fluid cycle
 
-    /**
-     * Cold coolant held by this hatch.
-     *
-     * @param coolant the fluid to report on; any other fluid - and an empty tank - reports 0.
-     */
+    /** Cold coolant held by this hatch; any other fluid - and an empty tank - reports 0. */
     public int getCoolantAmount(Fluid coolant) {
         if (mFluid == null || coolant == null) return 0;
         return mFluid.getFluid() == coolant ? mFluid.amount : 0;
     }
 
     /**
-     * Drains at most {@code amount} mB of cold coolant out of the tank.
+     * Drains at most {@code amount} mB of cold coolant.
      *
-     * @return the mB actually drained, never more than {@code amount} and never more than the tank held - the caller
-     *         can rely on it the same way it relies on {@code fill}'s return value.
+     * @return mB actually drained, never more than {@code amount} or the tank held - callers rely on it like on
+     *         {@code fill}'s return value.
      */
     public int drainCoolant(Fluid coolant, int amount) {
         if (amount <= 0) return 0;
@@ -133,9 +126,9 @@ public class MTReactorCoolantInputHatch extends MTEHatchInput {
     }
 
     /**
-     * Puts cold coolant back into the tank, for a cycle that drained coolant and could not deliver the hot coolant.
+     * Puts coolant back for a cycle that drained it and could not deliver the hot coolant.
      *
-     * @return the mB actually taken back, capped by the free tank space (the tank is 128,000 mB at EV)
+     * @return mB actually taken back, capped by free tank space (128,000 mB at EV)
      */
     public int refundCoolant(Fluid coolant, int amount) {
         if (coolant == null || amount <= 0) return 0;
@@ -174,9 +167,10 @@ public class MTReactorCoolantInputHatch extends MTEHatchInput {
     }
 
     /**
-     * Keeps GT's fluid pipe overlay (the base array) and layers the reactor decal on top of it. Unlike the access
-     * hatch this hatch does not restrict {@code isFacingValid}: a coolant port legitimately sits on any casing face
-     * including the top and bottom, fluids go in from every side anyway, and only the decal's direction would suffer.
+     * Keeps GT's fluid pipe overlay (the base array) and layers the reactor decal on top. {@code isFacingValid} is not
+     * restricted (unlike the access hatch): a coolant port sits on any casing face incl. top and bottom, fluids enter
+     * from
+     * every side and only the decal's direction would suffer.
      */
     private ITexture[] withDecal(ITexture[] aBaseTextures) {
         if (sCoolantOverlay == null) return aBaseTextures;

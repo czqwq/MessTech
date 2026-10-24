@@ -19,27 +19,28 @@ import gregtech.api.metatileentity.implementations.MTEHatch;
 import gregtech.api.render.TextureFactory;
 
 /**
- * Tiered reactor heat control hatch. A reactor needs exactly one of these.
+ * Tiered reactor heat control hatch; a reactor needs exactly one.
  * <p>
- * The tier sets the heat ceiling of the reactor: every page of every {@link MTReactorAccessHatch} uses this value as
- * its {@code maxHeat}, so the player picks how much heat the reactor can take before it explodes. The base texture is
- * the multiblock casing; the heat control decal from
- * {@code assets/messtech/textures/blocks/hatch/Hatch_Reactor_Temp_Control.png} is layered on the front face.
+ * The tier sets the reactor's heat ceiling: every page of every {@link MTReactorAccessHatch} uses it as
+ * {@code maxHeat}.
+ * Base texture = multiblock casing + {@code assets/messtech/textures/blocks/hatch/Hatch_Reactor_Temp_Control.png} on
+ * the
+ * front face.
  * <p>
- * The tier is also the cap for the access hatches ({@link #getHeatControlTier()}): a reactor whose heat hatch is EV
- * refuses a UHV access hatch next to it. This is deliberately the same number as the heat ceiling's tier, so one
- * hatch cannot buy pages without also buying heat headroom.
- * <p>
- * Every ceiling is finite, UIV included: {@link MTReactorHeatSystem#MAX_HEAT_CAPACITY} caps the whole scale so the
- * heat effects ({@code heat / maxHeat} at 40 / 50 / 70 / 85 / 100%) stay reachable at every tier.
+ * The tier also caps the access hatches ({@link #getHeatControlTier()}): an EV heat hatch refuses a UHV access hatch -
+ * deliberately the same number as the ceiling's tier, so one hatch cannot buy pages without heat headroom. Every
+ * ceiling
+ * is finite, UIV included ({@link MTReactorHeatSystem#MAX_HEAT_CAPACITY}), so the heat effects ({@code heat / maxHeat}
+ * at
+ * 40 / 50 / 70 / 85 / 100%) stay reachable at every tier.
  */
 public class MTReactorHeatHatch extends MTEHatch {
 
-    /** Lowest tier supported by this hatch (EV). */
+    /** Lowest tier (EV). */
     public static final int MIN_TIER = 4;
-    /** Highest tier supported by this hatch (UIV). */
+    /** Highest tier (UIV). */
     public static final int MAX_TIER = 11;
-    /** Heat ceiling used while no heat hatch is installed (identical to the EV hatch). */
+    /** Ceiling used while no heat hatch is installed (= the EV hatch). */
     public static final int DEFAULT_HEAT_CAPACITY = 10_000;
 
     private static final String OVERLAY_DOMAIN = "messtech";
@@ -49,10 +50,11 @@ public class MTReactorHeatHatch extends MTEHatch {
     /**
      * Heat ceiling per tier, indexed by {@code tier - MIN_TIER} (EV .. UIV).
      * <p>
-     * The UIV entry used to be {@code Integer.MAX_VALUE}, which quietly switched the heat risk model off: the heat
-     * effects compare {@code heat / maxHeat} against the 40 / 50 / 70 / 85 / 100% thresholds, and at a 2.1e9 ceiling
-     * no reachable amount of hull heat drives that ratio anywhere near them. It is
-     * {@link MTReactorHeatSystem#MAX_HEAT_CAPACITY} (50,000,000) instead, so every tier's thresholds are reachable.
+     * UIV is {@link MTReactorHeatSystem#MAX_HEAT_CAPACITY} (50,000,000), not {@code Integer.MAX_VALUE}: the heat
+     * effects
+     * compare {@code heat / maxHeat} with the 40 / 50 / 70 / 85 / 100% thresholds, which at a 2.1e9 ceiling no
+     * reachable
+     * hull heat could approach.
      */
     private static final int[] HEAT_CAPACITY = { 10_000, 20_000, 50_000, 100_000, 200_000, 500_000, 1_000_000,
         MTReactorHeatSystem.MAX_HEAT_CAPACITY };
@@ -73,7 +75,7 @@ public class MTReactorHeatHatch extends MTEHatch {
         super(aName, aTier, 0, aDescription, aTextures);
     }
 
-    /** Heat ceiling of a tier, clamped into the supported EV..UIV range. */
+    /** Heat ceiling of a tier, clamped into EV..UIV. */
     public static int getHeatCapacityForTier(int aTier) {
         int index = aTier - MIN_TIER;
         if (index < 0) return HEAT_CAPACITY[0];
@@ -81,14 +83,13 @@ public class MTReactorHeatHatch extends MTEHatch {
         return HEAT_CAPACITY[index];
     }
 
-    /** Heat ceiling this hatch grants to the reactor. */
     public int getHeatCapacity() {
         return getHeatCapacityForTier(mTier);
     }
 
     /**
-     * The tier of this hatch. The reactor uses it twice: as the index into {@link #HEAT_CAPACITY} for the ceiling, and
-     * (see {@code MTReactor.checkMachine}) as the highest tier an access hatch of the same structure may have.
+     * This hatch's tier, used twice by the reactor: as the index into {@link #HEAT_CAPACITY} and (see
+     * {@code MTReactor.checkMachine}) as the highest access hatch tier of the structure.
      */
     public int getHeatControlTier() {
         return mTier;
@@ -110,9 +111,10 @@ public class MTReactorHeatHatch extends MTEHatch {
     }
 
     /**
-     * Only horizontal facings are allowed so the front decal can never end up on the top or bottom face. The base
-     * tile entity defaults to {@link ForgeDirection#DOWN}, and {@code setFrontFacing} refuses to change an invalid
-     * facing, so the access hatch uses the same restriction and first-tick fallback.
+     * Horizontal facings only, so the front decal never lands on top/bottom. The base tile entity defaults to
+     * {@link ForgeDirection#DOWN} and {@code setFrontFacing} refuses an invalid facing, so this mirrors the access
+     * hatch's
+     * restriction and first-tick fallback.
      */
     @Override
     public boolean isFacingValid(ForgeDirection facing) {

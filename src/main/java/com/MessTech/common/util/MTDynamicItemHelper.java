@@ -39,79 +39,67 @@ import gregtech.common.config.Client;
 import gregtech.common.render.items.GlitchEffectRenderer;
 
 /**
- * Helper for "dynamic" items: one item, several looks, selected through {@link ItemStack#getItemDamage()}.
+ * Helper for "dynamic" items: one item, several looks, picked through {@link ItemStack#getItemDamage()}.
  * <p>
- * An item decides how many looks it has by registering one icon per {@link Effect} ({@link #registerIcons}) and by
- * asking this class for a renderer ({@link #registerItemRenderer}). The damage value of a stack is the index of the
- * effect it currently shows, so {@link #cycleEffect(ItemStack)} (used by shift + right click) simply walks the enum.
+ * Per {@link Effect}: one icon ({@link #registerIcons}), one renderer ({@link #registerItemRenderer}); damage value =
+ * effect index, so {@link #cycleEffect(ItemStack)} (shift + right click) walks the enum.
  * <p>
- * Each {@link Effect} copies one of GT5U's animated item renderers, which is what makes the effects look and behave
- * exactly like the GT items that use them:
+ * Each {@link Effect} copies a GT5U animated renderer, so the looks match the GT items:
  * <ul>
- * <li>{@link Style#TUMBLE} - {@code TranscendentMetalRenderer}: the flat quad tumbles around the oblique axis
- * (0.3, 0.5, 0.2) by 3.5 degrees per client tick, i.e. the "Transcendent Metal" animation.</li>
- * <li>{@link Style#HALO_PULSE} - {@code InfinityRenderer}: a dark halo behind the icon plus a randomly scaling
- * translucent copy of the icon on top of it. Used by Infinity, Eternity and MagMatter in GT5U; the animated part of
- * those materials is their texture strip, the renderer itself only pulses it.</li>
- * <li>{@link Style#UNIVERSIUM} - {@code UniversiumRenderer}: the plain icon, then gtnhlib's cosmic star shader draws
- * the Universium look on top of it. The shader keeps only the icon's alpha, so anything the sprite draws loses its
- * colour to the star field; an item can hand a second icon to {@link #registerUniversiumOverlay} to get it back.</li>
- * <li>{@link Style#GLITCH} - {@code GlitchEffectRenderer}: red and cyan ghost copies jittering around the icon for
- * 10 ticks every 100 ticks.</li>
+ * <li>{@link Style#TUMBLE} - {@code TranscendentMetalRenderer}: quad tumbles about the oblique axis
+ * (0.3, 0.5, 0.2), 3.5 degrees per client tick.</li>
+ * <li>{@link Style#HALO_PULSE} - {@code InfinityRenderer}: dark halo behind the icon plus a randomly scaling
+ * translucent copy on top (Infinity, Eternity, MagMatter: strips animate, renderer pulses).</li>
+ * <li>{@link Style#UNIVERSIUM} - {@code UniversiumRenderer}: icon, then gtnhlib's cosmic star shader (alpha only); a
+ * second icon from {@link #registerUniversiumOverlay} restores the colour.</li>
+ * <li>{@link Style#GLITCH} - {@code GlitchEffectRenderer}: red and cyan ghosts jittering around the icon, 10 ticks
+ * every 100.</li>
  * </ul>
- * Because the look is picked from the damage value, an item can use exactly one effect at a time. Stacking several
- * renderers on one stack is not supported on purpose.
+ * One effect per item by design; no stacking.
  * <p>
- * The icons themselves are expected to be pre-rendered per material (see {@code assets/messtech/textures/items/pigs}):
- * tinting a 32x32 pixel-art icon through {@code GL11.glColor4f} would flatten the shading of the whole picture, so the
- * material look is baked into the PNG instead. Animated effects need their own {@code .mcmeta} next to the PNG, and
- * every icon of one item must use the same frame size.
+ * Icons are pre-rendered per material (see {@code assets/messtech/textures/items/pigs}): {@code GL11.glColor4f} would
+ * flatten a 32x32 pixel-art icon's shading, so the look is baked into the PNG; animated effects need their own
+ * {@code .mcmeta}, all icons of one item the same frame size.
  * <p>
- * Icon names are relative to {@code textures/items/}: the item atlas adds that folder itself, so a base path of
- * {@code pigs/pig} points at {@code assets/messtech/textures/items/pigs/pig.png}. Adding an {@code items/} prefix
- * makes the atlas look for {@code textures/items/items/...} and every icon turns into the purple/black missing
- * texture.
+ * Icons live under {@code textures/items/} (atlas-added): {@code pigs/pig} ->
+ * {@code assets/messtech/textures/items/pigs/pig.png}; an {@code items/} prefix gives
+ * {@code textures/items/items/...}, i.e. the purple/black missing texture.
  */
 public final class MTDynamicItemHelper {
 
-    /** Texture domain of the icons: they live in {@code assets/messtech/textures/}. */
+    /** Icon domain: {@code assets/messtech/textures/}. */
     public static final String TEXTURE_DOMAIN = "messtech";
 
-    /**
-     * Suffix of the icon {@link #registerUniversiumOverlay} registers: for a base path of {@code pigs/pig} it is
-     * {@code pigs/pigUniversiumFace}.
-     */
+    /** {@link #registerUniversiumOverlay} icon suffix: {@code pigs/pig} -> {@code pigs/pigUniversiumFace}. */
     public static final String UNIVERSIUM_OVERLAY_SUFFIX = "UniversiumFace";
 
     private static final Random RANDOM = new Random();
 
-    /** Frames of the glitch animation before it repeats, and how long the glitch lasts. */
+    /** Glitch timing, in 10 ms frames. */
     private static final long GLITCH_FRAME_NANOS = 10_000_000L;
     private static final int GLITCH_LOOP_FRAMES = 200;
     private static final int GLITCH_DURATION_FRAMES = 40;
     private static final int GLITCH_MOVE_FRAMES = 5;
     private static final double GLITCH_MAX_OFFSET = 1.7D;
 
-    /** Copy of the offsets {@code GlitchEffectRenderer} keeps per instance, so the shared renderer can hold one set. */
+    /** Offsets {@code GlitchEffectRenderer} keeps per instance; the shared renderer holds one. */
     private static double glitchOffsetRed;
     private static double glitchOffsetCyan;
 
     /**
-     * The oblique axis {@link Style#TUMBLE} turns about, as {@code GL11.glRotatef} takes it - the axis of GT5U's
-     * {@code TranscendentMetalRenderer}. Public because the player model that wears such an item tumbles about it as
-     * well ({@code MTPiggyHatRenderer}).
+     * Oblique axis of the {@link Style#TUMBLE} spin, as {@code GL11.glRotatef} takes it (GT5U's
+     * {@code TranscendentMetalRenderer}); public for {@code MTPiggyHatRenderer}, which tumbles a worn item too.
      */
     public static final float TUMBLE_AXIS_X = 0.3F, TUMBLE_AXIS_Y = 0.5F, TUMBLE_AXIS_Z = 0.2F;
 
-    /** How far one client tick of the game turns a {@link Style#TUMBLE} - the number of GT5U's renderer. */
+    /** Degrees per client tick, GT5U's number. */
     private static final float TUMBLE_DEGREES_PER_TICK = 3.5F;
 
     private MTDynamicItemHelper() {}
 
     /**
-     * The angle the {@link Style#TUMBLE} animation is at right now, in degrees. Every tumble reads this one clock -
-     * the item in the inventory, the pig on a head and the player model wearing it - so the three cannot drift
-     * apart. The clock is {@link GTMod#clientProxy()}'s, so the animation stops together with the game.
+     * Current {@link Style#TUMBLE} angle in degrees; one clock for inventory, head and player model so they cannot
+     * drift, and {@link GTMod#clientProxy()}'s so it stops with the game.
      */
     @SideOnly(Side.CLIENT)
     public static float tumbleAngle() {
@@ -120,8 +108,8 @@ public final class MTDynamicItemHelper {
     }
 
     /**
-     * @return whether the stack wears the Transcendent Metal tumble right now, GT5U's fancy-graphics switch for that
-     *         animation included. A player who wears such a stack in the helmet slot tumbles with it.
+     * @return whether the stack wears the Transcendent Metal tumble now, GT5U's fancy-graphics switch included; a
+     *         helmet-wearing player tumbles too.
      */
     @SideOnly(Side.CLIENT)
     public static boolean isTumbling(ItemStack stack) {
@@ -131,46 +119,41 @@ public final class MTDynamicItemHelper {
     /** How an {@link Effect} is drawn. */
     public enum Style {
 
-        /** Nothing special: the icon is drawn with the same pipeline GT5U uses for plain materials. */
+        /** The icon through GT5U's plain-material pipeline. */
         PLAIN,
-        /** GT5U's Transcendent Metal animation. */
         TUMBLE,
-        /** GT5U's Infinity / Eternity / MagMatter animation. */
         HALO_PULSE,
-        /** GT5U's Universium cosmic shader. */
         UNIVERSIUM,
-        /** GT5U's Six-Phased Copper glitch. */
         GLITCH
     }
 
     /**
-     * The looks an item can cycle through, in the order the player sees them. The ordinal is the damage value of the
-     * stack, so {@link #NONE} has to stay at index 0: an unregistered/damaged stack then falls back to the plain icon.
+     * Looks an item cycles through, in player-visible order; the ordinal is the damage value, so {@link #NONE} must
+     * stay at index 0 (fallback for unregistered/damaged stacks).
      */
     public enum Effect {
 
         NONE("", "plain", Style.PLAIN),
-        /** GT5U Transcendent Metal: dark metal tint plus the tumbling preview. */
+        /** GT5U Transcendent Metal, dark metal tint. */
         TRANSCENDENT_METAL("TranscendentMetal", "transcendentMetal", Style.TUMBLE),
-        /** GT5U Infinity: the animated rainbow-ish strip with halo and pulse. */
+        /** GT5U Infinity, rainbow-ish strip. */
         INFINITY("Infinity", "infinity", Style.HALO_PULSE),
-        /** GT5U MagMatter: a greyscale flowing pattern, animated by the strip and pulsed by the renderer. */
+        /** GT5U MagMatter, greyscale flowing pattern. */
         MAGMATTER("MagMatter", "magMatter", Style.HALO_PULSE),
-        /** GT5U Eternity: animated strip with halo and pulse. */
+        /** GT5U Eternity, animated strip. */
         ETERNITY("Eternity", "eternity", Style.HALO_PULSE),
-        /** GT5U Universium: the icon is overlaid with the cosmic star shader. */
+        /** GT5U Universium, cosmic star shader. */
         UNIVERSIUM("Universium", "universium", Style.UNIVERSIUM),
-        /** GT5U Six-Phased Copper: the icon glitches into red and cyan ghosts from time to time. */
+        /** GT5U Six-Phased Copper, ghost copies. */
         SIX_PHASED_COPPER("SixPhasedCopper", "sixPhasedCopper", Style.GLITCH);
 
-        /** {@code values()} clones its backing array on every call, so the array is cached here. */
+        /** {@code values()} clones its array each call; cached. */
         public static final Effect[] VALUES = values();
 
-        /** Suffix appended to an item's base icon path to build this effect's icon name. */
+        /** Appended to the base icon path. */
         public final String iconSuffix;
-        /** Suffix of this effect's "messtech.itemEffect." translation key. */
+        /** Suffix of the "messtech.itemEffect." lang key. */
         public final String langSuffix;
-        /** How this effect is drawn. */
         public final Style style;
 
         Effect(String iconSuffix, String langSuffix, Style style) {
@@ -179,33 +162,29 @@ public final class MTDynamicItemHelper {
             this.style = style;
         }
 
-        /** @return the localised name of this effect, e.g. "Infinity". */
         public String getDisplayName() {
             return StatCollector.translateToLocal("messtech.itemEffect." + langSuffix);
         }
 
-        /** @return the effect with the given damage value, or {@link #NONE} when the value is out of range. */
+        /** @return effect for that damage value, {@link #NONE} out of range. */
         public static Effect byIndex(int index) {
             return index >= 0 && index < VALUES.length ? VALUES[index] : NONE;
         }
 
-        /** @return the next effect, wrapping around at the end. */
+        /** @return the next effect, wrapping at the end. */
         public Effect next() {
             return VALUES[(ordinal() + 1) % VALUES.length];
         }
     }
 
     /**
-     * Registers one icon per {@link Effect} using the given base path, e.g. {@code "pigs/pig"}:
-     * {@code pig}, {@code pigTranscendentMetal}, {@code pigInfinity}, ...
+     * Registers one icon per {@link Effect} from a base path, e.g. {@code "pigs/pig"} -> {@code pig},
+     * {@code pigTranscendentMetal}, {@code pigInfinity}, ...
      * <p>
-     * The returned array is indexed by {@link Effect#ordinal()}, i.e. by the damage value of a stack, so it can be
-     * handed to the item as-is.
+     * Indexed by {@link Effect#ordinal()}, i.e. the damage value, so hand the array over as-is.
      *
-     * @param register the icon register of the item
-     * @param basePath icon path without domain, without the per-effect suffix and without an {@code items/} prefix
-     *                 (the item atlas prepends {@code textures/items/} on its own)
-     * @return the icons, one per effect
+     * @param basePath icon path without domain, per-effect suffix or {@code items/} prefix (the atlas prepends
+     *                 {@code textures/items/})
      */
     @SideOnly(Side.CLIENT)
     public static IIcon[] registerIcons(IIconRegister register, String basePath) {
@@ -219,21 +198,15 @@ public final class MTDynamicItemHelper {
     }
 
     /**
-     * Registers the icon an item wants drawn over its {@link Style#UNIVERSIUM} look, next to the per-effect icons
-     * from {@link #registerIcons}: for a base path of {@code pigs/pig} the file is
-     * {@code assets/messtech/textures/items/pigs/pigUniversiumFace.png}.
+     * Registers the icon over an item's {@link Style#UNIVERSIUM} look, beside the per-effect icons of
+     * {@link #registerIcons}: {@code pigs/pig} -> {@code assets/messtech/textures/items/pigs/pigUniversiumFace.png}.
      * <p>
-     * The cosmic shader throws the icon's colour away - it reads the icon's alpha and paints the star field over
-     * everything else - so any detail the sprite carries (the piggy's eyes and snout, for instance) ends up behind
-     * the stars. The icon registered here is drawn back on top of the finished shader, so it is what the player
-     * sees in front of the sky.
-     * <p>
-     * The sky is dark, so an overlay painted in the material's own colour would be invisible on it: hand in the
-     * untinted art, not one of the {@link Effect} builds.
+     * The shader keeps only the icon's alpha and paints the sky over the rest, so detail (piggy eyes, snout) ends up
+     * behind the stars; this icon goes on top of the finished shader. Dark sky, so pass untinted art.
      *
-     * @param item     the item the overlay belongs to, i.e. the one passed to {@link #registerItemRenderer}
-     * @param register the item's icon register, i.e. the one {@link Item#registerIcons} is called with
-     * @param basePath base icon path, exactly as passed to {@link #registerIcons}
+     * @param item     as given to {@link #registerItemRenderer}
+     * @param register the register {@link Item#registerIcons} gets
+     * @param basePath as given to {@link #registerIcons}
      */
     @SideOnly(Side.CLIENT)
     public static void registerUniversiumOverlay(Item item, IIconRegister register, String basePath) {
@@ -243,13 +216,12 @@ public final class MTDynamicItemHelper {
     }
 
     /**
-     * Checks that the PNG of an icon really exists in the resource pack and logs a warning if it does not.
+     * Logs a warning when an icon PNG is missing from the resource pack.
      * <p>
-     * 1.7.10 replaced the "using missing texture" error with FML's silent missing texture tracking
-     * ({@code TextureMap} line 189), so a typo in {@code basePath} only shows up in game as the purple/black checker
-     * board. Checking the pack here turns that silence into a log line.
+     * 1.7.10 replaced the "using missing texture" error with FML's silent tracking ({@code TextureMap} line 189): a
+     * bad {@code basePath} only shows as the purple/black board, which this logs.
      *
-     * @param iconName the registered icon name, i.e. the path below {@code textures/items} without the extension
+     * @param iconName path below {@code textures/items}, no extension
      */
     @SideOnly(Side.CLIENT)
     private static void warnIfIconFileMissing(String iconName) {
@@ -259,7 +231,7 @@ public final class MTDynamicItemHelper {
 
         ResourceLocation file = new ResourceLocation(TEXTURE_DOMAIN, "textures/items/" + iconName + ".png");
         try {
-            // 1.7.10 has no IResourceManager#resourceExists, so the lookup itself is the existence check.
+            // 1.7.10 has no IResourceManager#resourceExists, so the lookup is the existence check.
             resources.getResource(file);
         } catch (IOException e) {
             MessTech.MT_LOG
@@ -267,20 +239,19 @@ public final class MTDynamicItemHelper {
         }
     }
 
-    /** @return the effect the given stack currently shows, {@link Effect#NONE} for a null stack. */
+    /** @return the stack's effect, {@link Effect#NONE} for a null stack. */
     public static Effect getEffect(ItemStack stack) {
         return stack == null ? Effect.NONE : Effect.byIndex(stack.getItemDamage());
     }
 
-    /** Makes the given stack show the given effect. */
     public static void setEffect(ItemStack stack, Effect effect) {
         if (stack != null) stack.setItemDamage(effect.ordinal());
     }
 
     /**
-     * Switches the given stack to the next effect, wrapping around.
+     * Switches the stack to the next effect, wrapping around.
      *
-     * @return the effect the stack shows afterwards
+     * @return the effect shown afterwards
      */
     public static Effect cycleEffect(ItemStack stack) {
         Effect next = getEffect(stack).next();
@@ -289,8 +260,8 @@ public final class MTDynamicItemHelper {
     }
 
     /**
-     * Registers the shared effect renderer for an item: the icon is read from {@link Item#getIcon(ItemStack, int)} and
-     * the effect from the damage value, so no extra renderer class is needed per item.
+     * Registers the shared effect renderer: icon from {@link Item#getIcon(ItemStack, int)}, effect from the damage
+     * value; no renderer class per item.
      */
     @SideOnly(Side.CLIENT)
     public static void registerItemRenderer(Item item) {
@@ -298,24 +269,19 @@ public final class MTDynamicItemHelper {
     }
 
     /**
-     * Draws the look of the given stack standing on the head of the given wearer: the same sprite the item renderer
-     * draws, in the space a player model is drawn in - the one {@code RenderPlayerEvent.Specials} hands out and
-     * vanilla puts the pumpkin and the skull in. {@code MTPiggyHatRenderer} sets that space up.
+     * Draws a stack standing on the wearer's head, in player-model space: the {@code RenderPlayerEvent.Specials} one,
+     * where vanilla puts the pumpkin and skull ({@code MTPiggyHatRenderer} sets it up).
      * <p>
-     * The sprite stands on the origin of the current matrix (its feet there, its top one unit above) and faces the
-     * way the wearer does, so whoever stands in front of the wearer sees the pig's face. The effect decides the rest:
+     * Sprite on the matrix origin (feet there, top one unit up), facing the wearer's way; the effect decides the
+     * rest:
      * <ul>
-     * <li>{@link Style#TUMBLE} tumbles - the same 3.5 degrees per client tick about the same oblique axis the item
-     * renderer uses - so the Transcendent Metal pig animates on the head instead of being a still picture.</li>
-     * <li>{@link Style#UNIVERSIUM} brings its cosmic shader along: the sky is drawn over the sprite in the same
-     * three passes the item renderer uses in the world, the stack's overlay last.</li>
-     * <li>Everything else is the sprite on its own, which is already the whole look outside of a GUI: GT5U draws the
-     * halo and the pulse of {@link Style#HALO_PULSE} and the ghosts of {@link Style#GLITCH} in the inventory only,
-     * and the animated material strips of the other effects animate by themselves.</li>
+     * <li>{@link Style#TUMBLE}: the item renderer's tumble about the sprite centre.</li>
+     * <li>{@link Style#UNIVERSIUM}: its cosmic shader, the same three passes as in the world, overlay last.</li>
+     * <li>Else: the sprite alone - GT5U draws {@link Style#HALO_PULSE}'s halo/pulse and {@link Style#GLITCH}'s ghosts
+     * in inventory only; other strips animate themselves.</li>
      * </ul>
      *
-     * @param wearer the entity the head belongs to; its position is what lights the cosmic shader
-     * @param stack  the worn stack
+     * @param wearer its position lights the cosmic shader
      */
     @SideOnly(Side.CLIENT)
     public static void renderOnHead(Entity wearer, ItemStack stack) {
@@ -323,8 +289,8 @@ public final class MTDynamicItemHelper {
     }
 
     /**
-     * Honours GT5U's "fancy" accessibility switches: when a player turned an effect off there, the plain icon is drawn
-     * instead, exactly like GT5U itself falls back to {@code GeneratedMaterialRenderer}.
+     * Honours GT5U's "fancy" switches: an effect a player turned off draws the plain icon, as with the
+     * {@code GeneratedMaterialRenderer} fallback in GT5U.
      */
     @SideOnly(Side.CLIENT)
     private static boolean isFancyEnabled(Style style) {
@@ -339,16 +305,15 @@ public final class MTDynamicItemHelper {
     }
 
     /**
-     * The renderer shared by every item registered through {@link #registerItemRenderer}. All methods are static
-     * because the renderer is stateless apart from the glitch offsets, which GT5U also keeps per renderer.
+     * Renderer shared by every item registered through {@link #registerItemRenderer}; the only state is the glitch
+     * offsets, which GT5U also keeps per renderer.
      */
     @SideOnly(Side.CLIENT)
     private static final class EffectRenderer implements IItemRenderer {
 
         /**
-         * The icons of {@link #registerUniversiumOverlay}, keyed by item. Both ends of this map are client only -
-         * it is filled while the item atlas is stitched and read while an item is drawn - so it lives here rather
-         * than in the outer class, which the server also loads.
+         * Icons of {@link #registerUniversiumOverlay}, keyed by item. Client only, so not in the outer class the
+         * server loads.
          */
         private static final Map<Item, IIcon> UNIVERSIUM_OVERLAYS = new IdentityHashMap<>();
 
@@ -384,9 +349,8 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Draws the stack's look standing on a head; the outer {@link MTDynamicItemHelper#renderOnHead} describes what
-         * the caller has to have set up. The sprite is the one {@link Item#getIcon(ItemStack, int)} hands out, i.e.
-         * the very sprite the inventory shows, so the look on the head is the look the stack carries everywhere else.
+         * Draws the stack's look standing on a head; the outer {@link MTDynamicItemHelper#renderOnHead} covers the
+         * caller's setup. Sprite from {@link Item#getIcon(ItemStack, int)}.
          */
         private static void renderOnHead(Entity wearer, ItemStack stack) {
             if (stack == null || stack.getItem() == null) return;
@@ -415,11 +379,9 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Copy of the animation {@link #applyTumbleTransform} gives an item, on a sprite that stands on a head: the
-         * same axis and the same 3.5 degrees per client tick, only about the centre of the sprite, which is half a
-         * unit up in the space {@link #drawStandingSprite} draws in.
-         * The axis is mirrored along Y and Z because that space is the mirrored one of a player model (its Y points
-         * down), which is what keeps the tumble turning the way it does in the inventory and in the hand.
+         * {@link #applyTumbleTransform} on a sprite standing on a head: same angles, but about the sprite centre, half
+         * a unit up. Y and Z are mirrored because model space is mirrored (its Y points down), which keeps the tumble
+         * turning as in inventory and hand.
          */
         private static void applyHeadTumbleTransform() {
             GL11.glTranslatef(0.0F, -0.5F, 0.0F);
@@ -428,10 +390,8 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Copy of the in-world half of {@link #renderUniversium} for a sprite standing on a head: the sprite is drawn
-         * once, then gtnhlib's cosmic star shader draws the star field over exactly the same geometry with the depth
-         * function at {@link GL11#GL_EQUAL}, so the stars land on the sprite and not on the head behind it, and
-         * finally the stack's overlay brings the details the shader painted away back in front of the finished sky.
+         * In-world half of {@link #renderUniversium} on a head: sprite once, then the cosmic shader over the same
+         * geometry with {@link GL11#GL_EQUAL} (stars on the sprite, not the head behind it), then the stack's overlay.
          */
         private static void renderHeadUniversium(Entity wearer, ItemStack stack, IIcon icon) {
             UniversiumShader shader = UniversiumShader.getInstance();
@@ -445,7 +405,6 @@ public final class MTDynamicItemHelper {
             GL11.glDepthFunc(GL11.GL_EQUAL);
             shader.use();
 
-            // RENDER COSMIC OVERLAY
             drawStandingSprite(icon);
 
             UniversiumShader.unbind();
@@ -454,8 +413,7 @@ public final class MTDynamicItemHelper {
             GL11.glDepthFunc(GL11.GL_LEQUAL);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
 
-            // The overlay is the sprite's own geometry, so GL_EQUAL still refers to the pixels the sprite pass wrote
-            // and the sky pass kept.
+            // Same geometry as the sprite pass, so GL_EQUAL still matches its pixels.
             IIcon overlay = UNIVERSIUM_OVERLAYS.get(stack.getItem());
             if (overlay == null) return;
 
@@ -464,14 +422,12 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Draws the given sprite standing on the origin of the current matrix: its feet stay on {@code y = 0}, it
-         * reaches up to {@code y = -1} and it is as wide as the sprite is (square for every pig icon, but the aspect
-         * is kept either way). For characters that stand in their picture - the pig does - that is the whole trick.
+         * Draws a sprite standing on the matrix origin: feet on {@code y = 0}, top at {@code y = -1}, width from the
+         * icon's aspect - the trick for characters drawn standing in their picture (the pig).
          * <p>
-         * Two things are mirrored compared to an item in the hand, because the model space of a player is: the sprite
-         * grows towards {@code -Y} (up is down in there) and it faces {@code -Z}, which is where the face of the
-         * wearer is. Its left-to-right order is the usual one either way - the mirrored X of the model space and the
-         * turn into the facing direction of the wearer cancel out - so the texture is not flipped.
+         * Mirrored because model space is: it grows towards {@code -Y} (up is down there), faces {@code -Z}, the
+         * wearer's face; left to right stays usual - mirrored X cancels the turn into the facing - so the texture is
+         * not flipped.
          */
         private static void drawStandingSprite(IIcon icon) {
             double halfWidth = 0.5D * icon.getIconWidth() / icon.getIconHeight();
@@ -487,7 +443,6 @@ public final class MTDynamicItemHelper {
             tessellator.draw();
         }
 
-        /** Plain material look: the icon on its own. */
         private static void renderPlain(ItemRenderType type, IIcon icon) {
             GL11.glPushMatrix();
             GL11.glEnable(GL11.GL_BLEND);
@@ -503,17 +458,17 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Copy of GT5U's {@code TranscendentMetalRenderer}: the flat quad is drawn with
-         * {@link net.minecraft.client.renderer.ItemRenderer#renderItemIn2D} instead of the vanilla pipeline, so it can
-         * be tumbled around the oblique axis (0.3, 0.5, 0.2) by 3.5 degrees per client tick. The angle comes from
-         * {@link GTMod#clientProxy()}, so the animation stops together with the game.
+         * Copy of GT5U's {@code TranscendentMetalRenderer}: the quad via
+         * {@link net.minecraft.client.renderer.ItemRenderer#renderItemIn2D}, not the vanilla pipeline, so it can
+         * tumble;
+         * the angle comes from {@link GTMod#clientProxy()}, so it stops with the game.
          */
         private static void renderTumble(ItemRenderType type, IIcon icon) {
             GL11.glPushMatrix();
             GL11.glPushAttrib(GL11.GL_ENABLE_BIT);
 
-            // Same order as GT5U's MetaGeneratedItemRenderer: standard transform first, then pretend fancy graphics is
-            // on (magic numbers taken from vanilla RenderItem) when it is off.
+            // Same order as GT5U's MetaGeneratedItemRenderer: transform, then fake fancy graphics (vanilla RenderItem
+            // numbers) if off.
             ItemRenderUtil.applyStandardItemTransform(type);
             if (type == ItemRenderType.ENTITY && !Minecraft.getMinecraft().gameSettings.fancyGraphics) {
                 if (RenderItem.renderInFrame) {
@@ -535,7 +490,7 @@ public final class MTDynamicItemHelper {
 
             boolean flipUv = type == ItemRenderType.INVENTORY;
             if (flipUv) {
-                // The inventory render space is 1 unit = 1 GUI pixel; renderItemIn2D draws a 1x1 quad.
+                // Inventory space is 1 unit = 1 GUI pixel; renderItemIn2D draws a 1x1 quad.
                 GL11.glScalef(16F, 16F, 32F);
             }
 
@@ -553,10 +508,10 @@ public final class MTDynamicItemHelper {
             GL11.glPopMatrix();
         }
 
-        /** Bit-for-bit copy of Transcendent Metal's rotation: pivot on the quad centre, tumble, then flip over. */
+        /** Transcendent Metal's rotation, copied: pivot on the quad centre, tumble, flip over. */
         private static void applyTumbleTransform(ItemRenderType type) {
             if (RenderItem.renderInFrame) {
-                // Float in front of the item frame to avoid z-fighting with its border.
+                // Float in front of the item frame, else z-fighting with the border.
                 GL11.glTranslatef(0.0F, 0.0F, -0.5F);
             }
 
@@ -576,14 +531,13 @@ public final class MTDynamicItemHelper {
                 GL11.glTranslatef(-0.5F, -0.5F, 0.0F);
             }
 
-            // Move the 2D quad onto the rotation axis (half of its thickness).
+            // Move the quad onto the rotation axis (half its thickness).
             GL11.glTranslatef(0.0F, 0.0F, 0.03125F);
         }
 
         /**
-         * Copy of GT5U's {@code InfinityRenderer}: in the inventory a dark halo is drawn behind the icon and a
-         * randomly scaling translucent copy on top of it; everywhere else the effect is skipped, which is what GT5U
-         * does as well (it only renders these two layers for {@link ItemRenderType#INVENTORY}).
+         * {@code InfinityRenderer}: in the inventory a dark halo behind the icon and a randomly scaling translucent
+         * copy on top; elsewhere both are skipped, as in GT5U ({@link ItemRenderType#INVENTORY} only).
          */
         private static void renderHaloPulse(ItemRenderType type, IIcon icon) {
             GL11.glPushMatrix();
@@ -608,7 +562,7 @@ public final class MTDynamicItemHelper {
             GL11.glPopMatrix();
         }
 
-        /** Copy of {@code InfinityRenderer#renderHalo}: a 10 pixel black spread around the 16x16 icon quad. */
+        /** {@code InfinityRenderer#renderHalo}: a 10 pixel black spread around the 16x16 icon quad. */
         private static void renderHalo() {
             IIcon halo = Textures.ItemIcons.HALO.getIcon();
             if (halo == null) return;
@@ -633,7 +587,7 @@ public final class MTDynamicItemHelper {
             tessellator.draw();
         }
 
-        /** Copy of {@code InfinityRenderer#renderPulse}: a copy of the icon at 60% alpha, scaled by a gaussian. */
+        /** {@code InfinityRenderer#renderPulse}: the icon at 60% alpha, scaled by a gaussian. */
         private static void renderPulse(IIcon... icons) {
             if (icons.length == 0) return;
 
@@ -662,14 +616,12 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Copy of GT5U's {@code UniversiumRenderer}: the icon is drawn once, then gtnhlib's cosmic star shader draws
-         * the star field over exactly the same geometry. In the inventory the second pass is drawn over the first one
-         * (there is no depth buffer to test against), outside of it the depth function is switched to
-         * {@link GL11#GL_EQUAL} so the stars only land on the icon itself.
+         * Copy of GT5U's {@code UniversiumRenderer}: the icon once, then gtnhlib's cosmic star shader over the same
+         * geometry. In inventory the second pass paints over the first (no depth buffer to test); outside, the depth
+         * function becomes {@link GL11#GL_EQUAL}, so stars land only on the icon.
          * <p>
-         * The shader writes its own colour wherever the icon is opaque, so the icon's own art ends up behind the
-         * sky. An item registered through {@link #registerUniversiumOverlay} therefore gets a third pass, once the
-         * sky is finished, with the icon that brings its details back.
+         * Opaque icon pixels become the shader's colour, hiding the art; {@link #registerUniversiumOverlay} items get a
+         * third pass after the sky, with the icon that brings the details back.
          */
         private static void renderUniversium(ItemRenderType type, ItemStack stack, IIcon icon, Object... data) {
             UniversiumShader shader = UniversiumShader.getInstance();
@@ -699,7 +651,6 @@ public final class MTDynamicItemHelper {
                     .use();
                 GL11.glColor4f(1, 1, 1, 1);
 
-                // Draw cosmic overlay
                 ItemRenderUtil.renderItem(type, icon);
 
                 UniversiumShader.clear();
@@ -707,7 +658,6 @@ public final class MTDynamicItemHelper {
 
                 renderUniversiumOverlay(type, stack);
             } else {
-                // RENDER ITEM
                 ItemRenderUtil.renderItem(type, icon);
 
                 int program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
@@ -716,14 +666,12 @@ public final class MTDynamicItemHelper {
                 GL11.glDepthFunc(GL11.GL_EQUAL);
                 shader.use();
 
-                // RENDER COSMIC OVERLAY
                 ItemRenderUtil.renderItem(type, icon);
 
                 UniversiumShader.unbind();
                 GL20.glUseProgram(program);
 
-                // The overlay is the icon's own geometry, so GL_EQUAL still refers to the pixels the item pass
-                // wrote and the sky pass kept.
+                // Same geometry as the item pass, so GL_EQUAL still matches its pixels.
                 renderUniversiumOverlay(type, stack);
 
                 GL11.glDepthFunc(GL11.GL_LEQUAL);
@@ -736,10 +684,9 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Draws the item's own overlay (see {@link #registerUniversiumOverlay}) over the finished cosmic sky, so
-         * the details the shader painted away come back in front of the stars. Items without an overlay render
-         * exactly as they did before, and the method leaves the colour state white either way - the shader has
-         * been unbound by the caller, but the GL colour is whatever the pass before it left behind.
+         * Draws the item's overlay (see {@link #registerUniversiumOverlay}) over the finished sky, so what the shader
+         * painted away comes back in front of the stars; no overlay renders unchanged. Colour is left white either way
+         * - the GL colour is whatever the previous pass left.
          */
         private static void renderUniversiumOverlay(ItemRenderType type, ItemStack stack) {
             IIcon overlay = UNIVERSIUM_OVERLAYS.get(stack.getItem());
@@ -750,14 +697,14 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Copy of {@code UniversiumRenderer#processLightLevel}: the shader is lit by the block the item is in. GT5U
-         * casts {@code data[1]} straight to the entity, which only holds for some render types, so the entity is
-         * looked up in the render data instead and {@link UniversiumShader#setLightLevel(float)} is the fallback.
+         * {@code UniversiumRenderer#processLightLevel}: the shader is lit by the block the item is in. GT5U casts
+         * {@code data[1]} to the entity, true only for some render types, so the render data is searched;
+         * {@link UniversiumShader#setLightLevel(float)} is the fallback.
          */
         private static void processLightLevel(UniversiumShader shader, Object... data) {
             Entity entity = null;
             for (Object argument : data) {
-                // The render data also carries the renderer and the stack; only an entity can light the shader.
+                // Render data also holds the renderer and the stack; only an entity can light the shader.
                 if (argument instanceof Entity found) {
                     entity = found;
                     break;
@@ -777,10 +724,9 @@ public final class MTDynamicItemHelper {
         }
 
         /**
-         * Copy of GT5U's {@code GlitchEffectRenderer}: for the first 40 of every 200 ten millisecond frames the icon
-         * is overdrawn with a cyan and a red copy, whose offsets are re-rolled every 5 frames. GT5U's
-         * {@link GlitchEffectRenderer#applyRedGlitchEffect} only draws in the inventory, so the effect is naturally
-         * limited to there.
+         * Copy of GT5U's {@code GlitchEffectRenderer}: for the first 40 of every 200 ten millisecond frames the icon is
+         * overdrawn with cyan and red copies, offsets re-rolled every 5 frames.
+         * {@link GlitchEffectRenderer#applyRedGlitchEffect} draws only in the inventory, so the effect stays there.
          */
         private static void renderGlitch(ItemRenderType type, IIcon icon) {
             GL11.glPushMatrix();

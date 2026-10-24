@@ -16,10 +16,8 @@ import com.cleanroommc.modularui.widgets.layout.Flow;
 import gregtech.api.modularui2.GTGuiTextures;
 
 /**
- * Base GUI for {@link TickableParallelismAcrossMultiMachineBase} machines.
- * <p>
- * Shows one MUI2 progress bar per thread, enabled only while that thread is active. The MT logo comes from
- * {@link MTMultiMachineBaseGui}.
+ * Base GUI for {@link TickableParallelismAcrossMultiMachineBase} machines: one MUI2 progress bar per thread, enabled
+ * only while that thread is active. The MT logo comes from {@link MTMultiMachineBaseGui}.
  */
 public class TickableParallelismMultiMachineBaseGui<T extends TickableParallelismAcrossMultiMachineBase<T>>
     extends MTMultiMachineBaseGui<T> {

@@ -31,26 +31,16 @@ import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.MultiblockTooltipBuilder;
 
 /**
- * MessTech machine template class.
- * <p>
- * A complete, copy-paste ready reference implementation of a
- * {@link MTMultiMachineBase} multi-block. Every hatch type of the base class is accepted by the
- * single structure element 'A':
- * <ul>
- * <li>InputBus / OutputBus</li>
- * <li>InputHatch / OutputHatch</li>
- * <li>Energy / ExoticEnergy (either one at any 'A' position)</li>
- * <li>Dynamo</li>
- * <li>Maintenance</li>
- * <li>Muffler</li>
- * </ul>
- * The controller '~' sits in the middle of the front face of a 3x3x3 cube; all other positions
- * are 'A' blocks (hatch or Assembler Machine Casing fill).
+ * MessTech machine template: a copy-paste reference multiblock on {@link MTMultiMachineBase}. The single structure
+ * element 'A' accepts every hatch type of the base class - InputBus / OutputBus, InputHatch / OutputHatch,
+ * Energy / ExoticEnergy (either one at any 'A' position), Dynamo, Maintenance and Muffler. The controller '~' sits in
+ * the middle of the front face of a 3x3x3 cube; all other positions are 'A' blocks (hatch or Assembler Machine
+ * Casing fill).
  */
 public class MachineTemplate extends MTMultiMachineBase<MachineTemplate> implements ISurvivalConstructable {
 
     // region Structure piece offsets
-    // '~' (controller) is at char index 1 (X), outer array index 1 (Y), inner string index 2 (Z).
+    // '~' (controller): char index 1 of X, outer array index 1 of Y, inner string index 2 of Z.
     private static final int HORIZONTAL_OFFSET = 1;
     private static final int VERTICAL_OFFSET = 1;
     private static final int DEPTH_OFFSET = 2;
@@ -64,7 +54,7 @@ public class MachineTemplate extends MTMultiMachineBase<MachineTemplate> impleme
     private static final String[][] structure_string = new String[][]{
         // Y = 2 (top layer)
         {"AAA", "AAA", "AAA"},
-        // Y = 1 (controller layer): '~' on the front face (Z = 2), hollow interior (Z = 1)
+        // Y = 1 (controller layer): '~' front face (Z = 2), hollow interior (Z = 1)
         {"AAA", "A A", "A~A"},
         // Y = 0 (bottom layer)
         {"AAA", "AAA", "AAA"},
@@ -74,7 +64,7 @@ public class MachineTemplate extends MTMultiMachineBase<MachineTemplate> impleme
     private static final IStructureDefinition<MachineTemplate> STRUCTURE_DEFINITION = StructureDefinition
         .<MachineTemplate>builder()
         .addShape(STRUCTURE_PIECE_MAIN, transpose(structure_string))
-        // A: any hatch of the base class, or the Assembler Machine Casing as the fill block.
+        // A: any base-class hatch, or Assembler Machine Casing as the fill block.
         .addElement(
             'A',
             HatchElementBuilder.<MachineTemplate>builder()
@@ -117,7 +107,6 @@ public class MachineTemplate extends MTMultiMachineBase<MachineTemplate> impleme
 
     @Override
     public RecipeMap<?> getRecipeMap() {
-        // Template machines use the Assembler recipe pool.
         return RecipeMaps.assemblerRecipes;
     }
 
@@ -171,7 +160,7 @@ public class MachineTemplate extends MTMultiMachineBase<MachineTemplate> impleme
             return new ITexture[] {
                 TextureFactory.of(Casings.AssemblyLineCasing.getBlock(), Casings.AssemblyLineCasing.getBlockMeta()) };
         }
-        // Other faces: Assembler Machine Casing (same as the fill block of element 'A').
+        // Other faces: Assembler Machine Casing, the 'A' fill block.
         return new ITexture[] { TextureFactory
             .of(Casings.AssemblerMachineCasing.getBlock(), Casings.AssemblerMachineCasing.getBlockMeta()) };
     }

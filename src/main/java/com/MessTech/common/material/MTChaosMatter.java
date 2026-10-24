@@ -14,23 +14,25 @@ import gregtech.api.interfaces.IMaterialHandler;
 /**
  * The Chaos Matter material (混乱物质): one ingot that is every alloy and element GregTech knows, stirred together.
  * <p>
- * It is a normal GregTech material, so GT itself provides the items: {@code MetaGeneratedItem01} walks
- * {@code GregTechAPI.sGeneratedMaterials} and turns the METAL/DUST/GEAR generation bits into the ingot, its dusts,
- * plates, gears and the ore dictionary entries, and the item's look comes from {@code Materials.renderer} - see
- * {@link com.MessTech.common.render.MTChaosMatterRenderer}.
+ * A normal GT material, so GT makes the items: {@code MetaGeneratedItem01} walks
+ * {@code GregTechAPI.sGeneratedMaterials} and
+ * turns the METAL/DUST/GEAR bits into ingot, dusts, plates, gears and ore dictionary entries; the look comes from
+ * {@code Materials.renderer} - see {@link com.MessTech.common.render.MTChaosMatterRenderer}.
  * <p>
- * <b>Registration timing.</b> GT runs {@code Materials.init()} in its own preInit, which happens before this mod's
- * preInit, so the handler must be added from the {@code @Mod} constructor ({@link #register()}) - at that point no
- * preInit has run at all. {@code IMaterialHandler#onMaterialsInit} is then called from inside
- * {@code Materials.init()}, right after {@code MaterialsIDMap} gave every GT material its {@code mMetaItemSubID} and
- * before the material list is frozen, which is the only moment a material and its id can still be added.
+ * <b>Registration timing.</b> GT's {@code Materials.init()} runs in GT's preInit, before this mod's, so the handler
+ * goes in
+ * from the {@code @Mod} constructor ({@link #register()}): {@code IMaterialHandler#onMaterialsInit} is then called
+ * inside
+ * that init, after {@code MaterialsIDMap} gave every material its {@code mMetaItemSubID} and before the list freezes -
+ * the
+ * only moment a material and its id can still be added.
  * <p>
- * <b>Material id.</b> {@code MaterialsIDMap} is GT's hardcoded 0..999 id table and has no "take a free id" API for
- * addons, so {@link #findFreeId()} takes the <b>middle of the widest run of unused ids</b> inside
- * {@value #ID_SCAN_MIN}..{@value #ID_SCAN_MAX}: GT keeps roughly the same amount of room on both sides of us, and
- * the top of the band - where GT registers its newest materials (Infinity, SpaceTime, the Halkonites) - is left
- * untouched on purpose. A run shorter than {@value #ID_MIN_FREE_RUN} ids is never taken, so a single hole in GT's
- * table is not squatted either.
+ * <b>Material id.</b> {@code MaterialsIDMap} is GT's hardcoded 0..999 table with no "take a free id" API, so
+ * {@link #findFreeId()} takes the <b>middle of the widest unused run</b> in
+ * {@value #ID_SCAN_MIN}..{@value #ID_SCAN_MAX}:
+ * equal room on both sides, GT's newest materials (Infinity, SpaceTime, the Halkonites) untouched at the top; a run
+ * shorter
+ * than {@value #ID_MIN_FREE_RUN} ids is refused, so a single hole is not squatted.
  */
 public final class MTChaosMatter {
 
@@ -49,8 +51,9 @@ public final class MTChaosMatter {
     public static final String TEXTURE_SET = "chaos";
 
     /**
-     * Ids are only taken from this band: below it sit the elements and the oldest alloys, above it GT's newest
-     * materials. The band and the minimum run length are what "leave GT room for its own registrations" means here.
+     * Ids are only taken from this band: below sit the elements and oldest alloys, above GT's newest materials. The
+     * band and
+     * the minimum run length are what "leave GT room for its own registrations" means here.
      */
     private static final int ID_SCAN_MIN = 100;
     private static final int ID_SCAN_MAX = 949;
@@ -64,7 +67,6 @@ public final class MTChaosMatter {
         Materials.add(new ChaosMatterHandler());
     }
 
-    /** The registered material, or null before GT's {@code Materials.init()} ran. */
     public static Materials getMaterial() {
         return material;
     }
@@ -96,8 +98,8 @@ public final class MTChaosMatter {
 
             IdSlot slot = findFreeId();
             if (slot == null) {
-                // Without an id OrePrefixes#doGenerateItem refuses every prefix, so GT would register no items at all
-                // and the material would be an invisible entry. Not registering is the honest outcome.
+                // Without an id OrePrefixes#doGenerateItem refuses every prefix: GT would register no items at all and
+                // the material would be an invisible entry, so not registering is the honest outcome.
                 MessTech.MT_LOG.error(
                     "Chaos Matter: no free material id in {}..{} (at least {} in a row needed) - not registered",
                     ID_SCAN_MIN,
@@ -135,10 +137,11 @@ public final class MTChaosMatter {
     }
 
     /**
-     * Middle of the widest run of unused ids inside the scan band, or null when the band has no run long enough.
-     * <p>
-     * Every GT material already has its id when this runs - {@code MaterialsIDMap#register()} is the first thing
-     * {@code Materials.init()} does - so the used ids can be read straight off the material map.
+     * Middle of the widest unused run in the scan band, or null when no run is long enough. Every GT material already
+     * has its
+     * id here - {@code MaterialsIDMap#register()} is the first thing {@code Materials.init()} does - so the used ids
+     * are read
+     * straight off the material map.
      */
     private static IdSlot findFreeId() {
         boolean[] used = new boolean[1000];
@@ -172,10 +175,10 @@ public final class MTChaosMatter {
     }
 
     /**
-     * The chaos texture set. GT's texture sets always read from the {@code gregtech} domain and an addon cannot put
-     * files into another mod's domain, so the freshly built set has its (public, element-mutable) texture array
-     * rewritten to {@code messtech} containers. A file that does not exist falls back to GT's global {@code NONE}
-     * set inside the container itself, so only the icons that were drawn are actually shipped.
+     * The chaos texture set. GT's sets always read from the {@code gregtech} domain and an addon cannot put files into
+     * another mod's domain, so the freshly built set has its (public, element-mutable) texture array rewritten to
+     * {@code messtech} containers. A file that does not exist falls back to GT's global {@code NONE} set inside the
+     * container itself, so only the icons that were drawn are actually shipped.
      */
     private static TextureSet chaosTextureSet() {
         TextureSet set = new TextureSet(TEXTURE_SET);

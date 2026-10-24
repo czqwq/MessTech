@@ -158,10 +158,9 @@ public class MTDBBFurnace extends MTMultiMachineBase<MTDBBFurnace>
     }
 
     /**
-     * The primitive-blast recipe pool can contain recipes whose output array has empty slots. GT's
-     * void-protection calculator maps every output slot to an ItemId before filtering them, which
-     * NPEs on those empty slots. This furnace has no useful void-protection configuration anyway,
-     * so disable it and let the normal output path (which skips null stacks) handle the results.
+     * The primitive-blast pool can hold recipes with empty output slots; GT's void-protection calculator maps every
+     * output slot to an ItemId before filtering and NPEs on those. With no useful void-protection config anyway, it is
+     * disabled so the normal output path (which skips null stacks) handles the results.
      */
     @Override
     public boolean supportsVoidProtection() {
@@ -212,8 +211,8 @@ public class MTDBBFurnace extends MTMultiMachineBase<MTDBBFurnace>
     }
 
     /**
-     * The Dimensionally Brick Furnace is intentionally EU-free: its structure does not accept energy
-     * hatches at all, so recipe EU values must never turn into an actual power demand.
+     * Intentionally EU-free: the structure accepts no energy hatches, so recipe EU values must never become a real
+     * power demand.
      */
     @Override
     protected void setEnergyUsage(ProcessingLogic processingLogic) {

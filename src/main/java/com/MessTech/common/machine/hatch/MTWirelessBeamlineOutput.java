@@ -10,10 +10,10 @@ import gtnhlanth.common.hatch.MTEHatchOutputBeamline;
 /**
  * Wireless particle beam output hatch.
  * <p>
- * The beam machines hand it a {@link gtnhlanth.common.beamline.BeamLinePacket} exactly like they do to the wired
- * hatch, but it is not pushed into beamline pipes. Instead it is handed to the {@link MTWirelessBeamlineInput} of
- * the same dye colour, and only while that colour is a clean 1:1 pair (one output, one input) - see
- * {@link WirelessBeamlineUtil#moveBeam(MTEHatchOutputBeamline)}.
+ * Beam machines hand it a {@link gtnhlanth.common.beamline.BeamLinePacket} exactly as to the wired hatch, but it is not
+ * pushed into pipes: it goes to the {@link MTWirelessBeamlineInput} of the same dye colour, and only while that colour
+ * is
+ * a clean 1:1 pair (one output, one input) - see {@link WirelessBeamlineUtil#moveBeam(MTEHatchOutputBeamline)}.
  */
 @IMetaTileEntity.SkipGenerateDescription
 public class MTWirelessBeamlineOutput extends MTEHatchOutputBeamline {
@@ -42,8 +42,8 @@ public class MTWirelessBeamlineOutput extends MTEHatchOutputBeamline {
 
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        // Re-register every tick: hatches that were placed before this feature existed (or whose chunk was
-        // reloaded) must be picked up without breaking and replacing them.
+        // Re-register every tick: hatches placed before this feature existed (or whose chunk was reloaded) are picked
+        // up without breaking and replacing them.
         if (aBaseMetaTileEntity.isServerSide()) WirelessBeamlineUtil.register(this);
         super.onPostTick(aBaseMetaTileEntity, aTick);
     }
@@ -60,13 +60,13 @@ public class MTWirelessBeamlineOutput extends MTEHatchOutputBeamline {
         super.onRemoval();
     }
 
-    /** Replaces the pipe walk of the wired hatch: the beam only ever travels over the colour channel. */
+    /** Replaces the wired hatch's pipe walk: the beam only travels over the colour channel. */
     @Override
     public void moveAround(IGregTechTileEntity aBaseMetaTileEntity) {
         WirelessBeamlineUtil.moveBeam(this);
     }
 
-    /** No beamline pipes: the output is wireless only (the colour channel decides the partner). */
+    /** No pipes: the output is wireless only (the colour channel decides the partner). */
     @Override
     public boolean canConnect(ForgeDirection side) {
         return false;

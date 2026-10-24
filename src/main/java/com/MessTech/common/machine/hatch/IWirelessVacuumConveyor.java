@@ -3,10 +3,10 @@ package com.MessTech.common.machine.hatch;
 import java.util.UUID;
 
 /**
- * Shared wireless-channel state for wireless NAC vacuum conveyor hatches.
+ * Shared wireless-channel state of the NAC wireless vacuum conveyor hatches.
  * <p>
- * The API mirrors the advanced wireless redstone covers: a public channel is a bare frequency string,
- * while a private channel additionally requires the same owning player UUID.
+ * Mirrors the advanced wireless redstone covers: a public channel is a bare frequency string, a private one also needs
+ * the same owning player UUID.
  */
 public interface IWirelessVacuumConveyor {
 

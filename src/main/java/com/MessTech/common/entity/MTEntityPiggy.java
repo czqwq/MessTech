@@ -13,17 +13,15 @@ import com.MessTech.init.MessTech;
 import cpw.mods.fml.common.registry.EntityRegistry;
 
 /**
- * The thrown "A Piggy".
- * <p>
- * A plain {@link EntityThrowable} with one job: whatever it hits is killed for good (see {@link MTPiggyKill}). The
- * effect (the damage value of the thrown stack) travels in a data watcher entry, so the client draws the same icon
- * the player was holding.
+ * The thrown "A Piggy": a plain {@link EntityThrowable} with one job - whatever it hits is killed for good (see
+ * {@link MTPiggyKill}). The effect (the thrown stack's damage value) travels in a data watcher entry, so the client
+ * draws the same icon the player was holding.
  */
 public class MTEntityPiggy extends EntityThrowable {
 
     /**
-     * Data watcher id of the effect ordinal. {@code EntityThrowable} itself does not use any id, so everything above
-     * the two ids of {@code Entity} is free.
+     * Data watcher id of the effect ordinal. {@code EntityThrowable} uses no id of its own, so everything above the
+     * two ids of {@code Entity} is free.
      */
     private static final int DW_EFFECT = 20;
 

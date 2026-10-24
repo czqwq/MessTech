@@ -8,13 +8,13 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * LWJGL key code to Mocha Doom {@link ScanCode} mapping for the game console.
- * <p>
- * The binding is written out by hand rather than computed: Mocha Doom's scan codes are DOS scan
- * codes and LWJGL's {@code KEY_*} constants happen to agree with them across the main keyboard
- * block, but they disagree about the arrow and editing keys (LWJGL {@code KEY_UP} is 200, Doom's
- * {@code SC_UP} is 103), and a silent off-by-one there would have the player firing when they
- * meant to walk. Naming both ends explicitly leaves the compiler to check every value.
+ * LWJGL key code to Mocha Doom {@link ScanCode} mapping for the game console. Written out by hand, not computed: Mocha
+ * Doom's
+ * scan codes are DOS scan codes, and LWJGL's {@code KEY_*} constants agree with them across the main keyboard block but
+ * not on
+ * the arrow and editing keys (LWJGL {@code KEY_UP} is 200, Doom's {@code SC_UP} is 103) - a silent off-by-one there
+ * would have
+ * the player firing when they meant to walk.
  */
 @SideOnly(Side.CLIENT)
 public final class MTGameConsoleKeys {
@@ -110,9 +110,10 @@ public final class MTGameConsoleKeys {
         bind(Keyboard.KEY_RMETA, ScanCode.SC_RWIN);
         bind(Keyboard.KEY_APPS, ScanCode.SC_MENU);
 
-        // Function keys. F1 is deliberately sent to Doom as its own Escape: the console reserves
-        // the real Escape key for closing its window, and Doom's menu - options, save, load, quit -
-        // would otherwise be unreachable. That costs the help screen, which shares the key.
+        // Function keys. F1 goes to Doom as its own Escape: the console reserves the real Escape for closing its
+        // window,
+        // and Doom's menu - options, save, load, quit - would otherwise be unreachable. That costs the help screen,
+        // which shares the key.
         bind(Keyboard.KEY_F1, ScanCode.SC_ESCAPE);
         bind(Keyboard.KEY_F2, ScanCode.SC_F2);
         bind(Keyboard.KEY_F3, ScanCode.SC_F3);
@@ -160,7 +161,7 @@ public final class MTGameConsoleKeys {
         bind(Keyboard.KEY_PAUSE, ScanCode.SC_PAUSE);
         bind(Keyboard.KEY_SYSRQ, ScanCode.SC_PRTSCRN);
 
-        // Escape is deliberately absent: the console reserves it for closing its own window, and
-        // Doom's menu is reachable from the F1 key instead (see the F1 binding above).
+        // Escape is deliberately absent: the console reserves it for closing its window, and Doom's menu hangs off F1
+        // (see above).
     }
 }

@@ -11,18 +11,16 @@ import cpw.mods.fml.relauncher.SideOnly;
 
 /**
  * Draws the moving half of {@link MTModuleProjectText}: under the letters a row of module chips - one per
- * {@link MTModuleProjectText#MODULE_SIZE} characters - lights up with the scan of the rack, with a brighter packet
- * on the module that is loading, a scan line travelling above the word and a bracket at either end of it.
+ * {@link MTModuleProjectText#MODULE_SIZE} characters - lights up with the rack's scan, with a brighter packet on the
+ * loading module, a scan line above the word and a bracket at either end of it.
  * <p>
- * The letters themselves stay where they are: the animation's own colours already read as a powered rack, so this
- * renderer adds the hardware around them instead of replacing the text ({@link #replacesText()} stays false).
+ * The letters stay put: their own colours already read as a powered rack, so this adds the hardware around them
+ * instead of replacing the text ({@link #replacesText()} stays false).
  * <p>
- * Only the word is decorated. The brand line is {@code 添加模组: <word>}, so the prefix is measured with the font and
- * skipped; the chip row, the scan line and the brackets all start at the first glyph of the word and end at its last
- * one. A line that does not carry that prefix (the animation can be registered on any text) is decorated as a whole.
- * <p>
- * The phase is read from the same clock the tooltip was drawn with ({@link MTModuleProjectText#lit}, {@link
- * MTModuleProjectText#head}, {@link MTModuleProjectText#flashing}), so the chips and the letters never drift apart.
+ * Only the word is decorated: the brand line is {@code 添加模组: <word>}, so the prefix is measured with the font and
+ * skipped, and a line without that prefix (the animation can be registered on any text) is decorated as a whole. The
+ * phase comes from the clock the tooltip was drawn with ({@link MTModuleProjectText#lit},
+ * {@link MTModuleProjectText#head}, {@link MTModuleProjectText#flashing}), so chips and letters never drift apart.
  */
 @SideOnly(Side.CLIENT)
 public final class MTModuleProjectTextRenderer implements MTTextRenderer {
@@ -39,19 +37,16 @@ public final class MTModuleProjectTextRenderer implements MTTextRenderer {
     /** Height of a chip. */
     private static final int CHIP_HEIGHT = 2;
 
-    /** A module that is not powered yet. */
+    /** A module that is not powered (yet). */
     private static final int CHIP_OFF = 0x55102030;
-    /** A loaded module. */
     private static final int CHIP_LOADED = 0xAA14586E;
     /** The module the scan is loading, and the packet running along the rack. */
     private static final int CHIP_HOT = 0xEE8FF0FF;
-    /** Full load. */
     private static final int CHIP_FULL = 0xEEFFFFFF;
     /** The brackets at both ends of the word and the line above it. */
     private static final int FRAME = 0x88A8E8FF;
     /** The tail of the scan line, over the module the scan just passed: it blinks, so the direction is visible. */
     private static final int SCAN_TAIL_BRIGHT = 0x77A8E8FF;
-    /** The same tail, dimmed. */
     private static final int SCAN_TAIL_DIM = 0x33A8E8FF;
 
     /** How far the brackets stand off the first and last glyph. */
@@ -70,9 +65,9 @@ public final class MTModuleProjectTextRenderer implements MTTextRenderer {
         if (modules <= 0) return;
 
         // Measure the way the font lays the line out, never by hand: a bold character advances one pixel further
-        // than its glyph width (FontRenderer#renderStringAtPos adds the bold copy to the advance, and
-        // FontRenderer#getStringWidth does the same), and the animation draws every character bold. A hand summed
-        // width would come out one pixel per character short and pull the chips and the right bracket into the text.
+        // than its glyph width (FontRenderer#renderStringAtPos adds the bold copy to the advance, as does
+        // FontRenderer#getStringWidth) and the animation draws every character bold - a hand summed width would come
+        // out one pixel per character short and pull the chips and the right bracket into the text.
         int rawStart = rawIndex(line, start);
         int wordX = x + font.getStringWidth(line.substring(0, rawStart));
         int[] edges = moduleEdges(font, line.substring(rawStart), wordX, word.length());
@@ -101,7 +96,7 @@ public final class MTModuleProjectTextRenderer implements MTTextRenderer {
 
     /**
      * The scan line: a bright one pixel line above the module that is loading, with a tail trailing back over the
-     * modules it already passed, so the direction of the scan is visible even on a still frame.
+     * modules it already passed, so the scan direction is visible even on a still frame.
      */
     private static void drawScanLine(int[] edges, int y, int head, long millis) {
         if (head < 0) return;
@@ -124,10 +119,9 @@ public final class MTModuleProjectTextRenderer implements MTTextRenderer {
     }
 
     /**
-     * The x of every module edge of the word, taken from the font itself: {@code edges[i]} is the left of module
-     * {@code i} and {@code edges[modules]} the right of the last one, i.e. the pixel the pen stands on after the
-     * last glyph. Every edge is measured on the drawn text (formatting codes included), so the bold advance the
-     * animation's own codes add is part of it.
+     * The x of every module edge of the word, from the font itself: {@code edges[i]} is the left of module {@code i},
+     * {@code edges[modules]} the right of the last one (the pixel the pen stands on). Edges are measured on the drawn
+     * text, formatting codes included, so the bold advance the animation's codes add is part of it.
      *
      * @param font          the font the line is drawn with
      * @param raw           the drawn word, formatting codes included
@@ -160,9 +154,8 @@ public final class MTModuleProjectTextRenderer implements MTTextRenderer {
     }
 
     /**
-     * The index of a visible character inside the drawn line, i.e. its index plus the formatting codes in front of
-     * it. The prefix of a brand line is plain text, but a resource pack may colour it, so the codes are skipped
-     * rather than assumed away.
+     * The index of a visible character inside the drawn line, i.e. its index plus the formatting codes in front of it.
+     * A brand line's prefix is plain text, but a resource pack may colour it, so codes are skipped, not assumed away.
      *
      * @param raw          the drawn line, formatting codes included
      * @param visibleIndex the index of that character in the visible text
@@ -183,11 +176,10 @@ public final class MTModuleProjectTextRenderer implements MTTextRenderer {
 
     /**
      * The index of the word inside the visible text of a brand line - an index, not a width: the caller measures it
-     * with the font and uses it to cut the string.
+     * with the font.
      *
      * @param visible the visible text of the line
-     * @return the length of the {@code messTech.addBy} prefix and its separator, or 0 when the line does not carry
-     *         that prefix
+     * @return the length of the {@code messTech.addBy} prefix and its separator, or 0 when the line lacks it
      */
     private static int wordStart(String visible) {
         String prefix = MTTextAnimation.visibleText(StatCollector.translateToLocal("messTech.addBy"))

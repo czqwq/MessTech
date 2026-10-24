@@ -14,8 +14,8 @@ import com.MessTech.common.process.IMTProcess;
 /**
  * 1:1 port of Draconic Evolution's
  * {@code com.brandon3055.draconicevolution.common.tileentities.multiblocktiles.reactor.ReactorExplosionTrace} (see
- * {@code tmp/Draconic-Evolution-master}). One trace is spawned per ring block of a {@link MTExplosionDE} and blasts
- * the whole vertical column of that block: downwards first, then upwards.
+ * {@code tmp/Draconic-Evolution-master}). One trace per ring block of a {@link MTExplosionDE} blasts that block's whole
+ * vertical column: downwards first, then upwards.
  */
 public class MTExplosionDETrace implements IMTProcess {
 

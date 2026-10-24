@@ -21,7 +21,7 @@ import gregtech.api.enums.Mods;
     version = com.MessTech.init.Tags.VERSION,
     name = "MessTech",
     acceptedMinecraftVersions = "[1.7.10]",
-    dependencies = "required-after:gregtech; required-after:tectech; required-after:structurelib; required-after:AppleCore")
+    dependencies = "required-after:gregtech; required-after:tectech; required-after:structurelib; required-after:AppleCore; required-after:Thaumcraft")
 public class MessTech {
 
     public static final String MODID = "MessTech";
@@ -36,32 +36,27 @@ public class MessTech {
 
     public MessTech() {
         instance = this;
-        // The material has to be handed to GT here: Materials.init() runs in GT's own preInit (before this mod's
-        // preInit) and IMaterialHandler#onMaterialsInit is only ever called from inside it.
+        // The material must be handed to GT here: Materials.init() runs in GT's own preInit, before this mod's, and
+        // IMaterialHandler#onMaterialsInit is only ever called from inside it.
         com.MessTech.common.material.MTChaosMatter.register();
     }
 
     @Mod.EventHandler
-    // preInit "Run before anything else. Read your config, create blocks, items, etc, and register them with the
-    // GameRegistry." (Remove if not needed)
     public void preInit(FMLPreInitializationEvent event) {
         proxy.preInit(event);
     }
 
     @Mod.EventHandler
-    // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
     public void init(FMLInitializationEvent event) {
         proxy.init(event);
     }
 
     @Mod.EventHandler
-    // postInit "Handle interaction with other mods, complete your setup based on this." (Remove if not needed)
     public void postInit(FMLPostInitializationEvent event) {
         proxy.postInit(event);
     }
 
     @Mod.EventHandler
-    // register server commands in this event handler (Remove if not needed)
     public void serverStarting(FMLServerStartingEvent event) {
         proxy.serverStarting(event);
     }

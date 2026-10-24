@@ -28,14 +28,10 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
- * Base class for MessTech multiblocks that can draw power from the GT wireless network.
- * <p>
- * Holds the shared wireless state (availability flag, enabled flag, parallel selector), the owner
- * UUID initialisation, wireless cost tracking / Waila display, recipe-processing lifecycle hooks,
- * and a generic wireless-mode processing path. Subclasses that need stricter validation should
- * override {@link #wirelessModeProcessOnce()} or the processing-logic validation hooks; the default
- * path follows the same rough order as the original design: find/validate a recipe, check the
- * wireless balance is sufficient, then deduct power and consume inputs before starting the recipe.
+ * Base class for MessTech multiblocks that can draw power from the GT wireless network: shared wireless state
+ * (availability, enabled, parallel), owner UUID init, cost tracking / Waila display, recipe lifecycle hooks and a
+ * generic wireless path (validate recipe, check balance, deduct power, consume inputs). Subclasses override
+ * {@link #wirelessModeProcessOnce()} for a stricter order.
  */
 public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachineBase<T>>
     extends MTMultiMachineBase<T> {
@@ -172,10 +168,7 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
         }
     }
 
-    /**
-     * Formats a wireless EU value with thousands separators and a compact scientific-notation
-     * suffix, e.g. {@code 1,000,000 (1.00e6)}.
-     */
+    /** Formats a wireless EU value with thousands separators and a scientific suffix, e.g. 1,000,000 (1.00e6). */
     protected String formatWirelessEU(String raw) {
         try {
             BigInteger value = new BigInteger(raw);
@@ -193,38 +186,29 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
     // endregion
 
     // region Generic wireless processing
-    /**
-     * Hook called before wireless processing starts.
-     */
+    /** Hook called before wireless processing starts. */
     protected void prepareProcessing() {}
 
-    /**
-     * Wireless mode ignores the normal energy-hatch voltage limit.
-     */
+    /** Wireless mode ignores the normal energy-hatch voltage limit. */
     protected void setupWirelessProcessingPowerLogic(ProcessingLogic logic) {
         logic.setAvailableVoltage(Long.MAX_VALUE);
         logic.setAvailableAmperage(1);
         logic.setAmperageOC(false);
     }
 
-    /**
-     * Extra EU multiplier for wireless processing (default 1).
-     */
+    /** Extra EU multiplier for wireless processing (default 1). */
     public int getExtraEUCostMultiplier() {
         return 1;
     }
 
-    /**
-     * Recipe duration the machine should report while in wireless mode.
-     */
+    /** Recipe duration the machine should report while in wireless mode. */
     public int getWirelessModeProcessingTime() {
         return Math.max(1, mMaxProgresstime);
     }
 
     /**
-     * Performs one wireless recipe cycle. The default implementation mirrors the original design:
-     * run the recipe check, then require enough wireless EU before deducting it and letting the
-     * processing logic consume inputs. Subclasses may override for stricter validation order.
+     * One wireless recipe cycle: check the recipe, require enough wireless EU, then deduct it and let the processing
+     * logic consume inputs. Subclasses may override for a stricter order.
      */
     public CheckRecipeResult wirelessModeProcessOnce() {
         if (!isRecipeProcessing) startRecipeProcessing();
@@ -243,7 +227,7 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
             .multiply(BigInteger.valueOf(duration))
             .multiply(BigInteger.valueOf(multiplier));
 
-        // Require the wireless balance to be sufficient before consuming anything.
+        // Balance must be sufficient before anything is consumed.
         if (ownerUUID == null || getUserEU(ownerUUID).compareTo(costEU) < 0) {
             return CheckRecipeResultRegistry.insufficientStartupPower(costEU);
         }
@@ -266,9 +250,8 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
     }
 
     /**
-     * Generic wireless-mode processing loop: resets cost tracking, then runs up to {@link #cycleNum}
-     * wireless recipe cycles. This is opt-in for subclasses; machines with their own recipe validation
-     * (such as MTDTPF) keep their own checkProcessing and do not call this.
+     * Generic wireless loop: reset cost tracking, then run up to {@link #cycleNum} cycles. Opt-in; machines with own
+     * recipe validation (e.g. MTDTPF) keep their own checkProcessing.
      */
     public CheckRecipeResult checkProcessingWirelessLoop() {
         costingEU = BigInteger.ZERO;
@@ -296,9 +279,7 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
     }
     // endregion
 
-    /**
-     * Simulated wireless power check. Called before any input is consumed.
-     */
+    /** Simulated wireless power check, called before any input is consumed. */
     protected CheckRecipeResult checkWirelessPower(long eut, int duration, int maxParallel) {
         if (!isWirelessModeActive()) return CheckRecipeResultRegistry.SUCCESSFUL;
         if (ownerUUID == null) return CheckRecipeResultRegistry.insufficientPower(eut);
@@ -312,9 +293,8 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
     }
 
     /**
-     * Wireless recipe validation shared by subclasses: checks that the wireless network can cover
-     * {@code eut * duration * maxParallel}. If the balance is too low, returns an insufficient-power
-     * result; otherwise returns SUCCESSFUL so the caller can continue to consuming inputs + power.
+     * Wireless recipe validation shared by subclasses: the network must cover {@code eut * duration * maxParallel},
+     * otherwise an insufficient-power result, else SUCCESSFUL.
      */
     protected CheckRecipeResult validateWirelessPowerForRecipe(long eut, int duration, int maxParallel) {
         if (!isEnableWireless()) return CheckRecipeResultRegistry.SUCCESSFUL;
@@ -328,10 +308,7 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    /**
-     * Safely starts a wireless recipe: deducts the actual EU cost from the wireless network first, and only
-     * consumes inputs after the deduction succeeds.
-     */
+    /** Deducts the EU cost from the wireless network first and only consumes inputs after the deduction succeeded. */
     protected CheckRecipeResult startWirelessRecipe(GTRecipe recipe, int parallel, long eut, int duration,
         FluidStack[] fluidInputs, ItemStack[] itemInputs) {
         if (!isWirelessModeActive()) return CheckRecipeResultRegistry.SUCCESSFUL;
@@ -341,7 +318,7 @@ public abstract class MTWirelessMultiMachineBase<T extends MTWirelessMultiMachin
         if (!addEUToGlobalEnergyMap(ownerUUID, required.negate())) {
             return CheckRecipeResultRegistry.insufficientStartupPower(required);
         }
-        // Keep Waila/GUI cost display in sync with the actual lump-sum wireless deduction.
+        // Keep the Waila/GUI cost display in sync with the lump-sum deduction.
         costingEU = required;
         costingEUText = String.valueOf(required);
         recipe.consumeInput(parallel, fluidInputs, itemInputs);

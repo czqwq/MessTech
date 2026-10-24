@@ -9,14 +9,11 @@ import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.api.items.ItemRadioactiveCellIC;
 
 /**
- * Burnable MessTech fuel rod (Transcendent Metal single/dual/quad).
- * <p>
- * Extending GT's {@link ItemRadioactiveCellIC} gives the IC2 reactor component behaviour (pulses, heat
- * redistribution, depletion), MTReactor's {@code IReactorComponent} simulation, radiation, the NEI nuclear
- * fake recipe and the auto input/output logic for free. The real fuel state lives in the NBT {@code advDmg}
- * tag while GT maintains the vanilla 0..99 damage bar.
- * <p>
- * Textures use MessTech's own domain ({@code messtech:FuelRod/...}), hence the icon registration override.
+ * Burnable MessTech fuel rod (Transcendent Metal single/dual/quad). GT's {@link ItemRadioactiveCellIC} brings the IC2
+ * reactor component behaviour (pulses, heat redistribution, depletion), MTReactor's {@code IReactorComponent}
+ * simulation, radiation, the NEI nuclear fake recipe and the auto input/output logic for free. Real fuel state lives in
+ * the NBT {@code advDmg} tag while GT maintains the vanilla 0..99 damage bar. Textures use MessTech's own domain
+ * ({@code messtech:FuelRod/...}), hence the icon registration override.
  */
 public class MTFuelRod extends ItemRadioactiveCellIC {
 

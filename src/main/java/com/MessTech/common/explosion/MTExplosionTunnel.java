@@ -20,27 +20,22 @@ import com.MessTech.init.Config;
  * The tunnel of the Voidstar Piercer's arrow: everything within {@link Config#VOIDSTAR_BOW_TUNNEL_RADIUS} of the
  * line the arrow flew is taken out of the world.
  * <ul>
- * <li>The <b>blocks</b> are destroyed, which is what turns an impact into "the wall has a three by three hole
- * through it, and so does everything behind it".</li>
- * <li>The <b>living things</b> caught in it are killed for good by {@link MTBowKill}, the bow's branch of the true
- * kill ladder of {@link MTKillBase}: the same kind of death the arrow deals a target it hits directly. The shooter is
- * exempt - the tunnel starts at the muzzle, i.e. inside their own body, so without that exemption every shot would
- * kill the player who fired it - and {@link MTBowKill} refuses them as well, because that rule belongs to the weapon
- * rather than to every caller.</li>
+ * <li><b>Blocks</b> are destroyed - "the wall has a three by three hole through it, and so does everything behind
+ * it".</li>
+ * <li><b>Living things</b> in it are killed for good by {@link MTBowKill}, the bow's branch of the true kill ladder of
+ * {@link MTKillBase} - the same death a direct hit deals. The shooter is exempt (the muzzle is inside their own body;
+ * see {@link #annihilateLiving}).</li>
  * </ul>
- * The line is the segment from the muzzle to the point the arrow stopped at, so the tunnel always starts in the air
- * the player shot through and ends inside the block that stopped the arrow. Above
- * {@link Config#VOIDSTAR_BOW_TUNNEL_LENGTH} the far end of the line is kept and the near end is dropped: the wall
- * the arrow hit is what the player is looking at, and one arrow must not be able to walk the whole render distance.
+ * The line runs from the muzzle to where the arrow stopped, so the tunnel starts in the air the player shot through
+ * and ends inside the block. Above {@link Config#VOIDSTAR_BOW_TUNNEL_LENGTH} the far end is kept and the near end
+ * dropped: the wall the arrow hit is what the player is looking at, and one arrow must not walk the whole render
+ * distance.
  * <p>
- * What survives the block pass: air, fluids (vanilla explosions do not destroy them either, see their blast
- * resistance), blocks with no hardness at all (bedrock, the portal, GT's own unbreakable blocks -
- * {@code getBlockHardness < 0}) and anything with an explosion resistance above {@link #MAX_RESISTANCE} (obsidian and
- * up, at 600). Nothing is dropped: the tunnel annihilates what it passes through, which the item's tooltip says out
- * loud. The two passes have their own switch in the config, so a server can have the tunnel without the block damage
- * or without the kills.
- * <p>
- * Server side only: the client learns about the tunnel from the ordinary block change packets and from the deaths.
+ * What survives: air, fluids (vanilla explosions do not destroy them either - see blast resistance), blocks with no
+ * hardness at all (bedrock, the portal, GT's own unbreakable blocks - {@code getBlockHardness < 0}) and anything with
+ * an explosion resistance above {@link #MAX_RESISTANCE} (obsidian and up, at 600). Nothing is dropped - the tunnel
+ * annihilates, as the item's tooltip says. Server side only: the client learns about it from the block change packets
+ * and from the deaths.
  */
 public final class MTExplosionTunnel {
 
@@ -52,30 +47,26 @@ public final class MTExplosionTunnel {
     public static final float MAX_RESISTANCE = 100.0F;
 
     /**
-     * How close to the impact a destroyed block has to be for its own break particles to be sent to the clients
-     * ({@code World#playAuxSFX} id 2001, the effect vanilla explosions send per block). The far end of a long tunnel
-     * is destroyed without them - one packet per block over hundreds of blocks is what makes big explosions lag, and
-     * the burst the arrow spawns client-side covers the whole tunnel anyway.
+     * How close to the impact a destroyed block must be for its break particles to be sent to the clients
+     * ({@code World#playAuxSFX} id 2001, the effect vanilla explosions send per block). The far end of a long tunnel is
+     * destroyed without them - one packet per block over hundreds of blocks is what makes big explosions lag, and the
+     * arrow's client side burst covers the whole tunnel anyway.
      */
     private static final double EFFECT_RADIUS = 12.0D;
 
     private MTExplosionTunnel() {}
 
     /**
-     * Blasts the tunnel of one shot: the living things inside it are killed, the blocks inside it are destroyed.
-     * Each of the two passes is skipped when its config switch is off.
+     * Blasts the tunnel of one shot: the living things inside it are killed, the blocks inside it destroyed. A pass is
+     * skipped when its config switch is off.
      *
-     * @param world      the world of the arrow; a client world is ignored
-     * @param source     the entity the tunnel belongs to, i.e. the shooter (see the class comment for the exemption),
-     *                   passed on to the blocks' own resistance check and used as the thrower of the kills
-     * @param projectile the arrow that cut the tunnel; it is the projectile of the kill the ladder builds, so the
-     *                   death reads as the bow's and not as a bare player hit
-     * @param fromX      the muzzle, i.e. where the arrow left the bow
-     * @param fromY      see {@code fromX}
-     * @param fromZ      see {@code fromX}
-     * @param toX        the point the arrow stopped at, i.e. the far end of the tunnel
-     * @param toY        see {@code toX}
-     * @param toZ        see {@code toX}
+     * @param source     the entity the tunnel belongs to, i.e. the shooter (see the class comment for the exemption);
+     *                   passed to the blocks' own resistance check and used as the thrower of the kills
+     * @param projectile the arrow that cut the tunnel; it is the projectile of the kill the ladder builds, so the death
+     *                   reads as the bow's and not as a bare player hit
+     * @param fromX      the muzzle, i.e. where the arrow left the bow; {@code fromY}/{@code fromZ} likewise
+     * @param toX        the point the arrow stopped at, i.e. the far end of the tunnel; {@code toY}/{@code toZ}
+     *                   likewise
      */
     public static void blast(World world, Entity source, Entity projectile, double fromX, double fromY, double fromZ,
         double toX, double toY, double toZ) {
@@ -124,14 +115,12 @@ public final class MTExplosionTunnel {
 
     /**
      * Kills every living thing inside the tunnel with the bow's branch of the true kill ladder ({@link MTBowKill}).
-     * The entity's own size counts as well as its position: a horse, a boss or a player is a big target whose centre
-     * can sit outside the radius while half of it is inside, so the radius the distance is compared against grows by
-     * half of the entity's largest side.
+     * The entity's size counts: a horse, a boss or a player is a big target whose centre can sit outside the radius
+     * while half of it is inside, so the radius compared against grows by half the entity's largest side.
      * <p>
-     * The shooter is skipped - the muzzle is inside their own body, so the tunnel always starts inside them - and so
-     * is anything that is already dead or dying (a corpse at zero health has no death left to run, and the ladder
-     * refuses it anyway). {@link MTBowKill} refuses the shooter a second time, because that rule belongs to the
-     * weapon rather than to every caller.
+     * The shooter is skipped - the muzzle is inside their own body, so without it every shot would kill the player who
+     * fired it - and so is anything already dead or dying (a corpse at zero health has no death left to run).
+     * {@link MTBowKill} refuses the shooter a second time: that rule belongs to the weapon, not to every caller.
      */
     private static void annihilateLiving(World world, Entity source, Entity projectile, double fromX, double fromY,
         double fromZ, double deltaX, double deltaY, double deltaZ, double lengthSquared, double radius) {
@@ -173,12 +162,11 @@ public final class MTExplosionTunnel {
      * Destroys the blocks of the tunnel: every block whose centre is within {@code radius} of the line, minus what
      * survives (see the class comment).
      * <p>
-     * The line is walked in one block steps, each step opening a cube around the point it reached, instead of
-     * iterating the bounding box of the whole segment: a shot fired diagonally would otherwise scan a box as big as
-     * its own extent in all three axes (a 128 block flight at 45 degrees is a 90 x 90 x 90 box, 729,000 blocks, to
-     * destroy a few hundred). One block steps cover the line within half a block, so a cube of the ceiling of the
-     * radius around every sample covers every block whose centre can be within the radius of it. Blocks a
-     * neighbouring step already destroyed read as air and are skipped.
+     * The line is walked in one block steps, each opening a cube around the sample, not by iterating the segment's
+     * bounding box: a diagonal shot would otherwise scan a box as big as its own extent in all three axes (a 128 block
+     * flight at 45 degrees is a 90 x 90 x 90 box, 729,000 blocks, to destroy a few hundred). One block steps cover the
+     * line within half a block, so a cube of the ceiling of the radius around each sample covers every block whose
+     * centre can be within the radius; blocks an earlier step destroyed read as air and are skipped.
      */
     private static void destroyBlocks(World world, Entity source, double fromX, double fromY, double fromZ,
         double deltaX, double deltaY, double deltaZ, double length, double lengthSquared, double radius) {
@@ -243,12 +231,10 @@ public final class MTExplosionTunnel {
     }
 
     /**
-     * Asks the world's protection mods whether the block may go. The tunnel is not a player's pickaxe, but it is
-     * caused by one, so the standard {@link BlockEvent.BreakEvent} is posted for a shot fired by a player and a
-     * cancelled event leaves the block standing. Blocks destroyed by anything else (a dispenser, a mob) are not
-     * posted, exactly like the event itself only ever covers players.
-     * <p>
-     * The kill of the entities is not routed through that pipeline: see {@link MTBowKill} and {@link MTKillBase}.
+     * Asks the world's protection mods whether the block may go. The tunnel is not a pickaxe, but it is caused by one,
+     * so the standard {@link BlockEvent.BreakEvent} is posted for a shot fired by a player and a cancelled event leaves
+     * the block standing. Blocks destroyed by anything else (a dispenser, a mob) are not posted, exactly like the event
+     * only ever covers players.
      */
     private static boolean mayBreak(World world, EntityPlayer player, int x, int y, int z, Block block, int meta) {
         if (player == null) return true;
@@ -259,8 +245,8 @@ public final class MTExplosionTunnel {
 
     /**
      * Distance from a point to the segment {@code from .. from + delta}, the standard clamped projection.
-     * {@code lengthSquared} is handed in because the caller already has it, and the projection of a zero length
-     * segment cannot happen: the caller returns early for one.
+     * {@code lengthSquared} is handed in because the caller already has it; a zero length segment cannot happen (the
+     * caller returns early for one).
      */
     private static double distanceToSegment(double pointX, double pointY, double pointZ, double fromX, double fromY,
         double fromZ, double deltaX, double deltaY, double deltaZ, double lengthSquared) {

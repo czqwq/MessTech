@@ -27,23 +27,18 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Base class for tick-driven, multi-threaded parallel machines.
+ * Base class for tick-driven, multi-threaded parallel machines: the scheduler runs from {@code checkProcessing()},
+ * normally once per second, so {@code startRecipeProcessing()} / {@code endRecipeProcessing()} are active while inputs
+ * are read and consumed. Each {@link WorkThread} owns one recipe pool and runs several independent {@link RecipeTask}s
+ * (one started recipe with its own progress, EU/t, parallel count and outputs).
  * <p>
- * The scheduler is driven from {@code checkProcessing()}, normally in a one-second GT multiblock
- * cycle, so the standard {@code startRecipeProcessing()} / {@code endRecipeProcessing()} wrapper is
- * active while inputs are read and consumed. Each {@link WorkThread} belongs to one recipe pool and
- * can run multiple independent {@link RecipeTask}s simultaneously. A task is one started recipe with
- * its own progress, EU/t, parallel count and output buffers.
- * <p>
- * Subclasses should set {@code mMaxProgresstime} to a short cycle (e.g. 20 ticks) and call
- * {@link #tickThreadScheduler(IGregTechTileEntity, long)} from their {@code checkProcessing()}.
- * The normal GT base then drains {@code lEUt} every running tick and invokes the scheduler once per
- * cycle.
+ * Subclasses set {@code mMaxProgresstime} to a short cycle (e.g. 20 ticks) and call
+ * {@link #tickThreadScheduler(IGregTechTileEntity, long)} from {@code checkProcessing()}.
  */
 public abstract class TickableParallelismAcrossMultiMachineBase<T extends TickableParallelismAcrossMultiMachineBase<T>>
     extends MTMultiMachineBase<T> {
 
-    /** Internal work-thread registry, ordered by creation time. */
+    /** Work-thread registry, ordered by creation time. */
     protected final Map<String, WorkThread> threads = new LinkedHashMap<>();
 
     public TickableParallelismAcrossMultiMachineBase(int aID, String aName, String aNameRegional) {
@@ -56,7 +51,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
 
     // region Thread management API
 
-    /** Maximum number of work threads this machine allows. */
+    /** Maximum number of work threads. */
     public abstract int getMaxThreadCount();
 
     /** Main scheduler interval in ticks. Defaults to 20 ticks = 1 second. */
@@ -64,7 +59,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
         return 20;
     }
 
-    /** How many new recipe tasks one thread may try to start per scheduler tick. */
+    /** New recipe tasks one thread may start per scheduler tick. */
     protected int getMaxNewTasksPerThread(WorkThread thread) {
         return 16;
     }
@@ -79,7 +74,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
         return 1;
     }
 
-    /** Default thread name generator, used by subclasses that pre-create threads. */
+    /** Default thread name generator. */
     protected String getDefaultThreadName(int index) {
         return "Thread_" + index;
     }
@@ -132,9 +127,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
 
     protected void onThreadRemoved(WorkThread thread) {}
 
-    /**
-     * Scheduling priority. Higher priority threads get first chance to consume power/inputs.
-     */
+    /** Scheduling priority: higher priority threads get first chance to consume power/inputs. */
     protected int getThreadPriority(WorkThread thread) {
         return 0;
     }
@@ -282,12 +275,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
 
     // region Scheduler
 
-    /**
-     * Advances and starts work-thread tasks. This should be called from {@code checkProcessing()}
-     * while the standard multiblock {@code checkRecipe()} wrapper has {@code startRecipeProcessing()} /
-     * {@code endRecipeProcessing()} active, so ME hatches and other recipe-processing-aware hatches
-     * work correctly.
-     */
+    /** Advances and starts work-thread tasks, with the recipe wrapper of {@code checkProcessing()} active. */
     protected void tickThreadScheduler(IGregTechTileEntity base, long aTick) {
         List<WorkThread> orderedThreads = new ArrayList<>(threads.values());
         orderedThreads.sort(
@@ -324,7 +312,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
             }
         }
 
-        // Try to start additional independent tasks from the same thread/pool.
+        // Start more independent tasks from the same thread/pool
         int attempts = 0;
         while (attempts < getMaxNewTasksPerThread(thread)) {
             CheckRecipeResult result = checkAndStartThread(base, thread);
@@ -333,10 +321,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
         }
     }
 
-    /**
-     * Checks whether every item/fluid output of the task can currently fit into output buses/hatches.
-     * Used by the output retry mechanism to avoid voiding outputs.
-     */
+    /** Whether every output of the task currently fits into the output buses/hatches; avoids voiding outputs. */
     protected boolean canOutputTask(RecipeTask task) {
         if (task.outputItems == null && task.outputFluids == null) return true;
         if ((task.outputItems == null || task.outputItems.length == 0)
@@ -352,7 +337,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
     }
 
     /**
-     * Try to find and start one recipe task on the given work thread.
+     * Try to start one recipe task on the given work thread.
      *
      * @return successful result if a task was started.
      */
@@ -394,9 +379,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
 
     // endregion
 
-    /**
-     * A thread is a named worker bound to one recipe pool. It can hold multiple {@link RecipeTask}s.
-     */
+    /** A named worker bound to one recipe pool, holding multiple {@link RecipeTask}s. */
     @Getter
     public class WorkThread {
 
@@ -464,9 +447,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
             tasks.clear();
         }
 
-        /**
-         * Legacy helper: add a single task. Kept for existing subclasses that used one task per thread.
-         */
+        /** Legacy helper: add a single task (one task per thread). */
         public RecipeTask start(int duration, RecipeMap<?> map, ItemStack[] outputs, FluidStack[] fluidOutputs) {
             RecipeTask task = new RecipeTask(duration, map, outputs, fluidOutputs);
             tasks.add(task);
@@ -475,9 +456,7 @@ public abstract class TickableParallelismAcrossMultiMachineBase<T extends Tickab
         }
     }
 
-    /**
-     * A single independent started recipe inside a thread.
-     */
+    /** A single independent started recipe inside a thread. */
     public class RecipeTask {
 
         @Getter

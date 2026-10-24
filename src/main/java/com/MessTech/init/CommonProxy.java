@@ -23,6 +23,7 @@ import com.MessTech.common.recipe.MTChemicalTwisterRecipes;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.recipe.MTVendingMachineRecipes;
 import com.MessTech.common.recipe.RecipeMessFood;
+import com.MessTech.common.thaumcraft.MTThaumcraftResearch;
 import com.MessTech.common.util.MTKillBase;
 
 import appeng.api.parts.IPart;
@@ -42,8 +43,9 @@ public class CommonProxy implements IGuiHandler {
 
     /**
      * GUI id of the Ultimate Pattern Terminal, handed to {@code EntityPlayer#openGui}. The part's side is packed into
-     * the bits above the id, because Forge's GUI handler is only given the cable bus' coordinates and the terminal is
-     * one part among six sides.
+     * the
+     * bits above the id: Forge's GUI handler only gets the cable bus' coordinates, and the terminal is one part among
+     * six.
      */
     public static final int GUI_ULTIMATE_PATTERN_TERMINAL = 20;
 
@@ -58,38 +60,39 @@ public class CommonProxy implements IGuiHandler {
     }
 
     /**
-     * Opens the game console's window (see {@code GuiGameConsole}). The console is a purely local
-     * toy - the DOOM engine it runs lives on the client's own machine and it has no inventory, no
-     * tile entity and no server state - so this is a no-op on the server and only implemented by
+     * Opens the game console's window (see {@code GuiGameConsole}). Purely local - the DOOM engine lives on the
+     * client's
+     * machine, with no inventory, tile entity or server state - so this is a no-op on the server, implemented only by
      * {@link ClientProxy}.
      */
     public void openGameConsole(EntityPlayer player) {
         // Server side: nothing to do, by design.
     }
 
-    // preInit "Run before anything else. Read your config, create blocks, items, etc, and register them with the
-    // GameRegistry." (Remove if not needed)
     public void preInit(FMLPreInitializationEvent event) {
         Config.synchronizeConfiguration(event.getSuggestedConfigurationFile());
         MTNetwork.register();
         NetworkRegistry.INSTANCE.registerGuiHandler(MessTech.instance, this);
         MTItems.registerItems();
-        // The thrown "A Piggy" (ids are per mod, so the single entity of this mod is id 0).
+        // The thrown "A Piggy" (ids are per mod, so this mod's single entity is id 0).
         MTEntityPiggy.register();
         // The arrow of the Voidstar Piercer (id 1): straight flight, trail and the tunnel of an impact.
         MTEntityVoidstarArrow.register();
-        // The fireball of a DE explosion (id 2): the visible half of MTExplosionDE, i.e. of the reactor explosion
-        // port. It has no renderer of its own - MTDEBlastRenderer draws every live one in the world pass.
+        // The DE explosion fireball (id 2), the visible half of MTExplosionDE / the reactor explosion port. No renderer
+        // of
+        // its own - MTDEBlastRenderer draws every live one in the world pass.
         MTEntityDEBlast.register();
-        // The true kill ladder (shared by the piggy's MTPiggyKill and the bow's MTBowKill) needs to know whether a
-        // death path really ran, so it watches the death event of the game.
+        // The true kill ladder (MTPiggyKill / MTBowKill) must know whether a death path really ran: watches the death
+        // event.
         MTKillBase.init();
         MTProcessHandler.init();
-        // Galacticraft's own rockets climb at 1 block per tick at most, so this hook can only ever fire for a player
-        // who was thrown up at 256 blocks/s or more (see MTGalacticraftSpaceHandler).
+        // Galacticraft rockets climb at 1 block per tick at most, so this only fires for a player thrown up at 256
+        // blocks/s
+        // or more (see MTGalacticraftSpaceHandler).
         MTGalacticraftSpaceHandler.init();
-        // The flight behind /messtech GoUp: it drives the server entity and pins the client with the position packets
-        // setPositionAndUpdate sends, so it needs no client-side counterpart.
+        // /messtech GoUp's flight: drives the server entity and pins the client with setPositionAndUpdate's packets, so
+        // it
+        // needs no client-side counterpart.
         MTGoUpFlight.init();
         if (Loader.isModLoaded("Torcherino")) {
             MT_LOG.info("拿火把捅你皮撅子");
@@ -105,22 +108,23 @@ public class CommonProxy implements IGuiHandler {
         }
     }
 
-    // load "Do your mod setup. Build whatever data structures you care about. Register recipes." (Remove if not needed)
     public void init(FMLInitializationEvent event) {
         MT_LOG.info("I'm a info here watching you");
         RecipeMessFood.register();
     }
 
-    // postInit "Handle interaction with other mods, complete your setup based on this." (Remove if not needed)
     public void postInit(FMLPostInitializationEvent event) {
         MT_LOG.info("Loading Machine!");
         MTBlocks.registerBlocks();
         MTMachineLoader.loadMachines();
+        // Thaumcraft's own research is registered in its postInit, which this mod loads after (required-after in @Mod);
+        // the tab therefore goes in only now, after the machines exist.
+        MTThaumcraftResearch.registerCategory();
+        MTThaumcraftResearch.registerResearches();
         MT_LOG.info("Ciallo～(∠・ω< )⌒★");
         MTChemicalTwisterRecipes.loadRecipePostInit();
     }
 
-    // register server commands in this event handler (Remove if not needed)
     public void serverStarting(FMLServerStartingEvent event) {
         MT_LOG.debug("Hello the mess world!");
         // /messtech - see MTCommand. Commands belong to this event, not to preInit.
@@ -140,7 +144,8 @@ public class CommonProxy implements IGuiHandler {
         }
 
         // AE only fills the open context in Platform#openGUI, and its middle-click "how many to craft" path on the
-        // blank pattern slot reads it, so a GUI opened through Forge's IGuiHandler has to set it itself.
+        // blank
+        // pattern slot reads it, so a GUI opened through Forge's IGuiHandler has to set it itself.
         final ContainerOpenContext context = new ContainerOpenContext(terminal);
         context.setWorld(world);
         context.setX(x);
@@ -169,11 +174,13 @@ public class CommonProxy implements IGuiHandler {
         // The QFT pool is filled while the GT recipe loaders run, i.e. possibly after our postInit.
         MTRecipeMaps.populateQftProbabilityDestroyerRecipes();
         // Same for the Assembly Factory's Assembly Line pool: it is built from GT's Assembly Line definitions, which
-        // other mods (TST's circuit lines, for one) only finish registering during their own postInit.
+        // other
+        // mods (TST's circuit lines, for one) only finish registering in their own postInit.
         MTRecipeMaps.populateAssFactoryAssemblyLineRecipes();
-        // Same reasoning for the Vending Machine: it reads its trade database in its own FMLServerStartingEvent
-        // handler, so the piggy trade can only be merged in after that (see MTVendingMachineRecipes). The machine is
-        // optional, so its classes must not be touched without it.
+        // Same again for the Vending Machine: it reads its trade database in its own FMLServerStartingEvent handler, so
+        // the
+        // piggy trade can only be merged in after that (see MTVendingMachineRecipes). The machine is optional, so its
+        // classes must not be touched without it.
         if (Mods.VendingMachine.isModLoaded()) {
             MTVendingMachineRecipes.register();
         }

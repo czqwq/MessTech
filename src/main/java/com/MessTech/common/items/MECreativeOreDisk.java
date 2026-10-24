@@ -36,11 +36,9 @@ import gregtech.api.modularui2.GTGuiThemes;
 import gregtech.api.modularui2.GTModularScreen;
 
 /**
- * ME Creative Ore Disk.
- * <p>
- * An AE storage cell that acts like a creative cell for every item registered under an ore dictionary
- * name beginning with {@code ore}. Shift-right-click opens a small MUI2 GUI to set the quantity that
- * each matching ore should appear with in the ME network.
+ * An AE storage cell acting like a creative cell for every item under an ore dictionary name starting with
+ * {@code ore}. Shift-right-click opens a small MUI2 GUI setting the quantity each matching ore appears with in the ME
+ * network.
  */
 public class MECreativeOreDisk extends AEBaseInfiniteCell implements IGuiHolder<ItemStackGuiData> {
 
@@ -107,7 +105,7 @@ public class MECreativeOreDisk extends AEBaseInfiniteCell implements IGuiHolder<
         ItemStack stack = guiData.getItemStack();
         EntityPlayer player = guiData.getPlayer();
         IntSyncValue quantitySync = new IntSyncValue(() -> getQuantity(stack), val -> {
-            // Make sure we mutate the actual stack in the player's inventory, not a GUI-side copy.
+            // Mutate the real stack in the player's inventory, not a GUI-side copy.
             ItemStack held = player.inventory.getCurrentItem();
             if (held != null && held.getItem() == MECreativeOreDisk.this) {
                 setQuantity(held, val);

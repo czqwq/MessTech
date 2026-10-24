@@ -9,8 +9,8 @@ import com.cleanroommc.modularui.network.NetworkUtils;
 import com.cleanroommc.modularui.utils.serialization.IByteBufAdapter;
 
 /**
- * MUI2 adapter for syncing the per-slot memory item array to the client, so empty locked slots can render a faded
- * ghost icon of the remembered item.
+ * MUI2 adapter syncing the per-slot memory array to the client, so empty locked slots can render a faded ghost icon of
+ * the remembered item.
  */
 public class MTReactorMemorySyncAdapter implements IByteBufAdapter<ItemStack[]> {
 

@@ -6,13 +6,9 @@ import gregtech.api.items.CircuitComponentFakeItem;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
 
 /**
- * Conversion helpers between NAC fake CircuitComponent stacks and their real item forms.
- * <p>
- * Real item forms are:
- * <ul>
- * <li>the original real item when {@link CircuitComponent#realComponent} exists;</li>
- * <li>{@link MTNACComponentItem} when the component previously only existed as a fake item.</li>
- * </ul>
+ * Conversion helpers between NAC fake CircuitComponent stacks and their real item forms: the original real item when
+ * {@link CircuitComponent#realComponent} exists, {@link MTNACComponentItem} when the component only ever existed as a
+ * fake item.
  */
 public final class MTNACComponentItems {
 
@@ -20,11 +16,11 @@ public final class MTNACComponentItems {
 
     public static ItemStack getRealItemStack(CircuitComponent component, int amount) {
         if (component == null || amount <= 0) return null;
-        // The "packet" is a physical, holdable item. Every CircuitComponent has one of these forms.
+        // The "packet" is a physical, holdable item; every CircuitComponent has one of these forms.
         if (MTNACComponentItem.INSTANCE != null) {
             return MTNACComponentItem.getStack(component, amount);
         }
-        // Fallback: use the hidden fake item so the mapping is still meaningful in early registration.
+        // Fallback: the hidden fake item, so the mapping still means something in early registration.
         return component.getFakeStack(amount);
     }
 

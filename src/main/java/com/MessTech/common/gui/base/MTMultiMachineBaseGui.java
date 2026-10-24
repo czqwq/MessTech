@@ -10,11 +10,8 @@ import gregtech.api.metatileentity.implementations.MTEMultiBlockBase;
 import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 
 /**
- * Shared MessTech multiblock GUI base.
- * <p>
- * Replaces the default GregTech logo in the bottom-right corner with the MessTech logo. Space modules
- * ({@code SpaceModuleInfinityGui} and its subclasses) intentionally use their own picture and are not derived from
- * this class.
+ * Shared MessTech multiblock GUI base: the GT logo in the bottom-right corner is replaced with the MessTech one. Space
+ * modules ({@code SpaceModuleInfinityGui} and its subclasses) use their own picture and do not derive from this class.
  */
 public class MTMultiMachineBaseGui<T extends MTEMultiBlockBase> extends MTEMultiBlockBaseGui<T> {
 

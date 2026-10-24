@@ -44,16 +44,14 @@ import gregtech.common.gui.modularui.hatch.base.MTEHatchBaseGui;
 import gregtech.common.modularui2.widget.builder.ItemSlotGridBuilder;
 
 /**
- * MUI2 GUI for {@link MTReactorAccessHatch}.
- * <p>
- * Shows exactly one 9x6 reactor page at a time. The page switching buttons sit in the bottom right corner:
- * "previous page" is hidden on the first page and "next page" is hidden on the last page.
+ * MUI2 GUI for {@link MTReactorAccessHatch}: one 9x6 reactor page at a time; the bottom-right page buttons hide
+ * "previous" on the first page and "next" on the last.
  * <p>
  * Slot memory:
  * <ul>
- * <li>Shift + right click on a filled, unlocked slot locks every slot of this hatch holding the same item type
- * (all pages, NBT ignored) and keeps the threshold of an already locked group of that type.</li>
- * <li>Shift + right click on a locked slot unlocks only that single slot.</li>
+ * <li>Shift + right click on a filled, unlocked slot locks every slot with the same item type (all pages, NBT ignored),
+ * keeping an already locked group's threshold.</li>
+ * <li>Shift + right click on a locked slot unlocks only that slot.</li>
  * <li>Alt + Shift + right click on a locked slot unlocks every locked slot of the same item type.</li>
  * <li>Middle click on a locked slot opens the auto-output panel with a percentage text field.</li>
  * </ul>
@@ -235,8 +233,9 @@ public class MTReactorAccessHatchGui extends MTEHatchBaseGui<MTReactorAccessHatc
     }
 
     /**
-     * Server side already enforces the lock through {@code MTEItemStackHandler#isItemValid}; this client side check
-     * additionally uses the synced lock/memory arrays, so a locked slot does not even accept a wrong item visually.
+     * The server already enforces the lock in {@code MTEItemStackHandler#isItemValid}; this client check adds the
+     * synced
+     * lock/memory arrays, so a locked slot does not even accept a wrong item visually.
      */
     private class MTReactorModularSlot extends ModularSlot {
 

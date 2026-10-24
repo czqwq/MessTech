@@ -86,10 +86,7 @@ import mcp.mobius.waila.overlay.tooltiprenderers.TTRenderStack;
 import tectech.thing.CustomItemList;
 
 /**
- * Nano-Scale Foundry.
- * <p>
- * AIO machine intended to aggregate all NAC processing in one multiblock. Currently cloned from
- * {@code MachineTemplate}: same 3x3x3 structure and no structure changes yet.
+ * Nano-Scale Foundry: AIO machine that aggregates all NAC processing in one multiblock.
  */
 public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBase<MTNanoScaleFoundry>
     implements ISurvivalConstructable, RecipeMapWorkable {
@@ -99,12 +96,12 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     /** Whether an Astral Array Fabricator has been consumed to unlock the one-step circuit pool mode. */
     private boolean astralArrayUnlocked = false;
 
-    /** Mode 0: the 11 NAC pool threads run side by side. This is the default. */
+    /** Mode 0: the 11 NAC pool threads run side by side (default). */
     public static final int MODE_THREADS = 0;
 
     /**
-     * Mode 1: all threads are off and the machine's main thread runs one recipe of the one-step circuit pool,
-     * selected by the circuit in an input bus circuit slot. Consuming an Astral Array unlocks the switch.
+     * Mode 1: threads off, the main thread runs one one-step circuit pool recipe selected by an input bus circuit
+     * slot.
      */
     public static final int MODE_ONE_STEP_CIRCUIT_POOL = 1;
 
@@ -238,9 +235,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     /**
-     * The mode switch button only exists while the Astral Array is unlocked: the MUI2 GUI reads its mode icons from
-     * the machine instance the GUI is built for, so a locked machine gets no button at all. The screwdriver is
-     * gated the same way in {@link #onScrewdriverRightClick}.
+     * The mode switch button exists only while the Astral Array is unlocked (the MUI2 GUI takes its mode icons from
+     * the machine instance); {@link #onScrewdriverRightClick} is gated the same way.
      */
     @Override
     protected MTNanoScaleFoundryGui getGui() {
@@ -311,10 +307,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     // region Machine modes
-    // Mode 0 (default) runs the 11 NAC pool threads. Consuming an Astral Array unlocks mode 1, in which every
-    // thread is off and the machine's main thread runs one one-step circuit pool recipe. The switch is offered by
-    // the screwdriver and by the GUI mode button, and it is refused while the machine is active - so it has to be
-    // switched off (soft mallet) or be idle first. Switching to mode 1 drops whatever the threads were holding.
+    // Mode 0 (default) runs the 11 NAC pool threads; an Astral Array unlocks mode 1 (main thread, one pool recipe),
+    // switched only while idle and dropping the threads' tasks.
 
     @Override
     public int totalMachineMode() {
@@ -335,13 +329,9 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     /**
-     * Refuses the switch while the machine is active, and refuses mode 1 while the Astral Array is not unlocked -
-     * the GUI button is hidden then, but the sync handler is not.
-     * <p>
-     * The threads' unfinished tasks are <b>dropped</b> when mode 1 is entered, without refunding their inputs,
-     * instead of making the player wait for every thread to finish. A running machine never reaches this point, so
-     * what gets dropped is what the threads held when the machine was switched off: {@code checkProcessing} stops
-     * ticking them there and their tasks sit frozen until the mode changes.
+     * Refuses the switch while active, and mode 1 without the Astral Array (the GUI button is hidden then, the sync
+     * handler is not). Entering mode 1 <b>drops</b> the threads' unfinished tasks without refunding inputs - what
+     * {@code checkProcessing} stopped ticking when the machine was switched off; a running machine never gets here.
      */
     @Override
     public void setMachineMode(int index) {
@@ -355,9 +345,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     /**
-     * Whether the controller currently reports itself as running. Mode 0 keeps a one-second cycle going for as long
-     * as it is allowed to work, so a machine in mode 0 is active whenever it is switched on; mode 1 is active only
-     * while it runs a main-thread recipe. This is the gate for changing modes.
+     * Whether the controller reports as running: mode 0 cycles every second while it may work, so it is active
+     * whenever switched on, mode 1 only while it runs a main-thread recipe. Gates mode changes.
      */
     public boolean isMachineActive() {
         IGregTechTileEntity base = getBaseMetaTileEntity();
@@ -365,8 +354,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     /**
-     * The screwdriver switches modes, the same way MTChemicalTwister and MTComputingCenter do it: while the machine
-     * is active the switch is refused, so the recipe that is being processed cannot change under it.
+     * The screwdriver switches modes (as MTChemicalTwister / MTComputingCenter do), refused while the machine is
+     * active.
      */
     @Override
     public void onScrewdriverRightClick(ForgeDirection side, EntityPlayer aPlayer, float aX, float aY, float aZ,
@@ -411,8 +400,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     @Override
     public RecipeMap<?> getRecipeMap() {
         if (machineMode == MODE_ONE_STEP_CIRCUIT_POOL) {
-            // Mode 1 is a single pool whose selector comes from an input bus circuit slot (1-6), like an
-            // independent machine's own circuit slot.
+            // Mode 1 is one pool whose selector comes from an input bus circuit slot (1-6), like a standalone
+            // machine's.
             return MTRecipeMaps.oneStepCircuitPoolRecipes;
         }
 
@@ -463,15 +452,15 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
 
     @Override
     public boolean shouldDisplayCheckRecipeResult() {
-        // Mode 1 runs the shared processing pipeline, so its "no recipe / processing" line is the real status.
-        // Mode 0's per-thread terminal rows already show active/idle state, and the machine polls every second.
+        // Mode 1's shared pipeline gives a real "no recipe / processing" line; mode 0's per-thread rows already show
+        // active/idle (polled every second).
         return machineMode == MODE_ONE_STEP_CIRCUIT_POOL;
     }
 
     @Override
     public boolean hasRunningText() {
-        // Mode 1 shows its own "machine main thread running" line, mode 0 the per-thread rows; a generic
-        // "Running..." line on top of either would say nothing.
+        // Mode 1 has its own "machine main thread running" line, mode 0 the per-thread rows; a generic "Running..."
+        // would say nothing.
         return false;
     }
 
@@ -490,27 +479,24 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
 
         if (machineMode == MODE_ONE_STEP_CIRCUIT_POOL) {
             if (!astralArrayUnlocked) {
-                // Defensive repair: mode 1 cannot exist without the array. The wire cutter refuses to take the array
-                // while mode 1 runs and switches the machine back to mode 0 when it succeeds, so this only covers a
-                // state that slipped in from elsewhere - and because setMachineMode is refused while the machine is
-                // active, the field is written directly as the fallback. Mode 0 never uses the processing logic, so
-                // no cached mode 1 recipe has to be dropped here.
+                // Defensive repair: mode 1 cannot exist without the array. The wire cutter refuses to take it while
+                // mode 1 runs and switches to mode 0 on success, so this only catches a slipped-in state;
+                // setMachineMode is refused while active, hence the direct field write. Mode 0 never uses the logic,
+                // so nothing is cached.
                 setMachineMode(MODE_THREADS);
                 if (machineMode == MODE_ONE_STEP_CIRCUIT_POOL) {
                     machineMode = MODE_THREADS;
                 }
             } else {
-                // Main-thread mode: the shared GT pipeline runs one one-step circuit pool recipe, and
-                // MTProcessingLogic#findRecipeMatches resolves that page itself (the pool recipes are fake,
-                // so the shared recipe lookup would never see them).
+                // Main-thread mode: the shared pipeline runs one pool recipe; MTProcessingLogic#findRecipeMatches
+                // resolves that page itself (the pool recipes are fake, so the shared lookup never sees them).
                 return super.checkProcessing();
             }
         }
 
-        // Keep mode 0 on a one-second GT cycle. The standard checkRecipe() wrapper calls
-        // startRecipeProcessing() before this method and endRecipeProcessing() after it, so ME input
-        // buses/hatches can snapshot and commit correctly. All thread input reads/consumption happen
-        // inside that wrapper.
+        // Keep mode 0 on a one-second GT cycle. checkRecipe() calls startRecipeProcessing() before this method and
+        // endRecipeProcessing() after it, so ME buses/hatches snapshot and commit correctly; all thread input reads and
+        // consumption happen inside that wrapper.
         mEfficiency = 10000;
         mEfficiencyIncrease = 10000;
         mMaxProgresstime = 20;
@@ -525,14 +511,12 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     /**
-     * Mode 1's recipe source. The one-step circuit pool holds <b>fake</b> recipes: they are NEI pages first and GT's
-     * recipe lookup skips fakes on purpose (indexing up to 54 item plus 54 fluid inputs per page would bloat
-     * {@code GTRecipeLookup}). So mode 1 resolves the matching page itself and hands it to the same pipeline every
-     * other recipe uses, exactly like {@code MTAssFactory} does for its Assembly Line definitions - parallels,
-     * overclock, void protection, ME buses and the input consumption all stay the shared code.
+     * Mode 1's recipe source. The pool holds <b>fake</b> recipes (NEI pages first; GT's lookup skips fakes on purpose -
+     * indexing up to 54 item + 54 fluid inputs per page would bloat {@code GTRecipeLookup}), so mode 1 resolves the
+     * page itself and feeds the shared pipeline as {@code MTAssFactory} does for Assembly Lines: parallels, overclock,
+     * void protection, ME buses and consumption stay shared.
      * <p>
-     * Only mode 1 takes this branch. Mode 0 runs its own thread scheduler and never asks the processing logic for a
-     * recipe, and every other map of this machine is a normal (non-fake) map.
+     * Only mode 1 takes this branch; mode 0 never uses the processing logic and its other maps are non-fake.
      */
     @Override
     protected ProcessingLogic createProcessingLogic() {
@@ -558,15 +542,14 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
 
     @Override
     protected int getMaxNewTasksPerThread(WorkThread thread) {
-        // Each thread runs one independent recipe at a time; multiple threads provide cross-pool
-        // parallel processing. This keeps GUI/Waila progress per-thread accurate and independent.
+        // One independent recipe per thread; threads give cross-pool parallelism, and per-thread GUI/Waila progress
+        // stays accurate.
         return 1;
     }
 
     @Override
     protected int getMaxParallelForThread(WorkThread thread) {
-        // The concrete machine is allowed to decide. Foundry lets each thread run as much as inputs
-        // and remaining power allow, up to int max.
+        // Foundry lets each thread run as much as inputs and remaining power allow, up to int max.
         return Integer.MAX_VALUE;
     }
 
@@ -590,8 +573,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         }
         if (items.isEmpty()) return CheckRecipeResultRegistry.NO_RECIPE;
 
-        // Fluid isolation follows GT5U's color model: only fluid hatches whose color matches the
-        // thread's input-bus colors (plus uncolored hatches) are visible to this thread.
+        // GT5U color model: a thread sees only fluid hatches matching its input-bus colors, plus uncolored ones.
         ArrayList<FluidStack> fluidStacks = getThreadFluidStacks(buses, dualInputs);
 
         GTRecipe recipe = recipeMap.findRecipeQuery()
@@ -695,7 +677,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    /** Snapshots each input bus's circuit number. ME buses move the circuit slot while processing, hence the flag. */
+    /** Snapshots each input bus's circuit number; ME buses move the circuit slot while processing, hence the flag. */
     private void refreshInputBusCircuits(boolean duringProcessing) {
         inputBusCircuitNumbers.clear();
         for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
@@ -722,8 +704,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
                 ItemStack stack = busTile.getStackInSlot(i);
                 if (stack != null && GTUtility.areStacksEqual(stack, starArray)) {
                     busTile.decrStackSize(i, 1);
-                    // The unlock only makes mode 1 selectable; the machine stays in mode 0 until the player
-                    // switches it with the screwdriver or the GUI button.
+                    // The unlock only makes mode 1 selectable; the machine stays in mode 0 until switched by hand.
                     astralArrayUnlocked = true;
                     return;
                 }
@@ -745,8 +726,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     /**
-     * An ME bus moves its circuit behind the stocked slots while processing, so the circuit is the
-     * second-to-last slot - true for GT's fixed 16+2 layout and for variable-size subclasses alike.
+     * An ME bus moves its circuit behind the stocked slots while processing: second-to-last slot (GT's 16+2 layout and
+     * variable-size subclasses alike).
      */
     private int getBusCircuitSlotDuringProcessing(MTEHatchInputBus bus) {
         if (bus instanceof MTEHatchInputBusME) {
@@ -843,8 +824,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     /**
-     * GT's input match: NBT is ignored unless the recipe is NBT sensitive or the item always needs it
-     * ({@code GTRecipe#shouldCheckNBT} - fluid cell, data stick, data orb). Lets a renamed item match.
+     * GT's input match: NBT is dropped unless the recipe is NBT sensitive or the item always needs it
+     * ({@code GTRecipe#shouldCheckNBT}: fluid cell, data stick, data orb), so a renamed item still matches.
      */
     private static boolean inputSatisfies(ItemStack sought, ItemStack other, boolean nbtSensitive) {
         if (other == null) return false;
@@ -901,9 +882,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         return fluids;
     }
 
-    /**
-     * Valid programmable hatches; {@code GTUtility.filterValidMTEs} cannot take them (not MetaTileEntity subclasses).
-     */
+    /** Valid programmable hatches; {@code GTUtility.filterValidMTEs} cannot take them (not MetaTileEntity). */
     private ArrayList<IDualInputHatch> validDualInputHatches() {
         ArrayList<IDualInputHatch> valid = new ArrayList<>();
         for (IDualInputHatch hatch : mDualInputHatches) {
@@ -1068,9 +1047,9 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     }
 
     /**
-     * The immersion fluids the Board Processor accepts, in the order GT5U's {@code BoardProcessingModuleFluidKey}
-     * numbers them: {@code MTEBoardProcessorModule#LEGAL_FLUIDS}, which gained UU-Matter as type 5 in 5.09.54.183. The
-     * machine keeps one tank per type, so it can be fed any of them without swapping what is inside.
+     * Immersion fluids the Board Processor accepts, in GT5U's {@code BoardProcessingModuleFluidKey} order
+     * ({@code MTEBoardProcessorModule#LEGAL_FLUIDS}; UU-Matter is type 5 since 5.09.54.183). One tank per type, so any
+     * of them can be fed without swapping what is inside.
      */
     private static final Materials[] BOARD_TANK_FLUIDS = { Materials.IronIIIChloride, Materials.GrowthMediumSterilized,
         Materials.BioMediumSterilized, Materials.PrismaticAcid, Materials.UUMatter };
@@ -1458,8 +1437,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
         int z) {
         super.getWailaNBTData(player, tile, tag, world, x, y, z);
-        // Mode 1 has no threads to report: the main thread runs one recipe, so the standard progress bar and the
-        // base class's mode line already describe the machine. Only the "main thread" marker travels here.
+        // Mode 1 has no threads: the standard progress bar and mode line suffice - only the "main thread" marker
+        // travels here.
         if (machineMode == MODE_ONE_STEP_CIRCUIT_POOL) {
             tag.setBoolean("oneStepMainThread", true);
             tag.setBoolean("isSneaking", player.isSneaking());
@@ -1517,8 +1496,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             index++;
         }
         tag.setTag("threads", list);
-        // Expanding the per-thread detail is the player's choice, so the decision travels with the tooltip (the same
-        // thing AE's WirelessDataProvider does for its wireless hub's connected-device list).
+        // Expanding the per-thread detail is the player's choice, so it travels with the tooltip (like AE's
+        // WirelessDataProvider does for its hub's device list).
         tag.setBoolean("isSneaking", player.isSneaking());
     }
 
@@ -1538,9 +1517,8 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
 
         NBTTagList list = tag.getTagList("threads", 10);
 
-        // Collapsed, the tooltip reads like an ordinary multiblock's: one progress bar for the work this machine is
-        // running (the sum over its active threads, so a dozen threads do not turn into a dozen bars). Sneaking expands
-        // it into the per-thread lines below - AE's WirelessDataProvider hides its connected-device list the same way.
+        // Collapsed the tooltip reads like an ordinary multiblock's: one progress bar, summed over the active threads,
+        // so a dozen threads do not become a dozen bars. Sneaking expands the per-thread lines below.
         if (!tag.getBoolean("isSneaking")) {
             long progress = 0;
             long max = 0;
@@ -1672,8 +1650,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         float aX, float aY, float aZ, ItemStack aTool) {
         if (!astralArrayUnlocked) return false;
 
-        // Mode 1 runs its recipe on the main thread; pulling the array out from under a running recipe is refused,
-        // so the machine can never be left in a mode it is not allowed to be in the middle of a run.
+        // Mode 1's recipe runs on the main thread, so pulling the array out from under it is refused.
         if (machineMode == MODE_ONE_STEP_CIRCUIT_POOL && getBaseMetaTileEntity() != null
             && getBaseMetaTileEntity().isActive()) {
             chat(aPlayer, "machine.nanoscale.cannot_extract_running");

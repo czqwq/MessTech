@@ -1,0 +1,22 @@
+package com.MessTech.client.text;
+
+/** A registered effect shades an existing text mask without owning layout. */
+public interface TextEffect extends AutoCloseable {
+
+    void render(TextRenderContext context);
+
+    default float padding(float height) {
+        return height;
+    }
+
+    default float padding(float width, float height) {
+        return padding(height);
+    }
+
+    default int fallbackColor() {
+        return 0xFFFFFF;
+    }
+
+    @Override
+    default void close() {}
+}

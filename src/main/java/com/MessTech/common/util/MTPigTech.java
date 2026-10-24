@@ -8,7 +8,7 @@ import net.minecraft.util.StatCollector;
 import com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler;
 
 /**
- * The "PigTech" brand line: {@link MTPigTechText}'s two second pig animation, behind the same static "Add by:" prefix
+ * The "PigTech" brand line: {@link MTPigTechText}'s two second pig animation behind the same static "Add by:" prefix
  * {@link AuthorDynamic} puts in front of the animated MessTech name, on an item tooltip through the same gtnhlib
  * mechanism the GT5U author names use.
  * <p>
@@ -17,11 +17,9 @@ import com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler;
  * own margin so the two can never touch. See {@link MTPigTechText} for what the medium can express.
  * <p>
  * {@code AnimatedTooltipHandler} keeps a {@code Supplier<String>} per {@link ItemStack} and re-evaluates it once per
- * frame ({@code renderTooltip} splits the result on {@code '\n'}), so the whole animation is simply the string the
- * supplier returns - there is no renderer, no event handler and no per frame state in this class.
- * <p>
- * {@link #pigRegisterOn(ItemStack)} is the "PigRegisterOn" entry point: it adds the animated line and nothing else.
- * Unlike {@link AuthorDynamic#registerOn} it adds no author line.
+ * frame ({@code renderTooltip} splits the result on {@code '\n'}), so the whole animation is the string the supplier
+ * returns: no renderer, no event handler, no per frame state here. {@link #pigRegisterOn(ItemStack)} adds the animated
+ * line only, unlike {@link AuthorDynamic#registerOn}.
  */
 public final class MTPigTech {
 
@@ -63,7 +61,7 @@ public final class MTPigTech {
     /**
      * PigRegisterOn: adds the animated "PigTech" line to the tooltips of the given stack, and nothing else.
      *
-     * @param stack the stack to decorate; {@code OreDictionary.WILDCARD_VALUE} as its damage covers every variant
+     * @param stack the stack to decorate; {@code OreDictionary.WILDCARD_VALUE} covers every variant
      */
     public static void pigRegisterOn(ItemStack stack) {
         if (stack == null) return;

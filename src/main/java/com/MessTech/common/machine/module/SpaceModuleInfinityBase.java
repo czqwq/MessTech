@@ -59,42 +59,27 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
- * Shared base for the wireless MessTech space modules.
+ * Shared base for the wireless MessTech space modules: they extend GTNH's native {@link TileEntityModuleBase}, so
+ * they are real Space Elevator project modules rather than machines standing next to one. Each subclass builds the
+ * elevator's module slot via {@link #buildModuleStructure} - only a controller standing on such a slot is registered -
+ * and the elevator itself calls {@code connect(this)} on modules whose {@code getNeededMotorTier()} the motor tier
+ * satisfies and {@code disconnect()} when it stops working, which is exactly what {@link #isMountedOnFormedElevator()}
+ * reads.
  * <p>
- * This class extends GTNH's native {@link TileEntityModuleBase}, so the modules are real Space Elevator
- * project modules rather than machines that merely stand next to one. Two things make that work:
- * <ul>
- * <li>the module's own structure is the module slot of the elevator - every subclass builds its piece
- * from {@link #buildModuleStructure}. The elevator walks its own structure and only registers a module
- * whose controller stands on one of its module slots, so the shape has to be the slot, not a lookalike;</li>
- * <li>the elevator hands the module its parent: every 20 ticks it walks {@code mProjectModuleHatches} and
- * calls {@code connect(this)} on each module whose {@code getNeededMotorTier()} the motor tier satisfies,
- * and {@code disconnect()} on all of them when it stops working. {@link #isMountedOnFormedElevator()} reads
- * exactly that, so the module never has to search the neighbourhood for an elevator.</li>
- * </ul>
- * Note that the slot only accepts a module in the right orientation: the module is 2 wide, 5 long and 2
- * deep, so its long axis has to run along the cell of the slot. The four rotations the player can give it
- * are not interchangeable; the ones that fit are the ones the elevator's own modules use.
- * <p>
- * The modules remain wireless: they draw power directly from the GT wireless network and do not draw
- * from the elevator's internal EU buffer.
+ * The module is 2 wide, 5 long and 2 deep, so only the rotations the elevator's own modules use fit the slot. Power
+ * comes from the GT wireless network, not from the elevator's internal EU buffer.
  */
 @Getter
 public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<T>> extends TileEntityModuleBase
     implements ISurvivalConstructable {
 
-    /**
-     * -- GETTER --
-     *
-     * @return The connected Space Elevator, or null when not mounted.
-     */
+    /** @return the connected Space Elevator, or null when not mounted. */
     protected TileEntitySpaceElevator parentElevator;
 
     private int crossRecipeParallel = 1;
     protected boolean shutdownRequestedDuringBatch = false;
 
-    // Tick-batched output state: the machine runs one continuous main batch and generates one
-    // sub-output per tick, accumulating everything into these lists until the batch finishes.
+    // One continuous main batch, one sub-output per tick, accumulated here.
     protected int batchRemainingTasks = 0;
     protected ArrayList<ItemStack> batchItemOutputs = new ArrayList<>();
     protected ArrayList<FluidStack> batchFluidOutputs = new ArrayList<>();
@@ -125,13 +110,12 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     }
 
     /**
-     * The same module, on a tier of its own. The Infinity modules are all a single MAX tier (14, 5, 5); a family
-     * that comes in several tiers - the space apiary modules - passes its own instead. Note that
-     * {@code TileEntityModuleBase} indexes {@code GTValues.V[tTier]} and shifts the EU buffer by {@code tTier - 7}, so
-     * the tier has to be a real entry of the voltage table (0..15) and at least 7.
+     * The same module on a tier of its own; the Infinity modules are all 14, 5, 5. {@code TileEntityModuleBase}
+     * indexes {@code GTValues.V[tTier]} and shifts the EU buffer by {@code tTier - 7}, so the tier must be a real
+     * voltage table entry (0..15) and at least 7.
      *
      * @param aTier         voltage tier of this module, see {@code TileEntityModuleBase#getTier()}
-     * @param aModuleTier   module tier, i.e. how far up the elevator's own ladder it sits
+     * @param aModuleTier   module tier, how far up the elevator's own ladder it sits
      * @param aMinMotorTier motor tier of the Space Elevator needed to run it, 1..5
      */
     protected SpaceModuleInfinityBase(int aID, String aName, String aNameRegional, int aTier, int aModuleTier,
@@ -160,17 +144,15 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     // region Elevator module slot
 
     /**
-     * The module slot of the Space Elevator, exactly as {@link TileEntityModuleBase} defines it for the native
-     * modules: two rows of two, five layers tall, controller on the second layer of the first row. The elevator
-     * only calls {@code addProjectModuleToMachineList} on a controller standing on its own module slot, so a
-     * module that wants to be registered has to occupy that slot and not merely stand next to the elevator.
+     * The Space Elevator's module slot as {@link TileEntityModuleBase} defines it: two rows of two, five layers,
+     * controller on the second layer of the first row. The elevator only registers a controller on that slot.
      *
      * @param hatchAdder adder that harvests the hatches of this module from the {@code H} positions
      */
     @SuppressWarnings("unchecked")
     protected IStructureDefinition<T> buildModuleStructure(IGTHatchAdder<? super T> hatchAdder) {
-        // The wildcard in the adder is what lets the callers pass a method reference that takes their own
-        // concrete class; the element itself belongs to this module, hence the cast.
+        // The wildcard lets callers pass a method reference on their own class; the element is this module's, hence
+        // the cast.
         IStructureElement<T> hatchElement = (IStructureElement<T>) GTStructureUtility.ofHatchAdderOptional(
             hatchAdder,
             TileEntitySpaceElevator.CASING_INDEX_BASE,
@@ -187,34 +169,26 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     }
 
     /**
-     * @return the module tier this module was constructed with, i.e. {@code tModuleTier} - the same number the
-     *         native modules read back through their own {@code getModuleTier()}. Recipes carry a
-     *         {@code MODULE_TIER} metadata and only match when it is not above this value.
+     * @return {@code tModuleTier}: what the native modules read back through {@code getModuleTier()}; recipes only
+     *         match when their {@code MODULE_TIER} metadata is not above this value.
      */
     public int getModuleTier() {
         return tModuleTier;
     }
 
-    /**
-     * The elevator this module is mounted on, or null while it is not mounted on one. The elevator sets this in
-     * {@code connect(this)}; the module never looks for an elevator on its own.
-     */
+    /** The elevator this module is mounted on, or null; set in {@code connect(this)}. */
     public TileEntitySpaceElevator getConnectedElevator() {
         return parentElevator;
     }
 
-    /**
-     * @return true while the module is mounted on an elevator whose structure is formed and whose motor tier is
-     *         at least {@code getNeededMotorTier()}. The elevator only connects modules that satisfy both.
-     */
+    /** @return true while mounted on a formed elevator whose motor tier is at least {@code getNeededMotorTier()}. */
     public boolean isMountedOnFormedElevator() {
         return parentElevator != null && parentElevator.getMotorTier() >= getNeededMotorTier();
     }
 
     /**
-     * Adds the "why is this module not running" structure error, telling the two reasons apart: the module is
-     * standing on a module slot but the elevator has not taken it in (its structure is incomplete, or it is
-     * switched off), or it is mounted but the elevator's motor tier is below {@code getNeededMotorTier()}.
+     * Adds the "why is this module not running" structure error: the elevator has not taken the module in (structure
+     * incomplete or switched off) or its motor tier is below {@code getNeededMotorTier()}.
      *
      * @param errors error list of the structure check
      * @param level  level suffix this module needs, e.g. {@code V} for {@code MK-V}
@@ -228,10 +202,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
             StructureErrors.of("machine.spacemodule.elevator_level_too_low", TranslatableText.literal("MK-" + level)));
     }
 
-    /**
-     * Reports the elevator linkage of this module after its own structure turned out to be complete. Call it from
-     * {@code checkMachine} once {@code checkPiece} succeeded.
-     */
+    /** Reports the elevator linkage once the module's own structure is complete ({@code checkPiece}). */
     protected void checkElevatorLinkage(List<StructureError> errors, String level) {
         if (!isMountedOnFormedElevator()) {
             addElevatorError(errors, level);
@@ -332,10 +303,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         }
     }
 
-    /**
-     * Formats a wireless EU value with thousands separators and a compact scientific-notation
-     * suffix, e.g. {@code 1,000,000 (1.00e6)}.
-     */
+    /** {@code 1,000,000 (1.00e6)}: thousands separators plus a compact scientific-notation suffix. */
     protected String formatWirelessEU(String raw) {
         try {
             BigInteger value = new BigInteger(raw);
@@ -385,7 +353,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
 
     @Override
     public long increaseStoredEU(long amount) {
-        // Wireless modules draw directly from the wireless network; no elevator EU buffer is used.
+        // Wireless modules draw from the network only; no elevator EU buffer is used.
         return 0;
     }
 
@@ -398,18 +366,12 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         return super.getAvailableData_EM();
     }
 
-    /**
-     * @return The amount of computation this module may draw from the connected Space Elevator.
-     */
+    /** @return the computation this module may draw from the connected Space Elevator. */
     public long getAvailableDataForModule() {
         return getAvailableData_EM();
     }
 
-    /**
-     * Keep a non-zero fake internal EU buffer while the module is structurally valid and connected.
-     * The real power is paid wirelessly, so this only prevents the module base from stopping us for
-     * an empty internal EU tank.
-     */
+    /** Keeps a fake internal EU buffer while valid: power is paid wirelessly, nothing may halt on an empty tank. */
     @Override
     protected void chargeController_EM(IGregTechTileEntity aBaseMetaTileEntity) {
         if (mMachine) {
@@ -419,8 +381,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
 
     @Override
     public boolean isAllowedToWork() {
-        // If a cross-recipe / multi-recipe batch is mid-way, keep the machine running even if the
-        // player toggled it off, so all planned outputs are finished before shutdown.
+        // Mid-batch, keep running even if toggled off, so every planned output finishes.
         if (hasPendingBatchWork()) {
             return true;
         }
@@ -430,14 +391,13 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         if (aBaseMetaTileEntity.isServerSide() && hasPendingBatchWork() && !aBaseMetaTileEntity.isAllowedToWork()) {
-            // The player (or redstone) asked to stop mid-batch; remember that and force the machine
-            // to continue until every planned output has been emitted.
+            // Stop requested (player or redstone) mid-batch: remember it and force the machine to continue.
             shutdownRequestedDuringBatch = true;
             aBaseMetaTileEntity.enableWorking();
         }
         super.onPostTick(aBaseMetaTileEntity, aTick);
         if (aBaseMetaTileEntity.isServerSide() && !hasPendingBatchWork() && shutdownRequestedDuringBatch) {
-            // Batch fully finished; now honor the previously requested shutdown.
+            // Batch finished: honour the requested shutdown.
             shutdownRequestedDuringBatch = false;
             aBaseMetaTileEntity.disableWorking();
         }
@@ -446,32 +406,23 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
 
     // region Tick-batched processing
 
-    /**
-     * @return number of sub-outputs in the current tick-batched batch.
-     */
+    /** @return number of sub-outputs in the current tick-batched batch. */
     protected abstract int getBatchTaskCount();
 
     /**
-     * Generates one sub-output and adds it to {@link #batchItemOutputs} / {@link #batchFluidOutputs}.
+     * Generates one sub-output into {@link #batchItemOutputs} / {@link #batchFluidOutputs}.
      *
-     * @return true if a sub-output was generated, false if there are no more valid sub-outputs.
+     * @return false once there are no more valid sub-outputs.
      */
     protected abstract boolean generateOneBatchTask();
 
-    /**
-     * @return base duration of the main batch, before the 1-tick distributed sub-outputs.
-     */
+    /** @return base duration of the main batch, before the 1-tick distributed sub-outputs. */
     protected abstract int getMainBatchDuration();
 
-    /**
-     * Called when a new tick-batched batch starts. Subclasses can reset per-batch cursors here.
-     */
+    /** Called when a new batch starts; subclasses reset per-batch cursors here. */
     protected void onBatchStart() {}
 
-    /**
-     * Starts a continuous tick-batched batch. The first sub-output is generated immediately so the
-     * machine has a valid recipe; remaining sub-outputs are generated one per tick.
-     */
+    /** Starts a continuous tick-batched batch: the first sub-output at once (a valid recipe), the rest one per tick. */
     protected CheckRecipeResult startBatchedProcessing() {
         batchItemOutputs.clear();
         batchFluidOutputs.clear();
@@ -501,9 +452,8 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
                 batchRemainingTasks = 0;
             }
         }
-        // Keep the GUI/Waila display updated with the accumulated total output while the batch runs.
-        // Modules that finish their whole batch inside checkProcessing must not have their real
-        // mOutputItems overwritten by the (empty) tick-batched lists.
+        // GUI/Waila shows the running total; modules that finish the whole batch in checkProcessing must not lose their
+        // real mOutputItems to the (empty) lists.
         if (mMaxProgresstime > 0 && usesTickBatchedOutputs()) {
             mOutputItems = batchItemOutputs.toArray(new ItemStack[0]);
             mOutputFluids = batchFluidOutputs.toArray(new FluidStack[0]);
@@ -511,10 +461,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         return result;
     }
 
-    /**
-     * @return true for modules that spread their outputs over the running ticks (miner/pump),
-     *         false for modules that generate all outputs at once inside checkProcessing.
-     */
+    /** @return true if outputs are spread over the ticks (miner/pump), false if all at once in checkProcessing. */
     protected boolean usesTickBatchedOutputs() {
         return true;
     }
@@ -524,17 +471,12 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         return Math.max(1, getWirelessParallel());
     }
 
-    /**
-     * @return true while a tick-batched output sequence is still running and must not be interrupted.
-     */
+    /** @return true while a tick-batched output sequence is still running and must not be interrupted. */
     protected boolean hasPendingBatchWork() {
         return batchRemainingTasks > 0;
     }
 
-    /**
-     * TT module recipe hook. MessTech modules no longer override the final {@code checkProcessing()};
-     * they override this method like every native elevator module does.
-     */
+    /** TT module recipe hook: override this, not the final {@code checkProcessing()}, like every native module. */
     @Override
     public @NotNull CheckRecipeResult checkProcessing_EM() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
@@ -551,17 +493,14 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         }
         costingEU = cost;
         costingEUText = String.valueOf(cost);
-        // Wireless power was already deducted in one lump; keep the machine from also trying to
-        // drain energy hatches (which would cause an instant power-loss shutdown).
+        // Wireless power was already deducted in one lump; don't drain energy hatches (instant power-loss shutdown).
         lEUt = 0;
         mMaxProgresstime = duration;
         mEfficiencyIncrease = 10000;
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    /**
-     * Simulated wireless power check. Called before any input is consumed.
-     */
+    /** Simulated wireless power check, called before any input is consumed. */
     protected CheckRecipeResult checkWirelessPower(long eut, int duration, int maxParallel) {
         if (!isWirelessModeActive()) return CheckRecipeResultRegistry.SUCCESSFUL;
         if (ownerUUID == null) return CheckRecipeResultRegistry.insufficientPower(eut);
@@ -575,11 +514,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    /**
-     * Wireless recipe validation shared by subclasses: checks that the wireless network can cover
-     * {@code eut * duration * maxParallel}. If the balance is too low, returns an insufficient-power
-     * result; otherwise returns SUCCESSFUL so the caller can continue to consuming inputs + power.
-     */
+    /** The network must cover {@code eut * duration * maxParallel}, else an insufficient-power result. */
     protected CheckRecipeResult validateWirelessPowerForRecipe(long eut, int duration, int maxParallel) {
         if (!isEnableWireless()) return CheckRecipeResultRegistry.SUCCESSFUL;
         if (ownerUUID == null) return CheckRecipeResultRegistry.insufficientPower(eut);
@@ -593,20 +528,14 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    /**
-     * Wireless-mode power setup for {@link ProcessingLogic}-driven modules. The module has no real
-     * energy hatches; the wireless network is the only power source.
-     */
+    /** Wireless power setup for {@link ProcessingLogic} modules: the wireless network is the only power source. */
     protected void setupWirelessProcessingPowerLogic(ProcessingLogic logic) {
         logic.setAvailableVoltage(Long.MAX_VALUE);
         logic.setAvailableAmperage(1);
         logic.setAmperageOC(false);
     }
 
-    /**
-     * Runs one wireless recipe cycle through the inherited {@link ProcessingLogic}. Used by modules that
-     * want normal recipe lookup/parallel calculation but still pay from the GT wireless network.
-     */
+    /** One wireless recipe cycle through the inherited {@link ProcessingLogic}, paid from the wireless network. */
     protected CheckRecipeResult wirelessModeProcessOnce() {
         if (processingLogic == null) return CheckRecipeResultRegistry.NO_RECIPE;
 
@@ -642,10 +571,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    /**
-     * Runs up to {@code maxCycles} independent wireless recipe cycles. Each cycle may match a different
-     * recipe against the remaining inputs, giving cross-recipe parallelism.
-     */
+    /** Up to {@code maxCycles} independent cycles, each matching a different recipe: the cross-recipe parallelism. */
     protected CheckRecipeResult checkProcessingWirelessLoop(int maxCycles) {
         costingEU = BigInteger.ZERO;
         costingEUText = "0";
@@ -683,8 +609,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
 
     // endregion
 
-    // Input helpers preserved from the former MessTech multiblock base. These are not provided by
-    // TileEntityModuleBase but are still required by the custom mining code.
+    // Input helpers of the former MessTech base: TileEntityModuleBase has none, the mining code needs them.
     public ArrayList<ItemStack> getStoredInputsNoSeparation() {
         ArrayList<ItemStack> rList = new ArrayList<>();
 
@@ -783,7 +708,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
 
     // endregion
 
-    // Original space modules don't expose batch/input-separation/void-protection/power-panel buttons.
+    // The original space modules expose no batch / input-separation / void-protection / power-panel buttons.
     @Override
     public boolean supportsVoidProtection() {
         return false;
@@ -820,9 +745,8 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     }
 
     /**
-     * The original GTNH space modules (miner/pump) do not use the TecTech LED GUI inherited from
-     * {@code TTMultiblockBase}; they explicitly opt back into MUI2 so the custom
-     * {@link SpaceModuleInfinityGui} subclasses are used.
+     * The GTNH miner/pump skip the TecTech LED GUI of {@code TTMultiblockBase} and use MUI2, hence
+     * {@link SpaceModuleInfinityGui}.
      */
     @Override
     protected boolean useMui2() {

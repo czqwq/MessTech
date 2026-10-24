@@ -17,9 +17,9 @@ import gregtech.common.tileentities.machines.multi.nanochip.hatches.MTEHatchVacu
 /**
  * Helpers shared by the wireless NAC vacuum conveyor input/output hatches.
  * <p>
- * The grid's own {@code vertices} set only contains elements that already have an edge, so isolated
- * wireless hatches are tracked in a dedicated registry here. Without this, two newly placed wireless
- * hatches could never discover each other.
+ * The grid's {@code vertices} set only holds elements that already have an edge, so isolated wireless hatches are
+ * tracked
+ * in a dedicated registry here - without it, two newly placed wireless hatches could never find each other.
  */
 public final class WirelessVacuumConveyorUtil {
 
@@ -50,9 +50,9 @@ public final class WirelessVacuumConveyorUtil {
     }
 
     /**
-     * Adds every registered wireless vacuum conveyor element that uses the same colour, frequency and
-     * privacy scope. Colour is required because the NAC module routing still identifies item flows by
-     * hatch colour (input-hatch colour decides the module output colour).
+     * Adds every registered wireless element with the same colour, frequency and privacy scope. Colour is required
+     * because
+     * NAC module routing still identifies item flows by hatch colour (input colour decides the module output colour).
      */
     public static void collectWirelessNeighbours(VacuumFactoryElement self, Collection<VacuumFactoryElement> out) {
         if (!(self instanceof IWirelessVacuumConveyor wirelessSelf)) return;
@@ -71,8 +71,8 @@ public final class WirelessVacuumConveyorUtil {
     }
 
     /**
-     * Directly finds all matching wireless output hatches for a wireless input. This is used by the
-     * input's movement tick as a more reliable path than depending on factory-grid edge formation.
+     * All matching wireless output hatches for a wireless input; used by the input's movement tick because it is more
+     * reliable than factory-grid edge formation.
      */
     public static List<MTEHatchVacuumConveyorOutput> findMatchingOutputs(IWirelessVacuumConveyor self) {
         List<MTEHatchVacuumConveyorOutput> result = new ArrayList<>();
@@ -92,8 +92,8 @@ public final class WirelessVacuumConveyorUtil {
     }
 
     /**
-     * Directly finds all matching wireless input hatches for a wireless output. Used as an extra
-     * output-push fallback so transfer does not depend solely on the input-side movement tick.
+     * All matching wireless input hatches for a wireless output: an output-push fallback, so transfer does not depend
+     * only on the input-side movement tick.
      */
     public static List<MTEHatchVacuumConveyorInput> findMatchingInputs(IWirelessVacuumConveyor self) {
         List<MTEHatchVacuumConveyorInput> result = new ArrayList<>();

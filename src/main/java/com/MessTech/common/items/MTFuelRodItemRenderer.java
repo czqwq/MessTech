@@ -19,11 +19,10 @@ import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.GTMod;
 
 /**
- * Item renderer for the fuel rods that copies GT5U's Transcendent Metal preview: the flat item quad is
- * rotated around the oblique axis (0.3, 0.5, 0.2) by 3.5 degrees per client tick before being drawn with
- * {@link ItemRenderer#renderItemIn2D}. The angle comes from {@link GTMod#clientProxy()}'s
- * {@code getAnimationRenderTicks()}, so the tumble pauses together with the game and looks identical to
- * Transcendent Metal in the inventory, NEI preview, item frames, drops and first/third person hand.
+ * Item renderer for the fuel rods, copying GT5U's Transcendent Metal preview: the flat quad rotates around the oblique
+ * axis (0.3, 0.5, 0.2) by 3.5 degrees per client tick before {@link ItemRenderer#renderItemIn2D}. The angle comes
+ * from {@link GTMod#clientProxy()}'s {@code getAnimationRenderTicks()}, so the tumble pauses with the game and matches
+ * Transcendent Metal in inventory, NEI, item frames, drops and hand.
  */
 @SideOnly(Side.CLIENT)
 public class MTFuelRodItemRenderer implements IItemRenderer {
@@ -65,8 +64,8 @@ public class MTFuelRodItemRenderer implements IItemRenderer {
         GL11.glPushMatrix();
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT);
 
-        // Same pipeline as GT's MetaGeneratedItemRenderer: apply the ENTITY standard transform first, then
-        // pretend fancy graphics is on (magic numbers taken from vanilla RenderItem) when it is off.
+        // Same pipeline as GT's MetaGeneratedItemRenderer: ENTITY transform first, then pretend fancy graphics is on
+        // (magic numbers from vanilla RenderItem) when it is off.
         ItemRenderUtil.applyStandardItemTransform(type);
         if (type == ItemRenderType.ENTITY && !Minecraft.getMinecraft().gameSettings.fancyGraphics) {
             if (RenderItem.renderInFrame) {
@@ -88,7 +87,7 @@ public class MTFuelRodItemRenderer implements IItemRenderer {
 
         boolean flipUv = type == ItemRenderType.INVENTORY;
         if (flipUv) {
-            // The inventory render space is 1 unit = 1 GUI pixel; renderItemIn2D draws a 1x1 quad.
+            // Inventory space is 1 unit = 1 GUI pixel; renderItemIn2D draws a 1x1 quad.
             GL11.glScalef(16F, 16F, 32F);
         }
 

@@ -87,10 +87,20 @@ public enum MTItemList {
     MTModuleParallel_UMV,
     MTModuleParallel_UXV,
     MTModuleParallel_MAX,
-    /** The game console (游戏机), an item that runs a copy of DOOM in a window of its own. */
+    /** The game console (游戏机): runs a copy of DOOM in its own window. */
     GameConsole,
     /** The Ultimate Pattern Terminal part (终极样板编码终端). */
-    UltimatePatternTerminal;
+    UltimatePatternTerminal,
+    /** Large Processing Factory (大型加工厂). */
+    MTLargeProcessingFactory,
+    /** Large Essentia Generator (大型源质发电机). */
+    MTLargeEssentiaGenerator,
+    /** Essentia input hatch block of the LEG (源质输入仓). */
+    MTEssentiaHatch,
+    /** ME essentia input hatch block of the LEG (ME 源质输入仓); only set when Thaumic Energistics is loaded. */
+    MTEssentiaHatchME,
+    /** LEG upgrade item (源质发电机升级), 10 metadata values. */
+    MTEssentiaUpgrade;
 
     /** Reactor access hatches ordered EV..UIV (index {@code tier - MTReactorAccessHatch.MIN_TIER}). */
     public static final MTItemList[] REACTOR_ACCESS_HATCHES = { MTReactorAccessHatch_EV, MTReactorAccessHatch_IV,
@@ -105,7 +115,7 @@ public enum MTItemList {
     /**
      * Reactor coolant pair of the fluid ("wet") mode: cold coolant in ({@code MTReactorCoolantInputHatch}), hot coolant
      * out ({@code MTReactorHotCoolantOutputHatch}). Not a tier family - one variant each at EV, see the hatch classes -
-     * so this array is only a list of the two entries that share a recipe, not a tier table.
+     * so this is only the two entries that share a recipe.
      */
     public static final MTItemList[] REACTOR_FLUID_HATCHES = { MTReactorCoolantInputHatch,
         MTReactorHotCoolantOutputHatch };
@@ -187,7 +197,6 @@ public enum MTItemList {
 
     public ItemStack get(int aAmount, Object... aReplacements) {
         sanityCheck();
-        // if invalid, return a replacements
         if (Utils.isStackInvalid(mStack)) {
             MessTech.LOG.error("Object in the ItemList is null at:");
         }

@@ -3,13 +3,9 @@ package com.MessTech.common.machine.Base;
 import java.util.Set;
 
 /**
- * One module of a {@link MTModuleMultiMachineBase}.
- * <p>
- * A module is whatever the machine puts in its module slot - normally a hatch - and it reports what it provides.
- * The machine collects the modules and folds their values into its own EU, speed and parallel values, so the
- * numbers live in the concrete module and the machine only aggregates them.
- * <p>
- * The tier of a module is the GT tier index, IV ({@link #MIN_TIER}) up to MAX ({@link #MAX_TIER}).
+ * One module of a {@link MTModuleMultiMachineBase}: whatever sits in its module slot (normally a hatch) and reports
+ * what it provides. The machine folds the module values into its own EU, speed and parallel values. A module's tier is
+ * the GT tier index, IV ({@link #MIN_TIER}) .. MAX ({@link #MAX_TIER}).
  */
 public interface IMTModule {
 
@@ -18,35 +14,24 @@ public interface IMTModule {
     /** Highest module tier, the GT tier index of MAX. */
     int MAX_TIER = 14;
 
-    /**
-     * @return Every module type this module provides. A composite module returns more than one.
-     */
+    /** @return Every type this module provides; a composite module returns more than one. */
     Set<MTModuleType> getModuleTypes();
 
-    /**
-     * @return The tier of this module, IV ({@link #MIN_TIER}) .. MAX ({@link #MAX_TIER}).
-     */
+    /** @return The tier, IV ({@link #MIN_TIER}) .. MAX ({@link #MAX_TIER}). */
     int getModuleTier();
 
-    /**
-     * @param type The module type to test.
-     * @return If true this module provides that type.
-     */
+    /** @return If true this module provides that type. */
     default boolean provides(MTModuleType type) {
         return getModuleTypes().contains(type);
     }
 
-    /**
-     * @param tier The GT tier index to test.
-     * @return If true the given tier is a valid module tier, IV .. MAX.
-     */
+    /** @return If true the GT tier index is a valid module tier, IV .. MAX. */
     static boolean isValidTier(int tier) {
         return tier >= MIN_TIER && tier <= MAX_TIER;
     }
 
     /**
-     * Called when this module is linked to a machine, so a hatch module can pick up the casing texture of the
-     * structure it was built into. The default does nothing.
+     * Called when this module is linked to a machine, so a hatch can pick up the casing texture of its structure.
      *
      * @param aBaseCasingIndex The casing texture index of the structure.
      */
@@ -54,26 +39,19 @@ public interface IMTModule {
 
     // region Effects. The defaults change nothing, the concrete module fills the numbers in.
 
-    /**
-     * @return Multiplier for the EU/t of the machine, below 1 is a discount.
-     */
+    /** @return EU/t multiplier of the machine, below 1 is a discount. */
     default float getEuModifier() {
         return 1.0F;
     }
 
-    /**
-     * @return Multiplier for the duration of the machine's recipes, below 1 is faster.
-     */
+    /** @return Duration multiplier of the machine's recipes, below 1 is faster. */
     default float getSpeedBonus() {
         return 1.0F;
     }
 
     /**
-     * The parallel this module supplies to the machine.
-     * <p>
-     * A parallel control module does not add to the parallel of the machine, it replaces it: a machine that has one
-     * runs on the parallel the module reports. That is why the numbers are large (64 at IV up to 16,777,216 at MAX,
-     * see {@link MTModuleValues#maxParallel}) and why only one parallel control module is allowed per machine.
+     * The parallel this module supplies. A parallel control module replaces the machine's parallel instead of adding to
+     * it, hence the large numbers (64 at IV .. 16,777,216 at MAX, see {@link MTModuleValues#maxParallel}).
      *
      * @return The parallel of this module, 0 when it supplies none.
      */
@@ -82,33 +60,30 @@ public interface IMTModule {
     }
 
     /**
-     * @return The highest parallel this module may supply, at least 1. Only read for a module that provides
-     *         {@link MTModuleType#PARALLEL_CONTROL}: it is the ceiling of the parallel field in the machine GUI.
+     * @return The highest parallel this module may supply, at least 1: the GUI parallel ceiling for
+     *         {@link MTModuleType#PARALLEL_CONTROL}.
      */
     default int getMaxParallel() {
         return 1;
     }
 
     /**
-     * Sets the parallel this module supplies, clamped to 1..{@link #getMaxParallel()}. Called by the GUI of the
-     * machine the module is built into; the default does nothing, because a module without
-     * {@link MTModuleType#PARALLEL_CONTROL} supplies no parallel to set.
+     * Sets the parallel this module supplies, clamped to 1..{@link #getMaxParallel()}; the default does nothing.
      *
      * @param value The requested parallel.
      */
     default void setParallelFromGui(int value) {}
 
     /**
-     * @return How many recipes this module may run at the same time. Only read by a machine that supports
-     *         {@link MTModuleType#CROSS_RECIPE_PARALLEL}.
+     * @return Recipes this module may run at once, only read for {@link MTModuleType#CROSS_RECIPE_PARALLEL}.
      */
     default int getCycleNum() {
         return 1;
     }
 
     /**
-     * @return If true this module can run the machine off the wireless EU network. Only read by a machine that
-     *         supports {@link MTModuleType#WIRELESS}.
+     * @return If true this module can run the machine off the wireless EU network, only read for
+     *         {@link MTModuleType#WIRELESS}.
      */
     default boolean providesWireless() {
         return false;

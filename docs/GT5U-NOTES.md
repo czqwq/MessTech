@@ -1,48 +1,45 @@
 # GT5-Unofficial / GTNH Multiblock knowledge notes (for writing new machines)
 
-> What was learned while implementing `MTDTPF`, distilled so future machines can be written
-> (and debugged) without re-reading the whole monorepo.
+> `MTDTPF` lessons, distilled so a new machine can be written and debugged without re-reading the monorepo.
 
 ## 0. Local reference source trees (offline lookup)
 
-The workspace already contains decompiled/source copies of the common dependencies. **Check these local paths
-first** when verifying API behaviour instead of guessing:
+**Check these first** for API behaviour:
 
 | Path | Contents / use |
 |---|---|
-| `tmp/GT5-Unofficial-beta3/` | **GT5U 5.09.54.133 源码快照**（上一版基线）；查 `gregtech.api.*` / `gregtech.common.*` 仍首选这里，但它**已不是当前编译依赖**——依赖由 `dependencies.gradle` 的 `gtnhVersion`（2.9.0-RC-1）manifest 解析，目前是 5.09.54.183，版本敏感的 API 请对照解析出来的 jar，差异清单见 `tmp/Compare.md` |
-| `tmp/GT5-Unofficial-master/` | GT5U master-branch snapshot, **noticeably older than the beta3 checkout (5.09.54.133)**; historical/diff reference only — always verify against `tmp/GT5-Unofficial-beta3/` |
-| `tmp/ic2-decompiled/`, `tmp/ic2-src/` | Decompiled IC2 source incl. `ic2.core.*` internals (`ItemReactorUranium`, `ItemReactorHeatStorage`, `TileEntityNuclearReactorElectric`, ...) |
-| `build/rfg/minecraft-src/java/` | **Forge + Minecraft 1.7.10 decompiled source** (`net.minecraft.*` such as `RenderItem`, `ItemRenderer`, `FontRenderer`, plus `cpw.mods.fml.*`) |
+| `tmp/GT5-Unofficial-beta3/` | **GT5U 5.09.54.133 源码快照**（上一版基线）；查 `gregtech.api.*` / `gregtech.common.*` 首选，但**已不是当前编译依赖**（`dependencies.gradle` 的 `gtnhVersion` 2.9.0-RC-2 → **5.09.54.205**）；版本敏感 API 对照解析出的 jar（解包到 `%TEMP%\gt205src` 也可），差异见 `tmp/Compare.md` |
+| `tmp/GT5-Unofficial-master/` | master snapshot, **much older than beta3 (5.09.54.133)**; diff/history only — verify against beta3 |
+| `tmp/ic2-decompiled/`, `tmp/ic2-src/` | IC2 source, incl. `ic2.core.*` internals (`ItemReactorUranium`, `ItemReactorHeatStorage`, `TileEntityNuclearReactorElectric`, ...) |
+| `build/rfg/minecraft-src/java/` | **Forge + MC 1.7.10 decompiled source** (`net.minecraft.*`: `RenderItem`, `ItemRenderer`, `FontRenderer`; `cpw.mods.fml.*`) |
 | `build/rfg/minecraft-src/resources/` | Vanilla MC assets |
-| `tmp/GTNHLib-master/` | GTNHLib source (`ItemRenderUtil`, `ItemRenderUtils`, `TexturedItemRenderer`, `AnimatedTooltipHandler`) |
-| `tmp/ModularUI2-master/` | ModularUI2 source (widgets, sync handlers, animation, slot layout) |
-| `tmp/NotEnoughItems-master/` | NEI source (how NEI invokes `IItemRenderer`, item preview, ...) |
-| `tmp/waila-master/` | Waila source (`getWailaBody`, ...) |
-| `tmp/StructureLib-master/` | StructureLib source (multiblock structure matching) |
-| `tmp/NewHorizonsCoreMod-2.9.61/`, `tmp/AppleCore-master/`, `tmp/SpiceOfLife-master/`, `tmp/Applied-Energistics-2-Unofficial-rv3-beta-1050-GTNH/`, `tmp/Twist-Space-Technology-Mod-main/`, `tmp/BlockRenderer6343-master/`, `tmp/UniMixins-0.3.1/` | Other reference implementations (recipes, compat, rendering, ...) |
-| `tmp/FuelRod_backup/`, `tmp/fuelrod_recolor/` | Transcendent Metal fuel rod texture sources and recolour intermediates (PNG / rgba data) |
+| `tmp/GTNHLib-master/` | GTNHLib (`ItemRenderUtil`, `ItemRenderUtils`, `TexturedItemRenderer`, `AnimatedTooltipHandler`) |
+| `tmp/ModularUI2-master/` | ModularUI2 (widgets, sync, animation, slots) |
+| `tmp/NotEnoughItems-master/` | NEI (`IItemRenderer` invocation, preview) |
+| `tmp/waila-master/` | Waila (`getWailaBody`) |
+| `tmp/StructureLib-master/` | StructureLib (matching) |
+| `tmp/GT-Not-Leisure/` | **modern GT5U API port of the same GoodGenerator LEG** (`common/machine/multiblock/LargeEssentiaGenerator.java`, `TileEntityEssentiaHatch`, `utils/machine/LargeEssentiaEnergyData`) plus a Thaumcraft research tab (`common/recipe/thaumcraft/TCResearches.java`) - the pattern used by MessTech's LEG / research port (its values were rebalanced, mechanics copied from the 5.09.51.242 original) |
+| `tmp/thaumicenergistics-src/` | **Thaumic Energistics 1.7.64-GTNH** decompiled with `tools/java-decompiler.jar` from `tmp/ThaumicEnergistics-1.7.64-GTNH-dev.jar`: AE essentia stack/monitor API (`common/storage/AEEssentiaStack`, `AEEssentiaStackType`), grid proxy examples (`MTEEssentiaOutputHatchME` in the GT5U tree is the closest one), import/export bus parts |
+| `tmp/NewHorizonsCoreMod-2.9.61/`, `tmp/AppleCore-master/`, `tmp/SpiceOfLife-master/`, `tmp/Applied-Energistics-2-Unofficial-rv3-beta-1050-GTNH/`, `tmp/Twist-Space-Technology-Mod-main/`, `tmp/BlockRenderer6343-master/`, `tmp/UniMixins-0.3.1/` | other references (recipes, compat, rendering) |
+| `tmp/FuelRod_backup/`, `tmp/fuelrod_recolor/` | Transcendent Metal fuel rod textures / recolour intermediates (PNG, rgba) |
 
-> Unpacking/decompiling other dependencies (e.g. the IC2 jar):
+> Decompiling another dependency (e.g. the IC2 jar):
 > `java -cp tools/java-decompiler.jar org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler -dgs=true <in.jar> <outDir>`
 
 ## 1. The project layout
 
-`tmp/GT5-Unofficial-master` is a **monorepo**: many "mods" live inside it as plain packages
-(packages are NOT separate gradle modules). Everything is on the compile classpath when you depend
-on `GT5-Unofficial`:
+`tmp/GT5-Unofficial-master` is a **monorepo**: its "mods" are plain packages, not gradle modules, all on the compile classpath of `GT5-Unofficial`:
 
-| Package              | What it is                                    | Typical imports                              |
-|----------------------|-----------------------------------------------|----------------------------------------------|
-| `gregtech.*`         | GT 5 Unofficial core                          | `GregTechAPI`, `GTValues`, `RecipeMaps`, ... |
-| `goodgenerator.*`    | GoodGenerator (Large Fusion Computers etc.)   | `goodgenerator.loader.Loaders.compactFusionCoil` |
-| `gtPlusPlus.*`       | GT++ (GT Plus Plus)                           | `gtPlusPlus.core.block.ModBlocks.blockCasings3Misc` |
-| `bartworks.*`        | BartWorks                                      | `ItemRegistry.bw_realglas`, `Werkstoff`      |
-| `tectech.*`          | TecTech                                        | `TTMultiblockBase`, `MTEHatchEnergyMulti`    |
-| `gtnhintergalactic.*`| GTNH Intergalactic / space                     | space project APIs                           |
+| Package | What it is | Typical imports |
+|---|---|---|
+| `gregtech.*` | GT 5 Unofficial core | `GregTechAPI`, `GTValues`, `RecipeMaps`, ... |
+| `goodgenerator.*` | GoodGenerator (Large Fusion Computers) | `goodgenerator.loader.Loaders.compactFusionCoil` |
+| `gtPlusPlus.*` | GT++ (GT Plus Plus) | `gtPlusPlus.core.block.ModBlocks.blockCasings3Misc` |
+| `bartworks.*` | BartWorks | `ItemRegistry.bw_realglas`, `Werkstoff` |
+| `tectech.*` | TecTech | `TTMultiblockBase`, `MTEHatchEnergyMulti` |
+| `gtnhintergalactic.*` | GTNH Intergalactic / space | space project APIs |
 
-So when you need a block from GoodGenerator you just `import goodgenerator.loader.Loaders;`
-(e.g. `Loaders.compactFusionCoil`), you do **not** add another gradle dependency.
+A GoodGenerator block is just `import goodgenerator.loader.Loaders;` (e.g. `Loaders.compactFusionCoil`) — no extra gradle dependency.
 
 ## 2. The machine base-class chain (that MessTech uses)
 
@@ -54,97 +51,45 @@ MTEBase -> ... -> MTEMultiBlockBase<T>
         -> your machine (fully generic self type)
 ```
 
-Key inherited tools you actually use:
-
-* `checkPiece(String piece, int hOff, int vOff, int dOff, List<StructureError> errors)`
-  — walks the shape; fills `errors`; returns boolean. Your `checkMachine` calls it first.
-* `checkHasAnyInput / checkHasAnyOutput / checkHasAnyEnergy(List<StructureError>)`
-  — hatch sanity checks after a successful piece check.
-* `checkStructure(boolean forceReset, IGregTechTileEntity)` — the caller: calls `checkMachine`,
-  then sets `mMachine = structureErrors.isEmpty()`.
-* `clearHatches()` — clears all hatch lists before each check.
-* `buildPiece`, `survivalBuildPiece`, `getStructureDefinition`.
-
-**Contract:** you only override
-`checkMachine(IGregTechTileEntity, ItemStack, List<StructureError>)` (void). Add an error + `return`
-on any failure; leave the list empty for success. Do NOT set `mMachine` yourself.
-
-`checkMachine` runs **server-side only** (`checkStructure` guards with `isServerSide()`).
+* `checkPiece(String piece, int hOff, int vOff, int dOff, List<StructureError> errors)` — walks the shape, fills `errors`, returns boolean; call first in `checkMachine`.
+* `checkHasAnyInput / checkHasAnyOutput / checkHasAnyEnergy(List<StructureError>)` — hatch sanity after a good piece check, `clearHatches()` first; also `buildPiece`, `survivalBuildPiece`, `getStructureDefinition`.
+* `checkStructure(boolean forceReset, IGregTechTileEntity)` — calls `checkMachine`, sets `mMachine = structureErrors.isEmpty()`. **Contract:** override only `checkMachine(IGregTechTileEntity, ItemStack, List<StructureError>)` (void) — error + `return` on failure, empty list = success, never set `mMachine`; server-side only (`isServerSide()` guard).
 
 ## 3. StructureLib shape convention (important!)
 
-* `addShape(pieceName, String[][] shape)` expects **`shape[z][y]` = a `String` spanning x**.
-* A `~` inside the shape marks the **controller** position (no element needed for it).
-* The GTNH "structure writer" tool prints shapes in a **tower-first** orientation: the first array
-  dimension (`z`) is the vertical axis. To make a normal multiblock that works when the controller
-  faces any horizontal direction, you usually need **`transpose(shape)`** when registering, so the
-  tall axis becomes `y` (vertical) and `z` becomes depth. Look at each machine to tell which
-  convention it uses:
-  * `MTELargeFusionComputer` and **MTDTPF** author the array as vertical layers and call
-    `.addShape(MAIN, transpose(structure_string))`.
-  * `MTEPlasmaForge`'s `structure_string` is already depth-first and registers directly
-    (offsets `16, 21, 16`).
-* The offsets passed to `checkPiece/buildPiece(...)` are the (x, y, z) coordinates of the `~` in the
-  **registered (post-transpose)** shape:
-  * `horizontalOffset = x` of `~`
-  * `verticalOffset   = y` of `~`
-  * `depthOffset      = z` of `~`
-* For MTDTPF: raw array is 32 layers × 33 rows × 33 wide, `~` at raw `(z=29, y=16, x=16)`; after
-  `transpose` it becomes `(z=16, y=29, x=16)` → offsets `(16, 29, 16)`.
-  If you ever register it without transpose the controller would need to face **up** for the shape to
-  line up (the "only works facing up" bug).
+* `addShape(pieceName, String[][] shape)` = **`shape[z][y]`**, each a `String` spanning x; `~` = **controller** (no element).
+* Structure-writer shapes are **tower-first** (`z` vertical) → machines facing any horizontal direction usually need **`transpose(shape)`** (`y` tall, `z` depth): `MTELargeFusionComputer` / **MTDTPF** → `.addShape(MAIN, transpose(structure_string))`; `MTEPlasmaForge`'s `structure_string` is already depth-first (offsets `16, 21, 16`).
+* `checkPiece/buildPiece(...)` offsets = `~` in the **registered (post-transpose)** shape: `horizontalOffset = x` · `verticalOffset   = y` · `depthOffset      = z`.
+* MTDTPF: raw 32 layers × 33 rows × 33 wide, `~` at raw `(z=29, y=16, x=16)` → `(z=16, y=29, x=16)` = offsets `(16, 29, 16)`; without transpose it only forms facing **up** (the "only works facing up" bug).
 
 ## 4. Structure elements (`addElement`)
 
-* `StructureUtility.ofBlock(Block, intMeta)` — exact block+meta match.
-* `StructureUtility.ofBlocksTiered(tierFetcher, List<Pair<Block,Integer>> blockList, int notSet,
-  BiConsumer<T,Integer> setter, Function<T,Integer> getter [, List<String> description])`
-  — the standard way to accept a whole "family" of blocks at one letter and record which tier was found:
-  * the first matched position calls `setter` with the tier,
-  * later positions must report the same tier via `getter` (mixed tiers → piece check fails),
-  * `tierFetcher` returns `null` for a block that isn't in the family (structure rejects it).
-  This is how `MTDTPF` auto-detects the reactor-coil tier (A) and the fusion-casing tier (B)
-  into two independent `int` fields with getters/setters.
-* `HatchElementBuilder.<T>builder().anyOf(HatchElement...).casingIndex(int).hint(int)
-  .buildAndChain(ofBlock(fallbackBlock, meta))` — a "functional" element that accepts the listed
-  hatches at the letter position and falls back to a plain casing. Used for D (input/output
-  bus/hatch + energy hatch compartments).
+* `StructureUtility.ofBlock(Block, intMeta)` — exact block+meta.
+* `StructureUtility.ofBlocksTiered(tierFetcher, List<Pair<Block,Integer>> blockList, int notSet, BiConsumer<T,Integer> setter, Function<T,Integer> getter [, List<String> description])` — a "family" at one letter: first match calls `setter` with the tier, later positions must agree via `getter` (mixed → piece check fails), `tierFetcher` returns `null` outside the family. Used by `MTDTPF` for the reactor-coil tier (A) and fusion-casing tier (B), two independent `int` fields.
+* `HatchElementBuilder.<T>builder().anyOf(HatchElement...).casingIndex(int).hint(int).buildAndChain(ofBlock(fallbackBlock, meta))` — "functional" element: listed hatches at that letter, else a plain casing (D = bus/hatch + energy hatch compartments).
+* **Structure channels**: `IStructureChannels.use(element)` = `StructureUtility.withChannel(name, element)` and `MultiblockTooltipBuilder.addSubChannel(channel)` advertise it. `withChannel` swaps the trigger stack's master channel for that sub-channel, so `ofBlocksTiered`'s hint/auto-build (which reads `trigger.stackSize`, 1-based into the `allKnownTiers` list) is selected per sub-channel on a blueprint. Applied on LEG's `E`: `GTStructureChannels.LES_ESSENTIA_CELL.use(ofBlocksTiered(...))`; the field the getter reads must be reset to `notSet` before every `checkPiece` (LEG: `mCellTier = -1` in `checkMachine`).
+* **`atLeast(...)` is a preview filter, not a structure requirement** (checked on 5.09.54.183: its `shouldReject` predicate, the only thing counting the required hatches, has no consumer outside the builder). Only the item filter/auto-build ordering uses the counts; the actual `checkPiece` accepts any number of those hatches. Required hatches must be checked by hand in `checkMachine` — `checkHasAnyInput/Output/Energy(errors)` or explicit list sizes and `StructureErrors.of(...)` (LEG: exactly one input hatch, one dynamo, at least one essentia hatch).
 
 ## 5. Blocks used by MTDTPF (registry names → meta → tier)
 
-| Letter | Meaning                          | Block                          | meta | tier |
-|--------|----------------------------------|--------------------------------|------|------|
-| A      | reactor coil                     | `Loaders.compactFusionCoil`    | 0..4 | 1..5 |
-| B (1)  | LuV machine casing ("gt.blockcasings") | `GregTechAPI.sBlockCasings1` | 6    | 1    |
-| B (2)  | Fusion Machine Casing ("gt.blockcasings4") | `GregTechAPI.sBlockCasings4` | 6 | 2 |
-| B (3)  | Fusion Machine Casing Mk-II      | `GregTechAPI.sBlockCasings4`   | 8    | 3    |
-| B (4)  | Fusion Machine Casing Mk-III     | `ModBlocks.blockCasings3Misc` (GT++) | 12 | 4 |
-| B (5)  | Fusion Machine Casing Mk-IV      | `ModBlocks.blockCasings6Misc` (GT++) | 0 | 5 |
-| C      | solenoid superconductor coil ("gt.blockcasings.cyclotron_coils") | `GregTechAPI.sSolenoidCoilCasings` | 5 (ZPM) | static |
-| D      | hatch compartments, fill casing ("gt.blockcasings8") | `GregTechAPI.sBlockCasings8` | 7 | fill |
+| Letter | Meaning | Block | meta | tier |
+|---|---|---|---|---|
+| A | reactor coil | `Loaders.compactFusionCoil` | 0..4 | 1..5 |
+| B (1) | LuV machine casing ("gt.blockcasings") | `GregTechAPI.sBlockCasings1` | 6 | 1 |
+| B (2) | Fusion Machine Casing ("gt.blockcasings4") | `GregTechAPI.sBlockCasings4` | 6 | 2 |
+| B (3) | Fusion Machine Casing Mk-II | `GregTechAPI.sBlockCasings4` | 8 | 3 |
+| B (4) | Fusion Machine Casing Mk-III | `ModBlocks.blockCasings3Misc` (GT++) | 12 | 4 |
+| B (5) | Fusion Machine Casing Mk-IV | `ModBlocks.blockCasings6Misc` (GT++) | 0 | 5 |
+| C | solenoid superconductor coil ("gt.blockcasings.cyclotron_coils") | `GregTechAPI.sSolenoidCoilCasings` | 5 (ZPM) | static |
+| D | hatch compartments, fill casing ("gt.blockcasings8") | `GregTechAPI.sBlockCasings8` | 7 | fill |
 
-These mirror `MTELargeFusionComputer1..5` (goodgenerator) — see
-`goodgenerator/blocks/tileEntity/MTELargeFusionComputer{1..5}.java`:
-coil meta 0/1/2/3/4 ↔ casing LuV / Fusion / Fusion-MkII / Fusion-MkIII / Fusion-MkIV
-and voltage tiers LuV(6)/ZPM(7)/UV(8)/UHV(9)/UEV(10).
-
-Registry-name helpers: `BlockCasings1` = "gt.blockcasings", `BlockCasings4` = "gt.blockcasings4",
-`BlockCasings8` = "gt.blockcasings8", `BlockCyclotronCoils` = "gt.blockcasings.cyclotron_coils".
-`GregTechAPI.sSolenoidCoilCasings` is the cyclotron-coil block field.
+Mirrors `MTELargeFusionComputer1..5` (`goodgenerator/blocks/tileEntity/MTELargeFusionComputer{1..5}.java`): coil meta 0/1/2/3/4 ↔ casing LuV / Fusion / Fusion-MkII / Fusion-MkIII / Fusion-MkIV, voltage LuV(6)/ZPM(7)/UV(8)/UHV(9)/UEV(10). Registry names: `BlockCasings1` = "gt.blockcasings", `BlockCasings4` = "gt.blockcasings4", `BlockCasings8` = "gt.blockcasings8", `BlockCyclotronCoils` = "gt.blockcasings.cyclotron_coils"; `GregTechAPI.sSolenoidCoilCasings` = the cyclotron-coil field.
 
 ## 6. Tier enforcement pattern (LevelTier)
 
-* Keep a `LevelTier` enum containing, per tier: `tier` (1..5), `voltageTier` (GT voltage index),
-  the A (coil) block+meta and B (casing) block+meta. Add an `INVALID` entry with tier -1.
-* The structure elements write `fusionCoilTier` / `fusionMachineTier` ints (independent getters/setters).
-* In `checkMachine`:
-  1. reset the two int fields + the resolved `levelTier` to INVALID,
-  2. `checkPiece(...)`; if it fails `return`,
-  3. resolve `LevelTier` from each int; if either is invalid or they differ →
-     add a **localized** `StructureErrors.of("key", ...)` error and `return`,
-  4. otherwise store the matched tier and run the hatch sanity checks.
-* Note the piece-check already rejects *mixed tiers inside A (or inside B)* — checkMachine only has
-  to compare A vs B.
+* `LevelTier` enum, per tier: `tier` (1..5), `voltageTier` (GT voltage index), A (coil) block+meta, B (casing) block+meta; `INVALID` with tier -1.
+* Structure elements write `fusionCoilTier` / `fusionMachineTier` ints (independent getters/setters).
+* `checkMachine`: both ints + `levelTier` → INVALID → `checkPiece(...)`, `return` on failure → resolve `LevelTier` per int, invalid or differing = localized `StructureErrors.of("key", ...)` + `return` → else store the tier, run the hatch checks. The piece check already rejects mixed tiers inside A (or B); only A vs B is compared.
 
 ### Reading the tier back (usage examples)
 
@@ -157,15 +102,12 @@ boolean exact = getLevelTier() == LevelTier.TIER2;
 LevelTier fromInt = LevelTier.fromTier(n);
 LevelTier fromBlock = LevelTier.getFromCoilBlock(block, meta);
 ```
-All "at least" checks return `false` when the machine is `INVALID` (unformed). The recipe cap in
-`validateRecipe()` already uses `getLevelTier().isValid()` + `voltageTier`; reuse
-`isTierAtLeast(...)` anywhere you need tier-gated logic (e.g. max parallel, overclock choice).
+"At least" checks return `false` when unformed (`INVALID`). The `validateRecipe()` cap already uses `getLevelTier().isValid()` + `voltageTier`; reuse `isTierAtLeast(...)` for tier-gated logic (max parallel, overclock choice).
 
 ## 7. Recipes: using the Large-Fusion pool with a tier cap
 
 * `getRecipeMap()` → `RecipeMaps.fusionRecipes` (same pool as MTELargeFusionComputer).
-* Override `createProcessingLogic()`: keep the base `process()` behavior
-  (`setEuModifier / setSpeedBonus / setOverclock`) and override `validateRecipe(GTRecipe)`:
+* `createProcessingLogic()`: keep the base `process()` behavior (`setEuModifier / setSpeedBonus / setOverclock`), override `validateRecipe(GTRecipe)`:
   ```java
   LevelTier current = getLevelTier();
   if (!current.isValid() || recipe.mEUt > GTValues.V[current.voltageTier]) {
@@ -173,79 +115,36 @@ All "at least" checks return `false` when the machine is `INVALID` (unformed). T
   }
   return CheckRecipeResultRegistry.SUCCESSFUL;
   ```
-  This is exactly the FusionComputer voltage restriction ("tier N can only do recipes of tier N and
-  below"), **without** the startup-energy (`FUSION_THRESHOLD`) system.
-* `GTValues.V[v]` holds the EU/t per voltage tier; `GTValues.VN[v]` holds short names ("LuV"...).
+  = the FusionComputer voltage restriction ("tier N does recipes of tier N and below") **without** the startup-energy (`FUSION_THRESHOLD`) system. `GTValues.V[v]` = EU/t per tier, `GTValues.VN[v]` = short names ("LuV"...).
 
 ## 8. Structure errors & localization
 
-* Use `StructureErrors.of("your.key", TranslatableText.literal(...))` to build a localized error.
-* Add the keys to **your own** lang files (`assets/<modid>/lang/en_US.lang`, `zh_CN.lang`).
-  `%1$s`/`%2$s` are the argument slots (see `structure.error.tier_mismatch`).
-* Do the `errors.add(...); return;` dance for fatal problems; hatch-count errors just append.
-* **The GUI only shows the list if the terminal widget contains it.**
-  `MTEMultiBlockBaseGui.createTerminalTextWidget()` puts `createStructureErrorWidget(syncManager)` into the
-  terminal flow. A machine that overrides `createTerminalTextWidget()` (as `MTReactorGui` does) silently drops
-  every detailed structure error and only shows whatever the override itself draws — the reactor then showed a
-  generic "incomplete structure" line while `missing_access_hatch` / `missing_heat_hatch` were in the error list
-  all along. Fix: append `.child(createStructureErrorWidget(syncManager))` to your own terminal list as well.
-  The widget is gated on `shouldDisplayShutDownReason() && !isActive && !isAllowedToWork()`, so it appears after
-  the controller stopped itself with `STRUCTURE_INCOMPLETE` (that shutdown calls `disableWorking()`).
-* A hatch-count error for a *custom* (non-`HatchElement`) hatch: use
-  `StructureErrors.of("your.missing_key")` / `StructureErrors.of("your.too_many_key")` and check
-  `list.isEmpty()` / `list.size() > 1` in `checkMachine(..., List<StructureError> errors)`.
+* `StructureErrors.of("your.key", TranslatableText.literal(...))`; keys in **your own** lang files (`assets/<modid>/lang/en_US.lang`, `zh_CN.lang`), `%1$s`/`%2$s` = argument slots (`structure.error.tier_mismatch`); `errors.add(...); return;` on fatal, hatch-count errors append.
+* **The GUI only shows the list if the terminal widget contains it.** `MTEMultiBlockBaseGui.createTerminalTextWidget()` adds `createStructureErrorWidget(syncManager)` to the terminal flow → overriding `createTerminalTextWidget()` (as `MTReactorGui` does) drops every detailed error (`missing_access_hatch` / `missing_heat_hatch` invisible). Fix: append `.child(createStructureErrorWidget(syncManager))`. Gated on `shouldDisplayShutDownReason() && !isActive && !isAllowedToWork()`, i.e. after `STRUCTURE_INCOMPLETE` (`disableWorking()`).
+* Custom (non-`HatchElement`) hatch: `StructureErrors.of("your.missing_key")` / `StructureErrors.of("your.too_many_key")` with `list.isEmpty()` / `list.size() > 1` in `checkMachine(..., List<StructureError> errors)`.
 
 ## 9. Construct / survival construct offsets
 
-`construct` → `buildPiece(piece, stack, hintsOnly, h, v, d)`.
-`survivalConstruct` → `survivalBuildPiece(piece, stack, h, v, d, elementBudget, env, false, true)`
-(with `if (mMachine) return -1;`). Offsets are the same `~` coordinates as `checkPiece`.
+`construct` → `buildPiece(piece, stack, hintsOnly, h, v, d)`; `survivalConstruct` → `survivalBuildPiece(piece, stack, h, v, d, elementBudget, env, false, true)` (with `if (mMachine) return -1;`); same `~` coordinates as `checkPiece`.
 
-Import trap: `ISurvivalBuildEnvironment` lives in
-`com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment` — it is **NOT** in
-`alignment.constructable` (that package only holds `ISurvivalConstructable`).
+Import trap: `ISurvivalBuildEnvironment` is in `com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment`, **NOT** in `alignment.constructable` (that only holds `ISurvivalConstructable`).
 
 ## 10. Textures & GUI (MTDTPF example)
 
-* **Textures** — `getTexture(...)`: the *front* face (`side == facing`) uses the Large Fusion
-  Computer Mk-V look (`Textures.BlockIcons.MACHINE_CASING_FUSION_GLASS` + a GT++ screen overlay from
-  `TexturesGtBlock.Casing_Machine_Screen_Rainbow/1`); every other face uses the fusion machine casing
-  texture matching the current tier (`INVALID` falls back to MKI). This is done with
-  `Textures.BlockIcons.getCasingTextureForId(GTUtility.getCasingTextureIndex(tier.machineBlock, tier.machineMeta))`,
-  following the same tier-to-casing idea as `MTEPreciseAssembler` (`CASING_INDEX + casingTier`).
-  The side texture is built with `TextureFactory.of(tier.machineBlock, tier.machineMeta)` so it uses
-  the actual block icon directly (avoids missing casing-texture entries for GT++/higher-tier casings).
-  The tier is synced to the client through `getUpdateData()` / `receiveClientEvent()` using
-  `GregTechTileClientEvents.CHANGE_CUSTOM_DATA` (same pattern as Precise Assembler).
-  The old Plasma Forge casing is still available through `ICasingTextureProvider#getCasingTexture()`
-  returning `Textures.BlockIcons.casingTexturePages[0][14]`.
-* **GUI** — machines override `protected @NotNull MTEMultiBlockBaseGui<?> getGui()` (in
-  `gregtech.api...MTEMultiBlockBase`). Modern GTNH GUI code is built on **CleanroomModularUI**
-  (`com.cleanroommc.modularui.*`: `ModularPanel`, `PanelSyncManager`, `BooleanSyncValue`,
-  `IntSyncValue`, `ButtonWidget`, `Flow`, `TextFieldWidget`), while the GT base keeps a few
-  `com.gtnewhorizons.modularui` helpers around — don't mix them up.
-  `MTEPlasmaForgeGui` is a good template: override `registerSyncValues(PanelSyncManager)` to bind
-  server fields (e.g. `convergence` + `catalystType`) with `.allowC2S()`, and override
-  `createButtonColumn(...)` to add a custom button. MTDTPF's `MTDTPFGui` is a verbatim port.
-* Sync-able fields on the MTE should be persisted in `saveNBTData/loadNBTData` (see the
-  `convergence` / `catalystTypeForRecipesWithoutCatalyst` pair in MTDTPF).
+* **Textures** — `getTexture(...)`: *front* face (`side == facing`) = Large Fusion Computer Mk-V look (`Textures.BlockIcons.MACHINE_CASING_FUSION_GLASS` + GT++ overlay `TexturesGtBlock.Casing_Machine_Screen_Rainbow/1`), other faces the current tier's casing (`INVALID` → MKI) via `Textures.BlockIcons.getCasingTextureForId(GTUtility.getCasingTextureIndex(tier.machineBlock, tier.machineMeta))` (`MTEPreciseAssembler` idea, `CASING_INDEX + casingTier`). Side texture = `TextureFactory.of(tier.machineBlock, tier.machineMeta)` (real block icon, no missing casing entries for GT++/higher tiers). Tier sync: `getUpdateData()` / `receiveClientEvent()` + `GregTechTileClientEvents.CHANGE_CUSTOM_DATA`. Old Plasma Forge casing: `ICasingTextureProvider#getCasingTexture()` → `Textures.BlockIcons.casingTexturePages[0][14]`.
+* **GUI** — override `protected @NotNull MTEMultiBlockBaseGui<?> getGui()` (in `gregtech.api...MTEMultiBlockBase`). Modern GTNH GUI is **CleanroomModularUI** (`com.cleanroommc.modularui.*`: `ModularPanel`, `PanelSyncManager`, `BooleanSyncValue`, `IntSyncValue`, `ButtonWidget`, `Flow`, `TextFieldWidget`); the GT base keeps a few `com.gtnewhorizons.modularui` helpers — don't mix them. Template `MTEPlasmaForgeGui`: `registerSyncValues(PanelSyncManager)` binds server fields (`convergence` + `catalystType`) with `.allowC2S()`, `createButtonColumn(...)` adds a button; `MTDTPFGui` is a verbatim port.
+* Sync-able MTE fields belong in `saveNBTData/loadNBTData` (`convergence` / `catalystTypeForRecipesWithoutCatalyst`).
 
 ## 10.5 Waila (tooltip) data
 
-Waila lines are split across two callbacks:
+* `getWailaNBTData(EntityPlayerMP, TileEntity, NBTTagCompound, World, x,y,z)` — **server**: runtime values into the tag, e.g. `tag.setBoolean("enablePOC", isTierAtLeast(5))`.
+* `getWailaBody(ItemStack, List<String>, IWailaDataAccessor, IWailaConfigHandler)` — **client**: `accessor.getNBTData()`, **gate on `tag.hasKey(...)`** (see `MTEPlasmaForge.getWailaBody`), then `currentTip.add(...)`.
 
-* `getWailaNBTData(EntityPlayerMP, TileEntity, NBTTagCompound, World, x,y,z)` — **server side**, write any
-  runtime value into the tag, e.g. `tag.setBoolean("enablePOC", isTierAtLeast(5))`.
-* `getWailaBody(ItemStack, List<String>, IWailaDataAccessor, IWailaConfigHandler)` — **client side**, read
-  `accessor.getNBTData()`, **gate on `tag.hasKey(...)`**, then `currentTip.add(...)`.
-
-The `hasKey` gate is the "should I add this line" check (see `MTEPlasmaForge.getWailaBody`). MTDTPF uses the
-same pattern to show perfect-overclock state with the existing `machine.dtpf.perfectoverclock*` lang keys,
-mirroring its own `getInfoData()` (yellow = on, green = off).
+MTDTPF shows perfect-overclock state the same way with the `machine.dtpf.perfectoverclock*` keys, mirroring `getInfoData()` (yellow = on, green = off).
 
 ## 10.6 Runtime efficiency scaling (DTPF-style)
 
-MTDTPF uses a DTPF-like `running_time` ramp (unlike DTPF's 8h target, this machine uses **3600s**):
+DTPF-like `running_time` ramp (target **3600s**, not DTPF's 8h):
 
 ```
 p        = min(running_time / 72000, 1)          // 72000 ticks = 3600s
@@ -254,567 +153,361 @@ time(p)  = p >= 1 ? 0.5 : 1.0                    // same step behaviour
 P        = (1 + machineTier - recipeTier) * 64   // parallel, min 1; machineTier/recipeTier are MKI..MKV (1..5)
 ```
 
-Implementation notes (all verified against GT source):
-* Parallel is **tier-difference based**, not runtime based: `validateRecipe()` sets
-  `maxParallel = max(1, (1 + current.tier - recipeTier) * 64)` where
-  `recipeTier = max(1, GTUtility.getTier(recipe.mEUt) - 5)` (LuV=1, ZPM=2, ... UEV=5).
-  `getMaxParallelRecipes()` only returns a tier-based fallback for the GUI. GT's `ParallelHelper` still caps
-  the real parallel by `availableEUt / recipeEUt` and by input counts.
-* `getEuModifier()` returns `EU(p)` — `OverclockCalculator` uses it as the EU/t discount.
-* `getSpeedBonus()` returns `time(p)` — it is the **duration multiplier** (`durationModifier`), not a speed
-  multiplier: `0.5` = half recipe time, `1.0` = normal.
-* `checkProcessing()` adds `mMaxProgresstime` to `running_time` on success; `onPostTick()` decays
-  `running_time` by `EFFICIENCY_DECAY_RATE = 100` per tick when `mMaxProgresstime == 0` (same as MTEPlasmaForge).
-* NBT persists `eRunningTime`; Waila shows `running_time`; item tooltip has four colored, localized lines
-  (yellow "EU/duration ramp", gray "full efficiency after 3600s", gold "parallel formula", aqua "EU|duration halved").
-* Fluid output is DTPF-style: `addOutput(FluidStack)` copies the stack and calls `addOutputPartial`, and
-  `addFluidOutputs(...)` is overridden to route normal completion outputs through that same `addOutput` path.
+* Parallel is **tier-difference based**, not runtime based: `validateRecipe()` sets `maxParallel = max(1, (1 + current.tier - recipeTier) * 64)`, `recipeTier = max(1, GTUtility.getTier(recipe.mEUt) - 5)` (LuV=1, ZPM=2, ... UEV=5); `getMaxParallelRecipes()` only feeds the GUI, GT's `ParallelHelper` still caps by `availableEUt / recipeEUt` and input counts.
+* `getEuModifier()` = `EU(p)`, the `OverclockCalculator` EU/t discount; `getSpeedBonus()` = `time(p)`, the **duration multiplier** (`durationModifier`), not a speed multiplier (`0.5` = half recipe time, `1.0` = normal).
+* `checkProcessing()` adds `mMaxProgresstime` to `running_time`; `onPostTick()` decays it by `EFFICIENCY_DECAY_RATE = 100` per tick while `mMaxProgresstime == 0` (as `MTEPlasmaForge`).
+* NBT `eRunningTime`, Waila `running_time`, four colored localized tooltip lines (yellow "EU/duration ramp", gray "full efficiency after 3600s", gold "parallel formula", aqua "EU|duration halved").
+* Fluid output: `addOutput(FluidStack)` copies the stack → `addOutputPartial`; `addFluidOutputs(...)` routes normal outputs through it.
 
 ## 10.7 Wireless mode (direct wireless-network power)
 
-Reference: `MTETranscendentPlasmaMixer` (`gregtech/common/tileentities/machines/multi/MTETranscendentPlasmaMixer.java`)
-and `WirelessNetworkManager` (`gregtech/common/misc/WirelessNetworkManager.java`).
+Reference: `MTETranscendentPlasmaMixer` (`gregtech/common/tileentities/machines/multi/MTETranscendentPlasmaMixer.java`), `WirelessNetworkManager` (`gregtech/common/misc/WirelessNetworkManager.java`).
 
-* The machine does **not** use a wireless energy hatch. In wireless mode it draws directly from the
-  global wireless network via `WirelessNetworkManager`.
-* `MTMultiMachineBase` owns the shared helpers:
-  * `initWirelessNetwork(IGregTechTileEntity)` — calls `processInitialSettings` once on the server.
-  * `checkWirelessPower(eut, duration, maxParallel)` — called from `validateRecipe`; returns
-    `insufficientStartupPower` before any input is consumed.
-  * `startWirelessRecipe(...)` — called from `onRecipeStart`; deducts the actual EU cost first, and
-    only then calls `GTRecipe.consumeInput`. This is what prevents “insufficient power swallowing inputs”.
-* Subclasses override `isWirelessModeAvailable()` / `isWirelessModeEnabled()` (MTDTPF maps them to
-  `EnableWirelessFunc` / `EnableWireless`).
-* In wireless mode:
-  * `createParallelHelper` sets `setConsumption(false)` so `ParallelHelper` does not consume inputs
-    before the wireless deduction.
-  * `setProcessingLogicPower` gives `Long.MAX_VALUE` voltage / 1 amp / unlimited tier skips (like TPM).
-  * `createOverclockCalculator` uses `OverclockCalculator.ofNoOverclock(...)` while still applying
-    MTDTPF's EU/duration efficiency modifiers, so the wireless network pays the actual no-overclock cost.
-  * `checkMachine` skips `checkHasAnyEnergy` and, like `OTEBBPlasmaForge`, **forbids** normal energy
-    hatches while wireless mode is active (`ErrorType.TOO_MANY`).
-  * `setEnableWireless` only enables when the feature is available and no energy hatches are present.
-  * Wireless parallel is user-selectable (like `MTETranscendentPlasmaMixer`): `wirelessParallel` field,
-    right-click on the wireless button opens a selector, max `Integer.MAX_VALUE`.
-  * Wireless mode disables the 3600s runtime ramp: `getEuModifier()`/`getSpeedBonus()` return a fixed
-    `0.75` and `running_time` is neither incremented nor decayed.
-  * GUI button uses `GTGuiTextures.TT_SAFE_VOID_ON/OFF` to toggle `EnableWireless`, gated by
-    `EnableWirelessFunc`.
+* No wireless energy hatch — it draws straight from the global `WirelessNetworkManager` network.
+* `MTMultiMachineBase` helpers: `initWirelessNetwork(IGregTechTileEntity)` (`processInitialSettings` once, server); `checkWirelessPower(eut, duration, maxParallel)` (from `validateRecipe`, returns `insufficientStartupPower` before inputs); `startWirelessRecipe(...)` (from `onRecipeStart`, deducts the EU first, then `GTRecipe.consumeInput`). Subclasses override `isWirelessModeAvailable()` / `isWirelessModeEnabled()` (MTDTPF: `EnableWirelessFunc` / `EnableWireless`).
+* In wireless mode: `createParallelHelper` → `setConsumption(false)` · `setProcessingLogicPower` → `Long.MAX_VALUE` voltage / 1 amp / unlimited tier skips (like TPM) · `createOverclockCalculator` → `OverclockCalculator.ofNoOverclock(...)` with MTDTPF's EU/duration modifiers · `checkMachine` skips `checkHasAnyEnergy` and, like `OTEBBPlasmaForge`, **forbids** normal energy hatches (`ErrorType.TOO_MANY`) · `setEnableWireless` only when available and hatch-free · wireless parallel user-selectable (as `MTETranscendentPlasmaMixer`): `wirelessParallel`, right-click the wireless button opens a selector, max `Integer.MAX_VALUE` · 3600s ramp off: `getEuModifier()`/`getSpeedBonus()` fixed `0.75`, `running_time` neither incremented nor decayed · GUI button toggles `EnableWireless` via `GTGuiTextures.TT_SAFE_VOID_ON/OFF`, gated by `EnableWirelessFunc`.
 
 ## 11. Gotchas
 
-* The tile factory pattern: to make `newMetaEntity(...)` work you need a **String constructor**
-  (`public MTDTPF(String aName) { super(aName); }`) and `newMetaEntity` returns `new MTDTPF(mName)`
-  — same as `MTELargeFusionComputer5`. MTDTPF now has both.
-* The front overlay is active-aware exactly like LFC5's `getTextureOverlay()` (`Casing_Machine_Screen_Rainbow`
-  while active / `Casing_Machine_Screen_1` idle); the non-front faces stay on the DTPF casing.
-* `getMaxParallelRecipes()` is a separate concept from the recipe *tier* restriction; leave it
-  according to the machine's intended parallelism.
-* Tier block lookups (`Loaders.compactFusionCoil`, `GregTechAPI.sBlockCasings*`) are populated during
-  mod pre-init, so classes that reference them in enum/static initializers must load after blocks exist
-  (normal MTE registration order is fine).
-* When copying a shape from the structure writer, keep it under `// spotless:off ... spotless:on`.
-* **`getInputVoltageTier()` only sees plain energy hatches.** `MTEMultiBlockBase#getInputVoltageTier()`
-  iterates `mEnergyHatches` and returns **0** when that list is empty — the machine is powered by an exotic
-  hatch (laser hatch / multi-amp hatch, which are collected into `mExoticEnergyHatches`) — or when the plain
-  hatches have differing tiers. Never read it as "the machine's tier" without a fallback, and never let that 0
-  reach a recipe gate: it then refuses *every* recipe with `insufficientMachineTier`, whose display string is
-  "配方需要更高等级的结构方块。此配方需要：N" / "needs a higher tier structure block", which is easily mistaken
-  for a structure problem. To read the tier of every energy hatch, iterate
-  `getExoticAndNormalEnergyHatchList()` and take `MTEHatch#getInputTier()` (that is `mTier`, a `GTValues.VN`
-  index, for plain *and* exotic hatches) — `MTMultiMachineBase#getEnergyHatchTier()` does exactly that and keeps
-  the highest hatch tier, and every MessTech "energy hatch tier" gate/bonus reads it instead of
-  `getInputVoltageTier()` (`MTAssFactory` component tier + Tier 1 parallel; `MTNanoScaleFoundry` assembly matrix
-  module gate, etching speed bonus, work-thread overclock count).
-* **Don't "fix" the base class to make one machine work — override in the concrete MTE instead.**
-* **Always end `createTooltip()` with `.toolTipFinisher()`** — the tooltip arrays (`iArray`/`sArray`/`hArray`)
-  are built there and nowhere else. If you skip it, `getStructureDescription()` (=
-  `getTooltip().getStructureHint()`) returns `null`, and BlockRenderer6343's NEI preview
-  (`GTGuiMultiblockHandler.findHints`) crashes with `NullPointerException: Cannot read the array length`
-  while rendering the usage GUI. (That is exactly why MTDTPF crashed — see the 2026-08-21 crash report.)
-* **`getMaxParallelRecipes()` must be > 0.** `ParallelHelper.determineParallel()` returns immediately when
-  `maxParallel <= 0`, so the recipe is found/matched but the machine never starts (no progress, empty GUI).
-  MTDTPF's skeleton returned 0; it now returns 1 so the machine actually runs.
-* **Don't set absurd parallel caps (e.g. millions).** GT has at least one O(parallel) loop
-  (`ParallelHelper.calculateChancedOutputMultiplier` does `for roll < parallel`) plus output splitting loops,
-  so a huge cap that is actually reached freezes the game with no crash/log. Keep caps sane and let
-  `availableEUt / recipeEUt` and input counts do the real limiting.
-* **`MTParallelHelper` re-declares `ParallelHelper`'s fields as its own privates** (it is a fork of GT++'s helper),
-  so an *inherited* `ParallelHelper` method reads the never-assigned parent fields. `copyInputs()` is the one that
-  was reachable: it runs whenever consumption is disabled (`if (!consume) copyInputs();`), and MTDTPF in wireless
-  mode disables consumption — with no input bus the parent field is `null` and the machine crashed every tick with
-  `NullPointerException: Cannot read the array length because "this.itemInputs" is null`
-  (`ParallelHelper.copyInputs`, `MTDTPF$1.createParallelHelper` → `setConsumption(false)`). `MTParallelHelper` now
-  overrides `copyInputs()` to clone its own arrays. The shadowing has two more consequences that are *not* fixed
-  (they silently change balance if "fixed" naively, so they are recorded rather than flipped):
-  `setMaxParallelCalculator`/`setInputConsumer` write the parent fields and are therefore no-ops on
-  `MTParallelHelper` (its `determineParallel` reads its own), and its `setEUtModifier(float)` is a dead overload
-  because GT5U's setter takes a `double` — so `euModifier` (MTDTPF's runtime EU discount) never reaches the fork's
-  `determineParallel`, which is why parallels there are still computed from the undiscounted `recipe.mEUt`. When
-  adding a machine that disables consumption, or when GT5U adds a new state-touching `ParallelHelper` method, check
-  whether `MTParallelHelper` must override it too.
-* **`IVoidable.canDumpItemToME/canDumpFluidToME` are implemented in `MTMultiMachineBase`**
-  so every MessTech multiblock satisfies `IVoidable` regardless of whether the GT5U `MTEMultiBlockBase`
-  in the active dependency provides them. The implementation mirrors upstream
-  (`tmp/GT5-Unofficial-master/.../MTEMultiBlockBase.java` ~line 3194/3218), including the
-  `hasPhysicalSpace()` and `getCheckMode()` checks. If the IDE claims a signature conflict, re-import
-  the Gradle project so the IDE picks up the same GT5U API as the compiler (`GTUtility.FluidId` is
-  `public abstract static class` in `GTUtility.java`).
+* Tile factory: `newMetaEntity(...)` needs a **String constructor** (`public MTDTPF(String aName) { super(aName); }`) returning `new MTDTPF(mName)` — as `MTELargeFusionComputer5`.
+* Front overlay active-aware like LFC5 `getTextureOverlay()`: `Casing_Machine_Screen_Rainbow` active / `Casing_Machine_Screen_1` idle; other faces = DTPF casing.
+* `getMaxParallelRecipes()` ≠ the recipe *tier* restriction — follow the intended parallelism.
+* Tier block lookups (`Loaders.compactFusionCoil`, `GregTechAPI.sBlockCasings*`) appear after mod pre-init → enum/static initializers must load after blocks (normal MTE order fine).
+* Structure-writer shapes stay under `// spotless:off ... spotless:on`.
+* **`getInputVoltageTier()` = plain energy hatches only.** `MTEMultiBlockBase#getInputVoltageTier()` iterates `mEnergyHatches`, returns **0** when empty (exotic hatch — laser / multi-amp → `mExoticEnergyHatches`) or tiers differ; that 0 in a recipe gate rejects *every* recipe with `insufficientMachineTier` ("配方需要更高等级的结构方块。此配方需要：N" / "needs a higher tier structure block") — looks like a structure bug. Real hatch tier: `getExoticAndNormalEnergyHatchList()` → `MTEHatch#getInputTier()` (`mTier`, a `GTValues.VN` index, plain *and* exotic); `MTMultiMachineBase#getEnergyHatchTier()` keeps the highest and every MessTech gate/bonus reads it (`MTAssFactory` component tier + Tier 1 parallel; `MTNanoScaleFoundry` assembly matrix module gate, etching speed bonus, work-thread overclock count).
+* **Never "fix" the base class for one machine — override in the concrete MTE.**
+* **Always end `createTooltip()` with `.toolTipFinisher()`** — it alone builds the arrays (`iArray`/`sArray`/`hArray`); without it `getStructureDescription()` (= `getTooltip().getStructureHint()`) is `null` and BlockRenderer6343's NEI preview (`GTGuiMultiblockHandler.findHints`) crashes with `NullPointerException: Cannot read the array length` (MTDTPF, 2026-08-21).
+* **`getMaxParallelRecipes()` > 0**: `ParallelHelper.determineParallel()` bails on `maxParallel <= 0` — recipe matches, machine never starts (no progress, empty GUI); MTDTPF 0 → 1.
+* **No absurd caps (millions)**: O(parallel) loops (`ParallelHelper.calculateChancedOutputMultiplier`: `for roll < parallel`, plus output splitting) freeze the game without a crash/log; `availableEUt / recipeEUt` + input counts limit for real.
+* **`MTParallelHelper` re-declares `ParallelHelper`'s fields as privates** (GT++ fork) → inherited methods read never-assigned parent fields. `copyInputs()` runs when consumption is off (`if (!consume) copyInputs();`), wireless MTDTPF does that — no input bus → parent `null` → every-tick `NullPointerException: Cannot read the array length because "this.itemInputs" is null` (`ParallelHelper.copyInputs`, `MTDTPF$1.createParallelHelper` → `setConsumption(false)`); now overridden to clone its own arrays. Still broken, recorded (fixing changes balance): `setMaxParallelCalculator`/`setInputConsumer` write parent fields = no-ops on the fork (its `determineParallel` reads its own); `setEUtModifier(float)` dead — GT5U takes a `double`, so `euModifier` never reaches `determineParallel` → parallels use the undiscounted `recipe.mEUt`. New consumption-disabling machine or state-touching `ParallelHelper` method → check the fork.
+* **`IVoidable.canDumpItemToME/canDumpFluidToME` live in `MTMultiMachineBase`** → every MessTech multiblock is `IVoidable` regardless of the active GT5U `MTEMultiBlockBase`; mirrors upstream (`tmp/GT5-Unofficial-master/.../MTEMultiBlockBase.java` ~line 3194/3218) incl. `hasPhysicalSpace()`/`getCheckMode()`. IDE conflict → re-import Gradle (`GTUtility.FluidId` is `public abstract static class` in `GTUtility.java`).
 
 ## 11.5 Nano Computing Center (`MTComputingCenter`)
 
-MessTech's computation multiblock, based on `CalculateMultiMachineBase`.
+Computation multiblock on `CalculateMultiMachineBase`, three modes: **Nano Computing** (QC style, data input auto-forwarded, wireless output toggled with a wire cutter) · **Research Station** (`F` holder hatch + Data Stick in the controller slot, finished stick → OutputBus) · **Scanner** (`RecipeMaps.scannerHandlers` / `RecipeMaps.scannerFakeRecipes`, same packet-loss logic).
 
-* Modes:
-  * Mode 1 = **Nano Computing** (quantum-computer style): racks produce computation, data input is
-    forwarded to output automatically, wireless output is enabled with a wire cutter.
-  * Mode 2 = **Research Station** style: holder hatch (`F`) holds the research item, controller slot
-    holds a Data Stick, computation is produced internally by racks, and the finished Data Stick is
-    output to an OutputBus or left in the controller slot.
-  * Mode 3 = **Scanner** style: same research-style computation/packet-loss logic as the original
-    Research Station scanner, using `RecipeMaps.scannerHandlers` and `RecipeMaps.scannerFakeRecipes`.
-* Structure:
-  * `A` = normal hatches + Uncertainty + Data + WirelessComputationOutput
-  * `D` = `MTHatchRack`
-  * `F` = research holder or air
-* Custom recipe map: `MTRecipeMaps.computingCenterFakeRecipes`.
-  * NEI: `MTMachineLoader` calls `MTRecipeMaps.populateComputingCenterFakeRecipes()` after
-    `MTEHatchRack.run()`. For each recipe copied from the shared rack-component pool it
-    **re-tags the recipe to this map's default `RecipeCategory`** before adding it — GT's NEI handler
-    reads `backend.getRecipesByCategory(defaultCategory)`, not `getAllRecipes()`, so without the
-    re-tag the independent Computing Center list stays empty. Title localized via
-    `mt.recipe.computingcenter`.
-* Rack class: `MTHatchRack` extends GT5U `MTEHatchRack`.
-  * `tickComponents(oc, ov)` is overridden to soften the overclock penalty: the stock
-    `(oc-ov)^2` denominator term is scaled by `PENALTY_FACTOR = 0.8f` (20% softer).
-    Component stats are looked up from the shared QC fake-recipe pool
-    (`QuantumComputerRecipeData`, cached by unique id).
-  * `getDescription()` is overridden so the item tooltip omits the "TecTech: Elemental Matter" line.
-* Research packet-loss / `checkComputationTimeout` (grace/decay/full windows) is ported into
-  `MTComputingCenter.onRunningTick`, with NBT persistence for `ticksUntilPacketLossFail` and
-  `packetLossDecayFrom`.
-* Wireless: `WirelessComputationPacket.uploadData` with a real world tick (obtained by casting the
-  base meta tile entity to `TileEntity`).
-* Heat/overclock:
-  * `machineHeat` is internal storage (max `10,000,000`), saved in NBT.
-  * While heat is present, overclock cannot be disabled, rack components stay locked, and the
-    screwdriver cannot switch modes until the heat is fully dissipated.
-  * Cooling:
-    * **Active**: `consumeCryotheumForHeat()` removes one `10,000` heat batch per `100,000L`
-      Gelid Cryotheum, looping until no full batch remains (or the fluid runs out) — applied
-      both while running and while stopped.
-    * **Passive** (machine stopped only): every second `machineHeat -= max(machineHeat/1000, 20)`
-      (mirrors the stock rack decay).
-  * If heat exceeds max, all rack components are melted and the machine stops with
-    `ExtraShutdownReason.OverHeating`.
-  * Manual shutdown (GUI on/off / redstone) never reaches `stopMachine`, so `onPostTick` clears
-    leftover Waila/GUI values (`eAvailableData`, `mEUt`, and any unfinished research progress)
-    whenever the controller is not active (`resetStoppedDisplay()`).
-  * On controller removal with residual heat, all rack components are burned (`meltAllComponents`).
-  * Lock handling: `setRacksActive(false)` is a no-op while `machineHeat > 0`, and
-    `onPostTick` re-asserts `setRacksActive(true)` whenever heat is present (covers chunk reloads).
-* Animated tooltip:
-  * `AuthorDynamic.registerOn` adds `Add by: <animated MessTech>` below the author line.
-  * The "MessTech" text uses a flowing purple gradient via gtnhlib `AnimatedTooltipHandler.animatedText`.
+* Structure: `A` = normal hatches + Uncertainty + Data + WirelessComputationOutput, `D` = `MTHatchRack`, `F` = research holder or air.
+* `MTRecipeMaps.computingCenterFakeRecipes`: `MTMachineLoader` calls `MTRecipeMaps.populateComputingCenterFakeRecipes()` after `MTEHatchRack.run()`; copied recipes are **re-tagged to the map's default `RecipeCategory`** — GT's NEI handler reads `backend.getRecipesByCategory(defaultCategory)`, not `getAllRecipes()`. Title `mt.recipe.computingcenter`.
+* `MTHatchRack` extends GT5U `MTEHatchRack`: `tickComponents(oc, ov)` scales the stock `(oc-ov)^2` term by `PENALTY_FACTOR = 0.8f` (20% softer), stats from the QC fake-recipe pool (`QuantumComputerRecipeData`, cached by unique id); `getDescription()` drops the "TecTech: Elemental Matter" line.
+* `checkComputationTimeout` (grace/decay/full windows) ported into `MTComputingCenter.onRunningTick`, NBT `ticksUntilPacketLossFail` / `packetLossDecayFrom`; wireless `WirelessComputationPacket.uploadData` with a real world tick (base meta tile entity cast to `TileEntity`).
+* Heat `machineHeat` (max `10,000,000`, NBT): overclock cannot be disabled, racks stay locked, screwdriver mode switching blocked until it dissipates. **Active** `consumeCryotheumForHeat()`: one `10,000` heat batch per `100,000L` Gelid Cryotheum, looping while possible (running and stopped); **passive** (stopped only) `machineHeat -= max(machineHeat/1000, 20)` per second (stock rack decay); above max → all components melted, `ExtraShutdownReason.OverHeating`.
+* Manual shutdown (GUI on/off, redstone) never reaches `stopMachine` → `onPostTick` clears stale Waila/GUI values (`eAvailableData`, `mEUt`, research progress) while inactive (`resetStoppedDisplay()`); controller removed with heat → `meltAllComponents`; `setRacksActive(false)` no-ops while `machineHeat > 0`, `onPostTick` re-asserts `setRacksActive(true)` while hot (chunk reloads).
+* Tooltip: `AuthorDynamic.registerOn` adds `Add by: <animated MessTech>` under the author line, the name a purple gradient via gtnhlib `AnimatedTooltipHandler.animatedText`.
 
 ## 11.6 Assembly Factory (`MTAssFactory`)
 
-* Two recipe pools, switched by screwdriver (also via the built-in mode button):
-  * Mode 0 = **Component Assembly Line**: `GoodGeneratorRecipeMaps.componentAssemblyLineRecipes`,
-    generic `ProcessingLogic` via the base machine; recipe casing tier (`mSpecialValue`, the recipe's
-    `COAL_CASING_TIER` metadata) is limited to the machine's energy hatch tier, i.e. the **highest**
-    `MTEHatch#getInputTier()` over `getExoticAndNormalEnergyHatchList()` (`MTMultiMachineBase#getEnergyHatchTier()`),
-    so laser hatches / multi-amp hatches count like plain ones and the best hatch on the machine sets the limit.
-    `getInputVoltageTier()` must not be used for this: it reads plain hatches only and gates everything at 0.
-    The same helper drives the Tier 1 parallel count (`3^能源仓等级`).
-  * Mode 1 = **Assembly Line**: reads the authorised recipes from the controller data stick and
-    Data Access hatches, resolves them against the input buses itself (`MTAssemblyLineMatcher`) and hands the
-    winner to the standard `ProcessingLogic` pipeline; only usable when `LevelTier == 2`. No single-recipe
-    locking in this mode (`supportsSingleRecipeLocking()` is false, like GT's own `MTEAssemblyLine`).
-* Structure:
-  * `F` accepts the usual buses/hatches/energy plus **Data Access hatches**.
-  * `I` = tiered Assembly Matrix Blocks (Tier 1 / Tier 2), derived into `LevelTier`.
-* GUI: `MTAssFactoryGui` (standard multi-block GUI; mode button comes from the base machine-mode stack).
-* Independent Assembly Line NEI pool: `MTRecipeMaps.assFactoryAssemblyLineRecipes`, built in
-  `MTRecipeMaps.populateAssFactoryAssemblyLineRecipes()` from `GTRecipe.RecipeAssemblyLine.sAssemblylineRecipes`
-  (the authoritative list a data stick / Data Access hatch resolves against):
-  * one **fake** recipe per definition, keeping the per-slot alternatives, is what NEI draws (one page per
-    Assembly Line recipe). `RecipeMapBackend#filterFindRecipe` rejects fake recipes, so nothing runs straight out of
-    this pool.
-    Its special slot carries the definition's flash drive (`displayDataStick`), the same data stick GT puts into every
-    `assemblylineVisualRecipes` entry, so the page shows the "reads research result" stick. GT fills its own sticks from
-    `RecipeAssemblyLine#reInit()`, which runs at postInit (ore dictionary activation) - before this pool is built at
-    `serverStarted` - and only again on an item remap, so the NBT is written when the stick is made. The sticks are
-    cached in `DISPLAY_DATA_STICKS` per definition because `newDataStickForNEI` appends to the strongly held
-    `RecipeAssemblyLine.dataSticksForNEI` and a populate happens on every world load.
-  * **no runnable recipes**, deliberately. One recipe per alternative combination - the obvious way to make the
-    alternatives matchable - is the cartesian product of a definition's slots, and that product reaches six digits for
-    a single definition (Wetware Mainframe: five ASMD/XSMD slots plus six superconductor wires), so building that table
-    exhausted the heap on `serverStarted`. The machine resolves the definitions on the fly instead, see below.
-  * `RecipeAssemblyLine` is still the only source used: `displayInputSpec` keeps a slot's alternatives in the NEI page
-    as a plain `ItemStack[]`, which `GTRecipe_WithAlt#buildItemInputCache` drops for anything that is not an
-    ore-dictionary slot (`mOreDictIds[i] >= 0`) - fine for a page, since NEI reads `mOreDictAlt` itself.
-* Assembly Line mode requires at least one Data Access hatch; `checkMachine` reports
-  `machine.assfactory.error.need_data_access` / `need_tier2`.
-* Assembly Line mode is **unordered**: `MTAssemblyLineMatcher` reads every input bus as one pool keyed by
-  `GTUtility.ItemId` (exact stack with NBT ignored, plus a wildcard-damage alias), and each slot takes the alternative
-  that leaves the most parallels once the slots before it are paid for. The outcome is a plain
-  `GTRecipe` built with `GTRecipeBuilder.builder()` and handed to `ProcessingLogic#findRecipeMatches`, so parallels,
-  perfect overclock, void protection, debug/phantom and ME buses and the consumption itself stay the shared pipeline.
-* Debug input buses are supported natively: Assembly Line mode delegates consumption to the
-  normal `ProcessingLogic` / `getStoredInputs` path, so phantom/debug-marked items are recognised.
-* **Always reuse existing inventory methods first.** Consuming inputs must go through the machine's
-  existing `depleteInput(ItemStack)` / `depleteInput(FluidStack)` (which properly handles regular,
-  debug/phantom and ME buses/hatches). Do not directly mutate `ItemStack.stackSize` /
-  `FluidStack.amount` or call `setInventorySlotContents` on bus slots from custom processing code.
-* Controller front texture: Advanced Molecular Casing base + Quantum Force Transformer face overlay.
-* Tooltips refer to the energy hatch option as **Multi-Amp Energy (多安能源仓)** (display naming in
-  the lang files uses 多安能源仓 instead of 异域能源仓).
-* Tooltips refer to the energy hatch option as **Multi-Amp Energy (多安能源仓)** (display naming in
-  the lang files uses 多安能源仓 instead of 异域能源仓).
+* Two pools, screwdriver-switched (or the mode button):
+  * Mode 0 **Component Assembly Line**: `GoodGeneratorRecipeMaps.componentAssemblyLineRecipes`, generic `ProcessingLogic`; recipe casing tier (`mSpecialValue`, the recipe's `COAL_CASING_TIER`) capped by the energy hatch tier = **highest** `MTEHatch#getInputTier()` over `getExoticAndNormalEnergyHatchList()` (`MTMultiMachineBase#getEnergyHatchTier()`, laser / multi-amp included), never `getInputVoltageTier()` (plain only, gates at 0); same helper → Tier 1 parallel `3^能源仓等级`.
+  * Mode 1 **Assembly Line**: authorised recipes from the data stick + Data Access hatches, matched against the input buses by `MTAssemblyLineMatcher`, winner to `ProcessingLogic`; only `LevelTier == 2`; no single-recipe locking (`supportsSingleRecipeLocking()` false, like `MTEAssemblyLine`).
+* Structure: `F` = buses/hatches/energy + **Data Access hatches**; `I` = Assembly Matrix Blocks (Tier 1 / Tier 2) → `LevelTier`; GUI `MTAssFactoryGui`.
+* NEI pool `MTRecipeMaps.assFactoryAssemblyLineRecipes` ← `MTRecipeMaps.populateAssFactoryAssemblyLineRecipes()` ← `GTRecipe.RecipeAssemblyLine.sAssemblylineRecipes` (what a data stick resolves against): fake recipe per definition = one page, special slot `displayDataStick` = GT's every-`assemblylineVisualRecipes` stick, filled in `RecipeAssemblyLine#reInit()` at postInit (before `serverStarted`, else on item remap), cached in `DISPLAY_DATA_STICKS` per definition (`newDataStickForNEI` → `RecipeAssemblyLine.dataSticksForNEI`, every world load); `RecipeMapBackend#filterFindRecipe` rejects fakes; `displayInputSpec` alternatives stay `ItemStack[]`, dropped by `GTRecipe_WithAlt#buildItemInputCache` for non-ore-dictionary slots (`mOreDictIds[i] >= 0`), NEI reads `mOreDictAlt`.
+  * **no runnable recipes**: per-combination = cartesian product of the slots (six digits; Wetware Mainframe: five ASMD/XSMD slots + six superconductor wires) → heap exhaustion on `serverStarted`; resolved on the fly.
+* Assembly Line needs a Data Access hatch: `machine.assfactory.error.need_data_access` / `need_tier2`.
+* **Unordered**: all input buses in one pool keyed by `GTUtility.ItemId` (exact stack, NBT ignored, wildcard-damage alias), each slot the alternative leaving the most parallels; result = `GTRecipe` from `GTRecipeBuilder.builder()` → `ProcessingLogic#findRecipeMatches` (parallels, perfect overclock, void protection, debug/phantom/ME buses and consumption stay shared); debug buses work natively (`ProcessingLogic` / `getStoredInputs`).
+* **Reuse the existing inventory methods**: `depleteInput(ItemStack)` / `depleteInput(FluidStack)` (regular, debug/phantom, ME); never `ItemStack.stackSize` / `FluidStack.amount` / `setInventorySlotContents` on bus slots.
+* Front texture: Advanced Molecular Casing + Quantum Force Transformer overlay. Tooltips: **Multi-Amp Energy (多安能源仓)** — lang files use 多安能源仓 instead of 异域能源仓.
 
 ## 12. Registering a machine + animated authors
 
 ### Registering an MTE so it shows up in game
 
-The MTE **constructor itself registers the id** (see `MetaTileEntity(int aID, ...)`: "This registers your
-Machine at the List"). You don't call any `registerMetaTileEntity`. Pattern (from `goodgenerator/loader/Loaders.java`
-and `gregtech/loaders/preload/LoaderMetaTileEntities.java`):
+The MTE **constructor registers the id** (`MetaTileEntity(int aID, ...)`: "This registers your Machine at the
+List"); no `registerMetaTileEntity` call. Pattern (`goodgenerator/loader/Loaders.java`,
+`gregtech/loaders/preload/LoaderMetaTileEntities.java`):
 
 ```java
 ItemStack stack = new MTDTPF(ID, "mt.dtpf.controller", "MT DTPF").getStackForm(1L);
 ```
 
-* `getStackForm(long)` returns `new ItemStack(GregTechAPI.sBlockMachines, size, metaTileID)` — the machine item.
-* **IDs**: GT reserves 0..2047; addon machines use the **32000+** range (goodgenerator 32019..32029,
-  NeutronAccelerator 32003.., Wires 32737+, ...). Pick a free value for your pack.
-* **When**: register in `postInit` if your machine's statics reference **other mods' blocks** (e.g. MTDTPF's
-  `LevelTier` reads `goodgenerator.loader.Loaders.compactFusionCoil`). Doing it in `postInit` guarantees every
-  mod's blocks are already loaded. (The MTE javadoc says "Load phase"; cross-mod refs are the exception that
-  justifies postInit.)
+* `getStackForm(long)` → `new ItemStack(GregTechAPI.sBlockMachines, size, metaTileID)`.
+* **IDs**: GT 0..2047 reserved; addons **32000+** (goodgenerator 32019..32029, NeutronAccelerator 32003.., Wires
+  32737+, ...).
+* **When**: `postInit` if statics touch **other mods' blocks** (MTDTPF's `LevelTier` reads
+  `goodgenerator.loader.Loaders.compactFusionCoil`); MTE javadoc says "Load phase", cross-mod refs are the exception.
 
 ### Animated "Author:" tooltip (gtnhlib)
 
-`AnimatedTooltipHandler` (gtnhlib: `com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler`) appends an animated
-line at the **end** of an item tooltip and is client-only (`@EventBusSubscriber(side = CLIENT)`):
+`AnimatedTooltipHandler` (`com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler`): animated line at the **end** of
+a tooltip, client-only (`@EventBusSubscriber(side = CLIENT)`).
 
-* primitives: `text(String)`, `animatedText(text, posstep, delay, colors...)`, `chain(Supplier...)`,
-  color constants (`AQUA`, `RED`, `BOLD`, ...), `addItemTooltip(ItemStack, Supplier<String>)`.
-* `animatedText` paints each char with `colors[(i*posstep - offset) mod len]`; `posstep` controls how fast the
-  color band moves across the text, `delay` the per-step ms.
-* Author composition: `GTAuthors.buildAuthorsWithFormatSupplier(Supplier<String>...)` wraps into the localized
-  `"gt.authors"` ("Author:"/"Authors:") prefix — that's the `LoaderMetaTileEntities` pattern:
+* primitives: `text(String)`, `animatedText(text, posstep, delay, colors...)`, `chain(Supplier...)`, colors
+  (`AQUA`, `RED`, `BOLD`, ...), `addItemTooltip(ItemStack, Supplier<String>)`.
+* `animatedText`: char i → `colors[(i*posstep - offset) mod len]`; `posstep` = band speed, `delay` = ms/step.
+* `GTAuthors.buildAuthorsWithFormatSupplier(Supplier<String>...)` prepends the localized `"gt.authors"`
+  ("Author:"/"Authors:"), as in `LoaderMetaTileEntities`:
   ```java
   addItemTooltip(ItemList.Machine_Multi_PurificationPlant.get(1),
                  GTAuthors.buildAuthorsWithFormatSupplier(GTAuthors.AuthorNotAPenguinAnimated));
   ```
-* `GTAuthors` has many static colored `String` authors and animated `Supplier<String>` authors
-  (`AuthorCloud`, `AuthorNoc`, `AuthorThree`, `fancyAuthorChrom`, `AuthorSerenibyss`, ...) — all built on
-  gtnhlib's `animatedText`/`chain`.
+* `GTAuthors`: static colored `String` + animated `Supplier<String>` authors (`AuthorCloud`, `AuthorNoc`,
+  `AuthorThree`, `fancyAuthorChrom`, `AuthorSerenibyss`, ...) on `animatedText`/`chain`.
 
-MessTech's `com.MessTech.common.util.AuthorDynamic` is a self-contained "czqwq" author:
-rainbow ramp (from `GTAuthors.AuthorThree` style) + color wave (`AuthorSerenibyss` style) + a custom
-**ping-pong offset** (triangle wave) so the rainbow band wobbles **left-right** instead of scrolling one way.
-`AuthorDynamic.author()` -> `Supplier<String>`; `AuthorDynamic.registerOn(stack)` =
-`AnimatedTooltipHandler.addItemTooltip(stack, GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
+`com.MessTech.common.util.AuthorDynamic` = self-contained "czqwq" author: rainbow ramp (`GTAuthors.AuthorThree`
+style) + color wave (`AuthorSerenibyss` style) + **ping-pong offset** (triangle wave) → the band wobbles
+**left-right**, not scrolling one way. `AuthorDynamic.author()` → `Supplier<String>`;
+`AuthorDynamic.registerOn(stack)` = `AnimatedTooltipHandler.addItemTooltip(stack,
+GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
 
 ### MessTech's actual refactor (current layout)
 
-The registration was split out of `CommonProxy` into three small pieces:
+Registration moved out of `CommonProxy` into three pieces:
 
 | file | responsibility |
 |---|---|
-| `com/MessTech/common/misc/MTItemList.java` | GT-style `ItemList` enum (copy of `gregtech.api.enums.ItemList` pattern): one entry per machine (`MTDTPF`), `set(Item/ItemStack/IMetaTileEntity)` + `get(int, Object...)` |
-| `com/MessTech/common/machine/loaders/MTMachineLoader.java` | `loadMachines()`: `MTItemList.MTDTPF.set(new MTDTPF(ID, ...).getStackForm(1L))` then `AuthorDynamic.registerOn(MTItemList.MTDTPF.get(1))` |
-| `com/MessTech/init/CommonProxy.java` | `postInit = MTMachineLoader.loadMachines()` (kept in postInit so cross-mod blocks are loaded) |
+| `com/MessTech/common/misc/MTItemList.java` | GT-style `ItemList` enum (`gregtech.api.enums.ItemList` pattern): one entry per machine (`MTDTPF`), `set(Item/ItemStack/IMetaTileEntity)` + `get(int, Object...)` |
+| `com/MessTech/common/machine/loaders/MTMachineLoader.java` | `loadMachines()`: `MTItemList.MTDTPF.set(new MTDTPF(ID, ...).getStackForm(1L))`, then `AuthorDynamic.registerOn(MTItemList.MTDTPF.get(1))` |
+| `com/MessTech/init/CommonProxy.java` | `postInit = MTMachineLoader.loadMachines()` (cross-mod blocks) |
 
-Keep it as ONE registration path: the loader calls `AuthorDynamic.registerOn(...)`, never a second inline
-`addItemTooltip`. Click-through: `postInit -> MTMachineLoader.loadMachines -> MTItemList.set(stack) +
-AuthorDynamic.registerOn(stack) -> AnimatedTooltipHandler.addItemTooltip(stack,
-GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
+ONE path (the loader calls `AuthorDynamic.registerOn(...)`, never a second inline `addItemTooltip`): `postInit` →
+`MTMachineLoader.loadMachines` → `MTItemList.set(stack)` + `AuthorDynamic.registerOn(stack)` →
+`AnimatedTooltipHandler.addItemTooltip(stack, GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
 
 ## 13. GT5U API knowledge from recent work
 
-* Upstream `MTEMultiBlockBase#getWailaBody` displays a running-mode line by reading `tag.getString("mode")`.
-  To show a localized machine-mode name, write `tag.setString("mode", getMachineModeName(machineMode))`.
-  Writing `tag.setInteger("mode", machineMode)` makes Waila show `运行模式: 0/1`.
-* `ProcessingLogic#findRecipeMatches` uses `recipeMap.findRecipeQuery().items(...).fluids(...).specialSlot(...).findAll()`.
-  Fake recipes (`addFakeRecipe`) are **not** found by `findRecipeQuery`; a machine that processes from a custom
-  pool needs real recipes (`addRecipe(copy, false, false, false)`).
-* NEI's `GTNEIDefaultHandler` reads `recipeMap.getBackend().getRecipesByCategory(defaultCategory)`.
-  When copying recipes from one recipe map to another, call `recipe.setRecipeCategory(targetDefaultCategory)`
-  or the copied list will stay empty in the new NEI tab.
-* Scanner mode (original Research Station scanner): `RecipeMaps.scannerHandlers.findRecipe(this, holder, special, fluid)`
-  returns `GTScannerResult`; required computation = `researchTime * 2^(tier-1)`, `eRequiredData = 1`,
-  EU = `max(|recipeEUt|, TierEU.RECIPE_UV)`.
-* `MTEHatchDataAccess#getAssemblyLineRecipes()` returns recipes from the data sticks stored inside the hatch.
-  Original Assembly Line processing is **ordered** by input-bus slots; an "unordered assembly line" must instead
-  delegate to normal `ProcessingLogic` / `getStoredInputs`.
-* `MTEHatchInputBusDebug` exposes phantom inventory via `getStackInSlot()` returning copied stacks with a huge
-  stack size (`Integer.MAX_VALUE` when not finite). Standard `getStoredInputs()` / `depleteInput()` handle it.
-* `COAL_CASING_TIER` is aliased into `GTRecipe.mSpecialValue` (`GTRecipeConstants.SPECIAL_VALUE_ALIASES`).
-* `RecipeMaps.scannerFakeRecipes` / `RecipeMaps.assemblylineVisualRecipes` are NEI/visual pools; they are not
-  meant to be searched by normal recipe processing unless copied into a real recipe map.
-* `WirelessNetworkManager` helpers: `processInitialSettings` (owner UUID), `getUserEU`, `addEUToGlobalEnergyMap`.
-  Safe wireless order: validate balance first (`checkWirelessPower`/`validateWirelessPowerForRecipe`), then
-  `startWirelessRecipe` deducts and consumes inputs.
+* `MTEMultiBlockBase#getWailaBody`: running-mode line from `tag.getString("mode")`; localized name =
+  `tag.setString("mode", getMachineModeName(machineMode))` (`tag.setInteger("mode", machineMode)` →
+  `运行模式: 0/1`).
+* `ProcessingLogic#findRecipeMatches` = `recipeMap.findRecipeQuery().items(...).fluids(...).specialSlot(...).findAll()`;
+  fake recipes (`addFakeRecipe`) are **not** found → a custom-pool machine needs real recipes
+  (`addRecipe(copy, false, false, false)`).
+* NEI `GTNEIDefaultHandler` reads `recipeMap.getBackend().getRecipesByCategory(defaultCategory)`; copied maps need
+  `recipe.setRecipeCategory(targetDefaultCategory)`, else the tab stays empty.
+* Scanner (Research Station): `RecipeMaps.scannerHandlers.findRecipe(this, holder, special, fluid)` →
+  `GTScannerResult`; computation `researchTime * 2^(tier-1)`, `eRequiredData = 1`, EU =
+  `max(|recipeEUt|, TierEU.RECIPE_UV)`.
+* `MTEHatchDataAccess#getAssemblyLineRecipes()` = recipes from the hatch's data sticks; the original Assembly Line
+  is **ordered** by input-bus slots → an "unordered assembly line" delegates to normal `ProcessingLogic` /
+  `getStoredInputs`.
+* `MTEHatchInputBusDebug`: phantom inventory (`getStackInSlot()` returns copied stacks of huge size,
+  `Integer.MAX_VALUE` when not finite); `getStoredInputs()` / `depleteInput()` handle it.
+* `COAL_CASING_TIER` aliased into `GTRecipe.mSpecialValue` (`GTRecipeConstants.SPECIAL_VALUE_ALIASES`).
+* `RecipeMaps.scannerFakeRecipes` / `RecipeMaps.assemblylineVisualRecipes` = NEI/visual pools, not searchable by
+  normal processing unless copied into a real map.
+* `WirelessNetworkManager`: `processInitialSettings` (owner UUID), `getUserEU`, `addEUToGlobalEnergyMap`; validate
+  first (`checkWirelessPower`/`validateWirelessPowerForRecipe`), then `startWirelessRecipe` (deducts + consumes).
 
 ## 14. MessTech's IC2/GT fuel rods (Transcendent Metal)
 
-* Classes:
-  * `com.MessTech.common.items.MTFuelRod extends gregtech.api.items.ItemRadioactiveCellIC` — burnable rods.
-  * `com.MessTech.common.items.MTDepletedFuelRod extends gregtech.common.items.ItemDepletedCell` — inert rods.
-  * `com.MessTech.common.items.MTFuelRodItemRenderer` — client `IItemRenderer`; copies
-    `TranscendentalMetaItemRenderer`'s oblique-axis tumble (3.5 deg per client tick around (0.3, 0.5, 0.2),
-    then 180 deg around X, pivot = quad centre; angle from `GTMod.clientProxy().getAnimationRenderTicks()`).
-  * Instances + stats live in `com.MessTech.common.items.MTItems` (region "Transcendent Metal fuel rods").
-* Why extend GT instead of IC2: `ItemReactorUranium`'s constructor needs an IC2 `InternalName` and hardcodes the
-  IC2 depleted stacks, while `ItemRadioactiveCellIC` is the public addon API: custom depleted `ItemStack`,
-  `IReactorComponent`, radiation, NBT `advDmg` + vanilla 0..99 damage bar, and the NEI nuclear fake recipe.
-* Registration gotcha: `GTGenericItem`'s constructor already calls
-  `GameRegistry.registerItem(this, "gt." + aUnlocalized)` (the 3-arg FML method ignores its modId in 1.7.10),
-  so the rods must NOT be registered again in `MTItems.registerItems()`. Display name / lang key:
-  `gt.rodTranscendentMetal.name` (and `...2` / `...4` / `...Depleted...`).
-* Current stats (`MTItems`): `maxDamage 250_000`, `radiation 32`, `MOX=true`, `heatBonus=2`,
-  **`heat 4_096`** and one energy per size — `ENERGY_SINGLE 9_000_000`, `ENERGY_DUAL 4_500_000`,
-  `ENERGY_QUAD 3_000_000`. MTReactor formulas: `output += pulses * sEnergy`, `EU/t = output * 5 *
-  balance/energy/generator/nuclear` (`MTReactor#getEuPerOutput()`; GTNH's `config/IC2.ini` ships that factor as
-  5.0, so one output point is 25 EU/t there - the same number `TileEntityNuclearReactorElectric#getOfferedEnergy()`
-  and GT5U's NEI nuclear fake recipe build with);
-  a lone rod adds `1 + cells / 2` pulses on each of its `cells` passes, so
-  `EU/t = sEnergy * cells * (1 + cells / 2) * 25` → **single 225,000,000 / dual 450,000,000 / quad 900,000,000
-  EU/t** (exact 1x/2x/4x scaling, the single rod is 6.7A UIV). The same formula is what the NEI nuclear fake recipe
-  prints, so the tooltip numbers match the real output.
-  Heat per cycle is `cells * triangular(1 + cells / 2) * sHeat` → 4,096 / 24,576 / 98,304 HU/s bare, which a
-  single `ItemList.neutroniumHeatCapacitor` (1G Neutronium Heat Capacitor, 1,000,000,000 HU) buffers for ~2.8 h.
-* `MTReactorAccessHatch.isFuelRod` was widened to `ItemReactorUranium || (ItemRadioactiveCell
-  && !ItemDepletedCell)` so GT-style rods also get the fuel durability line in the slot sub-panel.
+* `com.MessTech.common.items.MTFuelRod extends gregtech.api.items.ItemRadioactiveCellIC` (burnable),
+  `com.MessTech.common.items.MTDepletedFuelRod extends gregtech.common.items.ItemDepletedCell` (inert),
+  `com.MessTech.common.items.MTFuelRodItemRenderer` (client `IItemRenderer`, `TranscendentalMetaItemRenderer`'s
+  oblique-axis tumble: 3.5 deg per client tick around (0.3, 0.5, 0.2), then 180 deg around X, pivot = quad centre,
+  angle from `GTMod.clientProxy().getAnimationRenderTicks()`); instances + stats in
+  `com.MessTech.common.items.MTItems` ("Transcendent Metal fuel rods").
+* GT over IC2: `ItemReactorUranium`'s constructor needs an IC2 `InternalName` and hardcodes the IC2 depleted stacks;
+  `ItemRadioactiveCellIC` is the public addon API (custom depleted `ItemStack`, `IReactorComponent`, radiation, NBT
+  `advDmg`, vanilla 0..99 damage bar, NEI nuclear fake recipe).
+* Gotcha: `GTGenericItem`'s constructor already calls `GameRegistry.registerItem(this, "gt." + aUnlocalized)` (the
+  3-arg FML method ignores modId in 1.7.10) → do NOT re-register in `MTItems.registerItems()`. Lang keys:
+  `gt.rodTranscendentMetal.name` (+ `...2` / `...4` / `...Depleted...`).
+* Stats (`MTItems`): `maxDamage 250_000`, `radiation 32`, `MOX=true`, `heatBonus=2`, **`heat 4_096`**; energy per
+  size: `ENERGY_SINGLE 9_000_000`, `ENERGY_DUAL 4_500_000`, `ENERGY_QUAD 3_000_000`. MTReactor:
+  `output += pulses * sEnergy`, `EU/t = output * 5 * balance/energy/generator/nuclear`
+  (`MTReactor#getEuPerOutput()`; GTNH's `config/IC2.ini` ships 5.0 → 25 EU/t per output point, as in
+  `TileEntityNuclearReactorElectric#getOfferedEnergy()` and GT5U's NEI nuclear fake recipe). Lone rod:
+  `1 + cells / 2` pulses per `cells` pass → `EU/t = sEnergy * cells * (1 + cells / 2) * 25` = **single 225,000,000 /
+  dual 450,000,000 / quad 900,000,000 EU/t** (exact 1x/2x/4x, single = 6.7A UIV) = the NEI fake-recipe number. Heat
+  per cycle `cells * triangular(1 + cells / 2) * sHeat` → 4,096 / 24,576 / 98,304 HU/s bare; ~2.8 h on one
+  `ItemList.neutroniumHeatCapacitor` (1G Neutronium Heat Capacitor, 1,000,000,000 HU).
+* `MTReactorAccessHatch.isFuelRod` widened to `ItemReactorUranium || (ItemRadioactiveCell && !ItemDepletedCell)` →
+  GT rods get the fuel durability line in the slot sub-panel.
 
 ## 15. MTReactor heat control hatch (`MTReactorHeatHatch`)
 
-* `com.MessTech.common.machine.hatch.MTReactorHeatHatch extends MTEHatch` — no inventory (0 slots, like
-  `MTEHatchMuffler`), tier EV..UIV, front decal
-  `assets/messtech/textures/blocks/hatch/Hatch_Reactor_Temp_Control.png` (base texture = multiblock casing,
-  same `updateTexture(aBaseCasingIndex)` + `withOverlay` pattern as `MTReactorAccessHatch`).
-* Heat ceilings (`HEAT_CAPACITY`, index `tier - MIN_TIER`): EV 10,000 / IV 20,000 / LuV 50,000 / ZPM 100,000 /
-  UV 200,000 / UHV 500,000 / UEV 1,000,000 / **UIV `MTReactorHeatSystem.MAX_HEAT_CAPACITY` = 50,000,000**. EV equals
-  the old hardcoded default. `MTReactor.getReactorHeatCapacity()` clamps what it finds to the same cap.
-* **Why the UIV ceiling is finite:** the heat effects compare `heat / maxHeat` against the 40 / 50 / 70 / 85 / 100%
-  thresholds, and with `Integer.MAX_VALUE` (2.1e9) no amount of heat a reactor can hold drives that ratio anywhere
-  near them — a UIV heat hatch silently switched the whole risk model off. 50,000,000 is far above anything one 9x6
-  page can produce (IC2's largest heat storage item is well under 100,000) while keeping every threshold reachable,
-  and `MTReactorHeatSystem.getEffectiveMaxHeat()` clamps `ceiling + plating bonus` to it as well.
-* Structure: registered as another custom `IHatchElement` (`MTReactor.REACTOR_HEAT_HATCH`, `name() =
+* `com.MessTech.common.machine.hatch.MTReactorHeatHatch extends MTEHatch`: 0 slots (as `MTEHatchMuffler`), tier
+  EV..UIV, decal `assets/messtech/textures/blocks/hatch/Hatch_Reactor_Temp_Control.png` (base = multiblock casing,
+  `updateTexture(aBaseCasingIndex)` + `withOverlay`, as `MTReactorAccessHatch`).
+* Ceilings (`HEAT_CAPACITY`, index `tier - MIN_TIER`): EV 10,000 / IV 20,000 / LuV 50,000 / ZPM 100,000 / UV
+  200,000 / UHV 500,000 / UEV 1,000,000 / **UIV `MTReactorHeatSystem.MAX_HEAT_CAPACITY` = 50,000,000**; EV = the old
+  hardcoded default.
+* **UIV finite**: `heat / maxHeat` must reach the 40 / 50 / 70 / 85 / 100% thresholds and `Integer.MAX_VALUE`
+  (2.1e9) never does (risk model silently off); 50,000,000 exceeds one 9x6 page (IC2's largest heat storage item is
+  well under 100,000) yet keeps every threshold reachable; `MTReactorHeatSystem.getEffectiveMaxHeat()` clamps
+  `ceiling + plating bonus` too.
+* Structure: custom `IHatchElement` (`MTReactor.REACTOR_HEAT_HATCH`, `name() =
   "mt_reactor_heat_hatch"`, `count()` = `getReactorHeatHatchCount()`) and added to the `'K'`
-  `HatchElementBuilder.atLeast(...)` group next to the I/O buses and the hot coolant output, so it can go on any of
-  the 0-25 casings of the shell (the `'C'` group holds the access hatches, the input hatch and the coolant input).
-  `checkMachine()` requires **exactly one**: empty → `missing_heat_hatch`, `size() > 1` → `too_many_heat_hatch`
-  (both are our own lang keys; a duplicate hatch cannot be resolved by picking one, so it is a structure error).
-* **The heat hatch tier also caps the access hatch tier** (`MTReactor.checkAccessHatchTier()`, structure error
-  `machine.mtreactor.structure.error.access_hatch_tier`): an access hatch above `getHeatControlTier()` invalidates the
-  structure, so one hatch cannot buy pages per hatch without also buying the heat headroom for them. The check lives
-  in the controller and not in the hatches because a hatch only carries data — which is also why the data stick
-  replays settings across tiers without validating them (see `docs/knowledge.md`).
-* The hatch sets the heat ceiling of the reactor: `MTReactor.getReactorHeatCapacity()` returns the (lowest)
-  hatch value or `DEFAULT_HEAT_CAPACITY = 10,000` while the structure is broken, and `getHeatControlTier()` returns
-  the (highest) hatch tier — it drives the passive cooling rate and the access hatch tier limit.
-  `ReactorContext.bind()` / `bindSimulation()` seed `maxHeat` with it, and **reactor plating stacks again, IC2
-  style**: `ReactorContext.setMaxHeat()` resolves IC2's `setMaxHeat(getMaxHeat() + maxHeatAdd)` into
-  `MTReactorHeatSystem.setPageMaxHeat()`, which records the bonus **per page** (`pageBonus`, keyed like the heat
-  store): a 9x6 page is an independent reactor grid, so a page full of platings must not raise the ceiling of one
-  without any. Within a page the largest `maxHeatAdd` wins, so the result does not depend on the component layout, and
-  `getPageMaxHeat(owner, page)` is the hatch ceiling plus that page's own bonus, bounded per item by
-  `MAX_HEAT_BONUS_PER_ITEM` (100,000) and overall by `MAX_HEAT_CAPACITY`. `resetPageBonus()` runs before that page's
-  heat pass, so a removed plating stops contributing immediately. The call used to be a no-op, which left plating as a
-  pure downside (higher heat effect modifier, unchanged ceiling, bigger explosion).
-* **Changing the hatch rescales the stored heat instead of detonating the reactor.**
-  `MTReactorHeatSystem.onCapacityChanged()` multiplies every page's heat by `new ceiling / old ceiling` and clears the
-  running meltdown countdowns. With the old plain `heat / maxHeat` check a reactor holding 900,000 HU under a UHV
-  hatch detonated on the first cycle after that hatch was replaced by an EV one.
-* **`Integer.MAX_VALUE` as the sentinel** (the lesson from the `mPageMaxHeat` era): `getReactorHeatCapacity()`
-  searches for the lowest hatch value starting from `Integer.MAX_VALUE`, so the "no hatch at all" case is tracked with
-  a separate `boolean found` flag. The UIV ceiling is finite now, but the flag is what keeps that starter value from
-  being mistaken for a real ceiling.
-* Heat math is still `power = heat / maxHeat` per page, but the consequences changed: `>= 1.0F` no longer explodes on
-  the spot — the page arms a **meltdown countdown** — and `>= 0.85F` still ignites the surroundings. The world effects
-  (0.85 ignite air / 0.7 irradiate entities / 0.5 evaporate water / 0.4 ignite wood) run **once per cycle** on the
-  hottest page's ratio and that page's heat effect modifier, not once per page, so an N-page reactor no longer
-  irradiates the same entity N times. Which page detonates is still decided per page.
-* **Meltdown countdown, 600 ticks (30 s)** — `MTReactorHeatSystem.MELTDOWN_COUNTDOWN_TICKS`, armed by
-  `armCountdown()` with an absolute game-tick deadline `now + 600`. `MTReactor.armCountdowns()` runs at the end of
-  every material cycle, keeps the deadline of a page that is still at or over its ceiling (pinning the heat there
-  cannot postpone the explosion) and `clearCountdown()` drops a page that came back under it. The deadline is absolute
-  because a page is only visited once per cycle: counting "20 ticks per visit" stretched the grace window to
-  30 s x page count, i.e. no grace at all on a large reactor. `explodeExpiredCountdowns()` is checked every tick in
-  `MTReactor.onPostTick()`, so the page detonates 600 ticks after it first crossed the ceiling, with the machine
-  switched on or off (the heat cycle runs either way); `resetCountdown()` cancels everything on a player action
+  `HatchElementBuilder.atLeast(...)` group (I/O buses, hot coolant output) → any of the 0-25 shell casings (`'C'`
+  group = access hatches, input hatch, coolant input). `checkMachine()`: **exactly one** - empty →
+  `missing_heat_hatch`, `size() > 1` → `too_many_heat_hatch` (our lang keys; a duplicate cannot be resolved by
+  picking one → structure error).
+* **Heat hatch tier caps the access hatch tier** (`MTReactor.checkAccessHatchTier()`, structure error
+  `machine.mtreactor.structure.error.access_hatch_tier`): an access hatch above `getHeatControlTier()` invalidates
+  the structure → pages cost heat headroom. Check in the controller: a hatch only carries data, hence the data stick
+  replays settings across tiers unvalidated (`docs/knowledge.md`).
+* Ceiling: `MTReactor.getReactorHeatCapacity()` = (lowest) hatch value, `DEFAULT_HEAT_CAPACITY = 10,000` while
+  broken, clamped to `MAX_HEAT_CAPACITY`; `getHeatControlTier()` = (highest) hatch tier → passive cooling + access
+  hatch limit. `ReactorContext.bind()` / `bindSimulation()` seed `maxHeat`. **Plating stacks IC2-style**:
+  `ReactorContext.setMaxHeat()` resolves IC2's `setMaxHeat(getMaxHeat() + maxHeatAdd)` into
+  `MTReactorHeatSystem.setPageMaxHeat()`, bonus **per page** (`pageBonus`, keyed like the heat store) - a 9x6 page
+  is an independent reactor grid. Largest `maxHeatAdd` wins per page (layout independent);
+  `getPageMaxHeat(owner, page)` = hatch ceiling + page bonus, `MAX_HEAT_BONUS_PER_ITEM` (100,000) per item,
+  `MAX_HEAT_CAPACITY` overall; `resetPageBonus()` before the page's heat pass → a removed plating stops counting at
+  once. Was a no-op → plating was a pure downside (higher heat effect modifier, unchanged ceiling, bigger
+  explosion).
+* **Hatch change rescales heat, never detonates**: `MTReactorHeatSystem.onCapacityChanged()` scales every page by
+  `new ceiling / old ceiling` and clears running countdowns; with the old plain `heat / maxHeat` check 900,000 HU on
+  a UHV hatch detonated one cycle after switching to EV.
+* **`Integer.MAX_VALUE` sentinel** (the `mPageMaxHeat` era): `getReactorHeatCapacity()` scans from
+  `Integer.MAX_VALUE` for the lowest hatch value → "no hatch" needs a separate `boolean found` flag, so the starter
+  value cannot read as a ceiling.
+* Heat math still `power = heat / maxHeat` per page, but `>= 1.0F` no longer explodes on the spot (the page arms a
+  **meltdown countdown**) and `>= 0.85F` still ignites the surroundings. World effects (0.85 ignite air / 0.7
+  irradiate entities / 0.5 evaporate water / 0.4 ignite wood) run **once per cycle** on the hottest page's ratio and
+  modifier, not per page → an N-page reactor no longer irradiates an entity N times; detonation stays per page.
+* **Meltdown countdown, 600 ticks (30 s)** (`MTReactorHeatSystem.MELTDOWN_COUNTDOWN_TICKS`): `armCountdown()` sets
+  the absolute deadline `now + 600`; `MTReactor.armCountdowns()` runs at every material cycle's end, keeps a still
+  at/over-ceiling page's deadline (pinning heat cannot postpone the explosion), `clearCountdown()` drops a page back
+  under. Absolute because a page is visited once per cycle - "20 ticks per visit" stretched the window to 30 s x
+  page count. `explodeExpiredCountdowns()` runs every tick in `MTReactor.onPostTick()` → detonation 600 ticks after
+  first crossing, machine on or off (the heat cycle runs either way); `resetCountdown()` cancels on a player action
   (hatch change, fluid mode toggle).
-* **The countdown survives a reload** — as its *remaining* ticks, never as an absolute deadline, because the machine's
-  tick counter is not persisted: `saveNBTData()` writes `mtReactorArmedCountdowns` (`{x, y, z, page, ticks}`),
-  `MTReactor.loadNBTData()` hands its own counter over with `setLoadClock(getTimer())` before the store reads them, and
-  `refreshCountdownClock()` re-anchors every restored deadline onto the running counter. The meltdown therefore resumes
-  exactly where it stopped after a chunk unload or a server restart, it only ticks down while the chunk is loaded, and
-  a reload can neither extend nor shorten the 30 s window (the restored `ticks` is clamped to [1, 600], and an
-  already-expired entry is not saved at all). A backwards jump of the counter is treated as a reset: every deadline is
-  re-expressed by the window it had left.
+* **Countdown survives reload** as *remaining* ticks, never an absolute deadline (the tick counter is not
+  persisted): `saveNBTData()` writes `mtReactorArmedCountdowns` (`{x, y, z, page, ticks}`),
+  `MTReactor.loadNBTData()` hands its counter over with `setLoadClock(getTimer())` before the store reads,
+  `refreshCountdownClock()` re-anchors every deadline onto the running counter. Resumes where it stopped after a
+  chunk unload or restart, ticks only while loaded, cannot extend or shorten the 30 s window (restored `ticks`
+  clamped to [1, 600]; expired entries unsaved). A backwards counter jump = reset: every deadline re-expressed by
+  the window it had left.
 * **Passive cooling per hatch tier** (`MTReactorHeatSystem.PASSIVE_COOLING_PER_SECOND`, index `tier - MIN_TIER`,
   EV..UIV): 83 / 167 / 417 / 833 / 1,667 / 4,167 / 8,333 / 200,000 HU/s. The seven real tiers are exactly
-  `round(ceiling / 120)`, i.e. one full ceiling per 2400 ticks (two minutes) — slow enough that the hatch cannot
-  out-cool a running reactor, fast enough that shutting the machine down is a real way to save it. The UIV entry is
-  deliberately decoupled from that rule: `ceiling / 120` would be 416,667 HU/s, faster than the reactor can produce
-  heat, while 200,000 HU/s drains the whole 50,000,000 in 250 s. The rate is applied per tick as a fraction
-  (`rate / 20`, accumulated in `coolingProgress`; truncating it made every tier below ZPM cool at the same 4 HU/tick)
-  and only to pages carrying at least 5% of the hottest page's heat (`PASSIVE_COOLING_SHARE_THRESHOLD`), halved while
-  a countdown is running. `MTReactorHeatSystem.tick()` is called from `MTReactor.onPostTick()` every tick, so it works
-  while the machine is switched off too — the only way to cool a hot reactor back down.
-* **Fluid ("wet") mode** — toggled on the controller with a screwdriver (`onScrewdriverRightClick`, chat keys
-  `machine.mtreactor.fluidmode.on` / `.off`), which also clears a running countdown. The controller then requires a
-  `MTReactorCoolantInputHatch` and a `MTReactorHotCoolantOutputHatch` (`ExtraShutdownReason.MISS_COOLANT_HATCH`
-  soft-stop, not a structure error). The exchange is `MTReactorHeatSystem.coolantForHeat()`:
-  `COOLANT_PER_BUFFER_UNIT = 1`, i.e. **1 mB of `ic2coolant` per 1 HU of buffered component heat**, and the same
-  amount of `ic2hotcoolant` leaves. That is MessTech's own ratio, not IC2's: IC2 converts through `huOutputModifier`
-  (2 mB/HU by default), while 1:1 keeps the feed rate readable as "as much coolant per second as the core makes heat
-  per second". What the coolant did not absorb comes back as `getPendingEmitHeat() / 2` and is pushed onto the page
-  (IC2's `addHeat(huOutput / 2)`); dry mode has no coolant to absorb it, so the same half is pushed back instead of
-  being dropped. The two fluids come from GT's accessors — `MTReactorCoolantInputHatch.getCoolantFluid()` for the cold
-  coolant and `GTModHandler.getHotCoolant(1)` for the hot one — deliberately not `GTModHandler.getIC2Coolant(long)`,
-  which falls back to water when IC2 is absent (`GTModHandler` 212-215) and must never be drained as if it were coolant.
-* **The two IC2 fluid hooks are live** now, which is what makes the mode matter: `ReactorContext#isFluidCooled()`
-  reports the mode (`ItemReactorMOX#getFinalHeat` doubles MOX heat output above 50% heat only in wet mode) and
-  `ReactorContext#addEmitHeat()` buffers instead of dropping (`ItemReactorVent` / `ItemReactorVentSpread` send the heat
-  they removed there, so a vent's contribution is mode-dependent). Condensators, lithium cells and heat switches never
-  query either hook — checked against the IC2 compile dependency (`tmp/ic2-decompiled`, and the constant pool of
-  `tmp/ic2-242638-2353971-deobf.jar`) — so they behave identically in both modes.
-* **The heat effects never replace a block** (the IC2 code they were copied from did): the `>= 0.85F` branch only
-  places `Blocks.fire` into **air** (`isAir` check), the `Blocks.flowing_lava` replacement is gone. In IC2 that
-  branch turned any non-air block into fire or lava — GT casings use their own `MaterialCasings`, so they became
-  fire and stone/ground became lava, which ate the reactor's own casings/hatches and dissolved the multiblock.
-  Fire in an air block cannot break the structure: every structure position requires a specific non-air block and
-  the unchecked `' '` positions ignore the block. The `>= 0.5F` water removal and the `>= 0.4F` wood/leaves/cloth
-  ignition are kept (they can never touch a casing/hatch).
-* Explosion power is **IC2's number remapped onto the Draconic Evolution scale**: `explodeReactor()` still mirrors
-  IC2's `explode()` (start at 10, add every component's `influenceExplosion`, multiply the `0 < influence < 1` ones
-  into `boomMod`, then `* hem * boomMod`) and clamps the result to `Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT`
-  (default 45, IC2's own `protection/reactorExplosionPowerLimit`; it used to be a hardcoded `45.0F` and IC2's ini is
-  still **not** read, no IC2 dependency/mixin — the option only exists so a pack can change the number), but the
-  blast itself is now `MTExplosionDE`:
+  `round(ceiling / 120)` = one ceiling per 2400 ticks (two minutes): too slow to out-cool a running reactor, fast
+  enough that shutting down saves it. UIV decoupled on purpose: `ceiling / 120` would be 416,667 HU/s (faster than
+  the reactor makes heat), while 200,000 HU/s drains 50,000,000 in 250 s. Per tick as a fraction (`rate / 20`,
+  accumulated in `coolingProgress`; truncation made every tier below ZPM cool at the same 4 HU/tick), only for pages
+  carrying at least 5% of the hottest page's heat (`PASSIVE_COOLING_SHARE_THRESHOLD`), halved during a countdown.
+  `MTReactorHeatSystem.tick()` runs from `MTReactor.onPostTick()` every tick → works with the machine off (the only
+  way to cool a hot reactor down).
+* **Fluid ("wet") mode**: screwdriver toggle (`onScrewdriverRightClick`, chat keys `machine.mtreactor.fluidmode.on` /
+  `.off`), clears a running countdown; then requires `MTReactorCoolantInputHatch` + `MTReactorHotCoolantOutputHatch`
+  (`ExtraShutdownReason.MISS_COOLANT_HATCH` soft-stop, not a structure error). Exchange
+  `MTReactorHeatSystem.coolantForHeat()`: `COOLANT_PER_BUFFER_UNIT = 1` → **1 mB of `ic2coolant` per 1 HU of
+  buffered component heat**, same amount of `ic2hotcoolant` out. MessTech's ratio, not IC2's (`huOutputModifier`,
+  2 mB/HU default): 1:1 reads "as much coolant per second as the core makes heat per second". Unabsorbed heat
+  returns as `getPendingEmitHeat() / 2` onto the page (IC2's `addHeat(huOutput / 2)`); dry mode has no coolant, so
+  the same half is pushed back instead of dropped. Fluids from GT accessors
+  `MTReactorCoolantInputHatch.getCoolantFluid()` (cold), `GTModHandler.getHotCoolant(1)` (hot) - never
+  `GTModHandler.getIC2Coolant(long)`, which falls back to water without IC2 (`GTModHandler` 212-215).
+* **Both IC2 fluid hooks are live** (what makes the mode matter): `ReactorContext#isFluidCooled()` reports the mode
+  (`ItemReactorMOX#getFinalHeat` doubles MOX heat output above 50% heat only in wet mode);
+  `ReactorContext#addEmitHeat()` buffers instead of dropping (`ItemReactorVent` / `ItemReactorVentSpread` send removed
+  heat there → a vent's contribution is mode-dependent). Condensators, lithium cells and heat switches query neither
+  hook (checked against `tmp/ic2-decompiled`, constant pool of `tmp/ic2-242638-2353971-deobf.jar`) → identical in
+  both modes.
+* **Heat effects never replace a block** (the IC2 original did): `>= 0.85F` only places `Blocks.fire` into **air**
+  (`isAir`); the `Blocks.flowing_lava` replacement is gone. IC2 turned any non-air block into fire or lava - GT
+  casings use `MaterialCasings`, so casings became fire and stone/ground lava, dissolving the multiblock. Fire in
+  air cannot break the structure: every position needs a specific non-air block, unchecked `' '` positions ignore
+  it. `>= 0.5F` water removal and `>= 0.4F` wood/leaves/cloth ignition stay (never touch a casing/hatch).
+* Explosion power = **IC2's number remapped onto the Draconic Evolution scale**: `explodeReactor()` mirrors IC2's
+  `explode()` (start at 10, add each component's `influenceExplosion`, multiply the `0 < influence < 1` ones into
+  `boomMod`, then `* hem * boomMod`), clamps to `Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT` (default 45, IC2's
+  `protection/reactorExplosionPowerLimit`; was a hardcoded `45.0F`; IC2's ini still **not** read - no IC2
+  dependency/mixin, the option only lets a pack change it), and the blast is `MTExplosionDE`:
   `dePower = min(boomPower, ic2Limit) / ic2Limit * Config.REACTOR_EXPLOSION_DE_POWER_LIMIT` (default 40, `Reactor`
-  category, limit floored at 1 so the division cannot blow up).
-  `explodeMultiblock()` + `doExplosion(GTValues.V[8])` on the access hatches still remove the machine itself first.
-* `explodeReactor()` clears the heat of every page **on purpose** (comment in the source): the controller tile entity
-  and with it the heat store survive the `explodeMultiblock()` call for the rest of the tick, so a hot store would be
-  left behind on a dead machine. Before that it settles the EU/t the cycle had accumulated (`mPendingOutput`), so the
-  page that melted down does not also cost the player the output the whole reactor produced that cycle.
-* **Why IC2's `ExplosionIC2` was dropped** (it looked like a "powerless" explosion in game): IC2 shoots
-  `2 * steps^2` rays with `steps = ceil(pi / atan(0.4 / power))`, i.e. ~250k rays at power 45 but ~**25 million** at
-  power 450, each ray stepping through the blocks until its energy runs out (up to 900 blocks in air). The whole
-  destruction list is only written back *after* every ray finished, so a 450 power IC2 explosion freezes the server
-  for minutes and effectively removes nothing — the only blocks the player sees vanishing are the small
-  `doExplosion(V[8])` craters from the controller/hatches. DE's algorithm scales instead: one ring per tick, one
-  column per ring block.
-* `MTExplosionDE` / `MTExplosionDETrace` are a 1:1 port of Draconic Evolution's `ReactorExplosion` /
-  `ReactorExplosionTrace` (+ its `IProcess` / `ProcessHandler`, kept as `IMTProcess` / `MTProcessHandler` and ticked
-  on `TickEvent.ServerTickEvent`): the ring expands to `power * 10` blocks of radius, every ring block spawns a
-  column trace that blasts its column downwards (`energy = power * 10`, resisted per block, fire/lava puddles at the
-  end) and then upwards (`energy = power * 20`), damaging every entity it passes with `power * 100` of the
-  `damage.messtech.reactorExplode` damage source (armour bypassing, creative allowed). The port hard caps the power
-  at `MTExplosionDE.MAX_POWER = 40` — twice DE's own full reactor (2..20), one power unit being ~10 blocks of
-  radius, so the worst meltdown vaporises a 400 block radius. Cost notice: 40 power is ~500k columns and therefore
-  tens of millions of block updates spread over 400 ticks; lower `REACTOR_EXPLOSION_DE_POWER_LIMIT` if that is too
-  heavy for the server.
-* **Never cache the ceiling.** It used to live in a per-page `int[] mPageMaxHeat` that was only written during a
-  reactor cycle / stability simulation of a non-empty page and was also persisted to NBT. Consequences: an empty,
-  idle or freshly built reactor kept showing the old 10,000, and old saves reloaded the stale array. The array is
-  gone; `MTReactor.getHottestPageMaxHeat()` reads `getReactorHeatCapacity()` live (used by the GUI sync value,
-  Waila, the scanner info and the heat percentage), so replacing the hatch is visible immediately.
-* **The output has an extra `× 2` on purpose** (`MTReactor.MESSTECH_OUTPUT_MULTIPLIER`): `getEuPerOutput()` is
-  `IC2_EU_PER_OUTPUT * ConfigUtil.getFloat(MainConfig.get(), "balance/energy/generator/nuclear") * 2` (with a
-  `* 2 * 5` fallback when IC2's config is unavailable), so one output point is worth 50 EU/t with GTNH's
-  `nuclear = 5.0` instead of IC2's 25. It is a deliberate MessTech balance decision (the source names the constant and
-  points at this section), not a config value and not a bug: do not "fix" it back to IC2's number.
-* Registration: `MTItemList.MTReactorHeatHatch_EV..UIV`, IDs `MT_ID + 24 .. + 31` (32424..32431), built in
-  `MTMachineLoader` exactly like the access hatches. MTEs self-register in the `CommonMetaTileEntity(int, ...)`
-  constructor, so the ID must be unused (it throws otherwise) — the access hatches occupy `MT_ID + 16 .. + 23`.
-  Both loops now iterate the shared arrays `MTItemList.REACTOR_ACCESS_HATCHES` / `REACTOR_HEAT_HATCHES`, which
-  `GTRecipes.addReactorRecipes()` also uses so the recipe order cannot drift from the registration order.
-* Fluid hatch pair registration: `MTItemList.MTReactorCoolantInputHatch` at `MT_ID + 32` (32432) and
-  `MTItemList.MTReactorHotCoolantOutputHatch` at `MT_ID + 35` (32435) — `MT_ID + 33` / `+ 34` were already taken by
-  `MTChemicalTwister` / `MTHugeChemicalReactor`, so the pair is split around them. One variant each at EV by design
-  (plumbing, not a tier gate: `MTReactorCoolantInputHatch.TIER = 4`, whose `8000 * 2^4 = 128,000 mB` tank holds twice
-  what one cycle can ask for), built in `MTMachineLoader` outside the tier loops and listed in
-  `MTItemList.REACTOR_FLUID_HATCHES`.
+  category, floored at 1). `explodeMultiblock()` + `doExplosion(GTValues.V[8])` on the access hatches remove the
+  machine first; then every page's heat is cleared **on purpose** (the controller TE + heat store outlive
+  `explodeMultiblock()` for the rest of the tick), after settling the cycle's EU/t (`mPendingOutput`) so a
+  melted-down page does not cost the reactor's whole output.
+* **IC2's `ExplosionIC2` dropped** ("powerless" in game): IC2 shoots `2 * steps^2` rays with
+  `steps = ceil(pi / atan(0.4 / power))` - ~250k at power 45, ~**25 million** at 450 - each stepping through blocks
+  until its energy runs out (up to 900 in air) and writing the destruction list only *after* every ray finished →
+  power 450 freezes the server for minutes and removes nothing; only the small `doExplosion(V[8])` craters vanish.
+  DE scales instead: one ring per tick, one column per ring block.
+* `MTExplosionDE` / `MTExplosionDETrace` = 1:1 port of Draconic Evolution's `ReactorExplosion` /
+  `ReactorExplosionTrace` (+ its `IProcess` / `ProcessHandler` kept as `IMTProcess` / `MTProcessHandler`, ticked on
+  `TickEvent.ServerTickEvent`): ring to `power * 10` blocks of radius, each ring block spawning a column trace that
+  blasts downwards (`energy = power * 10`, resisted per block, fire/lava puddles at the end) then upwards
+  (`energy = power * 20`), damaging each entity passed with `power * 100` of `damage.messtech.reactorExplode` (armour
+  bypassing, creative allowed). Hard cap `MTExplosionDE.MAX_POWER = 40` (twice DE's own 2..20; 1 power = ~10 blocks
+  radius) → worst meltdown vaporises a 400 block radius. Cost: 40 power = ~500k columns, tens of millions of block
+  updates over 400 ticks; lower `REACTOR_EXPLOSION_DE_POWER_LIMIT` if too heavy.
+* **Never cache the ceiling**: the per-page `int[] mPageMaxHeat`, written only during a reactor cycle / stability
+  simulation of a non-empty page and persisted to NBT, left an empty, idle or fresh reactor showing the old 10,000
+  and old saves reloading the stale array. Gone; `MTReactor.getHottestPageMaxHeat()` reads
+  `getReactorHeatCapacity()` live (GUI sync value, Waila, scanner info, heat percentage) → a hatch swap shows
+  immediately.
+* **Extra `× 2` on purpose** (`MTReactor.MESSTECH_OUTPUT_MULTIPLIER`): `getEuPerOutput()` =
+  `IC2_EU_PER_OUTPUT * ConfigUtil.getFloat(MainConfig.get(), "balance/energy/generator/nuclear") * 2` (fallback
+  `* 2 * 5` without IC2's config) → 50 EU/t per output point at GTNH's `nuclear = 5.0`, not IC2's 25. Deliberate
+  balance decision (the source names the constant and points here), not config and not a bug - do not "fix" it back.
+* Registration: `MTItemList.MTReactorHeatHatch_EV..UIV`, IDs `MT_ID + 24 .. + 31` (32424..32431), in
+  `MTMachineLoader` like the access hatches. MTEs self-register in the `CommonMetaTileEntity(int, ...)` constructor
+  → the ID must be unused (throws otherwise); access hatches hold `MT_ID + 16 .. + 23`. Both loops iterate the
+  shared arrays `MTItemList.REACTOR_ACCESS_HATCHES` / `REACTOR_HEAT_HATCHES`, which
+  `GTRecipes.addReactorRecipes()` also uses → recipe order cannot drift from registration order.
+* Fluid hatch pair: `MTItemList.MTReactorCoolantInputHatch` at `MT_ID + 32` (32432),
+  `MTItemList.MTReactorHotCoolantOutputHatch` at `MT_ID + 35` (32435) - `MT_ID + 33` / `+ 34` taken by
+  `MTChemicalTwister` / `MTHugeChemicalReactor`, so the pair is split around them. One EV variant each by design
+  (plumbing, not a tier gate: `MTReactorCoolantInputHatch.TIER = 4`, whose `8000 * 2^4 = 128,000 mB` tank holds
+  twice what one cycle asks), outside the tier loops, listed in `MTItemList.REACTOR_FLUID_HATCHES`.
 
 ## 16. Reactor recipes (`GTRecipes.addReactorRecipes()`)
 
-* Tier helpers: `ItemList.MACHINE_CASINGS[tier]` gives the tier machine casing (index 9 = UHV, GT calls it
-  `Casing_MAX`); `OrePrefixes.circuit.get(Materials.<TIER>)` gives the tier circuit, the same mapping
-  `GTModHandler.addMachineCraftingRecipe` uses (tier 4 → `Materials.EV`, ..., tier 11 → `Materials.UIV`).
-  `TIER_RECIPE_EU[]` / `TIER_CIRCUIT_MATERIALS[]` in `GTRecipes` hold both tables.
+* Tier helpers: `ItemList.MACHINE_CASINGS[tier]` = machine casing (index 9 = UHV, GT's `Casing_MAX`);
+  `OrePrefixes.circuit.get(Materials.<TIER>)` = tier circuit, the `GTModHandler.addMachineCraftingRecipe` mapping
+  (tier 4 → `Materials.EV`, ..., tier 11 → `Materials.UIV`); `TIER_RECIPE_EU[]` / `TIER_CIRCUIT_MATERIALS[]` in
+  `GTRecipes` hold both tables.
 * Access hatch (assembler, `TierEU.RECIPE_<TIER>`, 2 min, circuit 1): tier casing + lever + 4 tier circuits.
-* Heat control hatch (assembler, same EU/t and time, circuit 2): tier casing + 4 solid steel casings
+* Heat control hatch (assembler, same EU/t + time, circuit 2): tier casing + 4 solid steel casings
   (`ItemList.Casing_SolidSteel`, "脱氧钢机械方块") + 4 tier circuits.
-* Coolant hatch pair (assembler, EV casing + 2 solid steel casings + 2 EV tier circuits, circuit 3, 2 min,
-  `TIER_RECIPE_EU[MTReactorCoolantInputHatch.TIER]`): the loop over `MTItemList.REACTOR_FLUID_HATCHES` builds the
-  identical recipe for the cold coolant input and the hot coolant output, so neither end of the loop is gated behind
-  the more expensive one. Deliberately cheaper than the heat control hatch — they are plumbing, and the coolant they
-  consume is the real cost.
-* Reactor controller (assembler, `RECIPE_EV`, 2 min, circuit 1): 16 solid steel casings + 16
-  `Ic2Items.nuclearReactor` + 64 `Ic2Items.reactorChamber` + 144×256 molten lead (36864 L). Use
-  `GTUtility.copyAmount(...)` on the IC2 static stacks — they are singletons and the recipe builder must not
-  mutate them (and `copyAmount` clamps at 64, use `copyAmountUnsafe` for bigger stacks).
+* Coolant pair (assembler, EV casing + 2 solid steel casings + 2 EV tier circuits, circuit 3, 2 min,
+  `TIER_RECIPE_EU[MTReactorCoolantInputHatch.TIER]`): the `MTItemList.REACTOR_FLUID_HATCHES` loop builds the
+  identical recipe for cold input and hot output, so neither end is gated; cheaper than the heat control hatch on
+  purpose - plumbing, the coolant is the real cost.
+* Reactor controller (assembler, `RECIPE_EV`, 2 min, circuit 1): 16 solid steel casings + 16 `Ic2Items.nuclearReactor`
+  + 64 `Ic2Items.reactorChamber` + 144×256 molten lead (36864 L). `GTUtility.copyAmount(...)` on the IC2 static
+  stacks (singletons, must not be mutated; `copyAmount` clamps at 64, use `copyAmountUnsafe` above).
 * Fuel rods (mirrors `FissionFuelLoader`: single = canner, dual/quad = assembler):
-  * single: The Core (`ItemList.RodNaquadah32`) + Avaritia Star Fuel (`getModItem(Avaritia, "Resource", 1, 8)`,
-    meta 8 in Avaritia 1.97/1.99) → canner, `RECIPE_UEV`, 32 s, guarded by `Mods.Avaritia.isModLoaded()`.
+  * single: The Core (`ItemList.RodNaquadah32`) + Avaritia Star Fuel (`getModItem(Avaritia, "Resource", 1, 8)`, meta
+    8 in Avaritia 1.97/1.99) → canner, `RECIPE_UEV`, 32 s, guarded by `Mods.Avaritia.isModLoaded()`.
   * dual: 2 single rods + 4 `stick` Transcendent Metal, circuit 2, UIV assembler, 100 s.
-  * quad: 4 single rods + 6 `stickLong`, circuit 4, UIV assembler, 100 s; alternative 2 dual rods + 2
-    `stickLong`, UIV assembler, 50 s.
-  * "NC 编程电路 N" just means GT's programmed circuit with config N → `.circuit(N)` (N = the "not consumed"
-    number shown in NEI).
-* Depleted rod recycling (`addDepletedRodRecycling`, `centrifugeRecipes`, `RECIPE_UIV`, 50/100/200 s) copies GT's
-  own depleted naquadah rod recycling chances (100/50/50/25/100/100 %) and scales the amounts by the rod size
-  (single 1x / dual 2x / quad 4x): Transcendent Metal dust 4/8/16, Naquadah dust 8/16/32 (100 %) plus the same
-  amount again at 50 %, Naquadria dustSmall 4/8/16 (50 %), NaquadahEnriched dustTiny 8/16/32 (25 %),
-  TungstenSteel dust 16/32/64 and Platinum dust 2/4/8.
+  * quad: 4 single rods + 6 `stickLong`, circuit 4, UIV assembler, 100 s; alt 2 dual rods + 2 `stickLong`, UIV
+    assembler, 50 s.
+  * "NC 编程电路 N" = GT's programmed circuit with config N → `.circuit(N)` (N = the "not consumed" number in NEI).
+* Depleted rod recycling (`addDepletedRodRecycling`, `centrifugeRecipes`, `RECIPE_UIV`, 50/100/200 s) copies GT's own
+  depleted naquadah rod chances (100/50/50/25/100/100 %) scaled by rod size (single 1x / dual 2x / quad 4x): Transcendent
+  Metal dust 4/8/16, Naquadah dust 8/16/32 (100 %) plus the same again at 50 %, Naquadria dustSmall 4/8/16 (50 %),
+  NaquadahEnriched dustTiny 8/16/32 (25 %), TungstenSteel dust 16/32/64, Platinum dust 2/4/8.
 
 ## 17. Beamline / particle hatch API (GT5U 5.09.54.133)
 
-Used as the reference for MessTech's wireless beamline hatches (`docs/knowledge.md`).
+Reference for MessTech's wireless beamline hatches (`docs/knowledge.md`).
 
-* Classes: `gtnhlanth.common.hatch.MTEHatchBeamlineConnector` (abstract, extends `MTEHatch`, holds the public
-  `BeamLinePacket dataPacket`, ticks `moveAround` at `tectech.util.CommonValues.MOVE_AT` = `tick % 20 == 4`,
-  reports the beam through `getInfoData()`), `MTEHatchInputBeamline` (`setContents(BeamLinePacket)`, impl.
-  `ISmartInputHatch`, `newMetaEntity` returns **`MetaTileEntity`**, `getDescription()` returns `null`) and
-  `MTEHatchOutputBeamline` (`moveAround` walks up to 128 beamline pipes in a straight line and calls
-  `setContents` on the first input hatch, then clears its packet; `newMetaEntity` returns `IMetaTileEntity`).
-* Filtered variant: `gregtech.common.tileentities.machines.multi.beamcrafting.MTEHatchAdvancedOutputBeamline`
-  extends the output hatch, is `@IMetaTileEntity.SkipGenerateDescription`, tier 8, and keeps
-  `Map<Particle, Boolean> acceptedInputMap` (+ `getParticleList()`/`getParticleMap()`/`setAcceptedInputMap`).
-  The LHC/beam splitter fill it via `MTEBeamMultiBase.addAdvancedBeamlineOutputHatch(...)` (which calls
-  `setInitialParticleList(LHCModule.<force>.acceptedParticles)`) and read it back before pushing a packet.
-  Its ModularUI (`gregtech.common.gui.modularui.hatch.MTEHatchAdvancedOutputBeamlineGui`) edits the map through
-  GenericMap/List sync handlers, so a subclass only needs to inherit `buildUI`.
-* Data: `BeamInformation` (`float energy` keV, `int rate` = flux, `int particleId`, `float focus`) and
-  `BeamLinePacket extends tectech.mechanics.dataTransport.DataPacket<BeamInformation>` (NBT round-trip ready).
-  `BeamInformation` validates the particle id; `Particle.VALUES[id]` is the enum table.
-* Machines push the beam by assigning `hatch.dataPacket = new BeamLinePacket(...)` (e.g. `MTESourceChamber`,
-  `MTESynchrotron`, `MTELINAC`, `MTEBeamStabilizer`, `MTEBeamSplitter`, `MTELargeHadronCollider`) and read inputs
-  with `mInputBeamline.get(n).dataPacket`. `MTEBeamMultiBase` keeps `mInputBeamline` / `mOutputBeamline` /
-  `mAdvancedOutputBeamline` and clears them in `clearHatches()`.
-* Hatch slots are `instanceof` based (`addBeamLineInputHatch` / `addBeamLineOutputHatch` /
-  `addAdvancedBeamlineOutputHatch`), and `BeamHatchElement.BeamlineInput/Output` match on `mteClasses()`, so a
-  subclass is accepted by every beam structure without touching GT5U. `.hatchId(<MetaTileEntityIDs id>)` feeds
-  `couldBeValid` and the autoplace item filter (both item-damage based), so it does *not* affect the structure
-  check but it does make the hologram flag a placed add-on hatch as an error and prevents auto-placing it.
-* The wired output hatch's `moveAround` walks its straight line and calls `setContents` on any
-  `MTEHatchInputBeamline` it meets **without checking `canConnect`** (`MTEHatchOutputBeamline.java:97-99`), so an
-  add-on input hatch has to reject foreign packets itself if it wants to stay channel-pure.
+* `gtnhlanth.common.hatch.MTEHatchBeamlineConnector` (abstract, extends `MTEHatch`, public
+  `BeamLinePacket dataPacket`, ticks `moveAround` at `tectech.util.CommonValues.MOVE_AT` = `tick % 20 == 4`, reports
+  via `getInfoData()`), `MTEHatchInputBeamline` (`setContents(BeamLinePacket)`, impl. `ISmartInputHatch`,
+  `newMetaEntity` returns **`MetaTileEntity`**, `getDescription()` returns `null`), `MTEHatchOutputBeamline`
+  (`moveAround` walks up to 128 beamline pipes straight, calls `setContents` on the first input hatch, clears its
+  packet; `newMetaEntity` returns `IMetaTileEntity`).
+* Filtered: `gregtech.common.tileentities.machines.multi.beamcrafting.MTEHatchAdvancedOutputBeamline` (extends the
+  output hatch, `@IMetaTileEntity.SkipGenerateDescription`, tier 8) keeps `Map<Particle, Boolean> acceptedInputMap`
+  (+ `getParticleList()`/`getParticleMap()`/`setAcceptedInputMap`); the LHC/beam splitter fill it via
+  `MTEBeamMultiBase.addAdvancedBeamlineOutputHatch(...)` (calls
+  `setInitialParticleList(LHCModule.<force>.acceptedParticles)`) and read it back before pushing. Its ModularUI
+  (`gregtech.common.gui.modularui.hatch.MTEHatchAdvancedOutputBeamlineGui`) edits the map through GenericMap/List
+  sync handlers → a subclass only inherits `buildUI`.
+* Data: `BeamInformation` (`float energy` keV, `int rate` = flux, `int particleId`, `float focus`);
+  `BeamLinePacket extends tectech.mechanics.dataTransport.DataPacket<BeamInformation>` (NBT round-trip ready);
+  `BeamInformation` validates the particle id, `Particle.VALUES[id]` is the enum table.
+* Machines push via `hatch.dataPacket = new BeamLinePacket(...)` (`MTESourceChamber`, `MTESynchrotron`, `MTELINAC`,
+  `MTEBeamStabilizer`, `MTEBeamSplitter`, `MTELargeHadronCollider`), read inputs with
+  `mInputBeamline.get(n).dataPacket`; `MTEBeamMultiBase` keeps `mInputBeamline` / `mOutputBeamline` /
+  `mAdvancedOutputBeamline`, clears them in `clearHatches()`.
+* Hatch slots `instanceof`-based (`addBeamLineInputHatch` / `addBeamLineOutputHatch` /
+  `addAdvancedBeamlineOutputHatch`); `BeamHatchElement.BeamlineInput/Output` match on `mteClasses()` → a subclass is
+  accepted by every beam structure without touching GT5U. `.hatchId(<MetaTileEntityIDs id>)` feeds `couldBeValid`
+  and the autoplace item filter (both item-damage based): no effect on the structure check, but the hologram flags a
+  placed add-on hatch as an error and blocks auto-placing.
+* The wired output hatch calls `setContents` on any `MTEHatchInputBeamline` it meets **without checking
+  `canConnect`** (`MTEHatchOutputBeamline.java:97-99`) → an add-on input hatch must reject foreign packets itself to
+  stay channel-pure.
 * The wired output hatch overwrites `canConnect` per side (`isOutputFacing`); the input hatch allows pipes only on
-  its input face. Both are tier 6 (LuV) hatches, registered as `HATCH_BEAMLINE_INPUT/OUTPUT` and
-  `HATCH_ADVANCED_BEAMLINE_OUTPUT` in `MetaTileEntityIDs`; names come from `gt.blockmachines.hatch.beamlineinput`
-  (束流输入仓), `...beamlineoutput` (束流输出仓) and `...hatch.advancedbeamlineoutput` (过滤式束流输出仓).
-* `MTEHatchBeamlineConnector.getDescription()` contains an "Must be painted to work" line, but colour is only
-  used for the texture modulation (`Dyes.getModulation`) - the wired pipe path ignores it entirely. Colour is
-  therefore free to be used as a channel key by addons (which is what MessTech does).
+  its input face. Both tier 6 (LuV), registered as `HATCH_BEAMLINE_INPUT/OUTPUT` and
+  `HATCH_ADVANCED_BEAMLINE_OUTPUT` in `MetaTileEntityIDs`; names from `gt.blockmachines.hatch.beamlineinput`
+  (束流输入仓), `...beamlineoutput` (束流输出仓), `...hatch.advancedbeamlineoutput` (过滤式束流输出仓).
+* `MTEHatchBeamlineConnector.getDescription()` has a "Must be painted to work" line, but colour only modulates the
+  texture (`Dyes.getModulation`) - the wired pipe path ignores it → colour is free as an addon channel key (what
+  MessTech does).
 * `IMetaTileEntity.SkipGenerateDescription` (not inherited by subclasses, `ItemMachines.addDescription` /
-  `registerDescription`): without it, `getDescription()` is dumped once into `GregTech.lang` at client setup and
-  read back from there, so per-instance text ends up frozen.
+  `registerDescription`): without it `getDescription()` is dumped once into `GregTech.lang` at client setup and read
+  back → per-instance text ends up frozen.

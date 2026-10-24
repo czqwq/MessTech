@@ -27,9 +27,8 @@ import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponen
 /**
  * Wireless NAC Vacuum Conveyor Output.
  * <p>
- * Extends the normal GT5U output hatch so existing NAC module structure code still recognises it as a
- * VCO. Instead of using coloured pipes, it pairs with wireless input hatches that share the same
- * frequency and privacy scope, including across NACs/dimensions.
+ * Extends the GT5U output hatch so existing NAC module structure code still sees a VCO, but pairs with wireless input
+ * hatches of the same frequency and privacy scope instead of coloured pipes, across NACs and dimensions.
  */
 public class MTWirelessVacuumConveyorOutput extends MTEHatchVacuumConveyorOutput implements IWirelessVacuumConveyor {
 
@@ -76,12 +75,12 @@ public class MTWirelessVacuumConveyorOutput extends MTEHatchVacuumConveyorOutput
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         if (aBaseMetaTileEntity.isServerSide()) {
-            // Re-register every tick so hatches that existed before the wireless registry was added
-            // still get picked up without needing to be broken and replaced.
+            // Re-register every tick so hatches that predate the wireless registry are picked up without being
+            // broken and replaced.
             WirelessVacuumConveyorUtil.register(this);
 
-            // Extra output-push fallback. Original logic is input-pull, but this ensures a lone output
-            // can still deliver its packet even if the matching input's movement tick is not running.
+            // Extra output-push fallback: the original logic is input-pull, this lets a lone output deliver its
+            // packet even when the matching input's movement tick is not running.
             if (aTick % 20 == VACUUM_MOVE_TICK && contents != null) {
                 List<MTEHatchVacuumConveyorInput> inputs = WirelessVacuumConveyorUtil.findMatchingInputs(this);
                 if (inputs.size() == 1) {

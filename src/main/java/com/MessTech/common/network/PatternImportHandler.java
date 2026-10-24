@@ -22,25 +22,28 @@ import gregtech.api.util.GTUtility;
 import io.netty.buffer.ByteBuf;
 
 /**
- * Client to server half of this mod's NEI import into the Ultimate Pattern Terminal.
- * <p>
- * NEI runs on the client and the grid lives in the part, so the cells the overlay computed travel over as one
- * compound: {@code in} and {@code out} are maps of cell index to ItemStack. Every cell is written by
- * {@link #writeCell(ItemStack)} and read back by {@link #readCell(NBTTagCompound)}, never by plain
- * {@code ItemStack#writeToNBT}/{@code loadItemStackFromNBT}: see {@link #COUNT_KEY}.
+ * Client to server half of the NEI import into the Ultimate Pattern Terminal: NEI runs on the client and the grid lives
+ * in
+ * the part, so the overlay's cells travel as one compound - {@code in} and {@code out} map cell index to ItemStack.
+ * Cells go
+ * through {@link #writeCell}/{@link #readCell}, never plain {@code ItemStack#writeToNBT}/{@code loadItemStackFromNBT}:
+ * see
+ * {@link #COUNT_KEY}.
  */
 public class PatternImportHandler extends ServerboundPacket {
 
     /**
-     * NBT key holding a cell's item count.
+     * NBT key holding a cell's real item count.
      * <p>
-     * 1.7.10 writes {@code ItemStack}'s count into the tag <em>byte</em> {@code Count} and reads it back as a byte,
-     * so any count outside -128..127 survives the round trip as a different number: 1024 and 4096 both come back as
-     * 0, 1025 and 4097 as 1. The Nano-Scale Foundry "24" pool needs exactly those amounts - its flattened Planck
-     * chain asks for 1024 Optical Fiber Cables and 4096 ASoC RAMs <em>in a single input cell</em> - and an imported
-     * cell whose count collapsed to 0 is a stack AE shows without a count and encodes into the pattern as
-     * {@code Cnt: 0}, so the material is effectively lost. Each cell therefore carries its real count again under
-     * this long tag, which is the same fix NotEnoughEnergistics applies to its own pattern transfer.
+     * 1.7.10 writes {@code ItemStack}'s count as tag <em>byte</em> {@code Count} and reads it back as a byte, so any
+     * count
+     * outside -128..127 comes back different (1024 and 4096 as 0, 1025 and 4097 as 1). The Nano-Scale Foundry "24" pool
+     * needs exactly those: its flattened Planck chain asks for 1024 Optical Fiber Cables and 4096 ASoC RAMs <em>in a
+     * single
+     * input cell</em>, and a cell collapsed to 0 is a stack AE shows without a count and encodes as {@code Cnt: 0},
+     * losing
+     * the material - so each cell carries its real count under this long tag, the same fix NotEnoughEnergistics
+     * applies.
      */
     public static final String COUNT_KEY = "MTCount";
 
@@ -55,10 +58,10 @@ public class PatternImportHandler extends ServerboundPacket {
     }
 
     /**
-     * Writes one grid cell: the stack as vanilla NBT plus its real count under {@link #COUNT_KEY}.
-     * <p>
-     * GT hands NEI fluid inputs over as {@code ItemList.Display_Fluid} display stacks whose NBT carries the amount,
-     * so their count is the display stack's own 1 and the amount survives untouched in that tag.
+     * Writes one grid cell: the stack as vanilla NBT plus its real count under {@link #COUNT_KEY}. GT's NEI fluid
+     * inputs are
+     * {@code ItemList.Display_Fluid} display stacks carrying the amount in their NBT, so their count stays the stack's
+     * own 1.
      */
     public static NBTTagCompound writeCell(ItemStack stack) {
         final NBTTagCompound cell = stack.writeToNBT(new NBTTagCompound());
@@ -67,9 +70,9 @@ public class PatternImportHandler extends ServerboundPacket {
     }
 
     /**
-     * Reads one grid cell back. A cell without {@link #COUNT_KEY} - only a payload from another build of this mod -
-     * keeps whatever vanilla read, and a count that arrives as zero or negative (the vanilla byte mangled it) settles
-     * on one, because a zero-count cell is not a stack that can be encoded at all.
+     * Reads one grid cell back. A cell without {@link #COUNT_KEY} (a payload from another build) keeps whatever vanilla
+     * read,
+     * and a count of zero or below (the vanilla byte mangled it) settles on one - a zero-count cell cannot be encoded.
      */
     public static ItemStack readCell(NBTTagCompound cell) {
         final ItemStack stack = ItemStack.loadItemStackFromNBT(cell);
@@ -103,16 +106,16 @@ public class PatternImportHandler extends ServerboundPacket {
     }
 
     /**
-     * Fills the terminal's grid from the compound. The compound holds two maps of cell index to stack - {@code in}
-     * for the inputs and {@code out} for the expected outputs. GT5U hands NEI fluid inputs over as
-     * {@code ItemList.Display_Fluid} stacks, which are turned back into real fluids here.
+     * Fills the terminal's grid from the compound: two maps of cell index to stack, {@code in} for the inputs and
+     * {@code out} for the expected outputs. GT5U's {@code ItemList.Display_Fluid} stacks become real fluids here.
      */
     private static void writeIntoGrid(ContainerPatternTerm container, NBTTagCompound cells) {
         // A pool page is a machine recipe, so it can only become a processing pattern. While AE's container is in
-        // crafting mode it mirrors the first nine cells into its crafting matrix on every later
-        // detectAndSendChanges() (ContainerPatternTerm#copyToMatrix), which clamps those cells to one and clears them
-        // if they are not items: an import must not lose its amounts to that. NotEnoughEnergistics switches the mode
-        // the same way before it writes its own transfer.
+        // crafting
+        // mode it mirrors the first nine cells into its crafting matrix on every later detectAndSendChanges()
+        // (ContainerPatternTerm#copyToMatrix), clamping those to one and clearing non-items - an import must not lose
+        // its
+        // amounts to that. NotEnoughEnergistics switches the mode the same way before writing its own transfer.
         if (container.isCraftingMode()) {
             container.setCraftingMode(false);
         }

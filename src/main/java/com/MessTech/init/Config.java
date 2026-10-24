@@ -14,124 +14,108 @@ public class Config {
     public static final String GAME_CONSOLE = "GameConsole";
     public static final String DEBUG = "Debug";
     public static boolean DEFAULT_BATCH_MODE = true;
-    /**
-     * Client-side look only: while a Transcendent Metal piggy is worn in the helmet slot, the whole player model
-     * tumbles with it (see {@code MTPiggyHatRenderer}). Purely visual, so the value that counts is the one in the
-     * config of the client doing the rendering.
-     */
+    /** Client-side look only, purely visual: see {@code MTPiggyHatRenderer}. */
     public static boolean PIGGY_TUMBLES_WEARER = true;
     /**
-     * Upper bound of the MTReactor meltdown in Draconic Evolution explosion power units (see
-     * {@code MTExplosionDE}) - Draconic Evolution's own reactor explodes with 2..20 and this port keeps twice the
-     * original value. One power unit is roughly ten blocks of radius, so 40 vaporises everything within 400 blocks.
-     * {@code MTExplosionDE.MAX_POWER} hard caps the same value, so raising it past 40 has no effect.
+     * Client-side: the text effect shaders (see {@code TextEffectRenderer} and {@code docs/text-fx/}). Off renders
+     * every
+     * effect-decorated span as plain text in its first palette colour, so the markers never show up as characters.
+     */
+    public static boolean TEXT_EFFECTS = true;
+    /**
+     * Upper bound of the MTReactor meltdown in DE power units (see {@code MTExplosionDE}): 40 = 400 blocks of radius,
+     * and
+     * {@code MTExplosionDE.MAX_POWER} caps it, so raising it past 40 does nothing.
      */
     public static float REACTOR_EXPLOSION_DE_POWER_LIMIT = 40.0F;
     /**
-     * IC2's own {@code protection/reactorExplosionPowerLimit} (its default is 45): the raw reactor explosion power the
-     * MTReactor computes is clamped to this value before it is mapped onto the Draconic Evolution power scale of
-     * {@link #REACTOR_EXPLOSION_DE_POWER_LIMIT}. Kept as a MessTech config option instead of reading IC2's ini, so a
-     * pack can change it without an IC2 dependency - see {@code MTReactor#explodeReactor()}.
+     * IC2's {@code protection/reactorExplosionPowerLimit} (default 45), clamped before the
+     * {@link #REACTOR_EXPLOSION_DE_POWER_LIMIT} scale applies. A config option instead of IC2's ini, so a pack needs no
+     * IC2 dependency - see {@code MTReactor#explodeReactor()}.
      */
     public static float REACTOR_IC2_EXPLOSION_POWER_LIMIT = 45.0F;
     /**
-     * Server-side: a player climbing past the altitude a Galacticraft rocket leaves the atmosphere at (1200, or the
-     * dimension's own {@code IExitHeight}) at 256 blocks per second or more is shown Galacticraft's celestial
-     * selection screen, pinned to tier 0 so Earth is the only destination on offer (see
-     * {@code MTGalacticraftSpaceHandler}).
+     * Server-side, see {@code MTGalacticraftSpaceHandler}: 1200, or the dimension's own {@code IExitHeight}, at 256
+     * blocks/s or more.
      */
     public static boolean GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI = true;
     /**
-     * Server-side ceiling of vanilla's "moved too quickly!" check, in the units the check itself uses: the squared
-     * per-tick distance it compares against, where the vanilla 100.0 means 10 blocks per tick in a single axis (and
-     * Forge's build of the method takes the largest of the reported movement and the entity's own motion per axis).
-     * Only used to <em>raise</em> the limit - 100.0 or anything below it leaves vanilla alone.
+     * Server-side ceiling of vanilla's "moved too quickly!" check, in squared per-tick distance (Forge's build takes
+     * the
+     * largest of the reported movement and the entity's own motion per axis). Only ever <em>raises</em> the limit.
      * <p>
-     * The default is sized for the launch the Galacticraft hook exists for. 50 TNT at the player's feet leaves the
-     * ground at {@code 50 * 0.7975 = 39.875} blocks/tick, i.e. 1590.016 squared, and that peak on the first flying
-     * tick is the largest value the check ever sees - speed only decays from there, down to the ~13.4 blocks/tick the
-     * flight still has when it crosses the rocket altitude at y=1200. 2000.0 therefore clears the 1590 the launch
-     * needs with roughly 26% of headroom, which is about 44.7 blocks/tick or a ~56 TNT pile. See
+     * Sized for the Galacticraft hook's launch: 50 TNT at the player's feet leaves the ground at
+     * {@code 50 * 0.7975 = 39.875} blocks/tick = 1590.016 squared, the peak the check ever sees (speed only decays
+     * after
+     * that, to ~13.4 blocks/tick at y=1200); 2000.0 clears it with ~26% headroom, ~44.7 blocks/tick or a ~56 TNT pile -
+     * see
      * {@code MixinNetHandlerPlayServer_MovedTooQuickly}.
      */
     public static double MOVED_TOO_QUICKLY_THRESHOLD = 2000.0D;
     /**
-     * Server-side: whether the Voidstar Piercer's arrow destroys the blocks on its flight path when it hits
-     * something (see {@code MTExplosionTunnel}). With it off the arrow is still straight, still trails and still
-     * hits like a vanilla arrow, it just stops at the wall instead of blowing a tunnel through it - the switch for a
-     * server that wants the weapon without the block damage.
+     * Server-side, see {@code MTExplosionTunnel}. Off: the arrow still flies straight and still trails, it just stops
+     * at the wall.
      */
     public static boolean VOIDSTAR_BOW_BREAKS_BLOCKS = true;
     /**
-     * Server-side: whether the Voidstar Piercer's arrow also kills every living thing inside its tunnel. The kill
-     * goes through {@code MTBowKill}, the bow's branch of the {@code MTKillBase} true kill ladder, so it reaches a
-     * target through armour, shields, entity level invulnerability and "second life" items - the same death a direct
-     * hit deals. The shooter is never caught by it (the tunnel starts inside their own body, and the branch refuses
-     * them as well). With it off the tunnel is blocks only, and nothing inside it dies.
+     * Server-side. The kill is {@code MTBowKill}, the {@code MTKillBase} ladder's bow branch: the death a direct hit
+     * deals,
+     * through armour, shields, entity level invulnerability and "second life" items. The shooter is never caught - the
+     * tunnel
+     * starts inside their own body and the branch refuses them too.
      */
     public static boolean VOIDSTAR_BOW_ANNIHILATES_LIVING = true;
     /**
-     * Server-side: whether letting go of the Voidstar Piercer heals the archer back to full health. It is a real
-     * heal of the difference between the maximum and the current health, so the game's heal path runs (the Forge
-     * heal event, healing effects) and the archer can never be pushed past their own maximum; a shot that does not
-     * happen - a draw too weak to fire, no arrow in the inventory - heals nothing.
+     * Server-side. A real heal of the maximum-minus-current difference, so the game's heal path runs (Forge heal event,
+     * healing effects) and the archer never ends above their own maximum; a shot that does not happen heals nothing.
      */
     public static boolean VOIDSTAR_BOW_HEALS_SHOOTER = true;
     /**
-     * Server-side: power of the explosion the Voidstar Piercer's DE mode fires (see {@code MTExplosionDE}, and
-     * {@link com.MessTech.common.explosion.MTExplosionDE#MAX_POWER} for the scale). One power unit is ten blocks of
-     * blast radius, and ten points of energy per column trace, spent against each block's own explosion resistance
-     * (stone is 10) - so the default 20 is the same blast a Draconic Evolution reactor makes when it melts down at
-     * full fuel: DE's own formula is {@code 2 + fuelFraction * 18}, i.e. 2 for an empty reactor and 20 for a full
-     * one. That is a 200 block radius: about 20 stone blocks of depth downwards per the same scale and twice that
-     * upwards, and a fireball that grows to 200 blocks over 12 seconds. It is a server-wide event - lower it, or set
-     * it to 2 for the weakest DE reactor, if that is more than the server wants.
+     * Server-side, for the bow's DE mode (see {@code MTExplosionDE} and
+     * {@link com.MessTech.common.explosion.MTExplosionDE#MAX_POWER}). One unit = ten blocks of blast radius and ten
+     * energy
+     * points per column trace, spent against each block's explosion resistance (stone 10), so 20 is the full-fuel DE
+     * reactor blast ({@code 2 + fuelFraction * 18}): a 200 block radius, ~20 stone blocks of depth downwards and twice
+     * that upwards, with a fireball growing to 200 blocks over 12 s. Server-wide event.
      */
     public static float VOIDSTAR_BOW_DE_POWER = 20.0F;
     /**
-     * Server-side: radius of that tunnel in blocks, measured from the line the arrow flew to the centre of a block,
-     * so 0.5 leaves the single column of blocks the line passes through, 1.5 a three by three hole (its corners sit
-     * at 1.41), 2.5 a five by five one and the default 6.0 a thirteen by thirteen one. The same radius decides which
-     * living things the tunnel catches.
+     * Server-side: radius of that tunnel in blocks, so 1.5 leaves a three by three hole (its corners sit at 1.41); the
+     * same
+     * radius decides which living things it catches.
      */
     public static float VOIDSTAR_BOW_TUNNEL_RADIUS = 6.0F;
     /**
-     * Server-side: how long the tunnel may be in blocks. The far end of a longer flight keeps its tunnel and the
-     * near end is dropped, so one arrow can never walk the whole render distance; see {@code MTExplosionTunnel}.
+     * Server-side: max tunnel length in blocks. A longer flight keeps the far end and drops the near one, so one arrow
+     * cannot walk the render distance - see {@code MTExplosionTunnel}.
      */
     public static double VOIDSTAR_BOW_TUNNEL_LENGTH = 128.0D;
     /**
-     * How long the Voidstar Piercer takes to reach a full draw, in ticks (20 ticks to the second), i.e. how long
-     * {@code MTItemVoidstarBow} eases its speed up and how long {@code MTMagicCircleRenderer} takes to unfold the
-     * magic circle. The default 80 is the four seconds the charge effect was designed around - the pack it was
-     * copied from spreads its own unfold over the same four seconds.
-     * <p>
-     * The bow's pull frames and the magic circle follow this value. One pose does not: vanilla's first person bow
-     * pose ramps over twenty ticks in {@code ItemRenderer}, line 466 ({@code f11 = f10 / 20.0F}) - that is a
-     * hardcoded constant of the client renderer, so a draw longer than twenty ticks finishes its arm movement first
-     * and keeps charging after it.
+     * Ticks to a full draw (20/s): how long {@code MTItemVoidstarBow} eases its speed up and
+     * {@code MTMagicCircleRenderer}
+     * takes to unfold; 80 = 4 s. Vanilla's first person bow pose ignores it - it ramps over twenty ticks in
+     * {@code ItemRenderer}, line 466 ({@code f11 = f10 / 20.0F}) - so the arm stops before the charge does.
      */
     public static int VOIDSTAR_BOW_DRAW_TICKS = 80;
 
     /**
-     * Client-side: the folder the game console (游戏机) keeps everything in. Relative paths are
-     * resolved against Minecraft's own {@code config} folder, so the default lands at
-     * {@code config/messtech/gameconsole}. This is where the IWAD is looked for, where the engine's
-     * own {@code mochadoom.cfg} and savegames go, and where a Freedoom download is unpacked.
+     * Client-side: the console's folder (游戏机), a relative path resolved against Minecraft's {@code config} folder.
+     * Holds
+     * the IWAD, the engine's {@code mochadoom.cfg} and savegames, and the Freedoom download.
      */
     public static String GAME_CONSOLE_DIR = "messtech/gameconsole";
 
     /**
-     * Client-side: an explicit IWAD to run, e.g. {@code DOOM.WAD} or {@code freedoom2.wad}. Empty
-     * (the default) means "use any IWAD found in {@link #GAME_CONSOLE_DIR}", which is what almost
-     * everyone wants.
+     * Client-side: an explicit IWAD to run ({@code DOOM.WAD}, {@code freedoom2.wad}, ...); empty means any IWAD found
+     * in
+     * {@link #GAME_CONSOLE_DIR}.
      */
     public static String GAME_CONSOLE_WAD = "";
 
     /**
-     * Client-side: whether the console may fetch Freedoom Phase 1 from its GitHub release when the
-     * folder holds no IWAD at all. Freedoom is free (a BSD-licensed Doom) and is the only WAD that
-     * may legally be downloaded for the player; nothing commercial is ever fetched or shipped.
+     * Client-side: fill a missing IWAD with Freedoom Phase 1 - free (BSD-licensed) and the only Doom WAD that may
+     * legally be
+     * downloaded, so nothing commercial is ever fetched or shipped.
      */
     public static boolean GAME_CONSOLE_DOWNLOAD_FREEDOOM = true;
 
@@ -139,39 +123,36 @@ public class Config {
     public static String GAME_CONSOLE_FREEDOOM_URL = "https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip";
 
     /**
-     * Client-side: how much of the screen's width the console's window takes, keeping DOOM's
-     * 320x200 shape. The default 0.5 is the "half a screen" the item was asked for; the window is
-     * also capped at 90% of the screen's height so it always fits.
+     * Client-side: the window's width as a fraction of the screen's, keeping DOOM's 320x200 shape; also capped at 90%
+     * of the
+     * screen height so it always fits.
      */
     public static float GAME_CONSOLE_SCREEN_FRACTION = 0.5F;
 
     /**
-     * Client-side: how many threads the engine's true-colour post-processing may use. DOOM renders
-     * at 320x200, which one core manages comfortably; the engine default would be every core in
-     * the machine, competing with Minecraft's own renderer.
+     * Client-side: threads the engine's true-colour post-processing may use. 320x200 needs one; the engine default is
+     * every
+     * core, competing with Minecraft's renderer.
      */
     public static int GAME_CONSOLE_THREADS = 2;
 
     /**
-     * Client-side: whether the game console plays DOOM's sound effects. These go through
-     * {@code javax.sound} (Mocha Doom's own mixer), not Minecraft's OpenAL - the two live side by
-     * side on the same sound card - so the engine's volume is what controls them. Off only if the
-     * extra audio device is a problem; the console starts and runs fine without it.
+     * Client-side: DOOM's sound effects, through {@code javax.sound} (Mocha Doom's own mixer), not Minecraft's OpenAL -
+     * the
+     * engine's volume controls them; the console runs fine without it.
      */
     public static boolean GAME_CONSOLE_SOUND = true;
 
     /**
-     * Client-side: whether the console also plays DOOM's music. DOOM's songs are FM music written
-     * for the OPL2 chip and the WAD carries the matching patch table, so the console emulates that
-     * chip in Java and mixes the result into the same output as the sound effects: nothing to
-     * install, no extra audio device, and no JVM flags on any Java version.
+     * Client-side: DOOM's music, an emulated OPL2 chip (the WAD's own patch table) mixed into the sound effects' output
+     * -
+     * nothing to install, no extra audio device, no JVM flags.
      */
     public static boolean GAME_CONSOLE_MUSIC = true;
 
     /**
-     * Client-side: whether the world freezes while the console's window is open. Off by default -
-     * a toy that stops the world would also freeze every mob and machine around the player for as
-     * long as they played.
+     * Client-side: freeze the world while the window is open; off by default so playing DOOM does not stop every mob
+     * and machine.
      */
     public static boolean GAME_CONSOLE_PAUSES_WORLD = false;
 
@@ -191,6 +172,13 @@ public class Config {
             PIGGY_TUMBLES_WEARER,
             "Client-side look only: while a Transcendent Metal piggy is worn in the helmet slot, the player model"
                 + " tumbles with it.");
+
+        TEXT_EFFECTS = configuration.getBoolean(
+            "TEXT_EFFECTS",
+            GENERAL,
+            TEXT_EFFECTS,
+            "Client-side: draw effect-decorated text with its shader (see docs/text-fx/). Off: the same spans still"
+                + " render, in the effect's first palette colour, so the markers never show up as characters.");
 
         REACTOR_EXPLOSION_DE_POWER_LIMIT = configuration.getFloat(
             "REACTOR_EXPLOSION_DE_POWER_LIMIT",
@@ -256,7 +244,7 @@ public class Config {
                 + " one and 6.0 (the default) a thirteen by thirteen one. The same radius decides which living things"
                 + " the tunnel catches, so a large value is heavy on both the world and the mobs.");
 
-        // 1.7.10's Configuration has no getDouble overload, so this goes through get(...) and reads the Property.
+        // 1.7.10's Configuration has no getDouble overload: go through get(...) and read the Property.
         VOIDSTAR_BOW_TUNNEL_LENGTH = configuration
             .get(
                 VOIDSTAR_BOW,
@@ -357,7 +345,7 @@ public class Config {
 
         // endregion
 
-        // 1.7.10's Configuration has no getDouble overload, so this goes through get(...) and reads the Property.
+        // 1.7.10's Configuration has no getDouble overload: go through get(...) and read the Property.
         MOVED_TOO_QUICKLY_THRESHOLD = configuration
             .get(
                 GENERAL,

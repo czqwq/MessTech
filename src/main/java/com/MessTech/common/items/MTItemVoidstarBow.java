@@ -30,68 +30,50 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * The Voidstar Piercer (混沌终焉·虚无贯星弓): a bow whose arrows fly dead straight and blast a tunnel through
- * everything on the line they flew - the blocks are destroyed and everything alive inside it is killed for good by
- * {@link MTBowKill}, the bow's branch of the true kill ladder. Letting go also heals the archer back to full.
+ * The Voidstar Piercer (混沌终焉·虚无贯星弓): dead-straight arrows that blast a tunnel through everything on the
+ * line - blocks destroyed, everything alive killed for good by {@link MTBowKill} (the bow's branch of the true kill
+ * ladder).
  * <p>
- * It is a {@link ItemBow} and keeps every part of the vanilla bow's behaviour that is not its projectile: the
- * minimum draw that fires at all, the arrow (and the Infinity enchantment that replaces it), the Power, Punch and
- * Flame enchantments, the durability and the enchantment table. What it changes:
+ * Beyond vanilla's {@link ItemBow} behaviour:
  * <ul>
- * <li>{@link #onPlayerStoppedUsing} launches an {@link MTEntityVoidstarArrow} instead of a vanilla
- * {@code EntityArrow}.</li>
- * <li><b>Its draw is longer than vanilla's.</b> A full draw takes {@link Config#VOIDSTAR_BOW_DRAW_TICKS} ticks,
- * four seconds by default, and vanilla's speed curve is stretched over that instead of over twenty ticks. The
- * minimum draw that fires at all moves with it (the same curve, so the same fifth of the draw, about 0.7 seconds).
- * The magic circle unfolds over exactly this time.</li>
- * <li>Its magic circle is not this class's business either: {@code MTMagicCircleRenderer} draws it in world space
- * while the bow is drawn (it reads the same use state this item sets up).</li>
- * <li><b>Letting go heals the archer</b> back to full health ({@link Config#VOIDSTAR_BOW_HEALS_SHOOTER}), on the
- * server, in the same branch that spawns the arrow - so a shot that never happens (a draw too weak to fire, no arrow
- * in the inventory) heals nothing. Everything the arrow kills dies through {@link MTBowKill} instead, the bow's
- * branch of the true kill ladder, so no kill of this weapon depends on that heal any more.</li>
- * <li>Its icons are three frame strips: {@code bow/voidstarBow_standby} and {@code _pulling_0/1/2}, each 16 frames
- * of an animated, enchanted void-metal bow with a shimmer travelling through the art (see the {@code .mcmeta} next
- * to each PNG).</li>
- * <li>It always carries the enchantment glint ({@link #hasEffect}), because the bow "is" enchanted: the glint is
- * the moving half of the enchantment look vanilla draws over an enchanted item, and the frame strips are the
- * other.</li>
- * <li>Its name wears the {@code STARFIELD} tooltip animation, registered in {@code ClientProxy.preInit} with
- * {@link com.MessTech.common.util.MTAnimatedTooltipHandler#addItemNameAnimation}. That registration has to use
- * {@code OreDictionary.WILDCARD_VALUE} as the stack's damage: the damage of a damageable stack is its durability
- * damage, and {@code ItemStackMap} keys on it, so a registration at damage 0 stops matching the bow the moment it
- * is fired once.</li>
+ * <li><b>Longer draw:</b> {@link Config#VOIDSTAR_BOW_DRAW_TICKS} ticks (four seconds by default) with vanilla's speed
+ * curve stretched over it instead of twenty ticks, the draw minimum moving with it (same curve, same fifth, about
+ * 0.7 s). {@code MTMagicCircleRenderer} unfolds the circle over exactly that time, in world space, from this item's
+ * use state.</li>
+ * <li><b>Release heals the archer</b> to full ({@link Config#VOIDSTAR_BOW_HEALS_SHOOTER}), server side, in the arrow
+ * branch - a shot that never happens (draw too weak, no arrow) heals nothing; kills use {@link MTBowKill}.</li>
+ * <li>Always glinting ({@link #hasEffect}); the name wears the {@code magnetar} text effect: its lang entry carries the
+ * inline {@code §{mg}} marker (see {@code docs/text-fx/}), so every place the font draws the name gets the field-line
+ * shader - no tooltip handler involved.</li>
  * </ul>
- * The pull icons have to come from {@link #getIcon(ItemStack, int, EntityPlayer, ItemStack, int)}: the icon of the
- * bow a player is drawing is picked by {@code EntityPlayer#getItemIcon}, and that method only knows vanilla's own
- * bow by identity ({@code itemStackIn.getItem() == Items.bow}) before it hands over to Forge's player sensitive
- * icon hook. A subclass of {@code ItemBow} is therefore never asked for an icon by the vanilla branch, and the
- * hook is the one place the draw can be seen.
+ * Icons are three 16-frame strips ({@code bow/voidstarBow_standby}, {@code _pulling_0/1/2}), an animated enchanted
+ * void-metal bow with a shimmer travelling through the art (see the {@code .mcmeta}). The pull icons must come from
+ * {@link #getIcon(ItemStack, int, EntityPlayer, ItemStack, int)}: {@code EntityPlayer#getItemIcon} hardcodes vanilla's
+ * bow identity ({@code itemStackIn.getItem() == Items.bow}), so only Forge's player sensitive hook sees a
+ * {@code ItemBow} subclass' draw.
  */
 public class MTItemVoidstarBow extends ItemBow {
 
     /** Icon path of the frame strips, relative to {@code textures/items} (no {@code items/} prefix). */
     public static final String TEXTURE_BASE = "bow/voidstarBow";
 
-    /** Pull frame strips: {@code _pulling_0} is the first pixel of the draw, {@code _pulling_2} a full one. */
+    /** Pull frames: {@code _pulling_0} is the first pixel of the draw, {@code _pulling_2} a full one. */
     private static final int PULL_FRAMES = 3;
 
     /** Durability: 1,024 shots, i.e. under three stacks of arrows. */
     public static final int MAX_DAMAGE = 1024;
 
     /**
-     * Draw of the pull frames, as fractions of a full draw ({@link Config#VOIDSTAR_BOW_DRAW_TICKS}): vanilla's own
-     * bow switches at 18 and 13 of its 20 ticks, i.e. at 90% and 65% of the draw, and the same two fractions are kept
-     * here so the frames are spread over whatever draw the config asks for instead of over twenty ticks.
+     * Pull-frame cut-offs as fractions of a full draw ({@link Config#VOIDSTAR_BOW_DRAW_TICKS}): vanilla switches at 18
+     * and 13 of its 20 ticks, i.e. 90% and 65%, kept here so the frames spread over whatever draw the config asks for.
      */
     private static final float PULL_FULL_FRACTION = 0.90F, PULL_MID_FRACTION = 0.65F;
 
-    /** Icons, indexed as {@code [standby, pulling_0, pulling_1, pulling_2]}. */
     private final IIcon[] icons = new IIcon[1 + PULL_FRAMES];
 
     /**
-     * NBT key of the sub-mode of a bow, and the modes themselves. The mode belongs to the stack, not to the player:
-     * two bows in one inventory can be in different modes, and the mode survives a relog like any other NBT.
+     * NBT key of the sub-mode, and the modes. The mode belongs to the stack, not the player: two bows in one inventory
+     * can differ, and it survives a relog like any other NBT.
      */
     public static final String MODE_TAG = "MTVoidstarMode";
 
@@ -101,13 +83,10 @@ public class MTItemVoidstarBow extends ItemBow {
     /** DE: one reactor explosion where the arrow hits, and the arrow is gone. */
     public static final int MODE_DE = 1;
 
-    /** Number of sub-modes; the switch cycles through {@code 0 .. MODE_COUNT - 1}. */
     public static final int MODE_COUNT = 2;
 
     public MTItemVoidstarBow() {
         setUnlocalizedName("messtech.voidstarBow");
-        // One bow is a weapon, not a stack of them; ItemBow's own constructor sets the same value, this is the
-        // explicit statement of the item's specification.
         setMaxStackSize(1);
         setMaxDamage(MAX_DAMAGE);
         setCreativeTab(CreativeTabs.tabCombat);
@@ -120,15 +99,13 @@ public class MTItemVoidstarBow extends ItemBow {
         for (int pull = 0; pull < PULL_FRAMES; pull++) {
             icons[1 + pull] = register.registerIcon(MTItems.TEXTURE_DOMAIN + ":" + TEXTURE_BASE + "_pulling_" + pull);
         }
-        // Vanilla's own field as well, so anything reading it directly (rather than through getIconIndex) sees the
-        // bow instead of a null icon.
+        // Vanilla's own field too, so direct readers (not via getIconIndex) see the bow, not a null icon.
         this.itemIcon = icons[0];
 
         // The magic circle and the arrow trail are drawn from this atlas too (item atlas = particle layer 2).
         MTVoidstarFx.registerIcons(register);
     }
 
-    /** The bow at rest. The pull frames are picked by the player sensitive hook below. */
     @Override
     @SideOnly(Side.CLIENT)
     public IIcon getIconIndex(ItemStack stack) {
@@ -141,12 +118,7 @@ public class MTItemVoidstarBow extends ItemBow {
         return icons[0];
     }
 
-    /**
-     * The icon of the bow while it is being drawn: Forge's player sensitive hook, which is the one
-     * {@code EntityPlayer#getItemIcon} reaches for an item that is not vanilla's own bow (see the class comment).
-     * The two cut-offs are vanilla's fractions of the draw (18 and 13 of its 20 ticks), applied to this bow's own
-     * draw length, so the three frames are spread over the whole charge however long it is.
-     */
+    /** Icon while the bow is drawn: the class comment's player sensitive hook, with vanilla's cut-offs. */
     @Override
     public IIcon getIcon(ItemStack stack, int pass, EntityPlayer player, ItemStack usingItem, int useRemaining) {
         if (usingItem != null && usingItem.getItem() == this) {
@@ -160,9 +132,8 @@ public class MTItemVoidstarBow extends ItemBow {
     }
 
     /**
-     * Vanilla's own "icon for this stage of the draw" method, which the hardcoded branch in
-     * {@code EntityPlayer#getItemIcon} calls on {@code Items.bow}. Nothing calls it for this item, but a mod that
-     * asks the same question (JEI-like previews, a renderer of its own) gets the right answer.
+     * Vanilla's "icon for this stage of the draw", which {@code EntityPlayer#getItemIcon} calls on {@code Items.bow}.
+     * Nothing calls it here, but a mod asking the same question (JEI-like previews) gets the right answer.
      */
     @Override
     @SideOnly(Side.CLIENT)
@@ -171,9 +142,9 @@ public class MTItemVoidstarBow extends ItemBow {
     }
 
     /**
-     * The bow is enchanted: vanilla draws the purple glint over an item whose {@code hasEffect} answers true, and
-     * this one always does, drawn bow or not. Enchanting it for real on top (Power, Infinity, ...) adds the
-     * enchantments themselves; the look does not change, it is already there.
+     * The bow is enchanted: vanilla draws the purple glint over an item whose {@code hasEffect} answers true, and this
+     * one always does, drawn or not, the frame strips being the moving half of that look. Real enchantments on top
+     * (Power, Infinity, ...) only add themselves; the look is already there.
      */
     @Override
     @SideOnly(Side.CLIENT)
@@ -181,28 +152,27 @@ public class MTItemVoidstarBow extends ItemBow {
         return true;
     }
 
-    /** The rarity of the tooltip name: the bow is an endgame weapon, and it reads like one when it is unenchanted. */
+    /** Tooltip name rarity: an endgame weapon, and it reads like one even unenchanted. */
     @Override
     public EnumRarity getRarity(ItemStack stack) {
         return EnumRarity.epic;
     }
 
     /**
-     * Sneaking with the bow in hand switches its sub-mode instead of drawing it, and the switch is announced in the
-     * chat. It is the same call on both sides, but only the server writes the mode - a client that wrote it would
-     * hold a mode the server does not have, and the next item sync would overwrite it anyway.
+     * Sneaking with the bow in hand switches its sub-mode and announces it in the chat. Only the server writes the
+     * mode - a client's would be overwritten by the next item sync anyway.
      * <p>
      * The sneak branch must not fall through to {@code super}: vanilla's {@code ItemBow} starts the draw right here
-     * ({@code player.setItemInUse}), and a switch that also started the draw would fire an arrow the moment the
-     * player let go of shift. Both sides return early, so neither of them begins a use.
+     * ({@code player.setItemInUse}), and a switch that also started it would fire an arrow when the player let go of
+     * shift. Both sides return early, so neither begins a use.
      */
     @Override
     public ItemStack onItemRightClick(ItemStack stack, World world, EntityPlayer player) {
         if (player.isSneaking()) {
             if (!world.isRemote) {
                 int mode = cycleMode(stack);
-                // A translation component, not a translated string: the key travels to the client and every player
-                // reads the message in their own language (the client does the translating, not the server).
+                // A translation component, not a translated string: the key travels to the client, which translates
+                // it per player.
                 player.addChatMessage(new ChatComponentTranslation(modeMessageKey(mode)));
             }
             return stack;
@@ -212,8 +182,8 @@ public class MTItemVoidstarBow extends ItemBow {
     }
 
     /**
-     * The sub-mode of a bow, from its own NBT. Anything missing or out of range reads as
-     * {@link #MODE_PIERCE} - a bow that has never been switched fires the way it did before the modes existed.
+     * The sub-mode from the bow's own NBT; anything missing or out of range reads as {@link #MODE_PIERCE}, so a bow
+     * that was never switched fires as before the modes existed.
      */
     public static int getMode(ItemStack stack) {
         if (stack == null || stack.stackTagCompound == null) return MODE_PIERCE;
@@ -222,7 +192,6 @@ public class MTItemVoidstarBow extends ItemBow {
         return mode < 0 || mode >= MODE_COUNT ? MODE_PIERCE : mode;
     }
 
-    /** Switches a bow to the given sub-mode. */
     public static void setMode(ItemStack stack, int mode) {
         if (stack == null) return;
 
@@ -232,36 +201,25 @@ public class MTItemVoidstarBow extends ItemBow {
         stack.stackTagCompound.setInteger(MODE_TAG, MathHelper.clamp_int(mode, 0, MODE_COUNT - 1));
     }
 
-    /**
-     * Switches a bow to the next sub-mode and answers which one that is.
-     *
-     * @return the new mode, i.e. {@code (old + 1) % MODE_COUNT}
-     */
     public static int cycleMode(ItemStack stack) {
         int mode = (getMode(stack) + 1) % MODE_COUNT;
         setMode(stack, mode);
         return mode;
     }
 
-    /** @return the translation key that announces a switch to this mode; see the {@code .mode.} keys of the lang. */
     public static String modeMessageKey(int mode) {
         return "messtech.voidstarBow.mode." + (mode == MODE_DE ? "de" : "pierce");
     }
 
-    /** @return the translation key of the name of a mode, as the tooltip and the switch message show it. */
     public static String modeNameKey(int mode) {
         return "messtech.voidstarBow.modeName." + (mode == MODE_DE ? "de" : "pierce");
     }
 
     /**
-     * Fires the arrow. This is vanilla's {@code ItemBow#onPlayerStoppedUsing} with two differences: the projectile
-     * is an {@link MTEntityVoidstarArrow} (created server side only - every client gets it from the spawn packet,
-     * with the muzzle position in its data watcher), and the arrow is never pickable, so it is not given back to
-     * the shooter.
-     * <p>
-     * Everything else is kept as it is, including the events: {@link ArrowLooseEvent} can still cancel the shot,
-     * the Infinity enchantment still saves the arrow, and the Power, Punch and Flame enchantments still apply to
-     * the projectile.
+     * Fire: vanilla's {@code ItemBow#onPlayerStoppedUsing} with two differences - an {@link MTEntityVoidstarArrow}
+     * (server side only; clients get it from the spawn packet, muzzle position in its data watcher), and the arrow is
+     * never pickable, so it is not given back. Everything else stays, events included: {@link ArrowLooseEvent} can
+     * still cancel the shot, Infinity still saves the arrow, Power/Punch/Flame still apply.
      */
     @Override
     public void onPlayerStoppedUsing(ItemStack stack, World world, EntityPlayer player, int useRemaining) {
@@ -281,12 +239,12 @@ public class MTItemVoidstarBow extends ItemBow {
             return;
         }
 
-        // Vanilla's curve, over this bow's own draw length instead of vanilla's twenty ticks: the speed of the
-        // arrow and the range of the tunnel both read the result. See Config#VOIDSTAR_BOW_DRAW_TICKS.
+        // Vanilla's curve over this bow's own draw length instead of twenty ticks: arrow speed and tunnel range read
+        // the result. See Config#VOIDSTAR_BOW_DRAW_TICKS.
         float draw = (float) drawn / Math.max(1, Config.VOIDSTAR_BOW_DRAW_TICKS);
         draw = (draw * draw + draw * 2.0F) / 3.0F;
 
-        // Vanilla's floor: a bow that was barely drawn does not fire at all.
+        // Vanilla's floor: a barely drawn bow does not fire at all.
         if ((double) draw < 0.1D) {
             return;
         }
@@ -317,9 +275,8 @@ public class MTItemVoidstarBow extends ItemBow {
 
             world.spawnEntityInWorld(arrow);
 
-            // The bow heals whoever draws it: letting go hands back everything the charge cost them. It is a real
-            // heal of the difference, not a health assignment, so it goes through the game's own heal path (the
-            // Forge heal event and the healing effects included) and can never push the archer over the maximum.
+            // Release hands back everything the charge cost: a real heal of the difference, not a health assignment, so
+            // it goes through the game's heal path (Forge heal event, healing effects) and never exceeds the maximum.
             if (Config.VOIDSTAR_BOW_HEALS_SHOOTER) {
                 player.heal(Math.max(0.0F, player.getMaxHealth() - player.getHealth()));
             }
@@ -334,15 +291,14 @@ public class MTItemVoidstarBow extends ItemBow {
     }
 
     /**
-     * The tooltip: what the item does, in the same shape the machine tooltips use - a bullet per mechanic, with
-     * the colours in the lang file and one line per key here. The charge line is the one formatted line, because its
-     * number is {@link Config#VOIDSTAR_BOW_DRAW_TICKS}: a tooltip that named a hardcoded four seconds would start
-     * lying the moment somebody changed the config.
+     * The tooltip: one bullet per mechanic, colours in the lang file, one line per key here. The charge line is
+     * formatted because its number is {@link Config#VOIDSTAR_BOW_DRAW_TICKS} - a hardcoded four seconds would start
+     * lying when the config changes.
      */
     @Override
     @SideOnly(Side.CLIENT)
     public void addInformation(ItemStack stack, EntityPlayer player, List<String> tooltip, boolean advanced) {
-        // The sub-mode first: which of the two weapons this bow currently is decides how every line below reads.
+        // Sub-mode first: which of the two weapons this bow is decides how every line below reads.
         tooltip.add(
             StatCollector.translateToLocalFormatted(
                 "messtech.voidstarBow.tooltip.mode",
@@ -362,8 +318,8 @@ public class MTItemVoidstarBow extends ItemBow {
     }
 
     /**
-     * The configured draw length as the tooltip shows it: whole seconds when it is a whole number of them (80 ticks
-     * reads "4"), one decimal otherwise.
+     * The configured draw length as the tooltip shows it: whole seconds when it is one (80 ticks reads "4"), one
+     * decimal otherwise.
      */
     private static String drawnSeconds() {
         int ticks = Math.max(1, Config.VOIDSTAR_BOW_DRAW_TICKS);
@@ -373,7 +329,7 @@ public class MTItemVoidstarBow extends ItemBow {
         return String.format(Locale.ROOT, "%.1f", ticks / 20.0F);
     }
 
-    /** The configured DE power as the tooltip shows it, in the same shape {@link #drawnSeconds()} uses. */
+    /** The configured DE power as the tooltip shows it, like {@link #drawnSeconds()}. */
     private static String dePowerText() {
         float power = Config.VOIDSTAR_BOW_DE_POWER;
         if (power == (float) (int) power) {

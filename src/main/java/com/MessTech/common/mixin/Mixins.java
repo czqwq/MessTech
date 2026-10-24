@@ -9,17 +9,15 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * Registry of MessTech mixins.
- * <p>
- * The late loader asks this enum which mixin classes should be applied based on the currently
- * loaded mods. This mirrors the pattern used by GTNH FMusic.
+ * Registry of MessTech mixins: the late loader asks this enum which mixin classes to apply for the loaded mods
+ * (the GTNH FMusic pattern).
  */
 @SuppressWarnings("unused")
 public enum Mixins {
 
     /**
-     * Makes Spice of Life treat every distinct mess food (i.e. every ordered ingredient list) as a
-     * separate food. The mixins are only applied when Spice of Life is present.
+     * Makes Spice of Life treat every distinct mess food (i.e. every ordered ingredient list) as a separate food.
+     * Applied only when Spice of Life is present.
      */
     SPICE_OF_LIFE_FOOD_IDENTITY(new MixinClass("MixinFoodEaten").setClass("MixinFoodEaten")
         .setPhase(Phase.LATE)
@@ -30,20 +28,23 @@ public enum Mixins {
 
     /**
      * Raises the ceiling of vanilla's "moved too quickly!" server-side speed check
-     * ({@code NetHandlerPlayServer#processPlayer}) from {@code Config.MOVED_TOO_QUICKLY_THRESHOLD}. The target is a
-     * vanilla class, so there is no mod to gate on and the mixin is always applied - values at or below vanilla's
-     * 100.0 hand the constant straight back. See {@code MixinNetHandlerPlayServer_MovedTooQuickly} for why it
-     * coexists with Hodgepodge's own mixin on the same constant instead of replacing it.
+     * ({@code NetHandlerPlayServer#processPlayer}) from {@code Config.MOVED_TOO_QUICKLY_THRESHOLD}. The target is
+     * vanilla, so there is no mod to gate on and the mixin always applies - values at or below vanilla's 100.0 hand the
+     * constant straight back. See {@code MixinNetHandlerPlayServer_MovedTooQuickly} for why it coexists with
+     * Hodgepodge's own mixin on the same constant instead of replacing it.
      */
     MOVED_TOO_QUICKLY_THRESHOLD(new MixinClass("MixinNetHandlerPlayServer_MovedTooQuickly")
         .setClass("MixinNetHandlerPlayServer_MovedTooQuickly")
-        .setPhase(Phase.LATE));
+        .setPhase(Phase.LATE)),
 
-    /*
-     * SPACE_ELEVATOR_MODULES(new MixinClass("MixinTileEntitySpaceElevator").setClass("MixinTileEntitySpaceElevator")
-     * .setPhase(Phase.LATE)
-     * .addTargetMod(TargetMod.GTNH_INTERGALACTIC));
+    /**
+     * NEI's formatted input field: keeps editable effect declarations and draws through the vanilla input renderer.
+     * (Angelica's batching font renderer is mixed in from the early config instead - see
+     * {@code MixinBatchingFontRenderer_TextEffect}.)
      */
+    NEI_TEXT_EFFECTS(new MixinClass("MixinFormattedTextField_TextEffect").setClass("MixinFormattedTextField_TextEffect")
+        .setPhase(Phase.LATE)
+        .addTargetMod(TargetMod.NOT_ENOUGH_ITEMS));
 
     private final MixinClass[] MIXIN_CLASS;
     private final Supplier<Boolean> shouldApplyThisMixinGroup;

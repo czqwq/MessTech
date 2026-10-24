@@ -243,7 +243,7 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
 
         NaniteTier providedTier = getHighestNaniteTier();
         if (providedTier == null || providedTier.tier < step.tier.tier) {
-            // Not enough nanite tier for the current step: stall and show the red warning.
+            // Too low a nanite tier for this step: stall and show the red warning.
             setNaniteStalled(true);
             return;
         }
@@ -254,8 +254,7 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
             return;
         }
 
-        // The stall condition is resolved once both tier and count are available; slow accumulation
-        // below should not keep the red warning on.
+        // Stall clears once both tier and count are available; slow accumulation below must not keep the warning on.
         setNaniteStalled(false);
 
         // Original BEC divisor formula, with no parallel or condensate slowdown on this standalone machine.
@@ -280,7 +279,7 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
     private void setNaniteStalled(boolean stalled) {
         if (naniteStalled == stalled) return;
         naniteStalled = stalled;
-        // Reuses GT's normal synced recipe-result widget, which is rendered above the progress line.
+        // Reuses GT's synced recipe-result widget, drawn above the progress line.
         checkRecipeResult = stalled ? NANITE_STALLED : CheckRecipeResultRegistry.SUCCESSFUL;
     }
 

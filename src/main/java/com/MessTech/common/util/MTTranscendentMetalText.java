@@ -6,17 +6,13 @@ import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.GRAY;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.WHITE;
 
 /**
- * The {@code TRANSCENDENT_METAL} text animation: GT5U's Transcendent Metal look, worn by a whole stretch of text.
- * <p>
- * The material's animation is a flat quad that turns about the oblique axis (0.3, 0.5, 0.2) by 3.5 degrees per
- * client tick, see GT5U's {@code TranscendentMetalRenderer} and {@link MTTranscendentMetalTextRenderer}, which
- * turns the tooltip line the same way, one way round, without ever jumping back. A string cannot turn, so this
- * class only supplies the other half of the look: a dark metal band (dark grey - grey - white - grey) that travels
- * along the text, one colour per character, so the letters themselves already read as polished metal while the
- * renderer turns them.
- * <p>
- * The band moves one character per {@link #COLOUR_STEP_MS} and the four entry palette is a whole number of steps
- * long, so a frame only repeats once the band has walked the text and wrapped around.
+ * The {@code TRANSCENDENT_METAL} text animation: GT5U's Transcendent Metal look for a whole stretch of text, a flat
+ * quad turning about the oblique axis (0.3, 0.5, 0.2) by 3.5 degrees per client tick (see GT5U's
+ * {@code TranscendentMetalRenderer} and {@link MTTranscendentMetalTextRenderer}, which turns the tooltip line the same
+ * way). A string cannot turn, so this class supplies the other half: a dark metal band (dark grey - grey - white -
+ * grey) travelling along the text, one colour per character, so the letters read as polished metal while the renderer
+ * turns them. One character per {@link #COLOUR_STEP_MS}, and the four entry palette is a whole number of steps long,
+ * so a frame repeats only once the band has walked the text and wrapped around.
  */
 public final class MTTranscendentMetalText implements MTTextAnimation {
 
@@ -27,8 +23,8 @@ public final class MTTranscendentMetalText implements MTTextAnimation {
     public static final float ROTATION_PER_TICK = 3.5F;
 
     /**
-     * The oblique axis GT5U turns its quad about - the same numbers, in the same order the item renderer passes to
-     * {@code glRotatef}. The text turns about it too, with the same angle and the same clock.
+     * The oblique axis GT5U turns its quad about - the same numbers, in the order the item renderer passes to
+     * {@code glRotatef}. The text turns about it too, with the same angle and clock.
      */
     public static final float ROTATION_AXIS_X = 0.3F, ROTATION_AXIS_Y = 0.5F, ROTATION_AXIS_Z = 0.2F;
 
@@ -42,13 +38,12 @@ public final class MTTranscendentMetalText implements MTTextAnimation {
     private MTTranscendentMetalText() {}
 
     /**
-     * The angle the plate has turned by, straight from GT5U's animation: the item sweeps
-     * <code>ticks * 3.5</code> degrees and so does the text. Nothing is folded, bounced or reset - the plate turns
-     * one way round, continuously, about {@link #ROTATION_AXIS_X the same oblique axis} the item turns about, and
-     * passes edge-on (invisible) once per revolution, exactly like the item.
+     * The angle the plate has turned by, straight from GT5U's animation: the item sweeps <code>ticks * 3.5</code>
+     * degrees and so does the text, one way round about {@link #ROTATION_AXIS_X the same oblique axis}, passing
+     * edge-on (invisible) once per revolution.
      *
-     * @param animationTicks the value of {@code GTMod.clientProxy().getAnimationRenderTicks()}, i.e. the same
-     *                       clock the GT5U item renderers animate with
+     * @param animationTicks the value of {@code GTMod.clientProxy().getAnimationRenderTicks()}, the clock the GT5U
+     *                       item renderers animate with
      * @return the angle in degrees, 0 (facing the viewer) to 360
      */
     public static float spinFor(float animationTicks) {
@@ -60,9 +55,8 @@ public final class MTTranscendentMetalText implements MTTextAnimation {
      * @param angle the angle of {@link #spinFor}
      * @return true while the plate shows its back, i.e. while the letters would read mirrored without being flipped
      *         over. Turning about {@code (x, y, z)} leaves the z part of the plate's normal at
-     *         {@code cos(a) + z^2 / (x^2 + y^2 + z^2) * (1 - cos(a))}, which turns negative exactly while the plate
-     *         faces away; the switch happens where it reaches zero, i.e. where the plate is edge-on and has no
-     *         visible area, so it is never seen.
+     *         {@code cos(a) + z^2 / (x^2 + y^2 + z^2) * (1 - cos(a))}, negative exactly while the plate faces away; the
+     *         switch is where it reaches zero - edge-on, no visible area - so it is never seen.
      */
     public static boolean showsBack(float angle) {
         double axisSquared = ROTATION_AXIS_X * ROTATION_AXIS_X + ROTATION_AXIS_Y * ROTATION_AXIS_Y

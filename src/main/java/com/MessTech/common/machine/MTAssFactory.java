@@ -66,12 +66,9 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
- * MessTech Assembly Factory.
- * <p>
- * The 'I' structure element is the tiered Assembly Matrix Block pair:
- * {@link MTBlocks#assMatrixBlock} (Tier 1) and {@link MTBlocks#advAssMatrixBlock} (Tier 2).
- * Mode 0 = Component Assembly Line recipes (generic ProcessingLogic).
- * Mode 1 = Assembly Line recipes (data-stick / Data Access based, requires LevelTier 2).
+ * MessTech Assembly Factory. 'I' is the tiered Assembly Matrix Block pair: {@link MTBlocks#assMatrixBlock} (Tier 1),
+ * {@link MTBlocks#advAssMatrixBlock} (Tier 2). Mode 0 = Component Assembly Line recipes (generic ProcessingLogic);
+ * Mode 1 = Assembly Line recipes (data-stick / Data Access, requires LevelTier 2).
  */
 
 public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements ISurvivalConstructable {
@@ -86,14 +83,11 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
         machineMode = 0;
     }
 
-    // region LevelTier
     /** Assembly Matrix tier derived from the 'I' structure blocks: 0=unformed, 1 or 2. */
     @Getter
     @Setter
     private int LevelTier = 0;
-    // endregion
 
-    // region Assembly Line data access hatches
     /** Data Access hatches used by Assembly Line mode (Mode 1). */
     public final ArrayList<MTEHatchDataAccess> mDataAccessHatches = new ArrayList<>();
 
@@ -110,9 +104,7 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
         }
         return false;
     }
-    // endregion
 
-    // region GUI / Machine modes
     @Override
     protected @Nonnull MTAssFactoryGui getGui() {
         return new MTAssFactoryGui(this);
@@ -162,9 +154,7 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
     public void setMachineMode(int index) {
         super.setMachineMode(index);
     }
-    // endregion
 
-    // region Processing configuration
     @Override
     protected boolean isEnablePerfectOverclock() {
         return true;
@@ -182,15 +172,11 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
         }
         return (int) Math.pow(3, getEnergyHatchTier());
     }
-    // endregion
 
-    // region Structure piece offsets
     private static final int HORIZONTAL_OFFSET = 5;
     private static final int VERTICAL_OFFSET = 7;
     private static final int DEPTH_OFFSET = 0;
-    // endregion
 
-    // region Structure definition
     protected static final String STRUCTURE_PIECE_MAIN = "main";
 
     // spotless:off
@@ -212,38 +198,18 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
     };
     //spotless:on
     /*
-     * Blocks:
-     * A -> addElement('A', Casings.AssemblyLineCasing.asElement())
-     * B -> addElement('B', Casings.AssemblerMachineCasing.asElement())
-     * C -> addElement('C', Casings.HermeticCasing9.asElement())
-     * D -> addElement('D', Casings.ComputerHeatVent.asElement())
-     * E -> addElement('E', Casings.AdvancedComputerCasing.asElement())
-     * F -> addElement('F', hatch adder: InputBus / InputHatch / Energy.or(ExoticEnergy) / OutputBus /
-     * OutputHatch / DataAccess; hatch background texture = AdvancedMolecularCasing; fill block = Advanced
-     * Molecular Casing (buildAndChain))
-     * G -> addElement('G', Casings.MolecularCoil.asElement())
-     * H -> addElement('H', Casings.UltimateMolecularCasing.asElement())
-     * I -> addElement('I', ofBlocksTiered(AssMatrixBlock / AdvAssMatrixBlock -> Tier 1 & 2))
-     * J -> addElement('J', Casings.QuantumGlass.asElement())
-     * Offsets: 5, 7, 0
-     * Dimensions (Width, Height, Length): 11, 12, 34
+     * Structural letters: see the addElement calls below. Offsets 5, 7, 0; dimensions (Width, Height, Length)
+     * 11, 12, 34.
      */
 
     private static final IStructureDefinition<MTAssFactory> STRUCTURE_DEFINITION = StructureDefinition
         .<MTAssFactory>builder()
         .addShape(STRUCTURE_PIECE_MAIN, transpose(structure_string))
-        // A: assembly line casing
         .addElement('A', Casings.AssemblyLineCasing.asElement())
-        // B: assembler machine casing
         .addElement('B', Casings.AssemblerMachineCasing.asElement())
-        // C: hermetic casing IX
         .addElement('C', Casings.HermeticCasing9.asElement())
-        // D: computer heat vent
         .addElement('D', Casings.ComputerHeatVent.asElement())
-        // E: advanced computer casing
         .addElement('E', Casings.AdvancedComputerCasing.asElement())
-        // F: hatch slot - input/output bus & hatch, energy or exotic energy hatch, and Data Access hatch
-        // in Assembly Line mode; the fill block is the Advanced Molecular Casing.
         .addElement(
             'F',
             HatchElementBuilder.<MTAssFactory>builder()
@@ -260,11 +226,8 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
                     ofBlock(
                         Casings.AdvancedMolecularCasing.getBlock(),
                         Casings.AdvancedMolecularCasing.getBlockMeta())))
-        // G: molecular coil
         .addElement('G', Casings.MolecularCoil.asElement())
-        // H: ultimate molecular casing
         .addElement('H', Casings.UltimateMolecularCasing.asElement())
-        // I: Assembly Matrix Block (Tier 1) / Advanced Assembly Matrix Block (Tier 2)
         .addElement(
             'I',
             ofBlocksTiered(
@@ -273,10 +236,8 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
                 0,
                 MTAssFactory::setLevelTier,
                 MTAssFactory::getLevelTier))
-        // J: quantum glass
         .addElement('J', Casings.QuantumGlass.asElement())
         .build();
-    // endregion
 
     @Override
     public IStructureDefinition<MTAssFactory> getStructureDefinition() {
@@ -333,8 +294,8 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
     }
 
     /**
-     * Assembly Line mode has no recipe locking, like GT's own Assembly Line: the mode does not match recipes out of a
-     * recipe map, so there is no map recipe for a lock to be built from. Mode 0 keeps the usual lock.
+     * Assembly Line mode (like GT's own) has no recipe locking: it matches no recipe map, so nothing to lock. Mode 0
+     * keeps the lock.
      */
     @Override
     public boolean supportsSingleRecipeLocking() {
@@ -362,12 +323,7 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
         return super.onRunningTick(aStack);
     }
 
-    // region Assembly Line processing (Mode 1)
-
-    /**
-     * Reads the recipes authorised by the controller data stick and Data Access hatches.
-     * Assembly Line mode does not search the whole registry: you must provide the flash drive.
-     */
+    /** Recipes authorised by the controller data stick and Data Access hatches; the registry is never searched. */
     private boolean collectAllowedAssemblyRecipes() {
         allowedAssemblyRecipes.clear();
         ItemStack controllerStack = getStackInSlot(getControllerSlotIndex());
@@ -381,17 +337,13 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
     }
 
     /**
-     * Mode 0 goes through the shared recipe map lookup; mode 1 does not, because the runnable form of an Assembly Line
-     * definition cannot be pre-computed.
-     * <p>
-     * Assembly Line mode is <b>unordered</b>: the definition is matched against everything the input buses hold as one
-     * pool, so the ingredients may sit in any bus in any order, and a slot that accepts several alternatives
-     * ({@code mOreDictAlt}) is satisfied by whichever of them the machine has. Doing that through
-     * {@link MTRecipeMaps#assFactoryAssemblyLineRecipes} would need one recipe per alternative combination, which is
-     * the cartesian product of a definition's slots - six digits for a single definition - and used to exhaust the heap
-     * at world load. {@link MTAssemblyLineMatcher} resolves the authorised definitions against the current buses
-     * instead, and hands the winning definition to the same pipeline as every other recipe, so parallels, overclock,
-     * void protection, debug/phantom and ME buses and the input consumption itself stay the shared code.
+     * Mode 0 uses the shared recipe map lookup; mode 1 cannot, because an Assembly Line definition's runnable form
+     * cannot be pre-computed. Mode 1 is <b>unordered</b>: a definition is matched against all buses as one pool
+     * (any bus, any order; an {@code mOreDictAlt} slot takes whichever alternative is present), because one recipe per
+     * alternative combination in {@link MTRecipeMaps#assFactoryAssemblyLineRecipes} would be the cartesian product -
+     * six digits per definition - and exhausted the heap at world load. {@link MTAssemblyLineMatcher} matches
+     * the authorised definitions against the current buses and hands the winner to the shared pipeline (parallels,
+     * overclock, void protection, debug/phantom, ME buses, input consumption).
      */
     @Override
     protected ProcessingLogic createProcessingLogic() {
@@ -422,18 +374,14 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
                 setSpeedBonus(getSpeedBonus());
                 setOverclock(isEnablePerfectOverclock() ? 4 : 2, 4);
                 // Assembly Line mode resolves its recipes itself, so a single-recipe lock built in Component mode (and
-                // still stored on the machine after a mode switch) must not be applied to it.
+                // still stored after a mode switch) must not be applied to it.
                 if (machineMode == 1) setRecipeLocking(MTAssFactory.this, false);
                 return super.process();
             }
         }.setMaxParallelSupplier(this::getLimitedMaxParallel);
     }
-    // endregion Assembly Line processing
 
-    /**
-     * Tier fetcher for StructureLib's {@code StructureUtility#ofBlocksTiered} used by structure
-     * element 'I'.
-     */
+    /** Tier fetcher for StructureLib's {@code StructureUtility#ofBlocksTiered}, element 'I'. */
     private static Integer getMatrixBlockTier(Block block, int meta) {
         if (block instanceof AssMatrixBlock matrixBlock) {
             int tier = matrixBlock.getLevelTier();
@@ -504,7 +452,7 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
     public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity, ForgeDirection side, ForgeDirection facing,
         int colorIndex, boolean aActive, boolean aRedstone) {
         if (side == facing) {
-            // Front: Advanced Molecular Casing base + Quantum Force Transformer controller face overlay.
+            // Front: Advanced Molecular Casing base + Quantum Force Transformer controller face.
             return new ITexture[] {
                 TextureFactory
                     .of(Casings.AdvancedMolecularCasing.getBlock(), Casings.AdvancedMolecularCasing.getBlockMeta()),

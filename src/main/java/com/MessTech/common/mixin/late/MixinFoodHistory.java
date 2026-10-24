@@ -11,9 +11,8 @@ import com.MessTech.common.items.MessFoodHelper;
 import squeek.spiceoflife.foodtracker.FoodHistory;
 
 /**
- * Spice of Life matches a food against the player's history with {@link ItemStack#isItemEqual},
- * which ignores NBT. Mess foods are matched by their full (ordered) ingredient tag instead, so
- * every ingredient order has its own diminishing-returns counter and its own journal entry.
+ * Spice of Life matches a food against the player's history with {@link ItemStack#isItemEqual}, which ignores NBT; mess
+ * foods are matched by their full ordered ingredient tag instead, so each order keeps its own counter and entry.
  */
 @Mixin(value = FoodHistory.class, remap = false)
 public abstract class MixinFoodHistory {

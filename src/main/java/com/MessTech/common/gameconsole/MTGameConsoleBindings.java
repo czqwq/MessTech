@@ -19,30 +19,24 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * The game console's own key bindings.
+ * The game console's own key bindings. Deliberately <em>not</em> Minecraft {@code KeyBinding}s: those are global,
+ * one-key-per-action and live in {@code options.txt}, and every key the console wants (E, Tab, Ctrl, Shift, 1-9) is
+ * already a
+ * vanilla key, so registering them would only fill the controls screen with conflict warnings. They mean something only
+ * while
+ * the console's window is open, so they live in its own file, next to its own DOOM.
  * <p>
- * These are deliberately <em>not</em> Minecraft {@code KeyBinding}s. A {@code KeyBinding} is a
- * global, one-key-per-action thing that lives in {@code options.txt}, and every key the console
- * wants (E, Tab, Ctrl, Shift, 1-9) is already a vanilla key - registering them would fill the
- * controls screen with conflict warnings and invite the player to "fix" them by breaking their own
- * game. The console's keys only mean anything while its window is open, so they live in its own
- * file, next to its own DOOM.
- * <p>
- * How a binding is applied is the interesting part, and it is why this can reuse machinery the
- * engine already has:
- * <ul>
- * <li>The physical key map ({@link MTGameConsoleKeys}) never changes. It answers "which DOOM scan
- * code is this keyboard key", for the whole keyboard, once.</li>
- * <li>Each {@link Action} has a <em>reference</em> scan code - the one DOOM itself listens for -
- * and, for the ten actions DOOM reads out of its {@code gamekeydown} table, the slot that scan code
- * indexes. Binding a key to an action makes that key drive the same slot, through
- * {@code DoomStatus#aliasKey}, which is the same hook that makes the arrow keys work next to
- * WASD.</li>
- * <li>{@link Action#AUTOMAP} is the one exception: DOOM reads the automap key as a scan code rather
- * than out of a slot, so a rebound key simply also emits that scan code.</li>
- * </ul>
- * Because of that, DOOM's own OPTIONS -> KEYS page is not a second place to change these: the
- * console forces the reference codes every time it starts.
+ * The physical key map ({@link MTGameConsoleKeys}) never changes: it answers "which DOOM scan code is this keyboard
+ * key" for
+ * the whole keyboard, once. Each {@link Action} has a <em>reference</em> scan code - the one DOOM listens for - and,
+ * for the
+ * ten actions DOOM reads out of {@code gamekeydown}, the slot that code indexes: binding a key makes it drive the same
+ * slot
+ * through {@code DoomStatus#aliasKey}, the hook that also makes the arrow keys work next to WASD.
+ * {@link Action#AUTOMAP} is
+ * the exception (DOOM reads it as a scan code, so a rebound key also emits that code). DOOM's own OPTIONS -> KEYS page
+ * is
+ * therefore not a second place to change these: the console forces the reference codes on every start.
  */
 @SideOnly(Side.CLIENT)
 public final class MTGameConsoleBindings {
@@ -51,10 +45,9 @@ public final class MTGameConsoleBindings {
     public static final int SLOTS_PER_ACTION = 2;
 
     /**
-     * One thing the player can press a key for.
-     * <p>
-     * {@code reference} is the scan code DOOM listens for; {@code slot} is the entry it looks at in
-     * {@code gamekeydown}, or -1 when DOOM reads the scan code itself (the automap key does).
+     * One thing the player can press a key for. {@code reference} is the scan code DOOM listens for; {@code slot} is
+     * the
+     * entry it looks at in {@code gamekeydown}, or -1 when DOOM reads the scan code itself (the automap key does).
      */
     public enum Action {
 
@@ -69,8 +62,8 @@ public final class MTGameConsoleBindings {
         RUN("run", ScanCode.SC_LSHIFT),
         STRAFE("strafeModifier", ScanCode.SC_LALT),
         /**
-         * The one action DOOM reads as a scan code rather than out of {@code gamekeydown}, hence the
-         * explicit -1: a key bound to it has to emit {@code SC_TAB} rather than drive a slot.
+         * The one action DOOM reads as a scan code rather than out of {@code gamekeydown}, hence the explicit -1: a key
+         * bound to it emits {@code SC_TAB} instead of driving a slot.
          */
         AUTOMAP("automap", ScanCode.SC_TAB, -1),
 
@@ -159,8 +152,6 @@ public final class MTGameConsoleBindings {
     public MTGameConsoleBindings() {
         resetToDefaults();
     }
-
-    // ------------------------------------------------------------------ editing
 
     public int get(final Action action, final int slot) {
         final int[] keys = bindings.get(action);
@@ -260,15 +251,13 @@ public final class MTGameConsoleBindings {
         return name == null ? "#" + key : name;
     }
 
-    // ------------------------------------------------------------------ applying
-
     /**
-     * Puts the current bindings onto a freshly built engine. Called on every start, right after the
-     * engine has read its own config - so DOOM's own KEYS page can never diverge from this file.
+     * Puts the current bindings onto a freshly built engine. Called on every start, right after the engine read its own
+     * config, so DOOM's own KEYS page can never diverge from this file.
      */
     public void apply(final DoomMain<?, ?> doom) {
-        // The ten slots DOOM reads out of gamekeydown get their reference scan codes back; the
-        // player's keys reach them through aliases instead.
+        // The ten slots DOOM reads out of gamekeydown get their reference scan codes back; the player's keys reach them
+        // through aliases instead.
         doom.key_up = ScanCode.SC_W.ordinal();
         doom.key_down = ScanCode.SC_S.ordinal();
         doom.key_left = ScanCode.SC_A.ordinal();
@@ -290,8 +279,8 @@ public final class MTGameConsoleBindings {
                 }
                 final ScanCode scanCode = MTGameConsoleKeys.of(key);
                 if (scanCode == null) {
-                    // A key the console's keyboard map does not know: it would never be forwarded,
-                    // so binding it would silently do nothing. Better to say so in the log.
+                    // A key the console's keyboard map does not know would never be forwarded, so binding it would
+                    // silently do nothing. Say so in the log.
                     MessTech.LOG.warn(
                         "Game console: key {} ({}) is not part of the console keyboard, ignored for {}",
                         key,
@@ -312,8 +301,6 @@ public final class MTGameConsoleBindings {
     public ScanCode extraScanCode(final int lwjglKey) {
         return extraScanCodes.get(lwjglKey);
     }
-
-    // ------------------------------------------------------------------ persistence
 
     public static MTGameConsoleBindings load(final File file) {
         final MTGameConsoleBindings bindings = new MTGameConsoleBindings();
@@ -337,8 +324,8 @@ public final class MTGameConsoleBindings {
                     continue;
                 }
                 final int[] keys = emptySlots();
-                // The file writes a "# W / UP" comment after the codes; drop it before parsing, or
-                // the second key would parse as garbage and come back unbound.
+                // The file writes a "# W / UP" comment after the codes; drop it before parsing, or the second key would
+                // parse as garbage and come back unbound.
                 String value = trimmed.substring(equals + 1);
                 final int comment = value.indexOf('#');
                 if (comment >= 0) {

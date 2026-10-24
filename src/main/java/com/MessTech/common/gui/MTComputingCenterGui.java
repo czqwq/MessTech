@@ -27,9 +27,8 @@ import gregtech.api.modularui2.GTGuiTextures;
 import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 
 /**
- * MUI2 GUI for {@link MTComputingCenter}.
- * <p>
- * Nano Computing mode shows wireless + overclock controls; Research mode only shows terminal text.
+ * MUI2 GUI for {@link MTComputingCenter}: Nano Computing mode shows wireless + overclock controls, Research mode only
+ * terminal text.
  */
 public class MTComputingCenterGui extends MTEMultiBlockBaseGui<MTComputingCenter> {
 

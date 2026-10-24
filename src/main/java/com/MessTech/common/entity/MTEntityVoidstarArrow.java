@@ -29,38 +29,24 @@ import cpw.mods.fml.common.registry.IThrowableEntity;
 /**
  * The arrow of the Voidstar Piercer (混沌终焉·虚无贯星弓).
  * <p>
- * Four things separate it from a vanilla arrow, all of them in {@link #onUpdate}:
+ * Four things separate it from a vanilla arrow, all in {@link #onUpdate}:
  * <ul>
- * <li><b>It flies dead straight.</b> The launch direction and the launch speed are kept, and the motion is written
- * back from them at the start and at the end of every tick. Vanilla's arrow loses 1% of its speed and 0.05 blocks
- * per tick of altitude at the end of each tick ({@code motion *= 0.99; motionY -= 0.05}), which is what makes it
- * drop; overwriting the motion every tick means neither the drag nor the gravity is ever carried into the next
- * tick's move, so the arrow travels exactly one {@code aim * speed} step per tick from the bow to whatever it
- * reaches. The vertical part of that step is the launch pitch, so a shot at a mob 50 blocks away lands where the
- * crosshair points, not 12 blocks below it.
- * <p>
- * The <b>server</b> owns that aim. A client is never told it - the fields below are not synced - so the client copy
- * takes the aim from the velocity the server sends instead ({@link #adoptSyncedAim}), which is the only reason this
- * class implements {@link IThrowableEntity}: FML only writes the velocity of a throwable into the spawn packet, so
- * without the interface a client copy starts with a motion of zero and flies the arrow along this class's default
- * aim, i.e. due south and perfectly level, until the server's position updates drag it onto the real line. That is
- * what a "curving arrow" (a model that starts out sideways and then swings onto the aim) looks like.</li>
- * <li><b>It drills on through what it hits.</b> A block in the way does not end the flight: the arrow is stopped by
- * it for a tick or two - vanilla catches it with its own ray trace - and {@link #onBlockContact} then blasts the
- * piece of tunnel between the last blast and that block, after which the arrow digs on by itself, because the block
- * it was stuck against is gone and vanilla's own in-ground branch releases the arrow again. Every contact therefore
- * extends the same tunnel, and one shot fired into a mountain carves a corridor all the way through it until the
- * arrow runs out of flight ticks ({@link #MAX_FLIGHT_TICKS}, 600 blocks at a full draw). The pieces are handed out
- * back to back ({@link #blastX} ...), so no block is ever scanned twice.</li>
- * <li><b>Anything it hits dies for good.</b> A hit on an entity is vanilla's (damage, knockback, the sound) and then
- * {@link MTBowKill}, the bow's branch of the {@link MTKillBase} ladder, finishes it - through armour, shields, entity
- * invulnerability and "second life" items. The target is found again with the same intercept test vanilla used
- * ({@link #findHitEntity}). The same happens when an entity refuses the hit and vanilla bounces the arrow off it:
- * the ladder does not care about the refusal.</li>
- * <li><b>It trails.</b> While it is in the air the client spawns chaos sparks along the step it just took
- * ({@link MTVoidstarFx}), a smaller burst at every block it chews through, and a large one when the flight ends.</li>
+ * <li><b>Dead straight.</b> Launch direction and speed are written back into the motion at the start and end of every
+ * tick, undoing vanilla's 1% speed and 0.05 blocks/tick of altitude ({@code motion *= 0.99; motionY -= 0.05}), so the
+ * arrow advances exactly one {@code aim * speed} step per tick, launch pitch included: a shot at a mob 50 blocks away
+ * lands where the crosshair points, not 12 blocks below it. The server owns the aim; the client learns it from the
+ * spawn packet's velocity ({@link #adoptSyncedAim}).</li>
+ * <li><b>Drills on.</b> A block does not end the flight: {@link #onBlockContact} blasts the tunnel piece between the
+ * last blast and the block, and the arrow digs on. One shot into a mountain carves a corridor until the flight ticks
+ * run out ({@link #MAX_FLIGHT_TICKS}, 600 blocks at a full draw); pieces go out back to back ({@link #blastX} ...), so
+ * no block is scanned twice.</li>
+ * <li><b>True kill.</b> An entity hit is vanilla's (damage, knockback, sound), then {@link MTBowKill} - the bow's
+ * branch of the {@link MTKillBase} ladder - finishes it through armour, shields, entity invulnerability and "second
+ * life" items; the target is found again with vanilla's own intercept test ({@link #findHitEntity}).</li>
+ * <li><b>Trail.</b> Chaos sparks along the step just taken ({@link MTVoidstarFx}), a small burst at every block chewed
+ * through and a large one when the flight ends.</li>
  * </ul>
- * The arrow cannot be picked up ({@code canBePickedUp = 0}), and one that hits nothing at all is removed after
+ * It cannot be picked up ({@code canBePickedUp = 0}) and one that hits nothing is removed after
  * {@link #MAX_FLIGHT_TICKS} ticks.
  */
 public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEntity {
@@ -69,10 +55,9 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     private static final int ENTITY_ID = 1;
 
     /**
-     * Data watcher ids of the muzzle position, i.e. where the tunnel of a shot starts. Every client simulates the
-     * flight itself (as it does for vanilla arrows), so the spark bursts are spawned locally - only the destruction
-     * of the blocks is the server's - and the muzzle position is what the client cannot work out on its own.
-     * {@code EntityArrow} uses id 16 for its own flags, everything above that is free.
+     * Data watcher ids of the muzzle position, i.e. where a shot's tunnel starts. Each client simulates the flight
+     * itself (as for vanilla arrows) and spawns the sparks locally - only block destruction is the server's - and the
+     * muzzle is what a client cannot work out. {@code EntityArrow} uses id 16 for its flags; above that is free.
      */
     private static final int DW_START_X = 20, DW_START_Y = 21, DW_START_Z = 22;
 
@@ -84,33 +69,29 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     public static final double MAX_SPEED = 3.0D;
 
     /**
-     * Ticks the arrow may fly before it gives up and vanishes (no impact, no tunnel). At
-     * {@link #MAX_SPEED} this is 600 blocks, i.e. further than a chunk is tracked, so it only ever catches an arrow
-     * fired into the open sky.
+     * Ticks the arrow may fly before it gives up and vanishes (no impact, no tunnel). At {@link #MAX_SPEED} that is
+     * 600 blocks, further than a chunk is tracked, so it only ever catches an arrow fired into the open sky.
      */
     private static final int MAX_FLIGHT_TICKS = 200;
 
     /**
-     * Fraction of its own speed the arrow has to have advanced by for a tick to count as an open one. Vanilla backs
-     * the arrow off by 0.05 blocks along the step when it stops it against a block, so a tick that ended on a wall
-     * always comes out shorter than the step - by 4.2% of the speed even at the weakest draw that fires
-     * ({@code 0.05 / MIN_SPEED}) and by 1.7% at a full one - while an open tick advances by exactly the speed. The
-     * threshold sits between the two.
+     * Fraction of its own speed the arrow must have advanced for a tick to count as open. Vanilla backs the arrow off
+     * by 0.05 blocks when it stops it against a block, so a tick that ended on a wall is shorter than the step - 4.2%
+     * of the speed at the weakest draw ({@code 0.05 / MIN_SPEED}), 1.7% at a full one - while an open tick advances by
+     * exactly the speed; the threshold sits between the two.
      */
     private static final double STOPPED_SPEED_FRACTION = 0.995D;
 
     /**
-     * How many ticks of being held up by blocks end the flight. Two of them always belong to a contact that went
-     * through (the tick vanilla stopped the arrow, and the tick it releases itself again once the block is gone), so
-     * anything above that is a wall the tunnel cannot open - bedrock, a protection plugin, an explosion resistant
-     * block - and the arrow gives up instead of sitting there for the rest of its life.
+     * How many ticks of being held up by blocks end the flight. Two always belong to a contact that went through (the
+     * tick vanilla stopped the arrow, the tick it releases once the block is gone), so anything above that is a wall
+     * the tunnel cannot open - bedrock, a protection plugin, an explosion resistant block - and the arrow gives up.
      */
     private static final int MAX_STUCK_TICKS = 6;
 
     /**
      * Below this speed the client has not been told how the arrow flies yet (see {@link #adoptSyncedAim}). A tenth of
-     * {@link #MIN_SPEED} is far below anything a shot can have and far above the rounding of the packet, which sends
-     * the velocity in 1/8000 blocks per tick.
+     * {@link #MIN_SPEED} is far below any shot and far above the packet's rounding (velocity in 1/8000 blocks/tick).
      */
     private static final double MIN_AIM_LENGTH = 0.02D;
 
@@ -139,18 +120,15 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * The arrow of one shot: launched from the shooter's eyes along exactly the way they are looking.
-     * <p>
-     * Vanilla's own spread ({@code setThrowableHeading} with a deviation of 1.0 adds up to 0.0075 per axis of
-     * random direction) is deliberately dropped here: the item's promise is the straight line, and re-adding an
-     * aim error on top of the enchantment would be the one thing the player cannot compensate for.
+     * The arrow of one shot: from the shooter's eyes along exactly the way they look. Vanilla's spread
+     * ({@code setThrowableHeading} with deviation 1.0 adds up to 0.0075 per axis of random direction) is deliberately
+     * dropped - the item's promise is the straight line, and an aim error on top of the enchantment is the one thing
+     * the player cannot compensate for.
      *
-     * @param world   the world to spawn the arrow in
-     * @param shooter the player who shot it
-     * @param draw    the draw of the bow, 0..1, i.e. vanilla's {@code f} of {@code ItemBow#onPlayerStoppedUsing};
-     *                it scales the speed between {@link #MIN_SPEED} and {@link #MAX_SPEED}
-     * @param mode    the sub-mode of the bow that shot it; only {@link MTItemVoidstarBow#MODE_DE} changes what the
-     *                arrow does when it hits a block, see {@link #onBlockContact}
+     * @param draw the draw, 0..1, i.e. vanilla's {@code f} of {@code ItemBow#onPlayerStoppedUsing}; scales the speed
+     *             between {@link #MIN_SPEED} and {@link #MAX_SPEED}
+     * @param mode the bow sub-mode; only {@link MTItemVoidstarBow#MODE_DE} changes what the arrow does on a block, see
+     *             {@link #onBlockContact}
      */
     public MTEntityVoidstarArrow(World world, EntityPlayer shooter, float draw, int mode) {
         super(world, shooter, draw);
@@ -162,7 +140,7 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
         Vec3 look = shooter.getLook(1.0F);
         double length = Math.sqrt(look.xCoord * look.xCoord + look.yCoord * look.yCoord + look.zCoord * look.zCoord);
         if (length < 1.0E-4D) {
-            // A zero length look vector cannot happen for a player, but a division by it would poison the flight.
+            // A zero length look vector cannot happen for a player, but dividing by it would poison the flight.
             look = Vec3.createVectorHelper(0.0D, 0.0D, 1.0D);
             length = 1.0D;
         }
@@ -259,9 +237,8 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
         }
 
         if (!hasAim) {
-            // The server has not told this client how the arrow flies yet (see adoptSyncedAim). Vanilla recomputes
-            // the rotation from the motion, and a motion of zero is yaw 0 and pitch 0 - due south and level - so the
-            // tick is spent holding the orientation the spawn packet brought instead of swinging away and back.
+            // The server has not told this client how the arrow flies yet (see adoptSyncedAim). Vanilla recomputes the
+            // rotation from motion, and motion zero is yaw 0 / pitch 0 - due south and level - so hold the spawn one.
             float yaw = this.rotationYaw, pitch = this.rotationPitch;
             super.onUpdate();
             this.rotationYaw = this.prevRotationYaw = yaw;
@@ -269,16 +246,16 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
             return;
         }
 
-        // The step of this tick. It is written again at the end of the tick, so the vanilla drag and gravity never
+        // The step of this tick; it is written again at the end of the tick, so vanilla's drag and gravity never
         // reach the next move - see the class comment.
         applyAim();
 
         double previousX = this.posX, previousY = this.posY, previousZ = this.posZ;
         super.onUpdate();
 
-        // The one thing vanilla kills an arrow with down here is a hit on an entity: it damages the target and
-        // removes the arrow. That hit - and a hit an entity refused, which leaves the arrow bounced instead of dead -
-        // is what the bow's true kill takes over.
+        // The one thing vanilla kills an arrow with down here is a hit on an entity: it damages the target and removes
+        // the arrow. That hit - and one an entity refused, leaving the arrow bounced instead of dead - is what the
+        // bow's true kill takes over.
         boolean bounced = this.motionX * this.aimX + this.motionY * this.aimY + this.motionZ * this.aimZ < 0.0D;
         if (this.isDead || bounced) {
             onEntityHit();
@@ -297,17 +274,15 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * The client side half of the flight: the aim of a shot is <b>not</b> part of the spawn packet, so a client has
-     * to take it from the velocity the server sends - which is exactly what {@link IThrowableEntity} is implemented
-     * for. Vanilla's own {@code EntityArrow} is not an {@code IThrowableEntity}, and FML only writes the velocity of
-     * one into the spawn packet ({@code FMLMessage.EntitySpawnMessage#toBytes}, the {@code instanceof
-     * IThrowableEntity} branch; the client reads it back in {@code EntitySpawnHandler#spawnEntity}). Without the
-     * interface a freshly created client copy of the arrow has a motion of zero and, once this class wrote its
-     * default aim of due south and perfectly level into the motion, the copy would fly off to the side until the
-     * position updates of the server dragged it onto the real line - the "curving arrow" this fixes.
+     * The client side half of the flight: the aim is <b>not</b> in the spawn packet, so the client takes it from the
+     * velocity the server sends - the only reason for {@link IThrowableEntity}, since FML only writes an
+     * {@code IThrowableEntity}'s velocity into the packet ({@code FMLMessage.EntitySpawnMessage#toBytes}, read back in
+     * {@code EntitySpawnHandler#spawnEntity}); vanilla's {@code EntityArrow} is not one. Without it a client copy
+     * starts at motion zero and, with this class's default aim (due south, level) in the motion, flies off sideways
+     * until server position updates drag it onto the real line - the "curving arrow".
      *
-     * @return whether an aim could be taken; {@code false} while the first velocity of the server is still on its
-     *         way, which is at most the first tick of the flight
+     * @return whether an aim could be taken; {@code false} while the server's first velocity is on its way, at most
+     *         the first tick
      */
     private boolean adoptSyncedAim() {
         double length = Math
@@ -336,10 +311,9 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * The end of a hit on an entity: the target of the shot is killed by the bow's branch of the true kill ladder
-     * ({@link MTBowKill}), which is the same death the tunnel hands out. The target has to be found again because
-     * vanilla does not tell us what it hit: the intercept test of {@link #findHitEntity} is the one vanilla itself
-     * ran a moment ago, on the same step, with the same 0.3 block expansion, so it finds the same entity.
+     * The end of a hit on an entity: the target dies by the bow's branch of the true kill ladder ({@link MTBowKill}),
+     * the same death the tunnel hands out. Vanilla does not say what it hit, so the target is found again with the
+     * intercept test of {@link #findHitEntity} - vanilla's own, same step, same 0.3 block expansion.
      */
     private void onEntityHit() {
         if (this.worldObj.isRemote) {
@@ -361,8 +335,8 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * @return the living entity this tick's step ran into, or {@code null} when there is none (an arrow that was
-     *         removed for another reason, or an entity that moved away between the two scans).
+     * @return the living entity this tick's step ran into, or {@code null} when there is none (an arrow removed for
+     *         another reason, or an entity that moved away between the two scans).
      */
     private EntityLivingBase findHitEntity() {
         Vec3 from = Vec3.createVectorHelper(this.prevPosX, this.prevPosY, this.prevPosZ);
@@ -404,18 +378,13 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * A block stopped the arrow. What happens here is the whole difference between the bow's two sub-modes:
+     * A block stopped the arrow; this is the whole difference between the bow's two sub-modes:
      * <ul>
-     * <li><b>Pierce mode</b> (the default): the piece of tunnel between the last blast and the face in front of the
-     * arrow is blasted, and the arrow digs on. The digging works on its own, because the block vanilla stuck the
-     * arrow into is the one that was just destroyed: on the next tick vanilla's in-ground branch finds a different
-     * block there, clears its own in-ground flag and the arrow flies again - with the aim written back by
-     * {@link #applyAim}. An arrow that stays stuck (the wall does not give way, see {@link #MAX_STUCK_TICKS}) ends
-     * its flight here.</li>
-     * <li><b>DE mode</b>: one explosion, at this contact, and the arrow is gone. It is a
-     * {@link MTExplosionDE} - the port of Draconic Evolution's reactor explosion, fireball included - of
-     * {@link Config#VOIDSTAR_BOW_DE_POWER} power, centred on the block the arrow touched, and nothing of the tunnel
-     * machinery runs at all: no piece is blasted, no block is drilled, and the arrow does not fly on.</li>
+     * <li><b>Pierce mode</b> (default): the tunnel piece between the last blast and the face ahead is blasted and the
+     * arrow digs on - the block vanilla stuck it into is gone, so the next tick vanilla's in-ground branch finds a
+     * different block, clears its in-ground flag and the arrow flies again with the aim written back by
+     * {@link #applyAim}. An arrow that stays stuck (see {@link #MAX_STUCK_TICKS}) ends its flight here.</li>
+     * <li><b>DE mode</b>: one explosion at this contact, then the arrow is gone - see {@link #detonate}.</li>
      * </ul>
      */
     private void onBlockContact() {
@@ -464,12 +433,12 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * The one explosion of DE mode: a {@link MTExplosionDE} of {@link Config#VOIDSTAR_BOW_DE_POWER} power, centred on
-     * the block the given point is in, and the arrow is removed.
+     * The one explosion of DE mode: a {@link MTExplosionDE} (the port of Draconic Evolution's reactor explosion,
+     * fireball included) of {@link Config#VOIDSTAR_BOW_DE_POWER} power on the block the point is in, arrow removed.
      * <p>
-     * The explosion carries its own fireball ({@link MTEntityDEBlast} is spawned by {@code MTExplosionDE} itself), so
-     * no burst of this mod's own particles is spawned on top of it - unlike pierce mode, where the arrow's own
-     * sparks are the only visual a drilled block gets. Server side only, like every other block change of the arrow.
+     * It carries its own fireball ({@code MTExplosionDE} spawns {@link MTEntityDEBlast}), so no burst of this mod's
+     * particles goes on top - in pierce mode the arrow's sparks are the only visual a drilled block gets. Server side
+     * only, like every block change of the arrow.
      */
     private void detonate(double hitX, double hitY, double hitZ) {
         if (!this.worldObj.isRemote) {
@@ -486,16 +455,14 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * The end of the flight - the arrow ran out of ticks, or was held up by a wall it cannot open. Whatever is still
-     * between the last blast and this point is blasted, the bang is played and the arrow is removed.
+     * The end of the flight - out of ticks, or held up by a wall it cannot open. What is still between the last blast
+     * and this point is blasted, the bang played, the arrow removed.
      * <p>
-     * In DE mode this is where a shot that hit nothing at all ends: the arrow never stops on a block there (it
-     * explodes on the first one), so the only way to get here is the flight running out of range - and a bomb arrow
-     * that simply vanished after 600 blocks would be a bug, so it detonates instead.
+     * In DE mode this is where a shot that hit nothing ends: the arrow never stops on a block (it explodes on the
+     * first), so only the flight running out gets here - and a bomb arrow that vanished after 600 blocks would be a
+     * bug, so it detonates instead.
      *
-     * @param hitX the point the flight ended at
-     * @param hitY see {@code hitX}
-     * @param hitZ see {@code hitX}
+     * @param hitX the point the flight ended at; {@code hitY} and {@code hitZ} likewise
      */
     private void finish(double hitX, double hitY, double hitZ) {
         if (this.worldObj.isRemote) {
@@ -516,10 +483,9 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * Writes the launch direction and speed back into the motion, undoing everything vanilla did to it. Called
-     * before the position advance, where it is what makes the flight straight, and again after it, where it keeps
-     * the motion the server reports to its clients constant (a motion that changed every tick would otherwise be
-     * re-sent as a velocity update every tick).
+     * Writes the launch direction and speed back into the motion, undoing everything vanilla did to it: before the
+     * position advance, where it makes the flight straight, and after it, where it keeps the motion the server reports
+     * constant (one that changed every tick would be re-sent as a velocity update every tick).
      */
     private void applyAim() {
         this.motionX = this.aimX * this.speed;
@@ -542,8 +508,8 @@ public class MTEntityVoidstarArrow extends EntityArrow implements IThrowableEnti
     }
 
     /**
-     * Saves the flight, so an arrow that was saved to disk mid-air (a chunk unload) resumes on the same line instead
-     * of falling out of the sky with a default aim, and so the tunnel it already opened is not blasted again.
+     * Saves the flight: an arrow saved mid-air (a chunk unload) resumes on the same line instead of falling out of the
+     * sky with a default aim, and the tunnel it already opened is not blasted again.
      */
     @Override
     public void writeEntityToNBT(NBTTagCompound tag) {

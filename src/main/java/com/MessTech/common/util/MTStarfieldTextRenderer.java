@@ -9,18 +9,17 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * Draws the moving half of {@link MTStarfieldText}: the line itself in the animation's flowing colours, and over it
- * the stars the "starfield" name promises - a handful of glinting pixels scattered over the letters, each on its own
- * blink clock, and a shooting star crossing the whole word now and then.
+ * Draws the moving half of {@link MTStarfieldText}: the line in the animation's flowing colours, and over it the
+ * stars the name promises - glinting pixels over the letters, each on its own blink clock, plus a shooting star
+ * crossing the word now and then.
  * <p>
- * The renderer <b>replaces</b> the text ({@link #replacesText()}): the animation is a look the letters wear, not an
- * overlay on a still copy of them, and a plain white copy underneath would be what the player actually reads.
+ * It <b>replaces</b> the text ({@link #replacesText()}): the animation is a look the letters wear, and a still white
+ * copy underneath would be what the player actually reads.
  * <p>
- * Everything here is a pure function of the clock the tooltip is drawn with, and of a hash of the character index,
- * so a star sits in the same pixel of the same glyph on every frame: only its blink phase moves. The stars are drawn
- * on the plane of the vanilla tooltip box (see {@link MTModuleProjectTextRenderer} for the same {@code Gui}
- * subclass trick), and the glyph geometry - where a character starts and how wide it is - comes from the font, never
- * from a hand sum, so a resource pack with different letter widths keeps the stars on their letters.
+ * Clock and character-index hash only, so a star keeps its pixel and its glyph and only its blink phase moves. Stars
+ * sit on the plane of the vanilla tooltip box ({@link MTModuleProjectTextRenderer} uses the same {@code Gui} subclass
+ * trick), and glyph geometry comes from the font, never a hand sum, so other letter widths keep the stars on their
+ * letters.
  */
 @SideOnly(Side.CLIENT)
 public final class MTStarfieldTextRenderer implements MTTextRenderer {
@@ -64,8 +63,8 @@ public final class MTStarfieldTextRenderer implements MTTextRenderer {
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
-        // The band itself. The frame is recomputed from the same clock the tooltip was drawn with, so the letters
-        // here are the letters the tooltip asked for, not a second copy that could drift a step behind.
+        // The band itself, recomputed from the same clock the tooltip was drawn with, so the letters here are the
+        // ones the tooltip asked for and not a second copy a step behind.
         font.drawStringWithShadow(MTStarfieldText.INSTANCE.frame(visible, millis), x, y, 0xFFFFFF);
 
         PAINTER.plane(Z_LEVEL, () -> {
@@ -75,9 +74,9 @@ public final class MTStarfieldTextRenderer implements MTTextRenderer {
     }
 
     /**
-     * One or two stars per glyph, each on its own blink clock: the position comes from a hash of the character
-     * index and the star's slot, so a star never moves between frames, while its phase comes from the hash as well
-     * and therefore ticks independently of its neighbours.
+     * One or two stars per glyph, each on its own blink clock: position and phase both come from a hash of the
+     * character index and the star's slot, so a star never moves between frames and ticks independently of its
+     * neighbours.
      */
     private static void drawStars(FontRenderer font, String visible, int x, int y, long millis) {
         long step = Math.floorDiv(millis, BLINK_STEP_MS);
@@ -113,9 +112,8 @@ public final class MTStarfieldTextRenderer implements MTTextRenderer {
     }
 
     /**
-     * A shooting star: once every {@link #SHOOTING_STAR_PERIOD_MS} one crosses the word from the upper left to the
-     * lower right, with a short tail of fading pixels behind it. It is visible for the first
-     * {@link #SHOOTING_STAR_VISIBLE} of its period, so it appears and disappears the way a shooting star does.
+     * A shooting star: once every {@link #SHOOTING_STAR_PERIOD_MS} one crosses the word from upper left to lower
+     * right with a short tail of fading pixels, visible for the first {@link #SHOOTING_STAR_VISIBLE} of its period.
      */
     private static void drawShootingStar(int x, int y, int width, long millis) {
         double progress = (double) Math.floorMod(millis, SHOOTING_STAR_PERIOD_MS) / SHOOTING_STAR_PERIOD_MS;
@@ -141,8 +139,8 @@ public final class MTStarfieldTextRenderer implements MTTextRenderer {
     }
 
     /**
-     * A cheap avalanche hash, so that two adjacent characters get unrelated stars: the classic
-     * multiply-xor-shift mix, which is all this needs - the stars only have to stay put and look scattered.
+     * A cheap avalanche hash, so adjacent characters get unrelated stars: the classic multiply-xor-shift mix, which is
+     * all this needs - the stars only have to stay put and look scattered.
      */
     private static int hash(int value) {
         int h = value * 0x9E3779B1;
@@ -161,7 +159,7 @@ public final class MTStarfieldTextRenderer implements MTTextRenderer {
 
     /**
      * {@code Gui#drawRect} and {@code Gui#zLevel} are both protected, so the stars are drawn through a subclass of
-     * {@code Gui}, on the plane of the tooltip box and with the plane restored afterwards.
+     * {@code Gui}, on the tooltip box's plane, which is restored afterwards.
      */
     @SideOnly(Side.CLIENT)
     private static final class Painter extends Gui {

@@ -27,8 +27,7 @@ import com.gtnewhorizons.modularui.common.fluid.FluidStackTank;
 import gregtech.api.modularui2.GTWidgetThemes;
 
 /**
- * Nano-Scale Foundry GUI: uses the shared tickable multi-thread GUI base and shows the Board
- * Processor immersion tank.
+ * Nano-Scale Foundry GUI: the shared tickable multi-thread GUI base plus the Board Processor immersion tank.
  */
 public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGui<MTNanoScaleFoundry> {
 
@@ -77,9 +76,8 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
             .coverChildren()
             .marginTop(2);
 
-        // Mode 1 switches every thread off and runs one recipe on the machine's main thread, so the per-thread rows
-        // are hidden and this one line takes their place. The check is live, because the mode button sits right next
-        // to these rows and can be clicked while the GUI is open.
+        // Mode 1 switches every thread off and runs one recipe on the machine's main thread: the per-thread rows are
+        // hidden and this one line takes their place. The check is live - the mode button sits right next to them.
         column.child(
             new TextWidget<>(
                 IKey.dynamic(
@@ -129,8 +127,8 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
 
     @Override
     protected ParentWidget<?> createTerminalParentWidget(ModularPanel panel, PanelSyncManager syncManager) {
-        // Keep the original GT terminal text layout on the left, and put the Board immersion tanks to the right
-        // (outside the text ListWidget so they are not clipped).
+        // GT's terminal text layout on the left, the Board immersion tanks on the right (outside the text ListWidget,
+        // so they are not clipped).
         return Flow.row()
             .size(getTerminalWidgetWidth(), getTerminalWidgetHeight())
             .paddingTop(4)
@@ -201,8 +199,8 @@ public class MTNanoScaleFoundryGui extends TickableParallelismMultiMachineBaseGu
     }
 
     private IWidget createBoardTankWidget() {
-        // Two slots per row, as many rows as the machine has immersion fluids (five since GT5U added UU-Matter), with
-        // the slot height shrunk so the whole grid keeps the 72px footprint four tanks used to need.
+        // Two slots per row, one row per immersion fluid (five since GT5U added UU-Matter), slot height shrunk so the
+        // grid keeps the 72px footprint four tanks used to need.
         final int count = multiblock.getBoardTankTypeCount();
         final int rows = (count + 1) / 2;
         final int slotHeight = Math.max(18, 72 / Math.max(rows, 1));

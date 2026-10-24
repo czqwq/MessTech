@@ -13,55 +13,46 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * The particle effects of the Voidstar Piercer's arrow, all of them spawned on the client that owns the view:
- * <ul>
- * <li>{@link #spawnTrail} - the trail: a few sparks along the step the arrow just flew, so a three block per tick
- * arrow leaves a continuous line of light instead of a dotted one.</li>
- * <li>{@link #spawnPierceBurst} - the small burst of one block the arrow chewed through while drilling (see
- * {@code MTEntityVoidstarArrow#onBlockContact}). It is deliberately cheap: a shot into a mountain triggers it every
- * few ticks for as long as the arrow digs.</li>
- * <li>{@link #spawnImpact} - the big burst at the end of the flight: a flash at the wall, sparks all along the
- * tunnel the arrow carved (using the muzzle position the arrow carries in its data watcher) and the vanilla
- * explosion particles, so the moment the shot goes off reads before the block updates of the tunnel arrive.</li>
- * </ul>
- * The magic circle the bow draws while it is being charged is <b>not</b> here: it is a textured quad rendered in
- * world space by {@code MTMagicCircleRenderer}. What is left in this class are the sprites that really are
- * particles; the spark sprite lives in the item atlas and is registered by the bow's own {@code registerIcons} (see
- * {@link MTEntityFXVoidstar} for why the item atlas is the one to use). Both ends of this class are client only.
+ * The particles of the Voidstar Piercer's arrow, spawned on the client that owns the view: {@link #spawnTrail},
+ * {@link #spawnPierceBurst}, {@link #spawnImpact}, each with its own budget and reason.
+ * <p>
+ * The charge magic circle is <b>not</b> here: {@code MTMagicCircleRenderer} draws it as a textured world space quad.
+ * These are sprites that really are particles; the spark sprite lives in the item atlas, registered by the bow's
+ * {@code registerIcons} (see {@link MTEntityFXVoidstar} for why that atlas). Client only.
  */
 @SideOnly(Side.CLIENT)
 public final class MTVoidstarFx {
 
-    /** The trail: particles per tick, their life, how far they scatter and how big they are. */
+    /** Trail: particles per tick, life, scatter, size. */
     private static final int TRAIL_PARTICLES_PER_TICK = 3;
     private static final int TRAIL_PARTICLE_LIFE = 6;
     private static final double TRAIL_SPREAD = 0.06D;
 
-    /** The burst of one drilled block: sparks thrown out of the face, and how far they spread. */
+    /** One drilled block: sparks out of the face, and their spread. */
     private static final int PIERCE_SPARKS = 7;
     private static final double PIERCE_SPREAD = 0.45D;
 
-    /** The impact: sparks flying out of the wall, sparks along the tunnel, and its own budget of them. */
+    /** Impact: sparks at the wall, sparks along the tunnel, each with its budget. */
     private static final int IMPACT_SPARKS = 26;
     private static final int IMPACT_TUNNEL_SPARKS = 60;
     private static final double IMPACT_TUNNEL_SPARKS_PER_BLOCK = 1.5D;
 
-    /** The one sprite of this class, registered by the bow's {@code registerIcons}; {@code null} until then. */
+    /** The one sprite here, from the bow's {@code registerIcons}; {@code null} until then. */
     private static IIcon sparkIcon;
 
     private MTVoidstarFx() {}
 
     /**
-     * Takes the spark sprite the item atlas is stitched with. Called from the bow's {@code Item#registerIcons}: the
-     * register handed to an item is the item atlas' one, which is the atlas layer 2 particles are drawn from.
+     * Takes the spark sprite of the item atlas. Called from the bow's {@code Item#registerIcons}, whose register is
+     * that atlas' (the atlas layer 2 particles are drawn from).
      */
     public static void registerIcons(IIconRegister register) {
         sparkIcon = register.registerIcon(MTItems.TEXTURE_DOMAIN + ":particle/voidstarSpark");
     }
 
     /**
-     * The trail of one tick of the arrow's flight: sparks spread along the step it just took (the arrow moves up to
-     * three blocks per tick, so one particle per position would leave a dotted line).
+     * The trail of one tick: sparks spread along the step just taken; the arrow moves up to three blocks per tick,
+     * so one particle per position would leave a dotted line.
      */
     public static void spawnTrail(MTEntityVoidstarArrow arrow) {
         if (sparkIcon == null || arrow == null) return;
@@ -96,13 +87,13 @@ public final class MTVoidstarFx {
     }
 
     /**
-     * The burst of one block the arrow drilled through: a handful of sparks thrown back out of the face it is
-     * pressed against. Cheap on purpose - the arrow triggers it once every few ticks while it digs.
+     * One block drilled through: a handful of sparks thrown back out of the face it is pressed against (see
+     * {@code MTEntityVoidstarArrow#onBlockContact}); cheap on purpose, it runs every few ticks while digging.
      *
-     * @param arrow the arrow that is stuck against the block
+     * @param arrow the arrow stuck against the block
      * @param x     the face it is pressed against
-     * @param y     see {@code x}
-     * @param z     see {@code x}
+     * @param y     as {@code x}
+     * @param z     as {@code x}
      */
     public static void spawnPierceBurst(MTEntityVoidstarArrow arrow, double x, double y, double z) {
         if (sparkIcon == null || arrow == null) return;
@@ -129,13 +120,12 @@ public final class MTVoidstarFx {
     }
 
     /**
-     * The big burst at the end of the flight: a flash at the point the arrow stopped at, sparks through the tunnel
-     * it carved and the vanilla explosion particles on top.
+     * The big burst at the end of the flight: the flash, the tunnel sparks and the vanilla explosion particles.
      *
-     * @param arrow the arrow whose flight ended; its data watcher carries the muzzle the tunnel starts at
+     * @param arrow the arrow whose flight ended; its data watcher carries the tunnel's muzzle
      * @param hitX  the point the flight ended at
-     * @param hitY  see {@code hitX}
-     * @param hitZ  see {@code hitX}
+     * @param hitY  as {@code hitX}
+     * @param hitZ  as {@code hitX}
      */
     public static void spawnImpact(MTEntityVoidstarArrow arrow, double hitX, double hitY, double hitZ) {
         if (arrow == null) return;
@@ -166,8 +156,7 @@ public final class MTVoidstarFx {
 
         spawnTunnelSparks(world, arrow, hitX, hitY, hitZ);
 
-        // The vanilla particles of an explosion, so the bang looks like one before the tunnel's block updates
-        // arrive at the client.
+        // Vanilla explosion particles, so the bang lands before the tunnel's block updates reach this client.
         for (int i = 0; i < 10; i++) {
             world.spawnParticle(
                 "largeexplode",
@@ -191,8 +180,8 @@ public final class MTVoidstarFx {
     }
 
     /**
-     * Sparks spread through the tunnel the shot carved: along the line from the muzzle to the wall, each one placed
-     * at a random point of the tunnel's cross section, so the whole corridor lights up at once.
+     * Sparks through the tunnel the shot carved: along the line from muzzle to wall, each at a random point of the
+     * tunnel's cross section, so the whole corridor lights up at once.
      */
     private static void spawnTunnelSparks(World world, MTEntityVoidstarArrow arrow, double hitX, double hitY,
         double hitZ) {
@@ -204,7 +193,7 @@ public final class MTVoidstarFx {
 
         double directionX = deltaX / length, directionY = deltaY / length, directionZ = deltaZ / length;
 
-        // The same right/up basis the magic circle uses, built from the flight direction.
+        // The same right/up basis as the magic circle, from the flight direction.
         double rightX = -directionZ, rightZ = directionX;
         double rightLength = Math.sqrt(rightX * rightX + rightZ * rightZ);
         if (rightLength < 1.0E-3D) {
@@ -248,7 +237,7 @@ public final class MTVoidstarFx {
         }
     }
 
-    /** One spark of the trail, of a drilled block and of the final impact. */
+    /** One spark: of the trail, of a drilled block, of the impact. */
     private static void spawnSpark(World world, double x, double y, double z, double motionX, double motionY,
         double motionZ, float scale, int life, float red, float green, float blue, float alpha) {
         Minecraft.getMinecraft().effectRenderer.addEffect(

@@ -11,26 +11,24 @@ import com.MessTech.common.util.Utils;
 /**
  * 1:1 port of Draconic Evolution's
  * {@code com.brandon3055.draconicevolution.common.tileentities.multiblocktiles.reactor.ReactorExplosion} (see
- * {@code tmp/Draconic-Evolution-master}), used as the MTReactor meltdown and as the Voidstar Piercer's DE mode.
+ * {@code tmp/Draconic-Evolution-master}), used as the MTReactor meltdown and the Voidstar Piercer's DE mode.
  * <p>
- * The explosion expands one block ring per tick up to {@code power * 10} blocks of radius and drops one
- * {@link MTExplosionDETrace} per ring block, which then blasts its whole vertical column, instead of IC2's
- * {@code ExplosionIC2}. IC2 never scales: its ray count is {@code 2 * ceil(pi / atan(0.4 / power))^2}, so a
- * 450 power explosion fires ~25 million rays (each one stepping hundreds of blocks) which freezes the server for
- * minutes before the very first block is removed.
+ * One block ring per tick up to {@code power * 10} blocks of radius, one {@link MTExplosionDETrace} per ring block,
+ * each blasting that block's whole vertical column - instead of IC2's {@code ExplosionIC2}, which never scales (ray
+ * count {@code 2 * ceil(pi / atan(0.4 / power))^2}: a 450 power explosion fires ~25 million rays, each stepping
+ * hundreds of blocks, and freezes the server for minutes before the first block goes).
  * <p>
- * <b>The fireball is ported too.</b> DE's process has no visual either - what the player sees is a client side
- * effect that {@code TileReactorCore#goBoom} triggers over the network, the
- * {@code Particles.ReactorExplosionParticle} that grows one block per tick up to {@code power * 10}. This mod has no
- * packet channel, so the same thing is spawned as a synced entity instead ({@link MTEntityDEBlast}, drawn by
- * {@code MTDEBlastRenderer}); the parameter DE sends over the wire - {@code (int) (power * 10F)} - is the entity's
- * maximum size. Every explosion of this class gets it, the reactor meltdown and the bow's DE mode alike.
+ * <b>The fireball is ported too.</b> DE's process has no visual either; the player sees a client side effect that
+ * {@code TileReactorCore#goBoom} triggers over the network, the {@code Particles.ReactorExplosionParticle} growing one
+ * block per tick up to {@code power * 10}. This mod has no packet channel, so it is a synced entity instead
+ * ({@link MTEntityDEBlast}, drawn by {@code MTDEBlastRenderer}); DE's parameter {@code (int) (power * 10F)} is the
+ * entity's maximum size. Every explosion of this class gets it.
  */
 public class MTExplosionDE implements IMTProcess {
 
     /**
-     * Draconic Evolution's own reactor explodes with 2..20 power, one power unit being roughly ten blocks of radius.
-     * This port keeps twice the original value, so the biggest possible MTReactor meltdown is 40 (400 blocks).
+     * DE's own reactor explodes with 2..20 power, one power unit being roughly ten blocks of radius. This port keeps
+     * twice the original value, so the biggest possible MTReactor meltdown is 40 (400 blocks).
      */
     public static final float MAX_POWER = 40.0F;
 

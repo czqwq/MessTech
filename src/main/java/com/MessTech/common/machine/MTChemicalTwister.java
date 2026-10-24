@@ -68,18 +68,15 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     private static final int HORIZONTAL_OFFSET = 8;
     private static final int VERTICAL_OFFSET = 8;
     private static final int DEPTH_OFFSET = 0;
-    // endregion
 
     // region Controller textures
     /**
-     * Face of the level 2 (概率毁灭者) controller: the four icon containers of GT++'s Quantum Force Transformer, i.e.
-     * exactly what {@code MTEQuantumForceTransformer#getTexture} passes to
-     * {@link Textures.BlockIcons#createTextureWithCasing}. The structure of that level is the QFT shell, so its
-     * controller looks like the QFT controller.
+     * Face of the level 2 (概率毁灭者) controller = GT++ QFT's own four icon containers (what
+     * {@code MTEQuantumForceTransformer#getTexture} passes to {@link Textures.BlockIcons#createTextureWithCasing}).
      * <p>
-     * These are fields and not inline reads on purpose: a {@code TexturesGtBlock.CustomIcon} adds itself to
-     * {@code GregTechAPI.sGTBlockIconload} in its constructor, and GT only walks that list while it loads the block
-     * textures. Read lazily (first frame) the icons would never be registered and the face would render empty.
+     * Fields, not lazy reads: a {@code TexturesGtBlock.CustomIcon} registers with
+     * {@code GregTechAPI.sGTBlockIconload} in its constructor and GT walks that list only while loading textures, so a
+     * first-frame read would render an empty face.
      */
     private static final IIconContainer QFT_FACE = TexturesGtBlock.oMCAQFT;
     private static final IIconContainer QFT_FACE_GLOW = TexturesGtBlock.oMCAQFTGlow;
@@ -87,11 +84,10 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     private static final IIconContainer QFT_FACE_ACTIVE_GLOW = TexturesGtBlock.oMCAQFTActiveGlow;
 
     /**
-     * Casing of the level 2 controller, i.e. what element {@code F} of that structure is built from: the
-     * BulkProductionFrame (GT++ {@code blockCasings2Misc:12}) of the QFT shell. The frame has no texture id in the GT
-     * casing index (its own id would be {@code TAE.getIndexFromPage(1, 12)}, and that slot is not registered - the
-     * block skips meta 12), so the block itself is copied, the same way {@code TextureFactory.of} does it for the
-     * casing of any casing-index-less block.
+     * Casing of the level 2 controller (element {@code F}): the QFT shell's BulkProductionFrame (GT++
+     * {@code blockCasings2Misc:12}), copied as a block because its GT casing id {@code TAE.getIndexFromPage(1, 12)} is
+     * an unregistered slot (the block skips meta 12) - what {@code TextureFactory.of} does for any casing-index-less
+     * block.
      */
     private static final ITexture TIER2_CASING = TextureFactory
         .of(Casings.BulkProductionFrame.getBlock(), Casings.BulkProductionFrame.getBlockMeta());
@@ -99,7 +95,7 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
 
     // region Structure definition
     protected static final String STRUCTURE_PIECE_MAIN = "main";
-    /** The level 2 (概率毁灭者) piece: a QFT shaped shell whose hatches sit on the SpaceTimeContinuumRipper. */
+    /** The level 2 (概率毁灭者) piece; its hatches sit on the SpaceTimeContinuumRipper. */
     protected static final String STRUCTURE_PIECE_TIER2 = "tier2";
 
     // spotless:off
@@ -124,16 +120,11 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
 
     };
     /*
-    Level 2 (概率毁灭者 / Probability Destroyer) uses its own letters, because StructureLib binds the element map to
-    the whole structure definition, not per shape - level 1 already means different casings with A-E:
-
-    F-> addElement('F', Casings.BulkProductionFrame.asElement()          (was 'A')
-    G-> addElement('G', Casings.QuantumForceTransformerCoilCasing.asElement()   (was 'B')
-    H-> addElement('H', Casings.SpaceTimeContinuumRipper ...)  + the hatches of that piece    (was 'C')
-    I-> addElement('I', Casings.SpaceTimeBendingCore.asElement()         (was 'D')
-    J-> addElement('J', Casings.ForceFieldGlass.asElement()              (was 'E')
-    Offsets:
-    8, 8, 0  (same controller position as level 1)
+    Level 2 (概率毁灭者 / Probability Destroyer) repeats the shape with its own letters: StructureLib binds the
+    element map to the whole structure definition, not per shape, and level 1 already means different casings with A-E.
+    F: BulkProductionFrame   G: QuantumForceTransformerCoilCasing   H: SpaceTimeContinuumRipper + its hatches
+    I: SpaceTimeBendingCore   J: ForceFieldGlass
+    Offsets 8, 8, 0 (same controller position as level 1)
     */
 
     //spotless:on
@@ -186,8 +177,8 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
             'C',
             GTStructureChannels.HEATING_COIL
                 .use(activeCoils(ofCoil(MTChemicalTwister::setCoilLevel, MTChemicalTwister::getCoilLevel))))
-        // level 2 (概率毁灭者): same shape as written in structure_tier2, letters F-J, hatches on the
-        // SpaceTimeContinuumRipper (element H). It has no heating coil ring: that mode runs at a fixed 12601 K.
+        // level 2 (概率毁灭者): shape as in structure_tier2, letters F-J, hatches on the
+        // SpaceTimeContinuumRipper (element H). No coil ring: that mode runs at a fixed 12601 K.
         .addShape(STRUCTURE_PIECE_TIER2, transpose(structure_tier2))
         .addElement('F', Casings.BulkProductionFrame.asElement())
         .addElement('G', Casings.QuantumForceTransformerCoilCasing.asElement())
@@ -200,11 +191,9 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
                     HatchElement.InputHatch,
                     HatchElement.OutputHatch,
                     HatchElement.Energy.or(HatchElement.ExoticEnergy))
-                // The ripper is a GT++ casing that has no entry in the GT casing texture pages: its
-                // Casings#textureId is -1 and HatchElementBuilder#casingIndex rejects anything <= 0 (passing it
-                // crashed the game while this class was being initialised). GT++'s own Quantum Force Transformer
-                // uses TAE.getIndexFromPage(0, 10) for the hatch host of this casing, so the hatches here get the
-                // same texture as there.
+                // The ripper has no GT casing texture page (Casings#textureId is -1) and
+                // HatchElementBuilder#casingIndex rejects <= 0 - that crashed the game during class init. GT++'s own
+                // QFT uses TAE.getIndexFromPage(0, 10) for this casing's hatches, so we match it.
                 .casingIndex(TAE.getIndexFromPage(0, 10))
                 .hint(1)
                 .buildAndChain(
@@ -218,25 +207,24 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
 
     // region Coil / heat
     /**
-     * Level of the heating coil ring of the structure (element {@code C}). The structure element writes it, once per
-     * coil block it accepts; {@link HeatingCoilLevel#None} means the structure has no coil (or a rejected one).
+     * Level of the heating coil ring (element {@code C}); {@link HeatingCoilLevel#None} = no coil (or a rejected one).
      */
     private HeatingCoilLevel mCoilLevel = HeatingCoilLevel.None;
 
     /**
-     * Heat the controller works with: the heat of the coil ring plus the heat bonus of the energy tier, the same
-     * formula the EBF uses. It is recomputed by every structure check, see {@link #checkMachine}.
+     * Heat the controller works with: coil ring heat plus the energy tier bonus (the EBF formula), see
+     * {@link #checkMachine}.
      */
     private int mHeatingCapacity;
 
-    /** @return the level of the coil ring, {@link HeatingCoilLevel#None} when no coil was found. */
+    /** @return the level of the coil ring, {@link HeatingCoilLevel#None} when none was found. */
     public HeatingCoilLevel getCoilLevel() {
         return mCoilLevel;
     }
 
     /**
-     * Called by the structure element {@code C}, once per coil block of the ring (see
-     * {@code GTStructureUtility.ofCoil}); a coil of a different level than the first one fails the structure check.
+     * Called by structure element {@code C} once per coil block ({@code GTStructureUtility.ofCoil}); a level differing
+     * from the first one fails the structure check.
      */
     public void setCoilLevel(HeatingCoilLevel aCoilLevel) {
         mCoilLevel = aCoilLevel;
@@ -250,8 +238,8 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     }
 
     /**
-     * @return the heat the recipes of this machine are checked against, i.e. {@link #getCoilHeat()} plus the tier
-     *         bonus. Zero while the structure is not formed, see {@link #checkMachine}.
+     * @return the heat the recipes are checked against, i.e. {@link #getCoilHeat()} plus the tier bonus; zero while
+     *         the structure is not formed, see {@link #checkMachine}.
      */
     public int getHeatingCapacity() {
         return mHeatingCapacity;
@@ -260,20 +248,15 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
 
     // region Structure level
     /**
-     * Level of the structure that is currently formed, zero while the machine is not formed. Levels 3..4 (bigger
-     * structures) will be added later, see {@link #checkMachine}.
+     * Level of the formed structure (0 = not formed; levels 3..4 come later, see {@link #checkMachine}).
      * <p>
-     * This is an independent gate from the coil ring: the coil ring only decides how much heat is available, the
-     * structure level decides which recipes are allowed at all. Recipes ask for a level with
-     * {@link MTRecipeMaps#CHEMICAL_TWISTER_STRUCTURE_LEVEL}; the processing logic refuses a recipe whose level is
-     * higher than this one with {@code insufficientMachineTier}.
-     * <p>
-     * The same level also decides what the controller looks like, see {@link #getTexture}, which is why it travels to
-     * the client with {@link #getUpdateData}.
+     * Independent gate of the coil ring: the ring gives the heat, the level decides which recipes run at all -
+     * {@link MTRecipeMaps#CHEMICAL_TWISTER_STRUCTURE_LEVEL} above this gives {@code insufficientMachineTier}. It also
+     * picks the controller face ({@link #getTexture}) and is synced with {@link #getUpdateData}.
      */
     private int mStructureLevel;
 
-    /** @return the level of the formed structure, zero when the machine is not formed. */
+    /** @return the level of the formed structure (0 when the machine is not formed). */
     public int getStructureLevel() {
         return mStructureLevel;
     }
@@ -294,18 +277,15 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
 
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
-        // The coil level, the heat and the structure level are properties of the structure, not a state of the
-        // machine: forget all three first, so a check that fails half way cannot leave the values of the previous
-        // structure behind.
+        // Coil level, heat and structure level describe the structure: reset all three first, so a check that fails
+        // half way cannot leave stale values behind.
         this.mHeatingCapacity = 0;
         this.mStructureLevel = 0;
         setCoilLevel(HeatingCoilLevel.None);
 
-        // Level 2 (概率毁灭者) is checked first and speculatively (null instead of the error list, see
-        // MTEPCBFactory#checkForNewTier), so a level 1 build keeps reporting only its own structure errors.
-        // That piece has no heating coil ring - the mode runs at a fixed 12601 K (Hypogen), see
-        // MTRecipeMaps.QFT_PROBABILITY_DESTROYER_HEAT - so no coil is required and none is read.
-        // The level it sets here is also what the controller renders with, see getTexture.
+        // Level 2 (概率毁灭者) first, speculatively (null, not the error list - see MTEPCBFactory#checkForNewTier), so a
+        // level 1 build reports only its own errors. It has no coil ring - a fixed 12601 K (Hypogen), see
+        // MTRecipeMaps.QFT_PROBABILITY_DESTROYER_HEAT - so no coil is read.
         if (checkPiece(STRUCTURE_PIECE_TIER2, HORIZONTAL_OFFSET, VERTICAL_OFFSET, DEPTH_OFFSET, null)) {
             this.mStructureLevel = 2;
             this.mHeatingCapacity = MTRecipeMaps.QFT_PROBABILITY_DESTROYER_HEAT;
@@ -315,8 +295,8 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
             return;
         }
 
-        // Level 1: the coil ring of element 'C' plus the energy tier bonus, the EBF formula (levels 3..4 would be
-        // checked the same way, biggest piece first, before the level 1 fallback below).
+        // Level 1: coil ring of element 'C' plus the energy tier bonus, the EBF formula (levels 3..4 would go the
+        // same way, biggest piece first).
         if (!checkPiece(STRUCTURE_PIECE_MAIN, HORIZONTAL_OFFSET, VERTICAL_OFFSET, DEPTH_OFFSET, errors)) return;
         this.mStructureLevel = 1;
 
@@ -328,15 +308,11 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
         checkHasAnyOutput(errors);
         checkHasAnyEnergy(errors);
 
-        // A structure without an energy hatch computes a lower value - the missing hatch is a structure error, so the
-        // machine cannot run with it anyway.
+        // Without an energy hatch this computes a lower value; the missing hatch is a structure error anyway.
         this.mHeatingCapacity = getCoilHeat() + 100 * (GTUtility.getTier(getMaxInputVoltage()) - 2);
     }
 
-    /**
-     * The heat is not only used by the recipe check below, it is also published to everything that reads device
-     * information (scanner, sensor card, metrics), the same way the EBF publishes its own heat.
-     */
+    /** Heat goes to every reader of device information (scanner, sensor card, metrics), like the EBF's own heat. */
     @Override
     public void getExtraInfoData(List<String> info) {
         super.getExtraInfoData(info);
@@ -344,19 +320,15 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     }
 
     /**
-     * Two independent gates, checked in this order:
+     * Two gates, in order:
      * <ol>
-     * <li><b>structure level</b>: the recipe must not need a bigger structure than the one that is formed. A recipe
-     * without {@link MTRecipeMaps#CHEMICAL_TWISTER_STRUCTURE_LEVEL} needs the base structure,
-     * {@link MTRecipeMaps#DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL}. Too low is reported with
-     * {@code CheckRecipeResultRegistry.insufficientMachineTier}.</li>
-     * <li><b>heat</b>: the heat of the coil ring (plus the tier bonus) must be at least the heat the recipe asks for,
-     * otherwise the recipe is refused as {@code insufficientHeat}.</li>
+     * <li><b>structure level</b>: above it, {@link MTRecipeMaps#CHEMICAL_TWISTER_STRUCTURE_LEVEL} (default
+     * {@link MTRecipeMaps#DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL}) gives
+     * {@code CheckRecipeResultRegistry.insufficientMachineTier};</li>
+     * <li><b>heat</b>: {@code mSpecialValue} above coil heat plus tier bonus gives {@code insufficientHeat}.</li>
      * </ol>
-     * The overclocking of a recipe that asks for heat follows the EBF: the difference between the required and the
-     * available heat is the heat discount and the heat overclocks. A recipe without a heat requirement (its
-     * {@code mSpecialValue} is zero, e.g. the assembler recipes of the template) keeps the standard overclocking of
-     * {@link MTMultiMachineBase}.
+     * Heat recipes overclock like the EBF: required vs available heat gives the heat discount and the heat overclocks;
+     * {@code mSpecialValue} zero keeps the standard {@link MTMultiMachineBase} overclocking.
      */
     @Override
     protected ProcessingLogic createProcessingLogic() {
@@ -407,10 +379,9 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     /** Mode 1: the QFT recipes at 100% output chance on the level 2 (概率毁灭者) structure, fixed 12601 K. */
     public static final int MODE_QFT_PROBABILITY_DESTROYER = 1;
     /**
-     * Level of the first of the bigger structures (概率毁灭者), and at the same time the trigger stack size at which a
-     * build hint / NEI preview switches from level 1 to level 2 - GT's tier convention, see
-     * {@link #getStructurePieceForBuild}. From this level on the controller renders the QFT face, see
-     * {@link #getTexture}.
+     * Level of the first bigger structure (概率毁灭者), and the trigger stack size at which a build hint / NEI preview
+     * switches from level 1 to level 2 - GT's tier convention, see {@link #getStructurePieceForBuild}. From here on
+     * the controller renders the QFT face, see {@link #getTexture}.
      */
     public static final int STRUCTURE_LEVEL_TIER2 = 2;
 
@@ -427,9 +398,8 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     }
 
     /**
-     * The screwdriver switches between the two modes; the base class also offers the same switch as a GUI button
-     * ({@code totalMachineMode() > 1} is what enables both). While the machine runs the switch is refused, so the
-     * recipe that is being processed cannot change under it.
+     * The screwdriver switches modes (the base class also offers a GUI button when {@code totalMachineMode() > 1}),
+     * refused while the machine runs so the running recipe cannot change under it.
      */
     @Override
     public void onScrewdriverRightClick(ForgeDirection side, EntityPlayer aPlayer, float aX, float aY, float aZ,
@@ -452,8 +422,8 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     }
 
     /**
-     * Mode 1 asks for a level 2 structure through the recipe metadata, so a wrong structure is reported as
-     * {@code insufficientMachineTier} by the processing logic instead of silently running the wrong recipes.
+     * Mode 1's recipes demand a level 2 structure via metadata, so a wrong structure reports
+     * {@code insufficientMachineTier} rather than silently running the wrong recipes.
      */
     @Override
     public RecipeMap<?> getRecipeMap() {
@@ -469,15 +439,11 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     // endregion
 
     /**
-     * Which piece a build hint / survival build / NEI preview shows.
-     * <p>
-     * The trigger's stack size is GT's usual "structure tier" switch (the PCB Factory picks its tier 1/2/3 the same
-     * way): {@code 1} = level 1, {@code >= 2} = level 2. That is what makes BlockRenderer6343 offer the Tier slider on
-     * this machine's NEI preview - it discovers the tiers by calling {@code construct()} with {@code stackSize =
-     * 1, 2, 3, ...} until nothing changes any more, and then offers a slider up to the highest tier that did. Selecting
-     * the tier explicitly always wins; without a tier (or with tier 1) the machine's current mode decides, so a player
-     * in 概率毁灭者 mode gets the level 2 hints in game while the NEI preview, which always previews a fresh machine in
-     * mode 0, still starts at level 1.
+     * Which piece a build hint / survival build / NEI preview shows. The trigger's stack size is GT's "structure tier"
+     * switch: {@code 1} = level 1, {@code >= 2} = level 2 - which is what makes BlockRenderer6343 offer its Tier slider
+     * ({@code construct()} is called with {@code stackSize = 1, 2, 3, ...} until nothing changes). An explicit tier
+     * wins, else the mode decides; the NEI preview builds a fresh machine, so it starts at level 1, while 概率毁灭者
+     * mode in game gets level 2 hints.
      */
     private String getStructurePieceForBuild(@Nullable ItemStack stackSize) {
         if (stackSize != null && stackSize.stackSize >= STRUCTURE_LEVEL_TIER2) return STRUCTURE_PIECE_TIER2;
@@ -487,12 +453,9 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
 
     /**
      * Makes the controller render the structure a build hint / survival build is about to place, see
-     * {@link #getStructurePieceForBuild}.
-     * <p>
-     * A formed machine is left alone - its level is the one {@link #checkMachine} found and is synced to the client on
-     * its own. An unformed one is the interesting case: BlockRenderer6343 previews this machine on a dummy multiblock
-     * in a dummy world that GT never ticks, so the trigger of the build is the only place the preview can learn which
-     * structure it is showing.
+     * {@link #getStructurePieceForBuild}. A formed machine keeps its level ({@link #checkMachine}, synced on its own);
+     * an unformed one matters, as BlockRenderer6343 previews it on a dummy multiblock in a world GT never ticks - the
+     * build trigger is the only place the preview can learn which structure it shows.
      */
     private void updatePreviewStructureLevel(@Nullable ItemStack stackSize) {
         if (mMachine) return;
@@ -574,10 +537,9 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     @Override
     public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity, ForgeDirection side, ForgeDirection facing,
         int colorIndex, boolean aActive, boolean aRedstone) {
-        // Which face the controller shows follows the structure that is formed, not the mode: level 1 is the base
-        // structure and its controller looks like a Large Chemical Reactor controller (idle or running, each with its
-        // glow layer) on a Chemically Inert Machine Casing, level 2 is the 概率毁灭者 (QFT shell) with the QFT face on
-        // the BulkProductionFrame. GT composes both for us, see getCasingTexture and STRUCTURE_LEVEL_TIER2.
+        // The face follows the formed structure, not the mode: level 1 = Large Chemical Reactor controller (idle or
+        // running, each with its glow layer) on Chemically Inert Machine Casing, level 2 = 概率毁灭者 (QFT shell), QFT
+        // face on BulkProductionFrame. GT composes both, see getCasingTexture and STRUCTURE_LEVEL_TIER2.
         if (mStructureLevel >= STRUCTURE_LEVEL_TIER2) {
             return Textures.BlockIcons.createTextureWithCasing(
                 this,
@@ -601,8 +563,8 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     }
 
     /**
-     * The casing of the controller, i.e. what element {@code D} (level 1) or {@code F} (level 2) of the structure is
-     * built from; see {@link #getTexture}. The level is the one on the client side too, see {@link #getUpdateData}.
+     * Casing of the controller, i.e. what element {@code D} (level 1) or {@code F} (level 2) is built from; see
+     * {@link #getTexture}. The level is client side too, see {@link #getUpdateData}.
      */
     @Override
     public ITexture getCasingTexture() {
@@ -611,10 +573,9 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     }
 
     /**
-     * The structure level decides how the controller looks (see {@link #getTexture}), so it has to be on the client as
-     * well - and only a structure check can know it, {@code MTEMultiBlockBase#checkStructure} does nothing on the
-     * client. This byte is what GT syncs for that: the value is sent whenever it changes and is part of the tile data
-     * packet, so a freshly loaded chunk renders correctly right away.
+     * The structure level decides how the controller looks (see {@link #getTexture}), so the client needs it - and
+     * only a structure check can know it ({@code MTEMultiBlockBase#checkStructure} does nothing on the client). GT
+     * syncs this byte in the tile data packet whenever it changes, so a loaded chunk renders right away.
      */
     @Override
     public byte getUpdateData() {

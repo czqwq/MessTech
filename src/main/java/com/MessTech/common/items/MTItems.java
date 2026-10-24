@@ -12,22 +12,21 @@ public final class MTItems {
     // region Transcendent Metal fuel rods
 
     /**
-     * IC2 pulse maths for a bare rod: every one of the {@code cells} passes adds {@code 1 + cells / 2} pulses and
-     * every pulse adds {@code energy} to the reactor output, so the EU/t of a lone rod is
-     * {@code energy * cells * (1 + cells / 2) * 5}. The energies below are picked so the output scales with the rod
-     * size instead of all three sizes sharing one base value:
+     * IC2 pulse maths for a bare rod: each of the {@code cells} passes adds {@code 1 + cells / 2} pulses, each pulse
+     * adds {@code energy}, so a lone rod makes {@code energy * cells * (1 + cells / 2) * 5} EU/t. The energies below
+     * scale with rod size instead of one shared base value:
      * <ul>
-     * <li>single: 9,000,000 x 1 x 1 x 5 = 45,000,000 EU/t (1.34A UIV, the requested "at least 1A UIV" floor)</li>
-     * <li>dual: 4,500,000 x 2 x 2 x 5 = 90,000,000 EU/t (exactly 2x the single rod)</li>
-     * <li>quad: 3,000,000 x 4 x 3 x 5 = 180,000,000 EU/t (exactly 4x the single rod)</li>
+     * <li>single: 9,000,000 x 1 x 1 x 5 = 45,000,000 EU/t (1.34A UIV, the "at least 1A UIV" floor)</li>
+     * <li>dual: 4,500,000 x 2 x 2 x 5 = 90,000,000 EU/t (2x the single rod)</li>
+     * <li>quad: 3,000,000 x 4 x 3 x 5 = 180,000,000 EU/t (4x the single rod)</li>
      * </ul>
-     * Durability 250,000 cycles (2.5x The Core) and the MOX heat bonus are unchanged.
+     * Durability 250,000 cycles (2.5x The Core); MOX heat bonus unchanged.
      * <p>
-     * Heat: per cycle a bare rod dumps {@code cells * triangular(1 + cells / 2) * heat} into its neighbours and the
-     * hull, so heat 4,096 means 4,096 / 24,576 / 98,304 HU per second for single / dual / quad. GT5U's
-     * {@code ItemList.neutroniumHeatCapacitor} ("1G Neutronium Heat Capacitor", 1,000,000,000 HU) therefore buffers
-     * a bare quad rod for ~2.8 hours and the UIV heat control hatch alone for ~6 hours, which is why the heat factor
-     * can be this high without making the rods unusable.
+     * Heat: per cycle a bare rod dumps {@code cells * triangular(1 + cells / 2) * heat} into neighbours and hull, so
+     * heat 4,096 gives 4,096 / 24,576 / 98,304 HU per second for single / dual / quad. GT5U's
+     * {@code ItemList.neutroniumHeatCapacitor} ("1G Neutronium Heat Capacitor", 1,000,000,000 HU) buffers a bare quad
+     * rod for ~2.8 hours and the UIV heat control hatch alone for ~6 hours, so the heat factor can be this high
+     * without making the rods unusable.
      */
     public static final int TRANSCENDENT_ROD_MAX_DAMAGE = 250_000;
     public static final float TRANSCENDENT_ROD_ENERGY_SINGLE = 9_000_000F;
@@ -98,7 +97,6 @@ public final class MTItems {
     public static final MTNACComponentItem nacComponentItem = new MTNACComponentItem();
     public static final ItemMessFood messFood = new ItemMessFood();
 
-    /** Decoration item whose look is cycled through the GT5U material effects (see {@code MTDynamicItemHelper}). */
     public static final MTItemPiggy piggy = new MTItemPiggy();
 
     /** The Voidstar Piercer (混沌终焉·虚无贯星弓): a bow whose arrows blast a tunnel through everything they fly into. */
@@ -110,6 +108,9 @@ public final class MTItems {
     /** The game console (游戏机): right click opens a window running a copy of DOOM. */
     public static final MTItemGameConsole gameConsole = new MTItemGameConsole();
 
+    /** LEG upgrade items (源质发电机升级): metadata 0 empty, 1..9 the essentia categories. */
+    public static final com.MessTech.common.thaumcraft.MTEssentiaUpgradeItem essentiaUpgrade = new com.MessTech.common.thaumcraft.MTEssentiaUpgradeItem();
+
     private MTItems() {}
 
     public static void registerItems() {
@@ -120,10 +121,12 @@ public final class MTItems {
         GameRegistry.registerItem(voidstarBow, "VoidstarBow");
         GameRegistry.registerItem(ultimatePatternTerminal, "UltimatePatternTerminal");
         GameRegistry.registerItem(gameConsole, "GameConsole");
+        GameRegistry.registerItem(essentiaUpgrade, "MTEssentiaUpgrade");
         MTItemList.UltimatePatternTerminal.set(new ItemStack(ultimatePatternTerminal, 1));
         MTItemList.GameConsole.set(new ItemStack(gameConsole, 1));
+        MTItemList.MTEssentiaUpgrade.set(new ItemStack(essentiaUpgrade, 1));
         // The fuel rods extend GT's GTGenericItem, whose constructor already calls
-        // GameRegistry.registerItem(this, "gt.<unlocalized>") (the same path GT's own rods use), so they must
-        // not be registered here a second time.
+        // GameRegistry.registerItem(this, "gt.<unlocalized>") (as GT's own rods do), so they must not be registered
+        // here a second time.
     }
 }

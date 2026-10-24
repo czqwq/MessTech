@@ -39,17 +39,16 @@ import gregtech.common.tileentities.machines.MTEHatchInputME;
 /**
  * "Inventory Input Hatch (ME)"
  * <p>
- * Like the GT5U stocking ME input hatch, but instead of exposing at most 16 configured fluid types it
- * snapshots the whole AE fluid network during every recipe processing check, so a multiblock can see
- * every fluid type stored in ME in one recipe check.
+ * Like the GT5U stocking ME input hatch, but it snapshots the whole AE fluid network on every recipe check instead of
+ * exposing at most 16 configured fluid types, so a multiblock sees every ME-stored type in one check.
  * <p>
- * It uses the advanced stocking ME hatch GUI (auto-pull toggle is available). When auto-pull is on,
- * the GUI still displays only the first 16 fluids from AE, while actual recipe processing uses the
- * complete snapshot from {@link #inventorySlots} (filtered by the configured minimum amount).
- * The per-recipe-check snapshot is refreshed on every {@link #startRecipeProcessing()}, matching the
- * GT5U stocking hatch's automatic per-check pull notification.
- * When auto-pull is off, it behaves like the normal GT5U stocking hatch: only the manually configured
- * 16 fluids are exposed and no auto pull happens.
+ * Uses the advanced stocking ME hatch GUI (auto-pull toggle). Auto-pull on: the GUI shows only the first 16 AE fluids
+ * while
+ * processing uses the full snapshot from {@link #inventorySlots} (filtered by the configured minimum amount), refreshed
+ * on
+ * every {@link #startRecipeProcessing()} like the GT5U hatch's per-check pull. Auto-pull off: behaves like the normal
+ * GT5U
+ * stocking hatch, only the manually configured 16 fluids, no auto pull.
  */
 public class MTInventoryInputHatchME extends MTEHatchInputME {
 
@@ -76,7 +75,6 @@ public class MTInventoryInputHatchME extends MTEHatchInputME {
     @Override
     public String[] getDescription() {
         return new String[] {
-            // EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.meinventory.inputhatch.desc.0"),
             EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.meinventory.inputhatch.desc.1"),
             EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.meinventory.inputhatch.desc.2") };
     }
@@ -130,10 +128,8 @@ public class MTInventoryInputHatchME extends MTEHatchInputME {
         }
 
         if (autoPullFluidList) {
-            // Auto-pull mode: the GUI only shows the first 16 fluids, but every recipe check pulls a
-            // fresh full snapshot from AE. This mirrors the original hatch behavior where the recipe
-            // check itself notifies the hatch to refresh its available contents, allowing continuous
-            // feeding even while autoPullRefreshTime governs the 16-slot GUI refresh.
+            // Auto-pull: every recipe check pulls a fresh full AE snapshot (the GUI still shows only the first 16
+            // fluids), so feeding is continuous although autoPullRefreshTime governs the GUI.
             try {
                 IMEMonitor<IAEFluidStack> sg = getProxy().getStorage()
                     .getFluidInventory();
@@ -236,8 +232,7 @@ public class MTInventoryInputHatchME extends MTEHatchInputME {
             return drained;
         }
 
-        // Outside recipe processing, allow direct simulated/real extraction from the whole ME fluid
-        // network for the requested fluid.
+        // Outside recipe processing, allow direct simulated/real extraction from the whole ME network.
         IMEMonitor<IAEFluidStack> sg;
         IEnergyGrid energy;
         try {

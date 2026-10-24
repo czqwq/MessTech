@@ -8,11 +8,10 @@ import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import io.netty.buffer.ByteBuf;
 
 /**
- * Base of every packet MessTech sends from a client to the server.
- * <p>
- * Ported unchanged from GT-Not-Leisure's {@code com.science.gtnl.common.packet.base.ServerboundPacket}: a malformed
- * payload is marked invalid instead of throwing out of Netty's decode loop, and the concrete packet only has to
- * implement {@link #read(ByteBuf)}, {@link #write(ByteBuf)} and {@link #handleServer(EntityPlayerMP)}.
+ * Base of every packet MessTech sends from a client to the server. Ported unchanged from GT-Not-Leisure's
+ * {@code com.science.gtnl.common.packet.base.ServerboundPacket}: a malformed payload is marked invalid instead of
+ * throwing out of Netty's decode loop, and a concrete packet only implements {@link #read(ByteBuf)},
+ * {@link #write(ByteBuf)} and {@link #handleServer(EntityPlayerMP)}.
  */
 public abstract class ServerboundPacket implements IMessage {
 

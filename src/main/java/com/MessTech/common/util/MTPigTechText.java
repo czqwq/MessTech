@@ -1,49 +1,37 @@
 package com.MessTech.common.util;
 
 /**
- * The "PigTech" brand line: the static "Add by:" prefix the MessTech line uses, followed by one two second loop in
- * which the word winds up, charges, slams into an invisible elastic wall, is thrown back, lands and settles again.
+ * The "PigTech" brand line: the static "Add by:" prefix the MessTech line uses, then one two second loop in which
+ * the word winds up, charges, slams into an invisible elastic wall, is thrown back, lands and settles again.
  * <p>
- * Everything is expressed in the <b>string</b> that a {@code Supplier<String>} hands to gtnhlib's
- * {@code AnimatedTooltipHandler}, which re-evaluates it once per frame - the same mechanism the "Add by: MessTech"
- * line and the animated author names in {@code GTAuthors} use. The prefix ({@code messTech.addBy}, "添加模组:" /
- * "Add by:") is copied into the line verbatim by {@link #frame(String, String, long)}, so it is byte for byte
- * identical in every frame and only the word after it animates.
+ * All of it is the <b>string</b> a {@code Supplier<String>} hands to gtnhlib's {@code AnimatedTooltipHandler}, which
+ * re-evaluates it once per frame - the mechanism of the "Add by: MessTech" line and the {@code GTAuthors} names. The
+ * prefix ({@code messTech.addBy}, "添加模组:" / "Add by:") is copied in verbatim by
+ * {@link #frame(String, String, long)}; only the word after it animates.
  * <p>
- * A tooltip line is laid out glyph by glyph at a fixed height, so the animation uses the four handles that medium
- * really has:
+ * A tooltip line is laid out glyph by glyph at a fixed height, so there are four handles:
  * <ul>
- * <li><b>Spaces.</b> Every space is a fixed advance, so the gaps between the letters can be pulled apart ("stretch")
- * or pushed into the margins ("squash"), and the whole word can travel sideways ("charge"). Every frame uses the same
- * glyphs and the same number of spaces, so the line - and therefore the tooltip box - never changes width, and the
- * word stays inside its own band of {@code letters - 1 + 2} spaces. That band keeps {@code MIN_MARGIN} space of
- * margin on each side in every frame, and {@link #frame(String, String, long)} puts {@link #PREFIX_SEPARATOR} in front
- * of it as well, so however hard the pig squashes there are always at least two spaces (~8 px) between the ":" of the
- * prefix and the nearest glyph of the animation. The brief's "no more than 20% of the type size" is one space of
- * travel (~10% of the word).</li>
- * <li><b>{@code §l} bold and {@code §o} italic.</b> The impact frames go bold - fat glyphs read as a squash - and the
- * charge leans forward. Neither changes the advance, so the width stays fixed.</li>
- * <li><b>Colour.</b> A four entry pig palette (pink, white, gold, white) steps once every 100 ms. 2000 / 100 is 20
- * steps and the palette divides 20, so the colour band is back where it started when the loop restarts. Everything
- * that has to appear and disappear (the two snout puffs and the ears) keeps its slot in the string and is painted
- * black while it is "gone" - black text on the dark tooltip background is invisible.</li>
- * <li><b>One line only.</b> There is no vertical axis: a tooltip line cannot be moved up or down, so the jump is told
- * by the squash and stretch of the letters, the ear twitch and the landing flash instead of by moving the word. This
- * line is deliberately a single line - no ground bar and no second tooltip line under it - so all the pig's weight
- * lands in the letters themselves. The ears are the two {@code ^} glyphs, which sit on the top row of the font, and
- * the snout puffs are {@code .}, which sit on the bottom row.</li>
+ * <li><b>Spaces.</b> A fixed advance: gaps pulled apart ("stretch"), pushed into the margins ("squash"), the word
+ * moved sideways ("charge"). Same glyphs and same space count in every frame, so neither the line nor the tooltip box
+ * changes width and the word stays in its band of {@code letters - 1 + 2} spaces - {@code MIN_MARGIN} on each side
+ * plus {@link #PREFIX_SEPARATOR} - leaving at least two spaces (~8 px) between the prefix's ":" and the nearest
+ * glyph. Travel budget from the brief: one space, ~10% of the word.</li>
+ * <li><b>{@code §l} bold, {@code §o} italic.</b> Impact frames go bold (fat glyphs read as a squash), the charge
+ * leans forward; neither changes the advance.</li>
+ * <li><b>Colour.</b> A four entry pig palette (pink, white, gold, white), 100 ms a step: 2000 / 100 = 20 steps, which
+ * the palette divides, so the loop restarts in its frame 0 colours. Parts that vanish (the two snout puffs, the ears)
+ * keep their slot and are painted black - invisible on the dark tooltip background.</li>
+ * <li><b>One line only.</b> No vertical axis, so the jump is told by squash and stretch, the ear twitch and the
+ * landing flash; deliberately no ground bar and no second line. Ears are the two {@code ^} (top row of the font), the
+ * puffs {@code .} (bottom row).</li>
  * </ul>
- * Only plain ASCII glyphs are used: the built-in font texture is a CP437 layout, so a code point such as {@code °}
- * would render as a shade block instead of a degree sign, while {@code ^ .} look the same in both of the game's
- * fonts.
+ * ASCII only: the built-in font is CP437, so {@code °} would render as a shade block, while {@code ^ .} look the same
+ * in both of the game's fonts. Plain Java, no Minecraft imports, so it compiles and can be inspected on its own (see
+ * {@code tmp/pigtext}); {@link #frame(String, String, long)} is all the game needs.
  * <p>
- * The class is deliberately plain Java - no Minecraft imports - so the animation can be compiled and inspected on its
- * own, see {@code tmp/pigtext}. {@link #frame(String, String, long)} is all the game needs.
- * <p>
- * The timeline follows the brief (all times in seconds): wind up {@code 0.00-0.40}, charge and impact
- * {@code 0.40-0.70}, recoil and jump {@code 0.70-1.10}, landing with two bounces {@code 1.10-1.40}, then settling
- * back to the exact frame 0 pose {@code 1.40-2.00}, so {@code frame(prefix, text, t)} always equals
- * {@code frame(prefix, text, t + 2000)}.
+ * Timeline (seconds): wind up {@code 0.00-0.40}, charge and impact {@code 0.40-0.70}, recoil and jump
+ * {@code 0.70-1.10}, landing with two bounces {@code 1.10-1.40}, settling back to the frame 0 pose
+ * {@code 1.40-2.00}, so {@code frame(prefix, text, t)} always equals {@code frame(prefix, text, t + 2000)}.
  */
 public final class MTPigTechText {
 
@@ -51,7 +39,7 @@ public final class MTPigTechText {
     public static final long LOOP_MS = 2_000L;
 
     /**
-     * The one space {@link #frame(String, String, long)} puts between a static prefix and the animation, the same
+     * The one space {@link #frame(String, String, long)} puts between a static prefix and the animation - the same
      * separator the MessTech line uses after {@code messTech.addBy}.
      */
     public static final String PREFIX_SEPARATOR = " ";
@@ -66,7 +54,7 @@ public final class MTPigTechText {
     /** The band the letters cycle through: pig pink, white, gold, white. */
     private static final String[] FLOW = { PINK, WHITE, GOLD, WHITE };
 
-    /** Brightness ramp for the parts that fade in and out. Index 0 is invisible on the dark tooltip background. */
+    /** Brightness ramp for the parts that fade in and out; index 0 is invisible on the dark tooltip background. */
     private static final String[] FADE_CODES = { BLACK, DARK_GREY, GREY, WHITE };
 
     /** Glyphs: ears on the top row of the font, tiny dots for the snout puffs. */
@@ -77,7 +65,7 @@ public final class MTPigTechText {
 
     /**
      * Spaces of margin the animated band keeps on each side in every frame, so neither the prefix on the left nor the
-     * edge of the tooltip on the right can ever be touched - not even in the frames that squash and push hardest.
+     * tooltip edge on the right can be touched, not even in the frames that squash hardest.
      */
     private static final int MIN_MARGIN = 1;
 
@@ -97,8 +85,8 @@ public final class MTPigTechText {
     /**
      * Renders one frame of the animation behind a static prefix.
      *
-     * @param prefix the static text in front of the animation, normally the translated {@code messTech.addBy}; it is
-     *               copied verbatim into every frame, an empty or {@code null} prefix leaves it out
+     * @param prefix the static text in front, normally the translated {@code messTech.addBy}; copied verbatim into
+     *               every frame, an empty or {@code null} prefix leaves it out
      * @param text   the string to animate, normally {@code "PigTech"}; the layout adapts to any length
      * @param millis any clock in milliseconds, normally {@code System.currentTimeMillis()}
      * @return that frame, as one tooltip line
@@ -205,10 +193,8 @@ public final class MTPigTechText {
     }
 
     /**
-     * The whole timeline as functions of the time inside the loop.
-     * <p>
-     * The word starts and ends at its rest pose: normal spacing, no travel and no effects, so frame 2000 is frame 0
-     * again.
+     * The whole timeline as functions of the time inside the loop. The word starts and ends at its rest pose - normal
+     * spacing, no travel, no effects - so frame 2000 is frame 0 again.
      */
     private static Pose poseAt(double t) {
         Pose pose = new Pose();
@@ -326,10 +312,8 @@ public final class MTPigTechText {
     }
 
     /**
-     * Piecewise smooth curve through {@code time, value} pairs, with one pair per two arguments.
-     * <p>
-     * Outside the given range the first (or last) value is held, which is what keeps the pose at both ends of the
-     * loop identical.
+     * Piecewise smooth curve through {@code time, value} pairs, one pair per two arguments. Outside the range the
+     * first (or last) value is held, which keeps the pose at both ends of the loop identical.
      */
     private static double curve(double t, double... points) {
         int last = points.length - 2;

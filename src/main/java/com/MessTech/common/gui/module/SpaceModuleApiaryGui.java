@@ -47,24 +47,13 @@ import gregtech.common.modularui2.widget.SlotLikeButtonWidget;
  * MUI2 GUI of the space apiary modules: the shared space-module GUI plus the bee slots.
  * <p>
  * The bee slots are not a machine inventory - a queen put in one is never consumed (see
- * {@link SpaceModuleApiary#checkProcessing_EM()}) - so they are drawn as
- * {@link SlotLikeButtonWidget}s and edited over clicks, the way GT5's own Mega Industrial Apiary does it. The terminal
- * area switches between the usual machine status text and a scrollable grid of those buttons; the switch is the
- * button this GUI adds to the right of the panel gap.
+ * {@link SpaceModuleApiary#checkProcessing_EM()}) - so they are {@link SlotLikeButtonWidget}s edited over clicks, like
+ * GT5's Mega Industrial Apiary; the button right of the panel gap toggles between the status text and the grid.
  * <p>
- * Two details are copied from the Mega Industrial Apiary on purpose:
- * <ul>
- * <li>Queens that share a species, a secondary species and a speed allele collapse into <b>one</b> button with their
- * number on it ({@link MTBeeSimulator#speciesKey}), so a module full of one bee is one button, and the free capacity is
- * the single empty button at the end.</li>
- * <li>An invisible one-item <b>queen buffer</b> slot is registered as the shift-click target. Without it a
- * shift-clicked queen would land in the machine's controller slot, which is the only shift-click target the shared
- * space-module GUI offers (see {@link #createButtonColumn}).</li>
- * </ul>
- * Slot contents are a single synced list (the machine's own array, which GT's tile NBT already persists): the client
- * only ever reads it, and every modification happens on the server in {@link #handleBeeClick(int)}. The clicks
- * themselves travel as one encoded integer - see {@link #sendClick(int, int)} - because the slot buttons carry no
- * inventory of their own.
+ * Queens of one species and speed collapse into <b>one</b> button with their number
+ * ({@link MTBeeSimulator#speciesKey}); an invisible one-item <b>queen buffer</b> slot catches shift-clicked queens
+ * (see {@link #registerQueenBufferSlot}). Slot contents: one synced list of the machine's array, edited only on the
+ * server ({@link #handleBeeClick(int)}), one encoded integer per click (see {@link #sendClick(int, int)}).
  */
 public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
 
@@ -92,8 +81,8 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
     }
 
     /**
-     * One button of the grid: queens of one species and speed, or - with a {@code null} stack - the free capacity that
-     * is left. {@code firstSlot} is the real bee slot a click on this button acts on, -1 for the free entry.
+     * One button of the grid: queens of one species and speed, or - with a {@code null} stack - the free capacity left.
+     * {@code firstSlot} is the bee slot a click acts on, -1 for the free entry.
      */
     private static final class BeeEntry {
 
@@ -125,8 +114,8 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
         super.registerSyncValues(syncManager);
         this.syncManager = syncManager;
 
-        // The machine's bee array is the single source of truth for both sides. GT's sync framework polls the getter
-        // and pushes it to the client whenever it changes, so showing or editing a queen needs no extra bookkeeping.
+        // The machine's bee array is the single source of truth for both sides: the sync framework polls the getter and
+        // pushes it to the client on change, so showing or editing a queen needs no bookkeeping.
         this.beeSlotsSyncer = GenericListSyncHandler.<ItemStack>builder()
             .getterArray(apiary::getBeeSlots)
             .serializer(IByteBufSerializer.wrapNullSafe((buffer, stack) -> buffer.writeItemStackToBuffer(stack)))
@@ -145,13 +134,10 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
     }
 
     /**
-     * Registers the invisible queen buffer slot that catches shift-clicked queens.
-     * <p>
-     * Shift-click transfer walks every registered slot group in priority order, and the only storage group the shared
-     * space-module GUI registers is the controller slot in its button column - which takes anything, so a queen ends up
-     * there instead of in a bee slot. This slot sits in the same priority bracket but only accepts queens and only
-     * while a bee slot is free, and it moves what it receives straight into the bee slots. Like the Mega Industrial
-     * Apiary's queen slot it needs no widget of its own: MUI2 finds transfer targets through the slot group.
+     * The invisible queen buffer slot for shift-clicked queens. Shift-click walks the registered slot groups in
+     * priority order, and the shared space-module GUI's only storage group is the button column's controller slot,
+     * which takes anything. This one has the same priority but takes queens only, while a bee slot is free, and moves
+     * them into the bee slots; MUI2 finds transfer targets through the slot group, so it needs no widget.
      */
     private void registerQueenBufferSlot(PanelSyncManager syncManager) {
         ItemStackHandler buffer = new ItemStackHandler(1) {
@@ -198,12 +184,9 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
     }
 
     /**
-     * The scrollable bee slot grid.
-     * <p>
-     * One button per possible entry is created once - at most one per bee slot plus the free entry - and each button
-     * enables itself while its entry exists. A disabled button collapses in its row (and a row without any enabled
-     * button collapses in the list), so the grid grows and shrinks with the bee population without being rebuilt; the
-     * buttons read their content from the synced list while they are drawn.
+     * The scrollable bee slot grid: one button per possible entry (one per bee slot plus the free entry), created once
+     * and enabling itself while its entry exists. A disabled button collapses in its row and an empty row in the list,
+     * so the grid follows the bee population without being rebuilt; the buttons read the synced list as they draw.
      */
     private IWidget createBeeSlotGrid() {
         int buttons = beeSlotCapacity() + 1;
@@ -229,8 +212,7 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
             @Override
             public void draw(ModularGuiContext context, WidgetThemeEntry<?> widgetThemeEntry) {
                 super.draw(context, widgetThemeEntry);
-                // The Mega Industrial Apiary puts the number of identical bees on the button; the free entry shows how
-                // much room is left instead.
+                // The number of identical bees rides on the button; the free entry shows the room left instead.
                 int count = entryCount(index);
                 if (count > 1 || isFreeEntry(index)) {
                     GuiDraw.drawStandardSlotAmountText(count, null, getArea());
@@ -256,9 +238,8 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
     }
 
     /**
-     * The bee slots as the Mega Industrial Apiary shows them: queens of one species and speed become one entry with
-     * their number on it, and the free capacity becomes the single empty entry at the end. Rebuilt only when the synced
-     * slots change.
+     * The bee slots as the Mega Industrial Apiary shows them: queens of one species and speed are one entry with their
+     * number, the free capacity one empty entry at the end. Rebuilt only when the synced slots change.
      */
     private List<BeeEntry> entries() {
         if (this.entries != null) return this.entries;
@@ -319,9 +300,9 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
     }
 
     /**
-     * Strips a queen down to what identifies her in the grid, the way the Mega Industrial Apiary does: chromosome 0
-     * (species) and chromosome 1 (speed) plus the analysed flag. Without this every bee would carry her whole genome on
-     * the button and two identical-looking bees would still differ.
+     * Strips a queen to what identifies her in the grid, as the Mega Industrial Apiary does: chromosome 0 (species),
+     * chromosome 1 (speed) and the analysed flag. Otherwise the whole genome would ride on the button and
+     * identical-looking bees would still differ.
      */
     private static ItemStack displayStack(ItemStack original) {
         ItemStack display = new ItemStack(original.getItem(), 1, original.getItemDamage());
@@ -380,8 +361,8 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
 
     /**
      * Packs a click into the single synced integer: the bee slot it acts on (-1 for the free entry, which the server
-     * resolves to its first free slot), the mouse button and whether shift was held. Both are offset by two so that no
-     * real click can ever be the value 0, which is what the framework resets the handler to between clicks.
+     * resolves to its first free slot), the mouse button and shift. The slot is offset by two so that no real click can
+     * be 0, the value the framework resets the handler to between clicks.
      */
     private void sendClick(int slot, int button) {
         if (beeClickSyncer == null) return;
@@ -497,10 +478,8 @@ public class SpaceModuleApiaryGui extends SpaceModuleInfinityGui {
     }
 
     /**
-     * The apiary has no controller slot to offer: the shared button column would register one, it would take any item
-     * a shift-click sends its way (queens included) and nothing in this machine ever reads it. Dropping it leaves the
-     * queen buffer as the only shift-click target, exactly like the Mega Industrial Apiary, and matches the other
-     * space modules that have nothing to put in a controller slot.
+     * The apiary offers no controller slot: the shared button column's would take any shift-clicked item (queens
+     * included) and nothing here reads it. Dropping it leaves the queen buffer as the only shift-click target.
      */
     @Override
     protected Flow createButtonColumn(ModularPanel panel, PanelSyncManager syncManager) {

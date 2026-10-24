@@ -16,9 +16,7 @@ import gregtech.api.GregTechAPI;
 import gregtech.common.gui.modularui.hatch.base.MTEHatchBaseGui;
 
 /**
- * GUI of {@link MTModuleParallelHatch}: one text field that sets the parallel the machine may use, between 1 and the
- * ceiling of the module tier.
- * <p>
+ * GUI of {@link MTModuleParallelHatch}: one text field setting the parallel the machine may use, 1..the tier ceiling.
  * Modelled on GT5U's {@code MTEHatchWirelessMultiGui}.
  */
 public class MTModuleParallelHatchGui extends MTEHatchBaseGui<MTModuleParallelHatch> {

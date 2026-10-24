@@ -8,22 +8,21 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * One particle of the Voidstar Piercer's effects: a single sprite of the item atlas, drawn as a camera facing quad
- * with a lifetime, a colour and a fade.
+ * One particle of the Voidstar Piercer's effects: a camera facing quad of one item atlas sprite, with a lifetime,
+ * a colour and a fade.
  * <p>
- * The layer is {@link #getFXLayer() 2}, the item atlas, because that is the one atlas a mod can put its own sprite
- * into without a texture stitch handler of its own - the bow's {@code registerIcons} registers the spark sprite
- * ({@code particle/voidstarSpark}) next to its own icons, and {@code EffectRenderer#renderParticles} binds exactly
- * that atlas for layer 2. Layer 0, the vanilla particle sheet, cannot take a custom sprite at all:
- * {@code EntityFX#setParticleIcon} throws for it.
+ * Layer {@link #getFXLayer() 2}, the item atlas - the one atlas a mod can add its own sprite to without a stitch
+ * handler: the bow's {@code registerIcons} registers the spark ({@code particle/voidstarSpark}) next to its icons,
+ * and {@code EffectRenderer#renderParticles} binds that atlas for layer 2. Layer 0, the vanilla particle sheet,
+ * cannot take a custom sprite at all: {@code EntityFX#setParticleIcon} throws.
  * <p>
- * The particles are full bright ({@link #getBrightnessForRender}, the same {@code 0xF000F0} vanilla's spell
- * particles return), so the trail and the bursts glow in an unlit cave instead of turning into grey dots.
+ * Full bright ({@link #getBrightnessForRender}: {@code 0xF000F0}, as vanilla's spell particles), so trail and bursts
+ * glow in an unlit cave instead of turning grey.
  */
 @SideOnly(Side.CLIENT)
 public final class MTEntityFXVoidstar extends EntityFX {
 
-    /** Full daylight brightness as a packed lightmap value; see the class comment. */
+    /** Packed lightmap full daylight; see the class comment. */
     private static final int FULL_BRIGHT = 0xF000F0;
 
     private final float initialScale;
@@ -31,19 +30,13 @@ public final class MTEntityFXVoidstar extends EntityFX {
     private final int lifetime;
 
     /**
-     * @param world    the client world
-     * @param x        position of the particle
-     * @param y        see {@code x}
-     * @param z        see {@code x}
-     * @param motionX  velocity, in blocks per tick
-     * @param motionY  see {@code motionX}
-     * @param motionZ  see {@code motionX}
-     * @param icon     the sprite to draw, from the item atlas
-     * @param scale    size multiplier: a scale of 1 draws a quad {@code 0.2} blocks wide
-     * @param lifetime how many ticks the particle lives, i.e. how long it fades
-     * @param red      colour of the sprite, 0..1
-     * @param green    see {@code red}
-     * @param blue     see {@code red}
+     * Position {@code x}/{@code y}/{@code z}, velocity {@code motionX}/{@code motionY}/{@code motionZ} in blocks per
+     * tick, colour {@code red}/{@code green}/{@code blue} 0..1.
+     *
+     * @param world    client world
+     * @param icon     sprite of the item atlas
+     * @param scale    1 = a 0.2 block quad
+     * @param lifetime ticks lived, i.e. the fade
      * @param alpha    starting opacity, 0..1
      */
     public MTEntityFXVoidstar(World world, double x, double y, double z, double motionX, double motionY, double motionZ,
@@ -64,8 +57,7 @@ public final class MTEntityFXVoidstar extends EntityFX {
         this.particleBlue = blue;
         this.particleAlpha = alpha;
         this.initialAlpha = alpha;
-        // A magic circle is drawn in the air in front of the player; a particle that collides with the blocks
-        // behind it would stop dead on them.
+        // Drawn in mid-air: colliding with the blocks behind it would stop it dead.
         this.noClip = true;
     }
 
@@ -80,8 +72,8 @@ public final class MTEntityFXVoidstar extends EntityFX {
     }
 
     /**
-     * Ages and fades the particle: the colour holds for the first third of its life and then fades out, while the
-     * sprite shrinks slightly, which reads as a spark burning down rather than blinking off.
+     * Ages and fades: the colour holds for the first third of the life, then fades while the sprite shrinks slightly
+     * - a spark burning down, not blinking off.
      */
     @Override
     public void onUpdate() {

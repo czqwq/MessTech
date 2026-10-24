@@ -7,15 +7,15 @@ import net.minecraft.network.PacketBuffer;
 import com.cleanroommc.modularui.value.sync.SyncHandler;
 
 /**
- * Client -&gt; server actions for the reactor access hatch slot memory system.
+ * Client -&gt; server actions for the reactor access hatch slot memory.
  * <p>
- * Using one shared handler (instead of one per slot) keeps the MUI2 sync map small even for the 8-page UIV hatch.
+ * One shared handler (not one per slot) keeps the MUI2 sync map small even for the 8-page UIV hatch.
  */
 public class MTReactorSlotActionSyncHandler extends SyncHandler<MTReactorSlotActionSyncHandler> {
 
     /** Shift + right click on an unlocked slot: lock all slots of the same item type. */
     public static final int ACTION_LOCK_GROUP = 1;
-    /** Shift + right click on a locked slot: unlock only this slot. */
+    /** Shift + right click on a locked slot: unlock this slot only. */
     public static final int ACTION_UNLOCK_SLOT = 2;
     /** Alt + Shift + right click on a locked slot: unlock all slots of the same item type. */
     public static final int ACTION_UNLOCK_GROUP = 3;

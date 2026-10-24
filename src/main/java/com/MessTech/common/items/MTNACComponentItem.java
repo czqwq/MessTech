@@ -18,10 +18,9 @@ import gregtech.api.enums.Mods;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponent;
 
 /**
- * Real item forms for NAC CircuitComponents that only exist as fake items.
- * <p>
- * Metadata values are identical to {@link CircuitComponent#metaId}, so fake/real conversion can be
- * done by item id + metadata. Textures and tooltips mirror the original fake CircuitComponent item.
+ * Real item forms for NAC CircuitComponents that only exist as fake items. Metadata values are identical to
+ * {@link CircuitComponent#metaId}, so fake/real conversion is item id + metadata; textures and tooltips mirror the
+ * original fake CircuitComponent item.
  */
 public class MTNACComponentItem extends Item {
 

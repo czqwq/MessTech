@@ -80,10 +80,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         super(aName);
     }
 
-    /**
-     * All MessTech machines share the MT logo in their controller GUI. Machines with a specialised GUI subclass
-     * override this or the GUI's logo widget; space modules use their own picture and are not affected.
-     */
+    /** Machines share the MT logo; specialised GUIs override this or the logo, space modules use their own picture. */
     @Override
     protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
         return new MTMultiMachineBaseGui<>(this);
@@ -105,13 +102,10 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     // region Energy tier
 
     /**
-     * Tier of the machine's energy hatches: the <b>highest</b> {@link MTEHatch#getInputTier()} among all of them,
-     * exotic hatches (laser hatch / multi-amp hatch) included.
-     * <p>
-     * Use this instead of {@link #getInputVoltageTier()}, which the GT base class implements by iterating
-     * {@code mEnergyHatches} only: it returns 0 for a machine powered by an exotic hatch (those are collected into
-     * {@code mExoticEnergyHatches}) and for plain hatches whose tiers differ, and a 0 that reaches a recipe gate
-     * refuses every recipe while displaying the recipe's own tier.
+     * Tier of the machine's energy hatches: the <b>highest</b> {@link MTEHatch#getInputTier()}, exotic hatches
+     * included. Use this instead of {@link #getInputVoltageTier()}, which iterates {@code mEnergyHatches} only and
+     * returns 0 for an exotic hatch or differing plain tiers - a 0 that reaches a recipe gate refuses every recipe
+     * while displaying the recipe's own tier.
      */
     public long getEnergyHatchTier() {
         long tier = 0;
@@ -126,9 +120,8 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     // region Processing Logic
 
     /**
-     * Creates logic to run recipe check based on recipemap. This runs only once, on class instantiation.
-     * <p>
-     * If this machine doesn't use recipemap or does some complex things, override {@link #checkProcessing()}.
+     * Creates the recipe-check logic of a recipemap, once on instantiation; without a recipemap override
+     * {@link #checkProcessing()} instead.
      */
     @ApiStatus.OverrideOnly
     protected ProcessingLogic createProcessingLogic() {
@@ -148,16 +141,12 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     }
 
     /**
-     * Proxy Perfect Overclock Supplier.
-     *
      * @return If true, enable Perfect Overclock.
      */
     protected abstract boolean isEnablePerfectOverclock();
 
     /**
-     * Proxy Standard Eu Modifier Supplier.
-     *
-     * @return The value (or a method to get the value) of Eu Modifier (dynamically) .
+     * @return The Eu Modifier, read dynamically.
      */
     @ApiStatus.OverrideOnly
     protected float getEuModifier() {
@@ -165,45 +154,29 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     }
 
     /**
-     * Proxy Standard Speed Multiplier Supplier.
-     *
-     * @return The value (or a method to get the value) of Speed Multiplier (dynamically) .
+     * @return The Speed Multiplier, read dynamically.
      */
     @ApiStatus.OverrideOnly
     protected abstract float getSpeedBonus();
 
     /**
-     * Proxy Standard Parallel Supplier.
-     *
-     * @return The value (or a method to get the value) of Max Parallel (dynamically) .
+     * @return The Max Parallel, read dynamically.
      */
     @ApiStatus.OverrideOnly
     public abstract int getMaxParallelRecipes();
 
-    /**
-     * Limit the max parallel to prevent overflow.
-     *
-     * @return Limited parallel.
-     */
+    /** @return The max parallel, limited to prevent overflow. */
     protected int getLimitedMaxParallel() {
         return getMaxParallelRecipes();
     }
 
-    /**
-     * Prevent overflow during power consumption calculation.
-     *
-     * @return Eu consumption per tick.
-     */
+    /** @return EU consumption per tick, avoiding overflow in the calculation. */
     @Override
     protected long getActualEnergyUsage() {
         return (long) (-this.lEUt * (10000.0 / Math.max(1000, mEfficiency)));
     }
 
-    /**
-     * Checks recipe and setup machine if it's successful.
-     * <p>
-     * For generic machine working with recipemap, use {@link #createProcessingLogic()} to make use of shared codebase.
-     */
+    /** Checks the recipe and sets up the machine if successful; see {@link #createProcessingLogic()}. */
     @Nonnull
     @Override
     public CheckRecipeResult checkProcessing() {
@@ -232,14 +205,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         return result;
     }
 
-    /**
-     * <p>
-     * Get inputting items without DualInputHatch, and no separation mode.
-     * <p>
-     * Always used to get some special input items.
-     *
-     * @return The inputting items.
-     */
+    /** @return The inputting items without DualInputHatch and without separation mode, for special input items. */
     public ArrayList<ItemStack> getStoredInputsWithoutDualInputHatch() {
 
         ArrayList<ItemStack> rList = new ArrayList<>();
@@ -297,11 +263,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         return rList;
     }
 
-    /**
-     * Forced get all input items, include all Dual Input Hatch slot.
-     *
-     * @return The items list.
-     */
+    /** @return All input items, including every Dual Input Hatch slot. */
     public ArrayList<ItemStack> getStoredInputsNoSeparation() {
         ArrayList<ItemStack> rList = new ArrayList<>();
 
@@ -349,11 +311,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         return rList;
     }
 
-    /**
-     * Forced get all input fluids, include all Dual Input Hatch slot.
-     *
-     * @return ArrayList of all fluid stacks, contains fluid stacks in Crafting Input Hatch.
-     */
+    /** @return All input fluids, including every Dual Input Hatch slot and the Crafting Input Hatch. */
     public ArrayList<FluidStack> getStoredFluidsWithDualInput() {
         ArrayList<FluidStack> rList = new ArrayList<>();
         Map<Fluid, FluidStack> inputsFromME = new HashMap<>();
@@ -420,7 +378,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         long amps = getMaxInputAmps();
 
         return new String[] {
-            /* 1 */ StatCollector.translateToLocal("GT5U.multiblock.Progress") + ": "
+            StatCollector.translateToLocal("GT5U.multiblock.Progress") + ": "
                 + EnumChatFormatting.GREEN
                 + mProgresstime / 20
                 + EnumChatFormatting.RESET
@@ -429,7 +387,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
                 + mMaxProgresstime / 20
                 + EnumChatFormatting.RESET
                 + " s",
-            /* 2 */ StatCollector.translateToLocal("GT5U.multiblock.energy") + ": "
+            StatCollector.translateToLocal("GT5U.multiblock.energy") + ": "
                 + EnumChatFormatting.GREEN
                 + storedEnergy
                 + EnumChatFormatting.RESET
@@ -438,12 +396,12 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
                 + maxEnergy
                 + EnumChatFormatting.RESET
                 + " EU",
-            /* 3 */ StatCollector.translateToLocal("GT5U.multiblock.usage") + ": "
+            StatCollector.translateToLocal("GT5U.multiblock.usage") + ": "
                 + EnumChatFormatting.RED
                 + getActualEnergyUsage()
                 + EnumChatFormatting.RESET
                 + " EU/t",
-            /* 4 */ StatCollector.translateToLocal("GT5U.multiblock.mei") + ": "
+            StatCollector.translateToLocal("GT5U.multiblock.mei") + ": "
                 + EnumChatFormatting.YELLOW
                 + voltage
                 + EnumChatFormatting.RESET
@@ -455,7 +413,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
                 + EnumChatFormatting.YELLOW
                 + VN[GTUtility.getTier(voltage)]
                 + EnumChatFormatting.RESET,
-            /* 5 */ StatCollector.translateToLocal("GT5U.multiblock.problems") + ": "
+            StatCollector.translateToLocal("GT5U.multiblock.problems") + ": "
                 + EnumChatFormatting.RED
                 + (getIdealStatus() - getRepairStatus())
                 + EnumChatFormatting.RESET
@@ -466,7 +424,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
                 + mEfficiency / 100.0F
                 + EnumChatFormatting.RESET
                 + " %",
-            /* 6 */ StatCollector.translateToLocal("GT5U.multiblock.pollution") + ": "
+            StatCollector.translateToLocal("GT5U.multiblock.pollution") + ": "
                 + EnumChatFormatting.GREEN
                 + getAveragePollutionPercentage()
                 + EnumChatFormatting.RESET
@@ -530,7 +488,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         for (MTEHatchDynamo aDynamo : filterValidMTEs(mDynamoHatches)) {
             long aVoltage = aDynamo.maxEUOutput();
             long aTotal = aDynamo.maxAmperesOut() * aVoltage;
-            // Check against voltage to check when hatch mixing
+            // Check against voltage to detect hatch mixing
             if (aFirstVoltageFound == -1) {
                 aFirstVoltageFound = aVoltage;
             } else {
@@ -541,13 +499,7 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
             totalOutput += aTotal;
         }
 
-        /*
-         * disable explosion
-         * if (totalOutput < aEU || (aFoundMixedDynamos && !aAllowMixedVoltageDynamos)) {
-         * explodeMultiblock();
-         * return false;
-         * }
-         */
+        // Explosion on insufficient output or mixed dynamos is disabled on purpose.
 
         long actualOutputEU;
         if (totalOutput < aEU) {
@@ -586,59 +538,38 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
         return true;
     }
 
-    /**
-     * No more machine error
-     */
+    /** Maintenance is disabled on every override below, so no machine error can occur. */
     @Override
     public boolean doRandomMaintenanceDamage() {
         return true;
     }
 
-    /**
-     * No more machine error
-     */
     @Override
     public void checkMaintenance() {}
 
-    /**
-     * No more machine error
-     */
     @Override
     public boolean getDefaultHasMaintenanceChecks() {
         return false;
     }
 
-    /**
-     * No more machine error
-     */
     @Override
     public final boolean shouldCheckMaintenance() {
         return false;
     }
 
-    /**
-     * Gets the maximum Efficiency that spare Part can get (0 - 10000)
-     *
-     * @param aStack
-     */
+    /** @return The maximum efficiency a spare part can get (0 - 10000). */
     @Override
     public int getMaxEfficiency(ItemStack aStack) {
         return 10000;
     }
 
-    /**
-     * Gets the damage to the ItemStack, usually 0 or 1.
-     *
-     * @param aStack
-     */
+    /** @return The damage to the ItemStack, usually 0 or 1. */
     @Override
     public int getDamageToComponent(ItemStack aStack) {
         return 0;
     }
 
-    /**
-     * no longer afraid of rain
-     */
+    /** no longer afraid of rain */
     @Override
     public boolean willExplodeInRain() {
         return false;
@@ -724,12 +655,9 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     }
 
     /**
-     * Set total mode count for the machine.
-     * Also indicate whether this machine has multiple modes.
-     * Use {@link #machineMode} to get current machine mode index.
-     * Override {@link #getMachineModeName(int)} to set name for each mode.
-     * Override {@link #setMachineModeIcons()} to set button icon.
-     * Override {@link #setMachineMode(int)} or {@link #nextMachineMode()} to restrict mode change.
+     * Set the total mode count, which also says whether the machine has multiple modes; {@link #machineMode} is the
+     * current index. Override {@link #getMachineModeName(int)}, {@link #setMachineModeIcons()} and
+     * {@link #nextMachineMode()} as needed.
      */
     public int totalMachineMode() {
         return 1;
@@ -791,9 +719,8 @@ public abstract class MTMultiMachineBase<T extends MTMultiMachineBase<T>> extend
     public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
         int z) {
         super.getWailaNBTData(player, tile, tag, world, x, y, z);
-        // Upstream GT MTEMultiBlockBase#getWailaBody displays tag.getString("mode") in the Waila
-        // running-mode line, so write the localized mode name instead of a raw integer.
-        // Also keep an integer copy for subclasses that need the numeric mode in their Waila body.
+        // Upstream GT MTEMultiBlockBase#getWailaBody shows tag.getString("mode") in the running-mode line, so write the
+        // localized name plus an integer copy for subclasses that need the numeric mode.
         if (supportsMachineModeSwitch()) {
             tag.setString("mode", getMachineModeName(machineMode));
             tag.setInteger("machineMode", machineMode);

@@ -7,8 +7,6 @@ dependencies {
         // 是否自动为输出的jar添加 `gtnhVersion` 后缀
         attachManifestVersionToJar = false
     }
-    //implementation("com.github.GTNewHorizons:GT5-Unofficial:5.09.54.108:dev")
-    //implementation("com.github.GTNewHorizons:NewHorizonsCoreMod:2.9.49:dev")
     implementation(gtnhDev("GT5-Unofficial"))
     implementation(gtnhDev("Applied-Energistics-2-Unofficial"))
     implementation(gtnhDev("NewHorizonsCoreMod"))
@@ -37,8 +35,17 @@ dependencies {
     implementation(deobfCurse('witchery-69673:2234410'))
     implementation(gtnhDev("WitcheryExtras"))
 
+    // TC API for the essentia machines and the Thaumonomicon research; present at runtime through the line below.
+    compileOnly("thaumcraft:Thaumcraft:1.7.10-4.2.3.5:dev") { transitive = false }
+    // ThE API for the ME essentia input hatch (AE2 itself is a full dependency above); runtime through the line below.
+    compileOnly(gtnhDev("ThaumicEnergistics")) { transitive = false }
+
+    // Optional client integrations of the text effects: the font batch bridge and the NEI input field are only mixed in
+    // when the mod is present, so they are compile-time only here and the pack supplies them at runtime.
+    compileOnly(gtnhDev("Angelica")) { transitive = false }
+    compileOnly(gtnhDev("NotEnoughItems")) { transitive = false }
+
     //runtime
-    //runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.125-GTNH:dev")
     runtimeOnlyNonPublishable(gtnhDev("Angelica"))
     runtimeOnlyNonPublishable(gtnhDev("NotEnoughItems"))
     runtimeOnlyNonPublishable(gtnhDev("OpenComputers"))

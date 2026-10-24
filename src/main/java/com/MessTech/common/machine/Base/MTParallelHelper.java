@@ -39,100 +39,34 @@ public class MTParallelHelper extends ParallelHelper {
 
     // region Variables
     private static final double MAX_BATCH_MODE_TICK_TIME = 128;
-    /**
-     * Machine used for calculation
-     */
     private IVoidable machine;
-    /**
-     * Machine used for single recipe locking calculation
-     */
     private IRecipeLockable singleRecipeMachine;
-    /**
-     * Is locked to a single recipe?
-     */
     private boolean isRecipeLocked;
-    /**
-     * Recipe used when trying to calculate parallels
-     */
     private GTRecipe recipe;
-    /**
-     * EUt available to the multiblock (This should be the total eut available)
-     */
+    /** The total EUt available to the multiblock */
     private long availableEUt;
-    /**
-     * The current parallel possible for the multiblock
-     */
     private int currentParallel = 0;
-    /**
-     * The maximum possible parallel possible for the multiblock
-     */
     private int maxParallel = 1;
-    /**
-     * The Batch Modifier applied when batch mode is enabled. 1 does nothing. 2 doubles max possible
-     * parallel, but also duration
-     */
+    /** Batch mode: 1 does nothing, 2 doubles the max possible parallel and the duration */
     private int batchModifier = 1;
-    /**
-     * The inputs of the multiblock for the current recipe check
-     */
     private ItemStack[] itemInputs;
-    /**
-     * The outputs of the recipe with the applied parallel
-     */
     private ItemStack[] itemOutputs;
-    /**
-     * The inputs of the multiblock for the current recipe check
-     */
     private FluidStack[] fluidInputs;
-    /**
-     * The outputs of the recipe with the applied parallel
-     */
     private FluidStack[] fluidOutputs;
-    /**
-     * Does the multi have void protection enabled for items
-     */
     private boolean protectExcessItem;
-    /**
-     * Does the multi have void protection enabled for fluids
-     */
     private boolean protectExcessFluid;
-    /**
-     * Should the Parallel Helper automatically consume for the multi
-     */
     private boolean consume;
-    /**
-     * Is batch mode turned on?
-     */
     private boolean batchMode;
-    /**
-     * Should the Parallel Helper automatically calculate the outputs of the recipe with current parallel?
-     */
     private boolean calculateOutputs;
-    /**
-     * Has the Parallel Helper been built?
-     */
     private boolean built;
-    /**
-     * What is the duration multiplier with batch mode enabled
-     */
     private double durationMultiplier;
-    /**
-     * Modifier which is applied on the recipe eut. Useful for GT++ machines
-     */
+    /** Modifier applied on the recipe eut (useful for GT++ machines) */
     private float eutModifier = 1;
-    /**
-     * Method for calculating max parallel from given inputs.
-     */
+    /** Calculates the max parallel from the given inputs */
     private MaxParallelCalculator maxParallelCalculator = MTParallelHelper::maxParallelCalculatedByInputs;
-//    private MaxParallelCalculator maxParallelCalculator = GTRecipe::maxParallelCalculatedByInputs;
-    /**
-     * Method for consuming inputs after determining how many parallels it can execute.
-     */
+    /** Consumes the inputs once the parallel count is known */
     private InputConsumer inputConsumer = MTParallelHelper::consumeInput;
 
-    /**
-     * Calculator to use for overclocking
-     */
     private OverclockCalculator calculator;
 
     private CheckRecipeResult result = CheckRecipeResultRegistry.NONE;
@@ -148,16 +82,12 @@ public class MTParallelHelper extends ParallelHelper {
     // region Setters
 
 
-    /**
-     * Sets machine, with current configuration for void protection mode.
-     */
+    /** Sets the machine, taking its own void protection flags. */
     public ParallelHelper setMachine(IVoidable machine) {
         return setMachine(machine, machine.protectsExcessItem(), machine.protectsExcessFluid());
     }
 
-    /**
-     * Sets machine, with void protection mode forcibly.
-     */
+    /** Sets the machine and the void protection flags. */
     public ParallelHelper setMachine(IVoidable machine, boolean protectExcessItem, boolean protectExcessFluid) {
         this.protectExcessItem = protectExcessItem;
         this.protectExcessFluid = protectExcessFluid;
@@ -165,9 +95,7 @@ public class MTParallelHelper extends ParallelHelper {
         return this;
     }
 
-    /**
-     * Sets the recipe, which will be used for the parallel calculation
-     */
+    /** Sets the recipe used for the parallel calculation. */
     public ParallelHelper setRecipe(@Nonnull GTRecipe aRecipe) {
         recipe = Objects.requireNonNull(aRecipe);
         return this;
@@ -179,33 +107,25 @@ public class MTParallelHelper extends ParallelHelper {
         return this;
     }
 
-    /**
-     * Sets the items available for the recipe check
-     */
+
     public ParallelHelper setItemInputs(ItemStack... aItemInputs) {
         this.itemInputs = aItemInputs;
         return this;
     }
 
-    /**
-     * Sets the fluid inputs available for the recipe check
-     */
+
     public ParallelHelper setFluidInputs(FluidStack... aFluidInputs) {
         this.fluidInputs = aFluidInputs;
         return this;
     }
 
-    /**
-     * Sets the available eut when trying for more parallels
-     */
+
     public ParallelHelper setAvailableEUt(long aAvailableEUt) {
         this.availableEUt = aAvailableEUt;
         return this;
     }
 
-    /**
-     * Sets the modifier for recipe eut. 1 does nothing 0.9 is 10% less. 1.1 is 10% more
-     */
+    /** Modifier for the recipe eut: 1 does nothing, 0.9 is 10% less, 1.1 is 10% more. */
     public ParallelHelper setEUtModifier(float aEUtModifier) {
         this.eutModifier = aEUtModifier;
         return this;
@@ -224,28 +144,19 @@ public class MTParallelHelper extends ParallelHelper {
         return setConsumption(true);
     }
 
-    /**
-     * Set if we should consume inputs or not when trying for parallels
-     *
-     * @param consume Should we consume inputs
-     */
+
     public ParallelHelper setConsumption(boolean consume) {
         this.consume = consume;
         return this;
     }
 
-    /**
-     * Sets the MaxParallel a multi can handle
-     */
+
     public ParallelHelper setMaxParallel(int maxParallel) {
         this.maxParallel = maxParallel;
         return this;
     }
 
-    /**
-     * Enables Batch mode. Can do up to an additional processed recipes of mCurrentParallel * mBatchModifier A batch
-     * modifier of 1 does nothing
-     */
+    /** Enables batch mode: up to mCurrentParallel * mBatchModifier extra recipes, a modifier of 1 does nothing. */
     public ParallelHelper enableBatchMode(int batchModifier) {
         this.batchMode = batchModifier > 1;
         this.batchModifier = batchModifier;
@@ -260,29 +171,19 @@ public class MTParallelHelper extends ParallelHelper {
         return setOutputCalculation(true);
     }
 
-    /**
-     * Sets if we should calculate outputs with the parallels we found or not
-     *
-     * @param calculateOutputs Should we calculate outputs with the helper or not
-     */
+
     public ParallelHelper setOutputCalculation(boolean calculateOutputs) {
         this.calculateOutputs = calculateOutputs;
         return this;
     }
 
-    /**
-     * Set a custom way to calculate item outputs. You are given the amount of parallels and must return an ItemStack
-     * array
-     */
+    /** Custom item output calculation: gets the parallel count, returns the ItemStack array. */
     public ParallelHelper setCustomItemOutputCalculation(Function<Integer, ItemStack[]> custom) {
         customItemOutputCalculation = custom;
         return this;
     }
 
-    /**
-     * Set a custom way to calculate item outputs. You are given the amount of parallels and must return a FluidStack
-     * array
-     */
+    /** Custom fluid output calculation: gets the parallel count, returns the FluidStack array. */
     public ParallelHelper setCustomFluidOutputCalculation(Function<Integer, FluidStack[]> custom) {
         customFluidOutputCalculation = custom;
         return this;
@@ -290,9 +191,7 @@ public class MTParallelHelper extends ParallelHelper {
 
     // endregion
 
-    /**
-     * Finishes the ParallelHelper. Anything changed after this will not effect anything
-     */
+    /** Finishes the ParallelHelper; anything changed after this has no effect. */
     public ParallelHelper build() {
         if (built) {
             throw new IllegalStateException("Tried to build twice");
@@ -305,9 +204,7 @@ public class MTParallelHelper extends ParallelHelper {
         return this;
     }
 
-    /**
-     * @return The current parallels possible by the multiblock
-     */
+
     public int getCurrentParallel() {
         if (!built) {
             throw new IllegalStateException("Tried to get parallels before building");
@@ -315,9 +212,7 @@ public class MTParallelHelper extends ParallelHelper {
         return currentParallel;
     }
 
-    /**
-     * @return The duration multiplier if batch mode was enabled for the multiblock
-     */
+
     public double getDurationMultiplierDouble() {
         if (!built) {
             throw new IllegalStateException("Tried to get duration multiplier before building");
@@ -336,9 +231,7 @@ public class MTParallelHelper extends ParallelHelper {
         return (float) getDurationMultiplierDouble();
     }
 
-    /**
-     * @return The ItemOutputs from the recipe
-     */
+
     @Nonnull
     public ItemStack[] getItemOutputs() {
         if (!built || !calculateOutputs) {
@@ -348,9 +241,7 @@ public class MTParallelHelper extends ParallelHelper {
         return itemOutputs;
     }
 
-    /**
-     * @return The FluidOutputs from the recipe
-     */
+
     @Nonnull
     public FluidStack[] getFluidOutputs() {
         if (!built || !calculateOutputs) {
@@ -360,9 +251,7 @@ public class MTParallelHelper extends ParallelHelper {
         return fluidOutputs;
     }
 
-    /**
-     * @return The result of why a recipe could've failed or succeeded
-     */
+
     @Nonnull
     public CheckRecipeResult getResult() {
         if (!built) {
@@ -380,11 +269,8 @@ public class MTParallelHelper extends ParallelHelper {
     }
 
     /**
-     * Try to consume the inputs of the recipe
+     * Try to consume the inputs of the recipe.
      *
-     * @param recipe      Processed recipe
-     * @param fluids      fluid inputs that will be consumed
-     * @param items       item inputs that will be consumed
      * @param minParallel minimum amount of parallels to do with this check
      * @return True if recipe was satisfied, else false
      */
@@ -394,9 +280,7 @@ public class MTParallelHelper extends ParallelHelper {
     }
 
 
-    /**
-     * Called by build(). Determines the parallels and everything else that needs to be done at build time
-     */
+    /** Called by build(): determines the parallels and everything else needed at build time. */
     protected void determineParallel() {
 
         if (maxParallel <= 0) {
@@ -430,12 +314,11 @@ public class MTParallelHelper extends ParallelHelper {
             return;
         }
 
-        // Save the original max parallel before calculating our overclocking under 1 tick
+        // Save maxParallel before the under-one-tick overclock correction
         int originalMaxParallel = maxParallel;
         calculator.setParallel(originalMaxParallel);
 
-        // If the machine has custom supplier, use old method for giving parallels for overclocking too much, otherwise
-        // use multiplier
+        // With a custom supplier use the old under-one-tick method, otherwise the multiplier
         if (calculator.hasDurationUnderOneTickSupplier()) {
             if (calculator.getDurationUnderOneTickSupplier() < 1) {
                 maxParallel = GTUtility.safeInt((long) (maxParallel / calculator.getDurationUnderOneTickSupplier()), 0);
@@ -461,8 +344,7 @@ public class MTParallelHelper extends ParallelHelper {
         if (isRecipeLocked && singleRecipeMachine != null) {
             recipeCheck = singleRecipeMachine.getSingleRecipeCheck();
             if (recipeCheck == null) {
-                // Machine is configured to lock to a single recipe, but haven't built the recipe checker yet.
-                // Build the checker on next successful recipe.
+                // Locked to a single recipe but the checker is not built yet: build it on the next successful recipe.
                 RecipeMap<?> recipeMap = singleRecipeMachine.getRecipeMap();
                 if (recipeMap != null) {
                     tSingleRecipeCheckBuilder = SingleRecipeCheck.builder(recipeMap)
@@ -471,7 +353,7 @@ public class MTParallelHelper extends ParallelHelper {
             }
         }
 
-        // Let's look at how many parallels we can get with void protection
+        // How many parallels fit with void protection
         if (protectExcessItem || protectExcessFluid) {
             if (machine == null) {
                 throw new IllegalStateException("Tried to calculate void protection, but machine is not set");
@@ -497,7 +379,6 @@ public class MTParallelHelper extends ParallelHelper {
 
         maxParallelBeforeBatchMode = Math.min(maxParallel, maxParallelBeforeBatchMode);
 
-        // determine normal parallel
         int actualMaxParallel = tRecipeEUt > 0 ? (int) Math.min(maxParallelBeforeBatchMode, availableEUt / tRecipeEUt)
                                     : maxParallelBeforeBatchMode;
         if (recipeCheck != null) {
@@ -506,7 +387,7 @@ public class MTParallelHelper extends ParallelHelper {
             currentParallel = (int) maxParallelCalculator.calculate(recipe, actualMaxParallel, fluidInputs, itemInputs);
             if (currentParallel > 0) {
                 if (tSingleRecipeCheckBuilder != null) {
-                    // If recipe checker is not built yet, build and set it
+                    // No checker yet: build and set it
                     inputConsumer.consume(recipe, 1, fluidInputs, itemInputs);
                     SingleRecipeCheck builtCheck = tSingleRecipeCheckBuilder.setAfter(itemInputs, fluidInputs)
                                                                             .setRecipe(recipe)
@@ -524,18 +405,10 @@ public class MTParallelHelper extends ParallelHelper {
             return;
         }
 
-
-//        long eutUseAfterOC = calculator.setCurrentParallel(currentParallel)
-//                                       .setParallel(Math.min(currentParallel, originalMaxParallel))
-//                                       .calculate()
-//                                       .getConsumption();
-//        if (currentParallel > originalMaxParallel) {
-//            calculator.setRecipeEUt(eutUseAfterOC);
-//        }
         calculator.setParallel(Math.min(currentParallel, originalMaxParallel))
                   .calculate();
 
-        // If Batch Mode is enabled determine how many extra parallels we can get
+        // Batch mode: how many extra parallels fit under MAX_BATCH_MODE_TICK_TIME
         if (batchMode && currentParallel > 0 && calculator.getDuration() < MAX_BATCH_MODE_TICK_TIME) {
             int tExtraParallels;
             double batchMultiplierMax = MAX_BATCH_MODE_TICK_TIME / calculator.getDuration();
@@ -554,7 +427,7 @@ public class MTParallelHelper extends ParallelHelper {
             currentParallel += tExtraParallels;
         }
 
-        // If we want to calculate outputs we do it here
+        // Outputs, if the helper should calculate them
         if (calculateOutputs && currentParallel > 0) {
             if (recipe.mOutputs != null) {
                 calculateItemOutputs(truncatedItemOutputs);
@@ -567,10 +440,9 @@ public class MTParallelHelper extends ParallelHelper {
     }
 
     /**
-     * This class keeps its own copies of the input arrays, shadowing {@link ParallelHelper}'s fields. The inherited
-     * implementation would read those (never assigned) parent fields and crash with a {@link NullPointerException}
-     * whenever a machine runs with {@link #setConsumption(boolean) consumption disabled} - e.g. MTDTPF in wireless
-     * mode, which has no input bus at all. Copy the arrays this class actually uses instead.
+     * Shadow the parent input fields: {@link ParallelHelper}'s inherited copyInputs reads fields this class never
+     * assigns and throws a {@link NullPointerException} when a machine runs with
+     * {@link #setConsumption(boolean) consumption disabled} (e.g. MTDTPF in wireless mode, which has no input bus).
      */
     @Override
     protected void copyInputs() {
@@ -727,8 +599,8 @@ public class MTParallelHelper extends ParallelHelper {
     }
 
     /**
-     * Returns the number of parallel recipes, or 0 if recipe is not satisfied at all. 0 < number < 1 means that inputs
-     * are found but not enough. Refer to SingleRecipeCheck#checkRecipeInputs.
+     * @return The number of parallel recipes, 0 if the recipe is not satisfied at all; 0 < n < 1 means inputs are
+     *         found but not enough. Refer to SingleRecipeCheck#checkRecipeInputs.
      */
     public static double maxParallelCalculatedByInputs(GTRecipe recipe, int maxParallel, FluidStack[] aFluidInputs, ItemStack... aInputs) {
         if (recipe.mInputs.length > 0 && aInputs == null) return 0;
@@ -738,7 +610,6 @@ public class MTParallelHelper extends ParallelHelper {
         double currentParallel = maxParallel;
 
         if (recipe.mFluidInputs.length > 0) {
-            // Create map for fluid -> stored amount
             Map<Fluid, Long> fluidMap = new HashMap<>();
             Map<Fluid, Long> fluidCost = new HashMap<>();
             for (FluidStack fluidStack : aFluidInputs) {
@@ -750,7 +621,6 @@ public class MTParallelHelper extends ParallelHelper {
                 fluidCost.merge(fluidStack.getFluid(), (long) fluidStack.amount, Long::sum);
             }
 
-            // Check how many parallels can it perform for each fluid
             for (Map.Entry<Fluid, Long> costEntry : fluidCost.entrySet()) {
                 if (costEntry.getValue() > 0) {
                     currentParallel = Math.min(
@@ -812,46 +682,6 @@ public class MTParallelHelper extends ParallelHelper {
         }
 
         return currentParallel;
-
-
-
-
-//        if (aInputs != null) {
-//            nextRecipeItemCost: for (ItemStack recipeItemCost : recipe.mInputs) {
-//
-//                // for non-consumed input
-//                if (recipeItemCost.stackSize == 0) continue;
-//
-//                ItemStack unifiedItemCost = GTOreDictUnificator.get_nocopy(recipeItemCost);
-//                if (unifiedItemCost != null) {
-//                    remainingCost = recipeItemCost.stackSize * currentParallel;
-//                    providedAmount = 0;
-//
-//                    for (ItemStack providedItem : aInputs) {
-//                        if (isNBTSensitive && !GTUtility.areStacksEqual(providedItem, unifiedItemCost, false)) {
-//                            continue;
-//                        } else if (!isNBTSensitive
-//                                       && !GTOreDictUnificator.isInputStackEqual(providedItem, unifiedItemCost)) {
-//                            continue;
-//                        }
-//
-//                        if (GTppRecipeHelper) { // Please see JavaDoc on GTppRecipeHelper for why this is here.
-//                            if (GTUtility.areStacksEqual(providedItem, Ic2Items.FluidCell.copy(), true)
-//                                    || GTUtility.areStacksEqual(providedItem, ItemList.Tool_DataStick.get(1L), true)
-//                                    || GTUtility.areStacksEqual(providedItem, ItemList.Tool_DataOrb.get(1L), true)) {
-//                                if (!GTUtility.areStacksEqual(providedItem, recipeItemCost, false)) continue;
-//                            }
-//                        }
-//
-//                        providedAmount += providedItem.stackSize;
-//
-//                        if (providedAmount >= remainingCost) continue nextRecipeItemCost;
-//                    }
-//                    if (providedAmount == 0) return 0;
-//                    currentParallel = Math.min(currentParallel, (double) providedAmount / recipeItemCost.stackSize);
-//                }
-//            }
-//        }
 
     }
 

@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+FMLCorePluginContainsFMLMod: true
+TweakClass: org.spongepowered.asm.launch.MixinTweaker
+MixinConfigs: mixins.MessTech.json
+ForceLoadAsMod: true
+JvmDowngrader-Version: 2.0.1
+JvmDowngrader-Downgrade-Target: 52
+Multi-Release: true
+

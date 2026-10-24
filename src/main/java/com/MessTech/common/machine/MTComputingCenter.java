@@ -74,23 +74,14 @@ import tectech.thing.metaTileEntity.hatch.MTEHatchObjectHolder;
 import tectech.thing.metaTileEntity.multi.base.render.TTRenderedExtendedFacingTexture;
 
 /**
- * MessTech Computing Center (skeleton).
- * <p>
- * Structure/registration only for now:
- * <ul>
- * <li>A = Energy / Data hatches</li>
- * <li>D = {@link com.MessTech.common.machine.hatch.MTHatchRack}</li>
- * <li>No maintenance hatch</li>
- * </ul>
- * Mode 1 uses the Quantum Computer fake recipe pool; Mode 2 uses the Research Station fake recipe pool.
- * Actual processing logic is intentionally not implemented yet.
+ * MessTech Computing Center: A = Energy / Data hatches, D = {@link com.MessTech.common.machine.hatch.MTHatchRack},
+ * no maintenance hatch.
  */
 public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCenter> implements ISurvivalConstructable {
 
     private static IIconContainer ScreenOFF;
     private static IIconContainer ScreenON;
 
-    // region Research / computation state
     private ItemStack holderStackToConsume;
     @Getter
     private long computationRemaining = 0;
@@ -112,15 +103,11 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     public static final int PACKET_LOSS_FULL_WINDOW = PACKET_LOSS_GRACE_WINDOW + PACKET_LOSS_DECAY_WINDOW;
     private int ticksUntilPacketLossFail = PACKET_LOSS_FULL_WINDOW;
     private long packetLossDecayFrom = 0;
-    // endregion
 
-    // region Structure piece offsets
     private static final int HORIZONTAL_OFFSET = 8;
     private static final int VERTICAL_OFFSET = 8;
     private static final int DEPTH_OFFSET = 8;
-    // endregion
 
-    // region Structure definition
     protected static final String STRUCTURE_PIECE_MAIN = "main";
 
     // spotless:off
@@ -148,7 +135,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     private static final IStructureDefinition<MTComputingCenter> STRUCTURE_DEFINITION = StructureDefinition
         .<MTComputingCenter>builder()
         .addShape(STRUCTURE_PIECE_MAIN, transpose(structure_string))
-        // A: normal hatches + Uncertainty / Data hatches
+        // A: hatches (incl. Uncertainty / Data)
         .addElement(
             'A',
             HatchElementBuilder.<MTComputingCenter>builder()
@@ -167,7 +154,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         .addElement('B', ofBlock(Casings.NanochipReinforcementCasing.getBlock(), 2))
         // C: computational matrix casing
         .addElement('C', ofBlock(Casings.NanochipComputationalMatrixCasing.getBlock(), 3))
-        // D: MTHatchRack, using NanochipFirewallProjectionCasing texture
+        // D: MTHatchRack (NanochipFirewallProjectionCasing texture)
         .addElement(
             'D',
             HatchElementBuilder.<MTComputingCenter>builder()
@@ -186,7 +173,6 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
                 .hint(3)
                 .buildAndChain(StructureUtility.isAir()))
         .build();
-    // endregion
 
     public MTComputingCenter(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional);
@@ -226,8 +212,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
 
     @Override
     public RecipeMap<?> getRecipeMap() {
-        // Mode 0 = Computing Center fake recipes, Mode 1 = Research Station fake recipes,
-        // Mode 2 = Scanner fake recipes.
+        // Mode 0 = Computing Center, 1 = Research Station, 2 = Scanner fake recipes.
         if (machineMode == 1) return TecTechRecipeMaps.researchStationFakeRecipes;
         if (machineMode == 2) return RecipeMaps.scannerFakeRecipes;
         return MTRecipeMaps.computingCenterFakeRecipes;
@@ -317,7 +302,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     public void setOverclockEnabled(boolean value) {
         if (!value && machineHeat > 0) {
             sendToOwner("machine.computingcenter.heat_present");
-            return; // cannot disable overclock while heat is still present
+            return; // cannot disable overclock while heat is present
         }
         this.overclockEnabled = value;
     }
@@ -418,24 +403,18 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         super.onPostTick(aBaseMetaTileEntity, aTick);
         if (aBaseMetaTileEntity.isServerSide()) {
-            // Re-assert the lock whenever heat is still present (covers chunk reloads and any
-            // code path that might otherwise unlock the rack while the controller is idle).
+            // Re-assert the lock while heat is present (chunk reloads, idle controllers).
             if (machineHeat > 0) {
                 setRacksActive(true);
                 if (!aBaseMetaTileEntity.isActive()) {
-                    // Machine stopped: dissipate heat.
-                    // Passive cooling every second...
+                    // Stopped: passive cooling every second, plus active cooling per 10,000 heat batch.
                     if (aTick % 20 == 12) {
                         passiveCoolDown();
                     }
-                    // ...and active cooling whenever a whole 10,000 heat batch can be removed,
-                    // consuming Gelid Cryotheum until no full batch remains (or runs out of fluid).
                     consumeCryotheumForHeat();
                 }
             }
-            // Manual shutdown (GUI on/off, redstone...) does not call stopMachine(); the last
-            // power/output numbers would linger in Waila/GUI. Reset them whenever the machine
-            // is not actively running.
+            // Manual shutdown (GUI/redstone) skips stopMachine(), so reset the stale Waila/GUI numbers.
             if (!aBaseMetaTileEntity.isActive()) {
                 resetStoppedDisplay();
             }
@@ -445,10 +424,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         }
     }
 
-    /**
-     * Clears any leftover displayed values (power, output computation, research progress) when the
-     * machine is stopped by any means — manual shutdown included, which never reaches stopMachine().
-     */
+    /** Clears leftover displayed values (power, output computation, research progress) on any stop. */
     private void resetStoppedDisplay() {
         if (eAvailableData != 0) eAvailableData = 0;
         if (mEUt != 0) mEUt = 0;
@@ -496,7 +472,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     private CheckRecipeResult checkQuantumProcessing() {
         long computation = getRackComputation();
         eAvailableData = computation;
-        // Default 1A UEV while running + 1A UEV per full 1,000,000 computation (round up if >0)
+        // 1A UEV + 1A UEV per 1,000,000 computation (round up if >0)
         int amps = 1;
         if (computation > 0) {
             amps += (int) Math.ceil(computation / 100_000.0);
@@ -523,9 +499,9 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
                 eRequiredData = recipe.mComputationRequiredPerSec;
                 ticksUntilPacketLossFail = PACKET_LOSS_FULL_WINDOW;
                 packetLossDecayFrom = 0;
-                // Do NOT consume the flash or holder item yet; they are consumed only on completion.
+                // Flash/holder are consumed on completion, not here.
                 mOutputItems = new ItemStack[] { createResearchOutput(recipe) };
-                // Energy: normal research EU/t + total produced computation / 2 (internal racks + external input)
+                // Energy: recipe EU/t + produced computation / 2 (internal racks + external input)
                 long produced = getRackComputation() + getExternalInputData();
                 mEUt = -(int) (Math.abs(recipe.mEUt) + produced / 2);
                 mMaxProgresstime = 20;
@@ -538,10 +514,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         return CheckRecipeResultRegistry.NO_RECIPE;
     }
 
-    /**
-     * Scanner mode (Mode 2): same research-style computation/packet-loss logic as the original
-     * Research Station, but recipes come from the scanner handler registry.
-     */
+    /** Scanner mode (Mode 2): research-style computation/packet-loss logic, recipes from scannerHandlers. */
     private CheckRecipeResult checkScannerProcessing() {
         ItemStack holderStack = getHolderStack();
         if (holderStack == null) return SimpleCheckRecipeResult.ofFailure("no_research_item");
@@ -623,10 +596,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
         return sum;
     }
 
-    /**
-     * Passive cooling applied every second while the machine is stopped: mirrors the stock rack
-     * decay (remove {@code max(heat/1000, 20)}) so the residual heat slowly dissipates on its own.
-     */
+    /** Passive cooling every second while stopped: mirrors the stock rack decay so residual heat dissipates. */
     private void passiveCoolDown() {
         if (machineHeat <= 0) return;
         machineHeat -= Math.max(machineHeat / 1000, 100);
@@ -634,17 +604,15 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     }
 
     /**
-     * Active cooling: for every whole 10,000 heat batch, consume 100,000L of Gelid Cryotheum.
-     * Keeps draining as long as at least one full batch remains and the fluid is available;
-     * when no full batch can be deducted any more (or Cryotheum runs out) it stops, leaving
-     * the rest to passive cooling.
+     * Active cooling: 100,000L Gelid Cryotheum per whole 10,000 heat batch; stops when no batch can
+     * be paid (or Cryotheum runs out), leaving the rest to passive cooling.
      */
     private void consumeCryotheumForHeat() {
         if (machineHeat <= 0) return;
         while (machineHeat >= 10000) {
             FluidStack cryotheum = new FluidStack(TFFluids.fluidCryotheum, 100000);
             if (!depleteInput(cryotheum, false)) {
-                break; // cannot afford one full batch -> stop; passive cooling takes over
+                break; // cannot afford a full batch; passive cooling takes over
             }
             machineHeat -= 10000;
         }
@@ -671,8 +639,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     }
 
     private void setRacksActive(boolean active) {
-        // While heat is still present the rack components must stay locked, even when the
-        // machine itself is stopped (racing heat can't be allowed to be pulled out freely).
+        // While heat is present racks stay locked, even when the machine is stopped.
         if (!active && machineHeat > 0) return;
         for (MTHatchRack rack : eRacks) {
             rack.getBaseMetaTileEntity()
@@ -682,7 +649,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
 
     private void meltAllComponents() {
         for (MTHatchRack rack : eRacks) {
-            // Use the underlying 4 rack slots directly; getSizeInventory() returns 0 while active/locked.
+            // Touch the 4 rack slots directly: getSizeInventory() returns 0 while active/locked.
             for (int i = 0; i < 4; i++) {
                 rack.getBaseMetaTileEntity()
                     .setInventorySlotContents(i, null);
@@ -755,7 +722,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
                 mProgresstime = 1;
             }
         } else if (machineMode == 0) {
-            // Forward incoming computation automatically; it does not count toward power surcharge.
+            // Forward incoming computation; it does not count toward the power surcharge.
             long input = 0;
             for (MTEHatchDataInput di : eInputData) {
                 if (di.q != null) {
@@ -765,7 +732,7 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
             }
             eAvailableData += input;
         }
-        // Active cooling runs while the machine is working too; if it overheats, everything melts.
+        // Active cooling also runs while working; overheating melts everything.
         consumeCryotheumForHeat();
         if (machineHeat > MAX_HEAT) {
             meltAllComponents();
@@ -798,7 +765,6 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     @Override
     protected void outputAfterRecipe() {
         if (machineMode == 1 || machineMode == 2) {
-            // consume holder item
             if (holderStackToConsume != null && !eHolders.isEmpty()) {
                 ItemStack holderStack = eHolders.getFirst().mInventory[0];
                 if (holderStack != null && GTUtility.areStacksEqual(holderStackToConsume, holderStack, false)
@@ -811,19 +777,18 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
                     mOutputItems = null;
                 }
             }
-            // Research mode consumes the data stick only on completion; scanner mode already consumed
-            // its special item when the recipe started.
+            // Research mode consumes the data stick on completion; scanner mode at start.
             if (machineMode == 1) {
                 setInventorySlotContents(getControllerSlotIndex(), null);
             }
-            // if no output bus (should not happen in research/scanner mode), keep the result in the controller slot
+            // No output bus (should not happen): keep the result in the controller slot.
             if (mOutputItems != null && mOutputBusses.isEmpty()) {
                 setInventorySlotContents(getControllerSlotIndex(), mOutputItems[0]);
                 mOutputItems = null;
             }
             resetResearchProgress();
         } else {
-            // quantum mode: output computation (wireless or data output hatches)
+            // Quantum mode: output computation (wireless or data output hatches)
             if (eAvailableData > 0) {
                 if (wirelessMode && getBaseMetaTileEntity() != null) {
                     long tick;

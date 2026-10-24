@@ -19,29 +19,26 @@ import gtnhlanth.common.hatch.MTEHatchInputBeamline;
 import gtnhlanth.common.hatch.MTEHatchOutputBeamline;
 
 /**
- * Pairing registry shared by the wireless beamline (particle) hatches.
+ * Pairing registry of the wireless beamline (particle) hatches.
  * <p>
- * The GT beamline works by pushing a {@link BeamLinePacket} from an output hatch through a straight line of
- * {@code MTEBeamlinePipe}s into an input hatch. The wireless hatches replace that line with a registry lookup: the
- * hatch dye colour is the only channel key, so two hatches with the same colour pair up automatically, no matter
- * where they are (including different dimensions).
+ * GT pushes a {@link BeamLinePacket} from an output hatch through a line of {@code MTEBeamlinePipe}s into an input
+ * hatch;
+ * these hatches replace that line with a registry lookup keyed by dye colour, so same-colour hatches pair up anywhere,
+ * dimensions included.
  * <p>
- * 1:1 is enforced, not assumed: a colour channel only carries a beam while it has <b>exactly one</b> output hatch
- * and <b>exactly one</b> input hatch. Anything else (no counterpart, several outputs, several inputs) means the
- * beam is dropped instead of being delivered to an arbitrary hatch.
+ * 1:1 is enforced: a colour carries a beam only with <b>exactly one</b> output and <b>exactly one</b> input; anything
+ * else
+ * (no counterpart, several outputs, several inputs) drops it.
  */
 public final class WirelessBeamlineUtil {
 
-    /**
-     * Every live wireless beamline hatch. A dedicated registry is needed because two isolated hatches have no
-     * pipe edge that could carry the connection.
-     */
+    /** Every live wireless beamline hatch; needed because isolated hatches share no pipe edge. */
     private static final Set<MTEHatchBeamlineConnector> REGISTRY = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /**
-     * Packets that are being handed over by {@link #moveBeam(MTEHatchOutputBeamline)} right now. The receiving
-     * hatch accepts only these, so a wired output hatch parked in front of it cannot inject a beam that ignores
-     * the colour channel.
+     * Packets being handed over by {@link #moveBeam(MTEHatchOutputBeamline)} right now: the input accepts only these,
+     * so a
+     * wired output hatch in front of it cannot bypass the colour channel.
      */
     private static final Set<BeamLinePacket> WIRELESS_DELIVERIES = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -62,8 +59,9 @@ public final class WirelessBeamlineUtil {
     }
 
     /**
-     * The pairing key of a hatch: its dye colour, or {@link #INVALID_CHANNEL} while it is unpainted. Unpainted
-     * hatches never link, so a hatch cannot join a channel by accident.
+     * Pairing key of a hatch: its dye colour, or {@link #INVALID_CHANNEL} while unpainted. Unpainted hatches never
+     * link,
+     * so none joins a channel by accident.
      */
     public static int getChannel(MTEHatchBeamlineConnector hatch) {
         if (hatch == null) return INVALID_CHANNEL;
@@ -97,7 +95,6 @@ public final class WirelessBeamlineUtil {
         return result;
     }
 
-    /** Every wireless input hatch on that colour channel. */
     public static List<MTEHatchInputBeamline> findInputs(int channel) {
         List<MTEHatchInputBeamline> result = new ArrayList<>();
         for (MTEHatchBeamlineConnector hatch : find(channel, MTEHatchInputBeamline.class)) {
@@ -106,24 +103,23 @@ public final class WirelessBeamlineUtil {
         return result;
     }
 
-    /** How many wireless output hatches (plain and filtered) use that colour channel. */
+    /** Output hatches (plain and filtered) on that colour channel. */
     public static int countOutputs(int channel) {
         return find(channel, MTEHatchOutputBeamline.class).size();
     }
 
-    /** How many wireless input hatches use that colour channel. */
     public static int countInputs(int channel) {
         return find(channel, MTEHatchInputBeamline.class).size();
     }
 
     /**
-     * Hands the output hatch's beam to its counterpart, then clears the hatch. Called from the hatch's own
-     * {@code moveAround} tick, i.e. at exactly the same cadence as the wired pipe transfer, so a beam is offered
-     * to the channel once per move tick and never queued.
-     * <p>
-     * The beam is dropped unless the channel is a clean 1:1 pair, just like the wired hatch drops it when no pipe
-     * reaches an input hatch. Some machines (LHC, beam splitter) only publish a new packet once per recipe cycle,
-     * which is exactly why nothing is cached here: the beam belongs to the tick it was published in.
+     * Hands the output's beam to its counterpart, then clears the hatch; called from the hatch's {@code moveAround}
+     * tick,
+     * i.e. at the wired pipe's cadence - one offer per move tick, never queued. Dropped unless the channel is a clean
+     * 1:1
+     * pair, like the wired hatch when no pipe reaches an input (LHC/beam splitter publish only once per recipe cycle,
+     * so
+     * nothing is cached: the beam belongs to the tick it was published in).
      */
     public static void moveBeam(MTEHatchOutputBeamline output) {
         BeamLinePacket packet = output.dataPacket;
@@ -146,7 +142,7 @@ public final class WirelessBeamlineUtil {
         }
     }
 
-    /** True while {@link #moveBeam(MTEHatchOutputBeamline)} is handing that exact packet to an input hatch. */
+    /** True while {@link #moveBeam(MTEHatchOutputBeamline)} hands that exact packet to an input hatch. */
     public static boolean isWirelessDelivery(BeamLinePacket packet) {
         return packet != null && WIRELESS_DELIVERIES.contains(packet);
     }
@@ -188,9 +184,9 @@ public final class WirelessBeamlineUtil {
     }
 
     /**
-     * The scanner info is built server-side but decoded by the client, so the colour has to be sent as
-     * {@code [colour code, colour name key]} instead of a translated string - otherwise a non-English client on a
-     * dedicated server would read the English name.
+     * Scanner info is built server-side but decoded by the client, so the colour travels as
+     * {@code [colour code, colour name key]}, not a translated string: else a non-English client on a dedicated server
+     * would read the English name.
      */
     private static Object[] channelArgs(int channel) {
         if (!Dyes.isDyeIndex(channel)) {
@@ -237,8 +233,8 @@ public final class WirelessBeamlineUtil {
         IGregTechTileEntity baseTile = self.getBaseMetaTileEntity();
         if (baseTile == null || !baseTile.isServerSide()) return lines.toArray(new String[0]);
 
-        // the parent already reports up to six lines and IGregTechDeviceInformation documents eight, so exactly one
-        // more line is added here; the states cover "no counterpart" and "too many same-colour hatches" by themselves
+        // the parent already reports up to six lines and IGregTechDeviceInformation documents eight: exactly one more
+        // line fits; getLinkState covers "no counterpart" and "too many same-colour hatches" itself
         LinkState state = getLinkState(self);
         // a bare translation key is valid here: IGregTechDeviceInformation's readers translate it client-side
         lines.add("machine.wirelessbeamline.state." + stateKey(state));

@@ -599,9 +599,9 @@ messtech.itemEffect.universium=宇宙素
 messtech.itemEffect.sixPhasedCopper=六相铜
 
 # --- 混沌终焉·虚无贯星弓 ---
-# 弓的名字挂着 STARFIELD 星空动画（MTStarfieldText）：处理器按“可见文本”认领动画对应的那一行，
-# 所以这条键同时也是动画注册用的名字。
-item.messtech.voidstarBow.name=混沌终焉·虚无贯星弓
+# 弓名直接挂着 magnetar（磁星场线）文字特效的标记：§{mg} 是短名，末尾 §r 收尾，
+# 见 docs/text-fx/ 与 common/text/effect/TextEffectFormat。任何用字体绘制这条名字的地方都会生效。
+item.messtech.voidstarBow.name=§{mg}混沌终焉·虚无贯星弓§r
 messtech.voidstarBow.tooltip.charge=§7· §6蓄力：§7满蓄力需要 §b%1$s 秒§7，期间在你面前展开一座 §d魔法阵§7，展开时四角再依次炸开四座小魔法阵
 messtech.voidstarBow.tooltip.flight=§7· §6飞行：§7箭矢保持 §b绝对直线§7 且几乎不下坠，一路拖出 §d混沌火花
 messtech.voidstarBow.tooltip.pierce=§7· §6命中：§7把挡路的方块整条 §c炸穿§7并 §b继续往里钻§7，直到射程用尽或撞上钻不开的东西
@@ -735,3 +735,179 @@ messtech.gameConsole.key.weapon7=武器 7
 messtech.gameConsole.key.weapon8=武器 8
 messtech.gameConsole.key.weapon9=武器 9
 messtech.gameConsole.key.weapon0=武器 0
+
+# 文字动态特效（docs/text-fx/），预览命令 /messtechfx
+command.messtechfx.usage=§c用法: /messtechfx <datafall|eventhorizon|inkbloom|magnetar|resonance|beamcut|cipher|petalfall|all>
+messtech.text_effect.datafall=数据坠流
+messtech.text_effect.datafall.sample=数据洪流 · 量子存储矩阵
+messtech.text_effect.eventhorizon=事件视界
+messtech.text_effect.eventhorizon.sample=终焉奇点 · 引力坍缩核心
+messtech.text_effect.inkbloom=墨韵流金
+messtech.text_effect.inkbloom.sample=墨染千秋 · 流金岁月
+messtech.text_effect.magnetar=磁星场线
+messtech.text_effect.magnetar.sample=磁星脉冲 · 偶极场约束环
+messtech.text_effect.resonance=共振声纹
+messtech.text_effect.resonance.sample=共振频率 · 声纹解析阵列
+messtech.text_effect.beamcut=光刃斩击
+messtech.text_effect.beamcut.sample=相位光刃 · 切割协议
+messtech.text_effect.cipher=密文解码
+messtech.text_effect.cipher.sample=密文协议 · 量子密钥轮换
+messtech.text_effect.petalfall=落英缤纷
+messtech.text_effect.petalfall.sample=落英缤纷 · 春风十里
+
+# 大型加工厂 / 大型源质发电机（GT++ / GoodGenerator 移植）
+machine.lpf.name=大型加工厂
+machine.lpf.machinetype=九合一
+machine.lpf.mode.0=金属
+machine.lpf.mode.1=流体
+machine.lpf.mode.2=杂项
+machine.lpf.tooltip.desc=§7一个外壳装下九台单方块机器：机器模式与电路决定配方池。
+machine.lpf.tooltip.flavour=§7老工厂其实从未真正关门。
+machine.lpf.tooltip.bonus.header=§6加成:
+machine.lpf.tooltip.bonus.speed=§7· 比单方块机器快§e250%§7
+machine.lpf.tooltip.bonus.eu=§7· 只需§e80%§7的 EU/t
+machine.lpf.tooltip.bonus.parallel=§7· 每级能源仓并行 §e+2 §7
+machine.lpf.tooltip.bonus.module=§7· 速度/耗电模块在此之上乘算，并行控制模块的并行§e相加§7
+machine.lpf.tooltip.modes.header=§6机器模式（螺丝刀或 GUI 按钮切换）:
+machine.lpf.tooltip.modes.metal=§7· §e金属§7（电路 20/21/22）：压缩机 / 车床 / 电磁极化器
+machine.lpf.tooltip.modes.fluid=§7· §e流体§7（电路 20/21/22）：发酵机 / 流体提取机 / 提取机
+machine.lpf.tooltip.modes.misc=§7· §e杂项§7（电路 20/21/22）：精密激光蚀刻机 / 高压釜 / 流体固化机
+machine.lpf.tooltip.modes.circuit=§7· 把电路放进控制器槽或输入总线
+machine.lpf.tooltip.structure.header=§6结构:
+machine.lpf.tooltip.structure.casing=§7· §b3×3×3§7 的 §e多用途机械方块§7外壳，至少 §b6§7 块
+machine.lpf.tooltip.structure.hatches=§7· 任意外壳，输入/输出总线、输入/输出仓、能源仓、消声仓或 §d模块仓§7
+machine.lpf.tooltip.details=§6支持输入分离，杂项模式下支持 GT++ 固化仓。
+machine.lpf.tooltip.details.hint=§7模块即速度 / 耗电 / 并行控制仓。
+machine.lpf.tooltip.controller=§7正面中心
+machine.lpf.tooltip.casing_name=多用途机械方块
+machine.lpf.tooltip.hatch_info=任意外壳
+machine.lpf.tooltip.module_hatch=模块仓
+
+machine.leg.name=大型源质发电机
+machine.leg.machinetype=源质发电机
+machine.leg.tooltip.desc=§7把储存在源质输入仓中的源质转化为 §eEU§7。动力仓决定输出电压与电流。
+machine.leg.tooltip.flavour=§7也许有些神秘使会因此不快……
+machine.leg.tooltip.fuel.header=§6燃料:
+machine.leg.tooltip.fuel.cells=§7· 每单位源质 EU = §e燃值 × 稳定点 / 25§7；扩散单元只提供稳定点
+machine.leg.tooltip.fuel.upgrade=§7· 手持升级右键控制器以解锁对应源质类别（NORMAL 默认开启）
+machine.leg.tooltip.fuel.fluids=§7· 依据升级不同决定消耗不同的辅助流体
+machine.leg.tooltip.output.header=§6输出:
+machine.leg.tooltip.output.hatch=§7· 恰好 §b1§7 个动力仓：普通、§e多安§7或§c激光§7皆可；
+machine.leg.tooltip.output.overmax=§7· 多安/激光动力仓可让输出超过 §cMAX§7 电压
+machine.leg.tooltip.output.wireless=§7· 本发电机§c不启用§7无线输出
+machine.leg.tooltip.structure.header=§6结构:
+machine.leg.tooltip.structure.cells=§7· §b25§7 个源质扩散单元，必须§b同一等级§7（蓝图子频道 §bessentia_cell§7）：新手/学徒/大师级限制动力仓等级在 EV/IV/LuV，§e宗师级§7不限制等级
+machine.leg.tooltip.structure.blocks=§7· §b4§7 琥珀砖块、§b24§7 奥术石砖，其余为 §e魔法机械方块§7
+machine.leg.tooltip.structure.hatches=§7· 仓室：§b1+§7 个源质输入仓、§b1§7 个输入仓、§b1§7 个动力仓
+machine.leg.tooltip.details=§6完整规则见“混乱科技”神秘时代研究页。
+machine.leg.tooltip.details.hint=§7鼠标悬停仓室可查看提示点编号。
+machine.leg.tooltip.controller=§7底部正面中心
+machine.leg.tooltip.hatch_info=魔法机械方块
+machine.leg.tooltip.essentia_hatch=源质输入仓
+machine.leg.tooltip.essentia_hatch_me=ME 源质输入仓
+machine.leg.tooltip.cells_name=源质扩散单元
+machine.leg.chat.upgrade=§a已安装升级: %s
+machine.leg.structure.error.no_cell=§c至少需要 1 个源质扩散单元
+machine.leg.structure.error.dynamo_count=§c需要恰好 1 个动力仓（普通、多安或激光）
+machine.leg.structure.error.hatch_tier=§c仓室等级超出扩散单元允许的范围（宗师级单元不限制等级）
+machine.leg.structure.error.input_hatch=§c需要恰好 1 个输入仓
+machine.leg.structure.error.no_essentia_hatch=§c至少需要 1 个源质输入仓
+
+tile.essentiaHatch.name=源质输入仓
+machine.essentiahatch.tooltip.0=§7手持源质容器右键以锁定过滤
+machine.essentiahatch.tooltip.1=§7空手右键以清除过滤
+machine.essentiahatch.chat.locked=§a已锁定为 %s
+machine.essentiahatch.chat.clear=§e过滤已清除
+
+item.messtech.essentiaUpgrade.0.name=源质发电机：Empty
+item.messtech.essentiaUpgrade.1.name=§e源质发电机：Air§r
+item.messtech.essentiaUpgrade.2.name=§c源质发电机：Thermal§r
+item.messtech.essentiaUpgrade.3.name=§8源质发电机：Unstable§r
+item.messtech.essentiaUpgrade.4.name=§d源质发电机：Victus§r
+item.messtech.essentiaUpgrade.5.name=§5源质发电机：Tainted§r
+item.messtech.essentiaUpgrade.6.name=§b源质发电机：Mechanics§r
+item.messtech.essentiaUpgrade.7.name=§6源质发电机：Spirit§r
+item.messtech.essentiaUpgrade.8.name=§a源质发电机：Radiation§r
+item.messtech.essentiaUpgrade.9.name=§3源质发电机：Electric§r
+
+# 神秘时代研究：混乱科技（MessTech）页签与 LEG 研究
+tc.research_category.messtech=混乱科技
+tc.research_name.messtech.leg=魔法世界的内燃机
+tc.research_text.messtech.leg=会造成咒波污染吗？
+tc.research_text.messtech.leg.0=你发现源质内蕴含的能量超乎你的想象。有没有用这些源质发电的方法呢？<BR><BR>LEG（大型源质发电机）可以根据动力仓自动调整其输出电压。扩散单元决定了 LEG 可接受的最高仓室等级，而宗师级扩散单元会取消这一限制。
+tc.research_text.messtech.leg.1=目前只有以下源质可以无需升级，直接转化为能量：<BR><BR>Terra：800EU<BR><BR>Aqua：5000EU<BR><BR>Ordo：12000EU<BR><BR>Lux：13000EU<BR><BR>Tempestas：61200EU<BR><BR>Gelum：3900EU<BR><BR>Vitreus：2000EU<BR><BR>Potentia：25600EU<BR><BR>Permutatio：6000EU<BR><BR>Metallum：2600EU
+tc.research_text.messtech.leg.2=Tenebrae：9000EU<BR><BR>Praecantatio：36000EU<BR><BR>Herba：2600EU<BR><BR>Arbor：4500EU<BR><BR>Bestia：1000EU<BR><BR>Messis：9800EU<BR><BR>Perfodio：1300EU<BR><BR>Instrumentum：1200EU<BR><BR>Meto：3600EU<BR><BR>Tutamen：6200EU<BR><BR>Fabrico：1100EU
+tc.research_text.messtech.leg.3=Pannus：600EU<BR><BR>Vinculum：500EU<BR><BR>Magneto：108000EU<BR><BR>Vesania：1EU<BR><BR>Primordium：217000<BR><BR>Gula：64000EU<BR><BR>Tempus：142857EU<BR><BR>如果想用其他源质作为燃料，你需要为你的发电机加装相应升级。
+
+tc.research_name.messtech.cells=更好的单元
+tc.research_text.messtech.cells=还有更高的效率。
+tc.research_text.messtech.cells.0=新手源质扩散单元的效率实在太低，你完全不能忍受。所以你研发了一些新的源质扩散单元。<BR><BR>新手源质扩散单元只提供 1 稳定点，学徒级的单元提供 2 稳定点，大师级的单元提供 5 稳定点，而宗师级的单元可以提供足足 10 稳定点！<BR><BR>稳定点越高，每点源质在发电机中产生的能量就越多。<BR><BR>同时也可以解锁更好的仓室。
+
+tc.research_name.messtech.upgrade.blank=升级你的发电机
+tc.research_text.messtech.upgrade.blank=来试试更危险的源质吧。
+tc.research_text.messtech.upgrade.blank.0=空白升级！我感觉它有无限可能。<BR><BR>除了几种特殊源质，大部分源质需要额外流体帮助其在单元中扩散或提高燃烧效率。而没有这些特殊流体，源质将阻塞单元的缝隙，造成效率低下甚至无法输出。你可以为一台大型源质发电机安装多种升级。<BR><BR>计算流体消耗速度的公式如下：<BR>基础消耗速度 × 源质系数 × 已消耗源质量
+
+tc.research_name.messtech.upgrade.air=源质：AIR
+tc.research_text.messtech.upgrade.air=我能从风中感受到它。
+tc.research_text.messtech.upgrade.air.0=这类源质与空气具有很高的亲和性，需要空气辅助其扩散。<BR><BR>我们可以使用更浓缩的液态空气以进一步提高源质效率。<BR><BR>基础消耗速度为 160L/秒。
+tc.research_text.messtech.upgrade.air.1=可用源质：<BR><BR>Aer：10000EU；系数：x1.0<BR><BR>Motus：20000EU；系数：x0.5<BR><BR>Volatus：56000EU；系数：x2.0<BR><BR>Auram：42000EU；系数：x2.7<BR><BR>需要流体：<BR><BR>空气：效率：x1.0<BR><BR>液态空气：效率：x1.5
+
+tc.research_name.messtech.upgrade.thermal=源质：THERMAL
+tc.research_text.messtech.upgrade.thermal=正在熔化。
+tc.research_text.messtech.upgrade.thermal.0=来自这类源质的能量无法完全被转化为电能，部分能量会被转化为热能，并加热扩散单元。<BR><BR>所以需要冷却液以保证发电机的稳定运行，而更好的冷却液可以使源质安全地释放更多能量。<BR><BR>基础消耗速度为 40L/秒。
+tc.research_text.messtech.upgrade.thermal.1=可用源质：<BR><BR>Ignis：16000EU；系数：x1.0<BR><BR>Aequalitas：300000EU；系数：x7.0<BR><BR>Volatus：56000EU；系数：x2.0<BR><BR>Infernus：35700EU；系数：x3.0<BR><BR>Ira：82600EU；系数：x5.0
+tc.research_text.messtech.upgrade.thermal.2=需要流体：<BR><BR>水：效率：x0.5<BR><BR>蒸馏水：效率：x1.0<BR><BR>碎冰：效率：x1.2<BR><BR>IC2 冷却液：效率：x1.5<BR><BR>极寒之凛冰：效率：x5.0<BR><BR>超级冷却液：效率：x9.0
+
+tc.research_name.messtech.upgrade.unstable=源质：UNSTABLE
+tc.research_text.messtech.upgrade.unstable=混沌之心。
+tc.research_text.messtech.upgrade.unstable.0=这类源质易与空气发生反应，往往会破坏扩散单元。<BR><BR>所以需要使用惰性气体保护扩散单元。<BR><BR>气体惰性越高，源质就能安全地释放越多能量。<BR><BR>基础消耗速度为 80L/秒。
+tc.research_text.messtech.upgrade.unstable.1=可用源质：<BR><BR>Perditio：4500EU；系数：x1.0<BR><BR>Vacuos：8200EU；系数：x1.5<BR><BR>Venenum：17000EU；系数：x2.0<BR><BR>Telum：14200EU；系数：x2.5<BR><BR>Terminus：300000EU；系数：x10.0
+tc.research_text.messtech.upgrade.unstable.2=需要流体：<BR><BR>氮：效率：x1.0<BR><BR>氦：效率：x2.0<BR><BR>氖：效率：x2.2<BR><BR>氩：效率：x2.5<BR><BR>氪：效率：x3.0<BR><BR>氙：效率：x4.0
+
+tc.research_name.messtech.upgrade.victus=源质：VICTUS
+tc.research_text.messtech.upgrade.victus=它会流血吗？
+tc.research_text.messtech.upgrade.victus.0=这类源质蕴含生命的本质。<BR><BR>大部分无法直接转化为能量，但你可以为其提供生命本质，大大增强它们的转化率。<BR><BR>基础消耗速度为 360L/秒。
+tc.research_text.messtech.upgrade.victus.1=可用源质：<BR><BR>Victus：20000EU；系数：x1.0<BR><BR>Spiritus：37600EU；系数：x0.7<BR><BR>Sano：24600EU；系数：x1.2<BR><BR>Corpus：5200EU；系数：x0.9<BR><BR>Humanus：16700EU；系数：x1.3<BR><BR>Fames：17600EU；系数：x1.1<BR><BR>Gloria：120000EU；系数：x0.6
+tc.research_text.messtech.upgrade.victus.2=可选流体：<BR><BR>液态 XP：效率：x2.0<BR><BR>生命本质：效率：x6.0
+
+tc.research_name.messtech.upgrade.tainted=源质：TAINTED
+tc.research_text.messtech.upgrade.tainted=肮脏的勾当，便宜的价格
+tc.research_text.messtech.upgrade.tainted.0=这类源质内含黑暗的能量。运行时可能产生咒波污染。<BR><BR>你可以为其提供净化之水或死亡之水……这会产生两种不同的效果。<BR><BR>净化之水可以净化源质，大大提升输出能量，且不会产生咒波污染。<BR><BR>死亡之水无法溶解源质，但将其加入已扩散的源质可以产生很棒的效果：源质的基础燃值越低，释放的黑暗能量越多。
+tc.research_text.messtech.upgrade.tainted.1=基础消耗速度为 60L/秒。
+tc.research_text.messtech.upgrade.tainted.2=可用源质：<BR><BR>Mortuus：7200EU；系数：x1.0<BR><BR>Alienis：9700EU；系数：x1.7<BR><BR>Vitium：4700EU；系数：x10.0<BR><BR>Exanimis：9000EU；系数：x1.2
+tc.research_text.messtech.upgrade.tainted.3=可选流体：<BR><BR>净化之水：效率：x60.0<BR><BR>死亡之水：效率：x(25000/基础燃值)^4
+
+tc.research_name.messtech.upgrade.mechanics=源质：MECHANICS
+tc.research_text.messtech.upgrade.mechanics=以太驱动。
+tc.research_text.messtech.upgrade.mechanics.0=这类源质必须处于快速流动中才能释放能量。<BR><BR>需要润滑油来为源质提供足够的流动性。<BR><BR>基础消耗速度为 400L/秒。
+tc.research_text.messtech.upgrade.mechanics.1=可用源质：<BR><BR>Iter：16000EU；系数：x1.0<BR><BR>Machina：61200EU；系数：x1.0<BR><BR>Limus：11800EU；系数：x1.0
+tc.research_text.messtech.upgrade.mechanics.2=需要流体：<BR><BR>润滑油：效率：x1.0
+
+tc.research_name.messtech.upgrade.sprite=源质：SPRITE
+tc.research_text.messtech.upgrade.sprite=机械中的大脑。
+tc.research_text.messtech.upgrade.sprite.0=精神类的源质的直接产能很低。只有用水心或虚伪泪水激活后，它们才能展示真正的能量。<BR><BR>当扩散单元的稳定点较低时，虚伪泪水可以从源质中激发出更多能量。而稳定点较高时，只能用水心才能激发出源质的真正能量。<BR><BR>基础消耗速度为 40L/秒。
+tc.research_text.messtech.upgrade.sprite.1=可用源质：<BR><BR>Cognitio：2200EU；系数：x1.2<BR><BR>Sensus：1400EU；系数：x0.7<BR><BR>Lucrum：6000EU；系数：x2.0<BR><BR>Strontio：200EU；系数：x0.03<BR><BR>Nebrisum：24300EU；系数：x2.0<BR><BR>Luxuria：79200EU；系数：x3.7<BR><BR>Superbia：10900EU；系数：x2.1<BR><BR>Invidia：7700EU；系数：x1.0<BR><BR>Desidia：600EU；系数：x0.1
+tc.research_text.messtech.upgrade.sprite.2=可选流体：<BR><BR>虚伪泪水：效率：x15×(1+100/稳定点)<BR><BR>水心：效率：x10×(1+稳定点/100)<BR><BR>简而言之，稳定点超过 150 后，水心的效率更高。
+
+tc.research_name.messtech.upgrade.radiation=源质：RADIATION
+tc.research_text.messtech.upgrade.radiation=原子之心
+tc.research_text.messtech.upgrade.radiation.0=用这类源质发电类似于用核燃料发电，不同之处在于源质是纯粹的“放射性”属性，而核燃料还有些乱七八糟的东西。<BR><BR>但是，提升核燃料输出的方法同样适用于此，可以直接提升源质释放的能量。<BR><BR>基础消耗速度为 120L/秒。
+tc.research_text.messtech.upgrade.radiation.1=可用源质：<BR><BR>Radio：238000EU；系数：x1.0<BR><BR>Astrum：118000EU；系数：x0.5
+tc.research_text.messtech.upgrade.radiation.2=可选流体：<BR><BR>熔融铯：效率：x2.0<BR><BR>熔融铀-235：效率：x3.0<BR><BR>熔融硅岩：效率：x4.0<BR><BR>熔融原子分离催化剂：效率：x16.0
+
+tc.research_name.messtech.upgrade.electric=源质：ELECTRIC
+tc.research_text.messtech.upgrade.electric=从……电里发电？
+tc.research_text.messtech.upgrade.electric.0=ELECTRUM 源质本身就代表了电力！<BR><BR>发电机的动力仓电压越高，ELECTRUM 源质被越强的电势差影响，发电量就越高。
+tc.research_text.messtech.upgrade.electric.1=可用源质：Electrum<BR><BR>能量公式：<BR>8×(3.0^动力仓等级)EU
+tile.essentiaHatchME.name=ME 源质输入仓
+machine.essentiahatch.me.tooltip.0=§7手持源质容器右键以标记该源质
+machine.essentiahatch.me.tooltip.1=§7空手右键打开 GUI
+machine.essentiahatch.me.gui.aspect=§7标记源质：§b%s
+machine.essentiahatch.me.gui.stored=§7已存储：§b%s§7 / §b%s
+machine.essentiahatch.me.gui.online=§7AE 网络：§a在线
+machine.essentiahatch.me.gui.offline=§7AE 网络：§c离线
+machine.essentiahatch.me.gui.max=§7单次最大输入数量：
+machine.essentiahatch.me.gui.clear=§e清除标记
+machine.essentiahatch.me.gui.no_aspect=无
+machine.essentiahatch.me.tooltip.capacity=§7容量：§b%s§7 源质
+machine.essentiahatch.me.tooltip.max_input=§7单次最大输入数量：§b%s

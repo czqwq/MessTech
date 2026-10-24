@@ -24,27 +24,19 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * One running copy of the Mocha Doom engine, embedded in the game console item.
+ * One running Mocha Doom engine in the game console item. The engine is a stand-alone program (own thread, own 35 Hz
+ * loop,
+ * own 320x200 buffer), so this class is the seam: the {@link Engine.Host} it asks for frames, the stop decision and an
+ * {@code IDoomSystem}, plus what the GUI talks to.
  * <p>
- * The engine is a stand-alone program at heart: it owns a thread, it runs its own 35 Hz loop and it
- * renders into its own 320x200 buffer. This class is the seam - it is the {@link Engine.Host} the
- * patched engine asks for frames, for a stop decision and for an {@code IDoomSystem}, and it is
- * what the GUI talks to.
- * <p>
- * Threading contract, and it matters:
- * <ul>
- * <li>Everything the engine touches stays on the engine thread. The GUI only hands it input through
- * {@link #postKey} / {@link DoomMain#PostEvent}, which is the same queue the AWT window upstream
- * used to post into from the event dispatch thread.</li>
- * <li>Frames travel the other way by double buffering: the engine finishes into one array, the
- * arrays swap under {@link #frameLock}, and the GUI copies the finished one out. The engine never
- * waits for the GUI and the GUI never sees a half-drawn frame.</li>
- * </ul>
+ * Engine state stays on the engine thread; the GUI only posts input ({@link #postKey} / {@link DoomMain#PostEvent}, the
+ * AWT
+ * window upstream's queue). Frames double-buffer under {@link #frameLock}, so the GUI never sees a half-drawn one.
  */
 @SideOnly(Side.CLIENT)
 public final class MTGameConsoleHost implements Engine.Host {
 
-    /** Native Doom resolution - the engine renders 1:1 and OpenGL does the upscaling. */
+    /** Native Doom resolution - the engine renders 1:1, OpenGL upscales. */
     public static final int WIDTH = 320;
     public static final int HEIGHT = 200;
     private static final int PIXELS = WIDTH * HEIGHT;
@@ -99,8 +91,6 @@ public final class MTGameConsoleHost implements Engine.Host {
         return host;
     }
 
-    // ------------------------------------------------------------------ engine thread
-
     private void run() {
         try {
             MTGameConsoleWads.ensureDirectory(runtimeDir);
@@ -125,9 +115,8 @@ public final class MTGameConsoleHost implements Engine.Host {
             final CVarManager cvm = new CVarManager(commandLine(wad));
             final Engine engine = Engine.bootstrap(cvm, this);
             final DoomMain<?, ?> main = engine.doom();
-            // The console's own bindings, on top of whatever DOOM's config said. This is the only
-            // place keys are decided - DOOM's own OPTIONS -> KEYS page is not a second one, which is
-            // why nothing is written back into mochadoom.cfg here any more.
+            // The console's own bindings, on top of DOOM's config. This is the only place keys are decided - DOOM's own
+            // OPTIONS -> KEYS page is not a second one, so nothing is written back into mochadoom.cfg.
             bindings.apply(main);
             this.doom = main;
 
@@ -152,11 +141,10 @@ public final class MTGameConsoleHost implements Engine.Host {
     }
 
     /**
-     * Keeps the console quiet when the player has turned Minecraft down: DOOM mixes its own audio
-     * and has a volume of its own, so without this the two would disagree.
-     * <p>
-     * Applied <em>after</em> the bindings were applied, and only to the live {@code IDoomSound},
-     * so the volume DOOM's own menu writes into {@code mochadoom.cfg} is left alone.
+     * Keeps the console quiet when the player turned Minecraft down: DOOM mixes its own audio. Applied <em>after</em>
+     * the
+     * bindings and only to the live {@code IDoomSound}, so the volume DOOM's own menu writes into {@code mochadoom.cfg}
+     * stands.
      */
     private void applyMinecraftVolume(final DoomMain<?, ?> main) {
         final float master;
@@ -175,10 +163,7 @@ public final class MTGameConsoleHost implements Engine.Host {
         main.doomSound.SetMusicVolume(volume);
     }
 
-    /**
-     * Stops the engine's audio. Best effort on purpose: a dummy driver answers with a no-op, and a
-     * failure here must never keep the console's window from closing.
-     */
+    /** Stops the engine's audio: best effort, since a failure here must never keep the window from closing. */
     private void releaseAudio() {
         final DoomMain<?, ?> main = doom;
         if (main == null) {
@@ -197,13 +182,11 @@ public final class MTGameConsoleHost implements Engine.Host {
     }
 
     /**
-     * Writes the engine config the console wants to start from, once, before the engine reads it.
-     * <p>
-     * The one setting that matters here is the true-colour post-processing thread count: Mocha
-     * Doom defaults it to {@code availableProcessors()}, and a 320x200 frame does not need eight
-     * threads competing with Minecraft's own renderer on the same cores. The engine rewrites the
-     * whole file as soon as the player changes anything in DOOM's menu, so this only ever seeds
-     * the first run.
+     * Seeds the engine config before the engine reads it. The setting that matters is the true-colour post-processing
+     * thread
+     * count: Mocha Doom defaults to {@code availableProcessors()}, and 320x200 does not need eight threads fighting
+     * Minecraft's renderer. The engine rewrites the file on the first change in DOOM's menu, so this seeds only the
+     * first run.
      */
     private void writeSeedConfig(final File dir) {
         final File cfg = new File(dir, "mochadoom.cfg");
@@ -226,19 +209,17 @@ public final class MTGameConsoleHost implements Engine.Host {
         final List<String> args = new ArrayList<>();
         args.add("-iwad");
         args.add(wad.getAbsolutePath());
-        // No -config here on purpose: it only replaces the list of files the engine *reads*, while
-        // where the settings are written is decided by ConfigBase's folder, which HostPaths points
-        // at the console's own directory. Passing an absolute path there would even be wrong, as
-        // that folder is prepended to the name.
-        // Vanilla resolution: the cheapest frame the engine can make, and the crispest once
-        // OpenGL scales it up with nearest-neighbour filtering.
+        // No -config on purpose: it only replaces the list of files the engine reads, while settings are written to
+        // ConfigBase's folder, which HostPaths points at the console's directory - and that folder is prepended to the
+        // name,
+        // so an absolute path would even be wrong.
+        // Vanilla resolution: the cheapest frame the engine can make, and the crispest once OpenGL upscales it.
         args.add("-multiply");
         args.add("1");
         args.add("-truecolor");
-        // Mocha Doom's audio is javax.sound, not Minecraft's OpenAL: the engine mixes its own
-        // 22050 Hz stream and writes it to a second data line, so it runs alongside the game
-        // without touching the OpenAL context. Anything that fails to open (no device, no MIDI
-        // synth) falls back to the engine's own dummy drivers rather than failing the console.
+        // Audio is javax.sound, not Minecraft's OpenAL: the engine mixes its own 22050 Hz stream into a second data
+        // line,
+        // alongside the game. A device or MIDI synth that fails to open falls back to the engine's dummy drivers.
         if (!Config.GAME_CONSOLE_SOUND) {
             args.add("-nosfx");
         }
@@ -252,9 +233,9 @@ public final class MTGameConsoleHost implements Engine.Host {
     }
 
     /**
-     * Aims the console at another key map. Called by the settings screen; the running engine keeps
-     * the bindings it was started with, so this only takes effect the next time the console is
-     * opened - which is also what the settings screen tells the player.
+     * Aims the console at another key map. The running engine keeps the bindings it started with, so this takes effect
+     * the
+     * next time the console is opened - as the settings screen tells the player.
      */
     public void setBindings(final MTGameConsoleBindings newBindings) {
         if (newBindings != null) {
@@ -294,8 +275,6 @@ public final class MTGameConsoleHost implements Engine.Host {
         this.progress = -1;
     }
 
-    // ------------------------------------------------------------------ Engine.Host
-
     @Override
     public void frameReady(final DoomMain<?, ?> main) {
         final Object graphics = main.graphicSystem;
@@ -329,8 +308,6 @@ public final class MTGameConsoleHost implements Engine.Host {
         fail(message);
         running = false;
     }
-
-    // ------------------------------------------------------------------ GUI side
 
     public State getState() {
         return state;
@@ -368,12 +345,10 @@ public final class MTGameConsoleHost implements Engine.Host {
     }
 
     /**
-     * Samples the keyboard and posts the edges to the engine.
-     * <p>
-     * Polling rather than listening is deliberate: a {@code GuiScreen} is only ever told about key
-     * presses, never about releases, and Doom cannot stop walking without the release. LWJGL's own
-     * key state is always current, and reading it here also means Minecraft's own bindings (E for
-     * the inventory, / for chat) cannot swallow a key before Doom sees it.
+     * Samples the keyboard and posts the edges to the engine. Polling, not listening: a {@code GuiScreen} only hears
+     * about
+     * presses, never releases, and Doom cannot stop walking without them - and LWJGL's key state is always current, so
+     * Minecraft's bindings (E, /) cannot swallow a key first.
      */
     public void pollInput() {
         final DoomMain<?, ?> main = doom;
@@ -391,12 +366,12 @@ public final class MTGameConsoleHost implements Engine.Host {
                 continue;
             }
             keyState[code] = down;
-            // The physical key goes through as itself first, so anything DOOM reads by scan code
-            // (its menus, for one) still sees the key the player actually pressed.
+            // The physical key goes through as itself first, so anything DOOM reads by scan code (its menus, for one)
+            // still sees the key the player actually pressed.
             main.PostEvent(down ? sc.doomEventDown : sc.doomEventUp);
 
-            // Then the one action that is not a gamekeydown slot - the automap - whose rebound key
-            // has to emit the scan code DOOM is listening for.
+            // Then the one action that is not a gamekeydown slot - the automap - whose rebound key has to emit the scan
+            // code DOOM is listening for.
             final ScanCode extra = bound == null ? null : bound.extraScanCode(code);
             if (extra != null && extra != sc) {
                 main.PostEvent(down ? extra.doomEventDown : extra.doomEventUp);
@@ -428,8 +403,9 @@ public final class MTGameConsoleHost implements Engine.Host {
     }
 
     /**
-     * Asks the engine loop to finish its current frame and stop. Called from the engine's own
-     * thread (DOOM's QUIT GAME) and from the GUI, so it must not wait for anything.
+     * Asks the engine loop to finish its frame and stop. Called from the engine thread (QUIT GAME) and from the GUI, so
+     * it
+     * must not wait.
      */
     public void requestStop() {
         running = false;

@@ -17,34 +17,27 @@ import gregtech.common.gui.modularui.UIHelper;
 /**
  * NEI frontend for the Nano-Scale Foundry's one-step circuit pool (the old "24" pool).
  * <p>
- * These recipes are recursively flattened Assembly Matrix chains and the raw material components are packed into
- * molten fluids (see {@code MTRecipeMaps#packMaterialInputs}), so a page is dominated by two wide grids. The layout
- * keeps everything inside the standard 170px recipe background: the progress bar, the single item output and the
- * logo share the header row, the item inputs take {@link #COLUMNS} columns underneath it, and the fluid inputs
- * follow directly below them.
- * <p>
- * The 1-6 selector circuit is a real (non-consumed) recipe input since the pool switched to
- * {@code GTRecipeBuilder#circuit(int)}, so it is drawn like any other item input instead of in a dedicated
- * special slot.
+ * These recipes are recursively flattened Assembly Matrix chains whose raw material components are packed into molten
+ * fluids (see {@code MTRecipeMaps#packMaterialInputs}), so a page is dominated by two wide grids, kept inside the
+ * standard 170px background: progress bar, single item output and logo on the header row, {@link #COLUMNS} item columns
+ * underneath, then the fluid rows. The 1-6 selector circuit is a real (non-consumed) recipe input since the pool
+ * switched
+ * to {@code GTRecipeBuilder#circuit(int)}, so it is drawn like any other item input, not in a special slot.
  */
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class OneStepCircuitPoolFrontend extends RecipeMapFrontend {
 
     /**
-     * Slot capacity of the pool. {@code MTRecipeMaps.oneStepCircuitPoolRecipes} takes its {@code maxIO} from
-     * these constants and every position below is derived from them too, so raising a limit here re-flows the whole
-     * grid; edit only these values and never hardcode the numbers again.
+     * Slot capacity of the pool. {@code MTRecipeMaps.oneStepCircuitPoolRecipes} takes its {@code maxIO} from these
+     * constants and every position below is derived from them, so raising a limit re-flows the whole grid: edit only
+     * these values and never hardcode the numbers again.
      * <p>
-     * The one measurement of the flattened recipes was 61 item inputs and 24 fluid inputs (the Planck chain), taken
-     * with packing switched off: {@code MTRecipeMaps#packMaterialInputs} turns bolts, plates, fine wires, screws,
-     * foils, casings and frame boxes into molten fluids, melts the non-superconductor wires and adds the polyethylene
-     * of every circuit wrap, which moves entries from the item grid into the fluid grid (and back, for the wraps), so
-     * that pair no longer describes this pool and both sides are the same size instead - 54 = 9 columns x 6 rows
-     * each, which keeps the page at one height while giving the fluids the room the packing needs. The circuit input
-     * takes one of the 54 item slots.
-     * {@code MTRecipeMaps#populateOneStepCircuitPoolRecipes()} logs the recipe's name and both of its counts if a
-     * flattened recipe ever outgrows these limits, so that log is where the current peaks show up, not this comment.
+     * 54 = 9 columns x 6 rows on both sides, one page height, because {@code MTRecipeMaps#packMaterialInputs} moves the
+     * raw material parts (and the wraps' polyethylene) into the fluid grid: without packing the measurement was 61 item
+     * inputs and 24 fluid inputs for the Planck chain. The circuit input takes one of the 54 item slots.
+     * {@code MTRecipeMaps#populateOneStepCircuitPoolRecipes()} logs a recipe's name and both counts if it ever outgrows
+     * these limits, so the log shows the current peaks, not this comment.
      */
     public static final int MAX_ITEM_INPUTS = 54;
     public static final int MAX_ITEM_OUTPUTS = 1;
@@ -117,8 +110,9 @@ public class OneStepCircuitPoolFrontend extends RecipeMapFrontend {
 
     /**
      * Orders the page list the way the machine's selector reads: the circuit ladder (1 Processor, 2 Assembly,
-     * 3 Supercomputer, 4 Mainframe, 5 the original GT ladder) and finally 6 for the special Pico/Quantum/Planck
-     * chains. Within one level the output name decides, so the list is stable.
+     * 3 Supercomputer, 4 Mainframe, 5 the original GT ladder), then 6 for the special Pico/Quantum/Planck chains;
+     * within
+     * one level the output name decides, so the list is stable.
      */
     private static int compareRecipes(GTRecipe left, GTRecipe right) {
         int byLevel = Integer.compare(selectorLevel(left), selectorLevel(right));

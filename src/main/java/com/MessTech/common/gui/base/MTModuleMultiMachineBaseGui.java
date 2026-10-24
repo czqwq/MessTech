@@ -14,10 +14,10 @@ import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 /**
  * GUI base of {@link MTModuleMultiMachineBase} machines.
  * <p>
- * Adds the parallel field of the linked parallel control module to the terminal, next to the machine's own data: the
- * machine runs on the parallel of that module, so the machine is where it is set. The field used to live in the GUI
- * of the module hatch; only one parallel module is ever taken ({@code MTModuleMultiMachineBase#addModule}), so the
- * machine owns the single field. The row is hidden while the machine has no such module, because its ceiling stays 1.
+ * Adds the parallel field of the linked parallel control module to the terminal: the machine runs on that module's
+ * parallel, so the machine is where it is set. Only one parallel module is ever taken
+ * ({@code MTModuleMultiMachineBase#addModule}), hence the single field on the machine instead of in the module hatch's
+ * GUI. The row is hidden while there is no such module, because its ceiling stays 1.
  */
 public class MTModuleMultiMachineBaseGui extends MTMultiMachineBaseGui<MTModuleMultiMachineBase<?>> {
 
@@ -28,8 +28,8 @@ public class MTModuleMultiMachineBaseGui extends MTMultiMachineBaseGui<MTModuleM
     @Override
     public void registerSyncValues(PanelSyncManager syncManager) {
         super.registerSyncValues(syncManager);
-        // The parallel and its ceiling come from the linked module, which only the server knows: the sync value
-        // carries both to the client, and an edit travels back to the server setter (allowC2S).
+        // The parallel and its ceiling live in the linked module, which only the server knows: both are synced, and an
+        // edit travels back to the server setter (allowC2S).
         syncManager.syncValue(
             "moduleParallel",
             new IntSyncValue(multiblock::getParallelForGui, multiblock::setParallelForGui).allowC2S());
@@ -44,8 +44,8 @@ public class MTModuleMultiMachineBaseGui extends MTMultiMachineBaseGui<MTModuleM
     }
 
     /**
-     * The parallel row: the label of the module and the field that sets the parallel the machine may use, between 1
-     * and the ceiling of the linked module. Modelled on the GUI the parallel module hatch used to have.
+     * The parallel row: the module's label and the field that sets the parallel the machine may use, between 1 and the
+     * linked module's ceiling.
      *
      * @param syncManager The sync manager of the open panel.
      * @return The row, or an empty row when the sync values are missing.

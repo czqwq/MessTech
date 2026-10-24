@@ -39,6 +39,7 @@ import static tectech.thing.CustomItemList.rack_Hatch;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.fluids.FluidStack;
 
 import com.MessTech.common.items.MTItemList;
@@ -47,6 +48,7 @@ import com.MessTech.common.items.MTNACComponentItems;
 import com.MessTech.common.machine.Base.IMTModule;
 import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
 import com.MessTech.common.machine.hatch.MTReactorCoolantInputHatch;
+import com.MessTech.common.thaumcraft.MTEssentiaHatchMETileEntity;
 
 import appeng.api.AEApi;
 import cpw.mods.fml.common.registry.GameRegistry;
@@ -77,6 +79,7 @@ import ic2.core.Ic2Items;
 import tectech.recipe.TTRecipeAdder;
 import tectech.recipe.TecTechRecipeMaps;
 import tectech.thing.CustomItemList;
+import thaumicenergistics.api.ThEApi;
 
 public class GTRecipes {
 
@@ -152,7 +155,6 @@ public class GTRecipes {
             .metadata(SCANNING, new Scanning(6 * HOURS, RECIPE_UHV))
             .itemInputs(
                 GTOreDictUnificator.get(OrePrefixes.nanite, Materials.Neutronium, 8),
-                // ItemList.Casing_Assembler.get(64),
                 Casings.AssemblerMachineCasing.toStack(64),
                 Casings.AssemblyLineCasing.toStack(64),
                 ItemList.Robot_Arm_UHV.get(64),
@@ -364,8 +366,8 @@ public class GTRecipes {
             .duration(MINUTES * 2)
             .addTo(assemblerRecipes);
 
-        // Wireless particle beam hatches: the same wireless kit as the vacuum conveyor hatches above, with the
-        // matching wired beam hatch as the base part. Input takes the receiver half, outputs the transmitter half.
+        // Wireless particle beam hatches: the same wireless kit as the vacuum conveyor hatches above, on the matching
+        // wired beam hatch. Input takes the receiver half, output the transmitter half.
         GTValues.RA.stdBuilder()
             .itemInputs(
                 LanthItemList.LUV_BEAMLINE_INPUT_HATCH,
@@ -500,8 +502,8 @@ public class GTRecipes {
             .addTo(assemblerRecipes);
 
         // The Huge Chemical Reactor is built from the reactor it runs: a stack of the Large Chemical Reactor
-        // multiblocks, the IV reactor to copy the pool of, and the PTFE pipes and cupronickel coils its own 5x5x5
-        // shell is made of (the coil band accepts any tier, this is the level 1 it is pictured with).
+        // multiblocks, the IV reactor to copy the pool of, and the PTFE pipes and cupronickel coils of its 5x5x5 shell
+        // (the coil band takes any tier, this is the level 1 pictured).
         GTValues.RA.stdBuilder()
             .itemInputs(
                 ItemList.Machine_Multi_LargeChemicalReactor.get(64),
@@ -538,13 +540,104 @@ public class GTRecipes {
         addModuleRecipes();
         addSpaceApiaryRecipes();
         addUltimatePatternTerminalRecipe();
-        // chemical recipe has been moved to MTChemicalTwisterRecipes
+        addLegacyMachineRecipes();
     }
 
     /**
-     * The Ultimate Pattern Terminal (终极样板编码终端) is AE's extended pattern terminal on a part item, and its
-     * recipe says exactly that: a titanium frame carrying that very part, two Engineering Processors and a Pattern
-     * Capacity Card (样板容量卡, AE's own pattern-capacity upgrade), with a Calculation Processor in the middle.
+     * The two ported GT++/GoodGenerator machines: neither had a crafting recipe in GT5U (the Large Essentia Generator
+     * only
+     * had its research), so both get an assembler recipe here. The LPF is the nine-in-one EV machine, so its recipe is
+     * one
+     * hull plus the three parts per machine block it replaces; the LEG is the HV magic generator of its research page.
+     */
+    private static void addLegacyMachineRecipes() {
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.Hull_EV.get(1),
+                Casings.MultiUseCasing.toStack(6),
+                ItemList.Electric_Motor_EV.get(3),
+                ItemList.Electric_Piston_EV.get(3),
+                ItemList.Conveyor_Module_EV.get(3),
+                new Object[] { OrePrefixes.circuit.get(Materials.EV), 4 })
+            .fluidInputs(Materials.Polytetrafluoroethylene.getMolten(INGOTS * 16))
+            .circuit(9)
+            .itemOutputs(MTItemList.MTLargeProcessingFactory.get(1))
+            .eut(TierEU.RECIPE_EV)
+            .duration(MINUTES * 2)
+            .addTo(assemblerRecipes);
+
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.Hull_HV.get(1),
+                ItemList.Casing_Firebox_TungstenSteel.get(4),
+                ItemList.Electric_Pump_HV.get(2),
+                ItemList.Field_Generator_HV.get(1),
+                new ItemStack(thaumcraft.common.config.ConfigBlocks.blockJar, 4),
+                GTOreDictUnificator.get(OrePrefixes.frameGt, Materials.Thaumium, 4),
+                new Object[] { OrePrefixes.circuit.get(Materials.HV), 4 })
+            .fluidInputs(Materials.Thaumium.getMolten(INGOTS * 16))
+            .itemOutputs(MTItemList.MTLargeEssentiaGenerator.get(1))
+            .eut(RECIPE_HV)
+            .duration(MINUTES * 2)
+            .addTo(assemblerRecipes);
+
+        // The ME essentia input hatch is the normal hatch plus an AE network interface (only exists with ThE).
+        if (MTItemList.MTEssentiaHatchME.hasBeenSet()) {
+            var ae = AEApi.instance()
+                .definitions();
+            GTValues.RA.stdBuilder()
+                .itemInputs(
+                    MTItemList.MTEssentiaHatch.get(1),
+                    ae.materials()
+                        .certusQuartzCrystal()
+                        .maybeStack(4)
+                        .orNull(),
+                    ae.materials()
+                        .logicProcessor()
+                        .maybeStack(1)
+                        .orNull(),
+                    ae.parts()
+                        .importBus()
+                        .maybeStack(1)
+                        .orNull(),
+                    ItemList.Emitter_HV.get(2),
+                    GTOreDictUnificator.get(OrePrefixes.plate, Materials.Thaumium, 4))
+                .fluidInputs(Materials.Thaumium.getMolten(INGOTS * 4))
+                .itemOutputs(MTItemList.MTEssentiaHatchME.get(1))
+                .eut(RECIPE_HV)
+                .duration(MINUTES)
+                .addTo(assemblerRecipes);
+        }
+
+        // The int-capacity ME hatch: the same hatch upgraded with KekzTech ichor jars, ThE storage buses and UV
+        // circuits.
+        // Capacity and per-tick limit ride in the item's NBT, so the upgrade survives breaking and replacing the block.
+        if (MTItemList.MTEssentiaHatchME.hasBeenSet() && kekztech.common.Blocks.jarIchor != null) {
+            ThEApi thEApi = ThEApi.instance();
+            if (thEApi != null) {
+                ItemStack upgraded = MTItemList.MTEssentiaHatchME.get(1);
+                NBTTagCompound tag = new NBTTagCompound();
+                tag.setInteger(MTEssentiaHatchMETileEntity.NBT_CAPACITY, Integer.MAX_VALUE);
+                tag.setInteger(MTEssentiaHatchMETileEntity.NBT_MAX_INPUT, Integer.MAX_VALUE);
+                upgraded.setTagCompound(tag);
+                GTValues.RA.stdBuilder()
+                    .itemInputs(
+                        MTItemList.MTEssentiaHatchME.get(1),
+                        new ItemStack(kekztech.common.Blocks.jarIchor, 4, 0),
+                        thEApi.parts().Essentia_StorageBus.getStacks(8),
+                        new Object[] { OrePrefixes.circuit.get(Materials.UV), 64 })
+                    .itemOutputs(upgraded)
+                    .eut(TierEU.RECIPE_UV)
+                    .duration(MINUTES)
+                    .addTo(assemblerRecipes);
+            }
+        }
+    }
+
+    /**
+     * The Ultimate Pattern Terminal (终极样板编码终端) is AE's extended pattern terminal on a part item, and its recipe
+     * says exactly that: a titanium frame carrying that part, two Engineering Processors, a Pattern Capacity Card
+     * (样板容量卡) and a Calculation Processor.
      */
     private static void addUltimatePatternTerminalRecipe() {
         var ae = AEApi.instance()
@@ -575,19 +668,16 @@ public class GTRecipes {
      * The 30 module hatch recipes: the speed, EU discount and parallel control modules of {@code MTModuleValues}, one
      * assembler recipe per family per tier IV..MAX.
      * <p>
-     * The shape follows TST's controller recipes ({@code ModularHatchesRecipes}) and GTNL's parallel controller hatch:
-     * anchored on the hull of the tier, a flat handful of that tier's components, circuits and plates, and the tier's
-     * own material as plates and as melt. The counts stay flat on purpose - it is the material and the recipe voltage
-     * that carry the price of a tier, the way both of those mods do it, so the recipe still reads the same at IV and
-     * at MAX. The three families differ only in the components they spend, TST's own split of them: a speed module is
-     * field generators, motors and pistons, a parallel module a field generator, robot arms and conveyors, an EU
-     * module field generators and emitters.
-     * <p>
-     * The integrated circuit numbers are this mod's own family markers - the same idea as the {@code 4} GTNL puts on
-     * its parallel controller hatch - and are what tells the three families apart in NEI at a glance.
+     * TST's controller recipes ({@code ModularHatchesRecipes}) and GTNL's parallel controller hatch are the shape:
+     * anchored on the tier's hull, a flat handful of that tier's components, circuits and plates, plus the tier's own
+     * material as plates and as melt - the counts stay flat on purpose, material and voltage carry the price of a tier.
+     * The families differ only in components, TST's own split: speed = field generators, motors and pistons; parallel =
+     * a
+     * field generator, robot arms and conveyors; EU = field generators and emitters. The circuit numbers are this mod's
+     * own family markers (the idea of the {@code 4} GTNL puts on its parallel controller hatch) and tell them apart in
+     * NEI at a glance.
      */
     private static void addModuleRecipes() {
-        // Flat counts: a tier is paid for in the material and the voltage below, not in stacks of components.
         final int HULLS = 4;
         final int COUNT = 16;
         final int SPEED_CIRCUIT = 4;
@@ -672,23 +762,23 @@ public class GTRecipes {
     }
 
     /**
-     * The four space apiary modules, one Space Assembler recipe each - the same bench and the same shape TST gives
-     * its {@code TST_SpaceApiary} in {@code GTCMMachineRecipes}. Every tier spends 4 stacks of 64 Industrial Apiaries
-     * and 4 stacks of 64 fully upgraded acceleration upgrades, i.e. the apiary it replaces four hundred times over,
-     * plus 16 of that tier's machine parts and 64 circuits, and pays in a solder fluid and honey. The tier of the
-     * parts and the doubling volumes are TST's as well.
+     * The four space apiary modules, one Space Assembler recipe each - the shape TST gives its {@code TST_SpaceApiary}
+     * in {@code GTCMMachineRecipes}. Every tier spends 4 stacks of 64 Industrial Apiaries and 4 stacks of 64 fully
+     * upgraded acceleration upgrades (the apiary it replaces four hundred times over), 16 of that tier's machine parts
+     * and 64 circuits, and pays in a solder fluid and honey; TST's parts tier and doubling volumes as well.
      * <p>
-     * The recipe is added to {@code IGRecipeMaps.spaceAssemblerRecipes}, which TST fills too, so the two mods have to
-     * stay distinguishable by their inputs. MK-III and MK-IV already are: their circuit differs from TST's (ours
-     * UXV/MAX, TST's UMV/UXV). MK-I and MK-II used to spend exactly what TST's T1/T2 spend - same parts, same
-     * circuit, same UU-Matter and honey, same EU/t and duration - and differed only in the output, which recipe
-     * matching cannot tell apart: a Space Assembler holding those components matched both and took whichever recipe it
-     * looked at first, leaving one of the two mods' modules unobtainable. They now pay in Mutated Living Solder
-     * instead of UU-Matter, which makes the two recipes mutually exclusive.
+     * The pages share {@code IGRecipeMaps.spaceAssemblerRecipes} with TST's, so the inputs must stay distinguishable:
+     * MK-III and MK-IV differ in circuit (ours UXV/MAX, TST's UMV/UXV), and MK-I and MK-II pay in Mutated Living Solder
+     * where TST's T1/T2 pay UU-Matter - with identical inputs a Space Assembler matched both recipes and took whichever
+     * it looked at first, leaving one module unobtainable. Replacing a *required* fluid is what makes them mutually
+     * exclusive; an added item or fluid leaves TST's recipe matching anyway. 16 ingots doubling per tier follows the
+     * pool's own module ladder (Space Elevator Pump Module MK-I 9 ingots, MK-II 32, MK-III 1 stack,
+     * MachineRecipes:279/297/332), and GT++'s solder chemistry puts out 4 stacks + 24 ingots per batch
+     * (RecipeLoaderGenericChem:163), so one module costs a fraction of a batch.
      * <p>
      * {@code specialValue} is inert here: the assembler's tier gate reads the {@code MODULE_TIER} metadata
-     * ({@code TileEntityModuleAssembler#createProcessingLogic}), which neither mod sets, so every one of these counts
-     * as module tier 1 whatever {@code specialValue} says.
+     * ({@code TileEntityModuleAssembler#createProcessingLogic}), which neither mod sets, so every recipe counts as
+     * module tier 1.
      */
     private static void addSpaceApiaryRecipes() {
         ItemStack[][] parts = {
@@ -707,13 +797,6 @@ public class GTRecipes {
 
         for (int i = 0; i < outputs.length; i++) {
             long scale = 1L << i;
-            // MK-I and MK-II pay in Mutated Living Solder where MK-III and MK-IV keep paying in UU-Matter. That is not
-            // a cost tweak: those two recipes spend exactly what TST's T1/T2 spend, and replacing one of the *required*
-            // fluids is the only thing that makes the two mutually exclusive - merely adding an item or a fluid would
-            // leave TST's recipe matching, since a recipe matches as soon as its inputs are present in the machine.
-            // 16 ingots doubling per tier follows the pool's own module ladder (Space Elevator Pump Module MK-I 9
-            // ingots, MK-II 32, MK-III 1 stack, MachineRecipes:279/297/332), and GT++'s solder chemistry puts out
-            // 4 stacks + 24 ingots per batch (RecipeLoaderGenericChem:163), so one module costs a fraction of a batch.
             FluidStack firstFluid = i < 2
                 ? MaterialMisc.MUTATED_LIVING_SOLDER.getFluidStack((int) (16 * INGOTS * scale))
                 : Materials.UUMatter.getFluid(1000L * 128 * scale);
@@ -742,11 +825,10 @@ public class GTRecipes {
     }
 
     /**
-     * Nuclear reactor parts: reactor access hatches, heat control hatches, the coolant hatch pair of the fluid (wet)
-     * mode, the controller and the Transcendent Metal fuel rods. The hatch recipes are one assembler recipe per tier
-     * (EV..UIV; the coolant pair is EV only, see the hatch classes); the single rod is made in the canning machine from
-     * The Core and Avaritia Star Fuel, the dual/quad rods in the UIV assembler (same shape as GT's own fission fuel
-     * rod recipes in {@code FissionFuelLoader}).
+     * Nuclear reactor parts: access hatches, heat control hatches, the coolant hatch pair of the fluid (wet) mode, the
+     * controller and the Transcendent Metal fuel rods. The hatches are one assembler recipe per tier (EV..UIV; the
+     * coolant pair EV only, see the hatch classes); the single rod is canned from The Core and Avaritia Star Fuel, the
+     * dual/quad rods are UIV assembler recipes (GT's own {@code FissionFuelLoader} shape).
      */
     private static void addReactorRecipes() {
         for (int i = 0; i < MTItemList.REACTOR_ACCESS_HATCHES.length; i++) {
@@ -778,10 +860,10 @@ public class GTRecipes {
                 .addTo(assemblerRecipes);
         }
 
-        // Reactor coolant pair of the fluid ("wet") mode: tier casing + 2 solid steel casings + 2 tier circuits, which
-        // is deliberately cheaper than the heat control hatch above - they are plumbing, not a tier gate, and the
-        // recipe that actually matters is the coolant they consume. Cold coolant in and hot coolant out cost exactly
-        // the same, so building the loop is never gated behind the more expensive of the two.
+        // Reactor coolant pair of the fluid ("wet") mode: tier casing + 2 solid steel casings + 2 tier circuits,
+        // deliberately cheaper than the heat control hatch - plumbing, not a tier gate, and the coolant they consume is
+        // what matters. Cold coolant in and hot coolant out cost the same, so the loop is never gated behind the
+        // dearer.
         int coolantTier = MTReactorCoolantInputHatch.TIER;
         for (MTItemList coolantHatch : MTItemList.REACTOR_FLUID_HATCHES) {
             GTValues.RA.stdBuilder()
@@ -874,9 +956,10 @@ public class GTRecipes {
     }
 
     /**
-     * Centrifuge recycling for one depleted Transcendent Metal rod, following GT's own depleted naquadah rod
-     * recycling (same output chances): the fuel itself is burned off, so the player gets back the tungstensteel
-     * frame, the naquadah family remains and a part of the rod shell as Transcendent Metal dust.
+     * Centrifuge recycling for one depleted Transcendent Metal rod, following GT's depleted naquadah rod recycling
+     * (same output chances): the fuel is burned off, so the tungstensteel frame, the naquadah family remains and part
+     * of
+     * the rod shell come back as Transcendent Metal dust.
      *
      * @param rod        the depleted rod (stack size is ignored, the recipe always consumes one)
      * @param multiplier 1 for a single, 2 for a dual and 4 for a quad rod
@@ -935,10 +1018,9 @@ public class GTRecipes {
         Materials.UIV, Materials.UMV, Materials.UXV, Materials.MAX };
 
     /**
-     * Hull of every voltage tier, indexed by GT tier. The two names that break the pattern are GT's own:
-     * {@code Hull_MAX} is the UHV hull (MAX was the top tier when it was added, UHV came with the later rename) and
-     * the MAX tier uses {@code Hull_MAXV}. TST reads it the same way - its controller array runs
-     * {@code Hull_ZPM, Hull_UV, Hull_MAX, Hull_UEV, ...} for ZPM..MAX.
+     * Hull of every voltage tier, indexed by GT tier. Two names break the pattern, GT's own: {@code Hull_MAX} is the
+     * UHV hull (MAX was the top tier when it was added, UHV came with the rename) and the MAX tier uses
+     * {@code Hull_MAXV}. TST reads it the same way: {@code Hull_ZPM, Hull_UV, Hull_MAX, Hull_UEV, ...} for ZPM..MAX.
      */
     private static final ItemList[] TIER_HULLS = { ItemList.Hull_ULV, ItemList.Hull_LV, ItemList.Hull_MV,
         ItemList.Hull_HV, ItemList.Hull_EV, ItemList.Hull_IV, ItemList.Hull_LuV, ItemList.Hull_ZPM, ItemList.Hull_UV,
@@ -947,9 +1029,8 @@ public class GTRecipes {
 
     /**
      * The material a module is paid in, one entry per module tier IV..MAX (aligned with
-     * {@code MTItemList.SPEED_MODULES} and the other two families). The first four are the materials GT5U itself
-     * builds that tier's hatches from - the muffler hatches of {@code AssemblerRecipes} - and above that it is TST's
-     * controller chain, see its {@code ModularHatchesRecipes}.
+     * {@code MTItemList.SPEED_MODULES} and the other two families): the first four are GT5U's own muffler hatch
+     * materials ({@code AssemblerRecipes}), above that TST's controller chain, see its {@code ModularHatchesRecipes}.
      */
     private static final Materials[] MODULE_MATERIALS = { Materials.TungstenSteel, Materials.Enderium,
         Materials.NaquadahAlloy, Materials.Neutronium, Materials.CosmicNeutronium, Materials.Infinity,

@@ -1,20 +1,18 @@
 # MessTech Knowledge Dump
 
-This file is a **context-preservation knowledge base**. It collects everything important from the
-current and previous work sessions so that work can continue even if earlier conversation context is
-compressed/removed. See also `repo-readme.md` (own-code notes) and `GT5U-NOTES.md` (GT5U notes).
+**Context-preservation knowledge base** (work continues after context loss). Own-code notes `repo-readme.md`, GT5U
+notes `GT5U-NOTES.md`.
 
 ---
 
 ## Project layout
 
-- Mod package: `com.MessTech`
-- Machine registration: `com.MessTech.common.machine.loaders.MTMachineLoader.loadMachines()` called in
-  `CommonProxy.postInit()`.
-- Block registration: `com.MessTech.common.block.MTBlocks.registerBlocks()` called before machine loading.
-- Item list enum: `com.MessTech.common.item.MTItemList` (GT-style ItemList pattern).
+- Mod package `com.MessTech`.
+- Machines: `com.MessTech.common.machine.loaders.MTMachineLoader.loadMachines()` in `CommonProxy.postInit()`;
+  blocks: `com.MessTech.common.block.MTBlocks.registerBlocks()`, first.
+- Item list enum: `com.MessTech.common.item.MTItemList` (GT ItemList pattern).
 - Machine IDs: MTDTPF = 32400, MTComputingCenter = 32401, MTHatchRack = 32402, MTAssFactory = 32403.
-- Language files: `src/main/resources/assets/messtech/lang/{en_US,zh_CN}.lang`.
+- Lang: `src/main/resources/assets/messtech/lang/{en_US,zh_CN}.lang`.
 
 ## Machine base hierarchy
 
@@ -29,377 +27,343 @@ MTMultiMachineBase<T>
 ```
 
 ### MTMultiMachineBase
-- Generic multi-block base extends GT `MTEExtendedPowerMultiBlockBase`.
-- Provides standard `ProcessingLogic` setup, machine-mode switching, Waila NBT/body.
-- `getEnergyHatchTier()`: the highest `MTEHatch#getInputTier()` over
-  `getExoticAndNormalEnergyHatchList()` - the machine's energy tier with laser/multi-amp (exotic) hatches and
-  mixed-tier plain hatches included. Every "energy hatch tier" gate and bonus in MessTech reads this instead of
-  GT's `getInputVoltageTier()`, which iterates `mEnergyHatches` only and returns 0 for those machines.
-- No wireless code anymore (moved to `MTWirelessMultiMachineBase`).
+- Base on GT `MTEExtendedPowerMultiBlockBase`: `ProcessingLogic` setup, mode switching, Waila NBT/body; no wireless
+  code (-> `MTWirelessMultiMachineBase`).
+- `getEnergyHatchTier()`: highest `MTEHatch#getInputTier()` over `getExoticAndNormalEnergyHatchList()` (exotic
+  laser/multi-amp + mixed-tier plain hatches); every "energy hatch tier" gate reads it, not GT's
+  `getInputVoltageTier()` (only `mEnergyHatches`, 0 there).
 
 ### MTModuleMultiMachineBase (module system)
-- `common/machine/Base`: `MTModuleMultiMachineBase<T>`, `IMTModule`, `MTModuleType`, `MTModuleValues`,
-  `MTModuleHatchElement`. The hatches live in `common/machine/hatch`: `MTModuleHatchBase` (plain `MTEHatch`, no
-  inventory, one decal per module), `MTModuleSpeedHatch`, `MTModuleEuHatch`, `MTModuleParallelHatch` +
-  `MTModuleParallelHatchGui`; the machine side is `common/gui/base/MTModuleMultiMachineBaseGui`.
-- Decal: each module names its own face art in `getOverlayPath()`, an icon path relative to `textures/blocks`
-  (`ModuleHatch/OVERLAY_PowerController`, `..._SpeedController`, `..._ParallelController`). The base resolves it
-  once per class in `registerIcons` and layers it over the casing on the front face, active and inactive alike -
-  the same shape as `MTReactorAccessHatch`/`MTReactorHeatHatch`. GT's `BlockMachines#registerBlockIcons` calls
-  every meta tile entity's `registerIcons` *before* it runs the `sGTBlockIconload` phase, which is what makes a
-  `Textures.BlockIcons.custom` container resolved there usable. The three textures are 40-frame `.mcmeta`
-  animations (`frametime` 2, one 4 s loop), so the decals are animated in the world.
-- A module is whatever the machine links into its module slot (here: a hatch). The module reports what it
-  provides, the machine aggregates - the numbers live in the concrete module.
-- `MTModuleType`: `EU_DISCOUNT`, `SPEED_BONUS`, `PARALLEL_CONTROL`, `CROSS_RECIPE_PARALLEL`, `WIRELESS` (working
-  titles). The first three are the standard set (`MTModuleType.defaultSupported()`); the other two only work after
-  a machine opted in by overriding `getSupportedModuleTypes()`, because not every machine can use them.
-- A module returns a **set** of types, so a composite module (e.g. speed + parallel in one module) needs no type of
-  its own. `acceptsModule()` takes a module only when the machine supports every type it provides and the tier is
-  in range.
-- Module tier is the GT tier index: `IMTModule.MIN_TIER` = 5 (IV) .. `MAX_TIER` = 14 (MAX), `isValidTier()` rejects
-  everything outside.
-- Folding: the EU and speed modules **multiply** onto `getBaseEuModifier()` / `getBaseSpeedBonus()`, the parallel
-  module **supplies**: `getMaxParallelRecipes()` returns `getModuleParallel()` (the highest `IMTModule#getParallel`
-  of the linked parallel control modules) and falls back to `getBaseMaxParallelRecipes()` only when there is none.
-  The module's number **is** the parallel the machine runs at (`baseParallel = module.getParallel()`), so 64
-  parallel at IV stay 64 instead of becoming 68 on a machine that had 4. Only **one** parallel control module is
-  taken (`addModule`), the way TST's `checkSingleModularHatch` treats a second controller as a structure error.
-  Those three methods are **final**; subclasses implement the `getBase*` hooks (defaults 1 / 1 / 1), so a machine
-  cannot lose its module values by accident.
-- `checkMachine` is final and runs `clearModules()` before delegating to the subclass'
-  `checkMachineStructure(...)`: the module list is rebuilt by every structure check, so pulling a module hatch
-  removes its bonus at the next check. (TST solves the same problem with `resetModularHatchCollections()`.)
-- Linking: `addModuleHatchToMachineList(te, casingIndex)` is the adder behind `MTModuleHatchElement.Module`
-  (`IHatchElement<MTModuleMultiMachineBase<?>>`); a machine opts in with one line,
+- Files: `common/machine/Base` - `MTModuleMultiMachineBase<T>`, `IMTModule`, `MTModuleType`, `MTModuleValues`,
+  `MTModuleHatchElement`; `common/machine/hatch` - `MTModuleHatchBase` (plain `MTEHatch`, no inventory, one decal
+  per module), `MTModuleSpeedHatch`, `MTModuleEuHatch`, `MTModuleParallelHatch` + `MTModuleParallelHatchGui`;
+  `common/gui/base/MTModuleMultiMachineBaseGui`.
+- Decal `getOverlayPath()`: icon under `textures/blocks` (`ModuleHatch/OVERLAY_PowerController`,
+  `..._SpeedController`, `..._ParallelController`), resolved once per class in `registerIcons`, over the front-face
+  casing, active/inactive (like `MTReactorAccessHatch`/`MTReactorHeatHatch`); needs GT's
+  `BlockMachines#registerBlockIcons` (`registerIcons` *before* `sGTBlockIconload`, so a
+  `Textures.BlockIcons.custom` container survives). 40-frame `.mcmeta` (`frametime` 2, 4 s loop) -> animated.
+- Module = whatever the machine links into its module slot (a hatch); it reports, the machine aggregates.
+- `MTModuleType`: `EU_DISCOUNT`, `SPEED_BONUS`, `PARALLEL_CONTROL` (= `MTModuleType.defaultSupported()`), plus
+  opt-in `CROSS_RECIPE_PARALLEL`, `WIRELESS` (`getSupportedModuleTypes()`).
+- Types are a **set** (composite module needs no own type); `acceptsModule()` needs every type supported + tier in
+  range. Tier = GT tier index: `IMTModule.MIN_TIER` = 5 (IV) .. `MAX_TIER` = 14 (MAX), `isValidTier()` else.
+- Folding: EU/speed **multiply** into `getBaseEuModifier()` / `getBaseSpeedBonus()`; parallel **supplies** -
+  `getMaxParallelRecipes()` = `getModuleParallel()` (highest `IMTModule#getParallel`), else
+  `getBaseMaxParallelRecipes()`; the number **is** the parallel (`baseParallel = module.getParallel()`), 64 at IV
+  stay 64. One only (`addModule`), like TST's `checkSingleModularHatch` (= second controller a structure error).
+  `isModuleParallelAdditive()` opts into `base + module` instead (the LPF is the only user).
+  Three methods **final**, `getBase*` hooks (defaults 1 / 1 / 1).
+- `checkMachine` final: `clearModules()` + `checkMachineStructure(...)`; rebuilt each check, so a pulled hatch loses
+  its bonus (TST: `resetModularHatchCollections()`).
+- Linking: `addModuleHatchToMachineList(te, casingIndex)` behind `MTModuleHatchElement.Module`
+  (`IHatchElement<MTModuleMultiMachineBase<?>>`); opt in with
   `buildHatchAdder(MyMachine.class).casingIndex(casing).hint(1).atLeast(MTModuleHatchElement.Module).build()`.
-  `IMTModule#onLinkedToMachine(casingIndex)` is the hook that lets a hatch take the casing texture, so the base
-  class never has to reference the hatch types. No machine uses this yet.
-- Values (`MTModuleValues`, tier IV..MAX):
-  - speed module: MessTech's own fixed duration table → `{0.95,0.85,0.75,0.70,0.65,0.40,0.35,0.20,0.10,0.01}`, i.e.
-    5% faster at IV up to 100x at MAX. `getSpeedBonus()` **is** the table entry, the fraction of the original
-    duration that is left; the module no longer follows TST's `SpeedMultiplierOfSpeedController` ×2 law;
-  - EU module: TST's `PowerConsumptionMultiplierOfPowerConsumptionController` `{0.95,0.9,0.85,0.8,0.75,0.7,0.5,0.25}`
-    with the tail halving → `{...,0.125,0.0625}` (5% saved at IV up to 93.75% at MAX);
-  - parallel module: `1 << (2 * (tier - 2))` = 64 at IV up to 16,777,216 at MAX, player-lowerable in the GUI
-    (1..ceiling, clamped by `setParallelFromGui`, saved as NBT `parallel`).
-  - TST registers its controllers on ZPM..MAX (its T1..T8). Our modules run IV..MAX, so TST's T1 sits on IV and the
-    UXV/MAX EU entries are the only extrapolated TST numbers (the speed table is ours now).
-- Items/IDs: `MT_ID + 40..49` speed, `+50..59` EU, `+60..69` parallel - one per tier IV..MAX, registered by looping
-  over `MTItemList.SPEED_MODULES` / `EU_MODULES` / `PARALLEL_MODULES` in `MTMachineLoader`. Lang keys
-  `machine.module.*` in both languages (`speed.name`, `speed.desc.0`, `eu.name`, `eu.desc.0`, `parallel.name`,
-  `parallel.desc.0/1`, `parallel.label`, `desc.install`). A tooltip states the *factor* the module grants, in the
-  decimal form of the tables above: the speed module prints the recipe duration reduction, i.e. the fraction of the
-  old duration that is left (`MTModuleValues#speedBonusText`, `0.95` at IV up to `0.01` at MAX, always two
-  decimals - which also keeps the float entries from leaking noise, `0.95F` is `0.949999988079071`), the EU module
-  the EU/t modifier (`MTModuleValues#euModifierText`, `0.95` at IV down to `0.0625` at MAX, rounded to four
-  decimals and without trailing zeros, because the last two table entries need those decimals; the percent form
-  `euDiscountText` - 5% at IV up to 93.75% at MAX - is kept for the harness), and the parallel module only its
-  ceiling plus "configurable in the GUI" - the `1..ceiling` range is what the GUI field enforces, not tooltip text.
-  Every module closes with `desc.install` = 可用于模块化机器 / usable in a modular machine. The modules carry **no
-  author line**: `MTMachineLoader#brandAsModuleProject` gives every one of them the animated `Add by: ModularProject`
-  brand line (`AuthorDynamic.MODULE_PROJECT` / `MTModuleProjectText`, the same look the Huge Chemical Reactor wears)
-  in place of the author + MessTech pair `AuthorDynamic#registerOn` would add.
-- Recipes (`GTRecipes#addModuleRecipes`): 30 **assembler** recipes, one per family per tier. The shape is TST's
-  controller recipes (`ModularHatchesRecipes`) crossed with GTNL's parallel controller hatch - 4 `TIER_HULLS[tier]`,
-  a flat 16 of that tier's components, 16 of that tier's circuit (`TIER_CIRCUIT_MATERIALS[tier]`) and 16 plates of
-  `MODULE_MATERIALS[i]`, plus `144 * 16` L of the same material as melt. Counts stay flat on purpose: a tier is
-  paid for in *which* material and which `TIER_RECIPE_EU[tier]` it is made at, the way both of those mods do it, so
-  the recipe reads the same at IV and at MAX. Duration is `MINUTES * (i + 1)`, i.e. 1 minute at IV to 10 at MAX.
-  The three families differ only in the components they spend (TST's own split): speed is 3x field generator + motor
-  + piston, parallel is field generator + robot arm + conveyor, EU is 2x field generator + emitter. Integrated
-  circuits 4 / 5 / 6 mark the speed / parallel / EU family in NEI, the same idea as the `4` GTNL puts on its
-  controller hatch.
-  - `TIER_HULLS` is indexed by GT tier and the two names that break the pattern are GT's own: `Hull_MAX` is the
-    **UHV** hull (MAX was the top tier when it was added) and the MAX tier uses `Hull_MAXV` - TST's controller array
-    reads `Hull_ZPM, Hull_UV, Hull_MAX, Hull_UEV, ...` for ZPM..MAX and agrees.
-  - `MODULE_MATERIALS` is indexed by module index (IV..MAX): tungstensteel, enderium, naquadah alloy, neutronium -
-    the materials GT5U itself builds those tiers' muffler hatches from - then TST's chain cosmic neutronium,
-    infinity, transcendent metal, space time, MHDCSM, magmatter.
-- Waila (`MTModuleMultiMachineBase#getWailaBody`, keys `machine.module.waila.*` in both languages): the three
-  module lines, below everything the bases above put into the body and in the order of the module tooltips -
-  耗时减免 / Duration reduction, 耗电减免 / EU discount, then 并行 / Parallel. The values are the ones the tooltips print
-  (`MTModuleValues#speedBonusText` / `#euModifierText`, the parallel through `NumberFormatUtil#formatNumber`), the
-  colour codes live in the lang text (`§7` label, `§b` / `§a` / `§e` values), and a line is only added while the
-  matching module is linked. The flags and numbers travel through `getWailaNBTData`, because the module list only
-  exists on the server: the structure scan does not run on a client.
-- Parallel field in the machine GUI: `common/gui/base/MTModuleMultiMachineBaseGui` (returned by the base's
-  `getGui()`) adds the label plus text field of the linked parallel control module to the terminal, next to the
-  machine's own data. It reads `getParallelForGui()` / `getParallelCeilingForGui()`, writes through
-  `setParallelForGui()` -> `IMTModule#setParallelFromGui` (new interface defaults, together with
-  `IMTModule#getMaxParallel`), and syncs both values with `IntSyncValue`s (`allowC2S`), because only the server
-  knows the module. The hatch keeps its own MUI2 GUI (`MTModuleParallelHatchGui`) - `useMui2()` must stay
-  overridden there: `MTEHatch#useMui2()` is `false` by default, so a hatch without it falls back to GT's MUI1 GUI,
-  while `MTEMultiBlockBase#useMui2()` (and therefore any machine) is MUI2 already.
-- The two optional types are only *reported*, the logic stays in the machine: `hasModule(type)`,
-  `getModules(type)`, `getModuleCycleNum()` (highest `IMTModule#getCycleNum`) and `hasWirelessModule()`. A machine
-  that needs the real loops uses the existing wireless (`MTWirelessMultiMachineBase`) or cross recipe
-  (`TickableParallelismAcrossMultiMachineBase` / `ParallelismAcrossMultiMachineBase`) bases - Java cannot extend
-  both chains, so a machine that needs modules *and* wireless means lifting the registry into a shared helper
-  (composition). No such machine exists yet.
-- Design references: TST `ModularizedMachineBase` / `ModularizedMachineSupportAllModuleBase` (modules as hatches,
-  static/dynamic controllers push into machine accumulators, `MultiExecutionCoreMachineBase` for the cross recipe
-  execution core); the EU and parallel numbers come from TST's controllers and the parallel ceiling formula above
-  and the speed table is MessTech's own.
-- Harness: `tools/modulebase/verify_module_base.py` (97 source checks plus `ModuleBaseHarness` with 102 runtime
-  checks compiled against `tools/modulebase/stubs`). It cross-checks the EU table against TST's `Config.java`, the
-  parallel table against the `1 << (2 * (tier - 2))` ceiling and the tier names against `GTValues.VN`. Mutation
-  tested: a wrong EU tail, the additive parallel of the older design, a dropped single-parallel rule, a skipped
-  `clearModules()` and a false `isOptional()` are all caught. Its speed checks (`SPEED_MULTIPLIER`, the TST ×2
-  law, `speedMultiplier`) still encode the old TST table and are stale since the speed module got its own fixed
-  table; the harness is only run on request and was left untouched.
-- Next steps: wire `MTModuleHatchElement.Module` into a real machine structure, add the composite module (one hatch
-  that provides two types - the API already allows it), and decide the numbers of the optional cross recipe and
-  wireless modules.
+  `IMTModule#onLinkedToMachine(casingIndex)` passes the casing texture, so the base never names hatch types. Unused.
+- Values (`MTModuleValues`, IV..MAX):
+  - speed: `{0.95,0.85,0.75,0.70,0.65,0.40,0.35,0.20,0.10,0.01}` = 5% faster at IV up to 100x at MAX;
+    `getSpeedBonus()` **is** the entry = fraction of duration left (no TST `SpeedMultiplierOfSpeedController` ×2).
+  - EU: TST `PowerConsumptionMultiplierOfPowerConsumptionController` `{0.95,0.9,0.85,0.8,0.75,0.7,0.5,0.25}`, tail
+    halved -> `{...,0.125,0.0625}` = 5% saved at IV up to 93.75% at MAX.
+  - parallel: `1 << (2 * (tier - 2))` = 64 at IV up to 16,777,216 at MAX, GUI-lowerable (1..ceiling,
+    `setParallelFromGui`, NBT `parallel`).
+  - TST controllers ZPM..MAX (T1..T8), ours IV..MAX: T1 = IV, only UXV/MAX EU entries extrapolated (speed ours).
+- Items: `MT_ID + 40..49` speed, `+50..59` EU, `+60..69` parallel (one per tier IV..MAX), looped from
+  `MTItemList.SPEED_MODULES` / `EU_MODULES` / `PARALLEL_MODULES` in `MTMachineLoader`; lang `machine.module.*` both
+  files (`speed.name`, `speed.desc.0`, `eu.name`, `eu.desc.0`, `parallel.name`, `parallel.desc.0/1`,
+  `parallel.label`, `desc.install`).
+- Tooltip factor, decimal: speed `MTModuleValues#speedBonusText` = `0.95` .. `0.01`, two decimals (hides float
+  noise: `0.95F` is `0.949999988079071`); EU `MTModuleValues#euModifierText` = `0.95` .. `0.0625`, four decimals, no
+  trailing zeros (the last two entries need them), percent `euDiscountText` = 5% .. 93.75% kept for the harness;
+  parallel = ceiling + "configurable in the GUI" (the `1..ceiling` range is the GUI field's); all close with
+  `desc.install` = 可用于模块化机器 / usable in a modular machine. **No author line**:
+  `MTMachineLoader#brandAsModuleProject` -> animated `Add by: ModularProject` brand
+  (`AuthorDynamic.MODULE_PROJECT` / `MTModuleProjectText`, Huge Chemical Reactor look), not the
+  `AuthorDynamic#registerOn` pair.
+- Recipes (`GTRecipes#addModuleRecipes`): 30 **assembler**, one per family per tier = TST's `ModularHatchesRecipes`
+  crossed with GTNL's parallel controller hatch: 4 `TIER_HULLS[tier]`, flat 16 of that tier's components, 16
+  circuits (`TIER_CIRCUIT_MATERIALS[tier]`), 16 plates of `MODULE_MATERIALS[i]`, plus `144 * 16` L of that material
+  as melt - flat counts on purpose, the tier is paid for in *which* material and which `TIER_RECIPE_EU[tier]`.
+  Duration `MINUTES * (i + 1)` (1 minute at IV, 10 at MAX). Components per family (TST's split): speed 3x field
+  generator + motor + piston, parallel field generator + robot arm + conveyor, EU 2x field generator + emitter;
+  circuits 4 / 5 / 6 mark them in NEI, like the `4` GTNL puts on its controller hatch.
+  - `TIER_HULLS` GT-tier indexed, two names GT's own: `Hull_MAX` = **UHV** hull (MAX was the top tier then), MAX
+    uses `Hull_MAXV`; TST's `Hull_ZPM, Hull_UV, Hull_MAX, Hull_UEV, ...` agrees.
+  - `MODULE_MATERIALS` by module index: tungstensteel, enderium, naquadah alloy, neutronium (GT5U's muffler hatches
+    for those tiers), then TST's cosmic neutronium, infinity, transcendent metal, space time, MHDCSM, magmatter.
+- Waila (`MTModuleMultiMachineBase#getWailaBody`, `machine.module.waila.*` both languages): three module lines last,
+  tooltip order - 耗时减免 / Duration reduction, 耗电减免 / EU discount, 并行 / Parallel; values = tooltip ones
+  (`MTModuleValues#speedBonusText` / `#euModifierText`, parallel via `NumberFormatUtil#formatNumber`), colours in
+  the lang text (`§7` label, `§b` / `§a` / `§e` values), a line only while linked; flags/numbers via
+  `getWailaNBTData` (server-side only, no structure scan on a client).
+- Parallel GUI field (`common/gui/base/MTModuleMultiMachineBaseGui`, `getGui()`): linked parallel module's label +
+  text field beside the machine data; `getParallelForGui()` / `getParallelCeilingForGui()` in, `setParallelForGui()`
+  -> `IMTModule#setParallelFromGui` out (new interface defaults + `IMTModule#getMaxParallel`), `IntSyncValue`s
+  (`allowC2S`, only the server knows the module). Hatch keeps its own MUI2 GUI (`MTModuleParallelHatchGui`),
+  `useMui2()` overridden there: `MTEHatch#useMui2()` is `false` by default (GT's MUI1 GUI), while
+  `MTEMultiBlockBase#useMui2()` (any machine) is MUI2.
+- Optional types only *reported*: `hasModule(type)`, `getModules(type)`, `getModuleCycleNum()` (highest
+  `IMTModule#getCycleNum`), `hasWirelessModule()`; real loops need the wireless (`MTWirelessMultiMachineBase`) or
+  cross recipe (`TickableParallelismAcrossMultiMachineBase` / `ParallelismAcrossMultiMachineBase`) base - Java cannot
+  bridge both chains, so modules *and* wireless needs a composition registry helper. None yet.
+- References: TST `ModularizedMachineBase` / `ModularizedMachineSupportAllModuleBase` (modules as hatches,
+  static/dynamic controllers into machine accumulators, `MultiExecutionCoreMachineBase` = cross recipe core);
+  EU/parallel from TST + the ceiling formula, speed ours.
+- Harness `tools/modulebase/verify_module_base.py`: 97 source checks + `ModuleBaseHarness` (102 runtime,
+  `tools/modulebase/stubs`); EU table vs TST's `Config.java`, parallel vs `1 << (2 * (tier - 2))`, tier names vs
+  `GTValues.VN`; mutation-tested (EU tail, additive parallel, single-parallel rule, `clearModules()`,
+  `isOptional()`). Its speed checks (`SPEED_MULTIPLIER`, TST ×2 law, `speedMultiplier`) still encode the old table,
+  stale; request-only.
+- Next: wire `MTModuleHatchElement.Module` into a real structure, add the composite module (one hatch, two types;
+  the API allows it), fix the numbers of the optional cross recipe and wireless modules.
 
 ### MTWirelessMultiMachineBase
-- State: `ownerUUID`, `EnableWirelessFunc`, `EnableWireless`, `wirelessParallel`,
-  `isRecipeProcessing`, `costingEU`, `costingEUText`, `cycleNum`.
-- Methods:
-  - `isWirelessModeAvailable()`, `isWirelessModeEnabled()`, `isEnableWireless()`
-  - `setEnableWireless(boolean)`, `setWirelessParallel(int)`, `getWirelessParallel()`
-  - `startRecipeProcessing()` / `endRecipeProcessing()`
-  - `initWirelessNetwork()`, `onFirstTick()`, `onPreTick()`
-  - `checkWirelessPower(eut,duration,maxParallel)` — simulate before consume
-  - `validateWirelessPowerForRecipe(eut,duration,maxParallel)` — shared recipe validation
-  - `startWirelessRecipe(...)` — deduct power first, then consume inputs
-  - `wirelessModeProcessOnce()` — one wireless recipe cycle
-  - `checkProcessingWirelessLoop()` — opt-in multi-cycle wireless processing
-  - hooks: `prepareProcessing()`, `getExtraEUCostMultiplier()`, `getWirelessModeProcessingTime()`,
-    `getDefaultWirelessMode()`, `setupWirelessProcessingPowerLogic()`
-- Waila: writes `wirelessMode` + `costingEUText`; displays `无线模式` / `耗电`.
-- NBT: saves `enableWireless`, `wirelessParallel`.
+- State: `ownerUUID`, `EnableWirelessFunc`, `EnableWireless`, `wirelessParallel`, `isRecipeProcessing`, `costingEU`,
+  `costingEUText`, `cycleNum`.
+- `isWirelessModeAvailable()`, `isWirelessModeEnabled()`, `isEnableWireless()`, `setEnableWireless(boolean)`,
+  `setWirelessParallel(int)`, `getWirelessParallel()`, `startRecipeProcessing()` / `endRecipeProcessing()`,
+  `initWirelessNetwork()`, `onFirstTick()`, `onPreTick()`.
+- Power path: `checkWirelessPower(eut,duration,maxParallel)` (simulate before consume),
+  `validateWirelessPowerForRecipe(eut,duration,maxParallel)` (shared validation), `startWirelessRecipe(...)` (power
+  first, then inputs), `wirelessModeProcessOnce()` (one cycle), `checkProcessingWirelessLoop()` (opt-in multi-cycle).
+- Hooks: `prepareProcessing()`, `getExtraEUCostMultiplier()`, `getWirelessModeProcessingTime()`,
+  `getDefaultWirelessMode()`, `setupWirelessProcessingPowerLogic()`; Waila writes `wirelessMode` + `costingEUText`
+  (`无线模式` / `耗电`), NBT saves `enableWireless`, `wirelessParallel`.
 
 ### MTGeneratorMultiBase
-- Extends `MTMultiMachineBase` (not the wireless-consumption base).
-- For generator multiblocks: keeps `lEUt` positive; `checkProcessing()` returns `GENERATING`
-  when the generic ProcessingLogic path succeeds with `lEUt > 0`.
-- Wireless EU output is supported and defaults **off**.
-  - State: `ownerUUID`, `EnableWirelessFunc` (available, default true), `EnableWireless`.
-  - `setEnableWireless(true)` only works when wireless is available and no dynamo/exotic-dynamo
-    hatches are present.
-  - `onRunningTick()` in wireless mode sends `getCurrentGenerationEUt()` directly to the owner's
-    wireless network instead of feeding dynamo hatches.
-- Hatches: `addToMachineList()` also accepts dynamo, exotic dynamo (multi-Amp) and laser-output
-  hatches; `addEnergyOutputMultipleDynamos()` fills both normal and exotic dynamo lists.
-- Waila: wired mode uses GT's normal generation line; wireless mode writes `wirelessMode` +
-  `generatedEUText` and displays `无线模式` / `无线发电` with the same comma + scientific formatting
-  as `MTWirelessMultiMachineBase`, followed by current-process `总发电量` (compact `(n MAX)`
-  suffix when it exceeds MAX-tier voltage; `n = floor(total / 2147483640)`).
-- Current-process wireless total is computed as
-  `wirelessGenerationPerTick * mMaxProgresstime` (BigInteger), so it shows the complete process
-  output instead of a real-time running total.
-- NBT: saves `enableWireless`.
-- Parallelism:
-  - Default `getMaxParallelRecipes()` is `Integer.MAX_VALUE` (subclasses may lower it).
-  - `getParallelForAvailable(availableAmount, requiredAmount)` caps by the GT power-panel parallel
-    override and by the actual available fuel/input amount.
-- Helpers: `getCurrentGenerationEUt()`, `startGenerating(...)`, `setEnergyUsage()` keeps EU positive,
-  `getParallelForAvailable(...)` for fuel/input based auto-parallel.
+- Extends `MTMultiMachineBase` (not the wireless-consumption base); keeps `lEUt` positive, `checkProcessing()`
+  returns `GENERATING` on a generic ProcessingLogic success with `lEUt > 0`.
+- Wireless EU output supported, defaults **off**: state `ownerUUID`, `EnableWirelessFunc` (available, default true),
+  `EnableWireless`; `setEnableWireless(true)` needs wireless available and no dynamo/exotic-dynamo hatches;
+  `onRunningTick()` in wireless mode feeds `getCurrentGenerationEUt()` to the owner's network, not dynamo hatches;
+  `addToMachineList()` also takes dynamo, exotic dynamo (multi-Amp) and laser-output hatches, and
+  `addEnergyOutputMultipleDynamos()` fills both dynamo lists.
+- Waila: wired mode = GT's generation line; wireless writes `wirelessMode` + `generatedEUText`, shows `无线模式` /
+  `无线发电` (same comma + scientific formatting as `MTWirelessMultiMachineBase`) plus current-process `总发电量`
+  (compact `(n MAX)` suffix above MAX-tier voltage; `n = floor(total / 2147483640)`), computed as
+  `wirelessGenerationPerTick * mMaxProgresstime` (BigInteger) = whole process output, not a running total. NBT:
+  `enableWireless`.
+- Parallelism: default `getMaxParallelRecipes()` = `Integer.MAX_VALUE` (subclasses may lower);
+  `getParallelForAvailable(availableAmount, requiredAmount)` caps by the GT power-panel parallel override and the
+  available fuel/input amount. Helpers: `getCurrentGenerationEUt()`, `startGenerating(...)`, `setEnergyUsage()`,
+  `getParallelForAvailable(...)`.
 
 ### ParallelismAcrossMultiMachineBase
-- Extends `MTWirelessMultiMachineBase`.
-- Cross-recipe parallelism: in wireless mode, `checkProcessing()` calls `checkProcessingWirelessLoop()`.
-- Each cycle can pick a different recipe; outputs accumulate.
-- `setWirelessCycleNum(int)` configures `cycleNum`.
-- Wireless network validation inherited from parent (`getUserEU` + `addEUToGlobalEnergyMap`).
+- Extends `MTWirelessMultiMachineBase`; wireless `checkProcessing()` calls `checkProcessingWirelessLoop()`, each
+  cycle may pick a different recipe, outputs accumulate.
+- `setWirelessCycleNum(int)` sets `cycleNum`; validation inherited (`getUserEU` + `addEUToGlobalEnergyMap`).
 
 ### CalculateMultiMachineBase / MTComputingCenter
-- `CalculateMultiMachineBase<T>` extends `MTMultiMachineBase<T>`; adds computation-machine hatch lists:
-  uncertainty, data input/output, racks (`MTHatchRack`), holders, wireless computation output.
-- `MTComputingCenter` modes:
-  - 0 = Nano Computing
-  - 1 = Research Station
-  - 2 = Scanner
-- Research/Scanner share computation/packet-loss logic.
-- Heat/overclock: `machineHeat`, MAX 10,000,000; cryotheum active cooling; passive cooling when stopped;
-  overheat melts rack components; heat locks racks and blocks mode switch.
-- Waila values reset when machine not active (manual shutdown included).
+- `CalculateMultiMachineBase<T>` extends `MTMultiMachineBase<T>`; adds uncertainty, data input/output, racks
+  (`MTHatchRack`), holders and wireless computation output hatch lists.
+- Modes: 0 = Nano Computing, 1 = Research Station, 2 = Scanner; research/scanner share the computation/packet-loss
+  logic. Heat: `machineHeat` MAX 10,000,000, cryotheum active cooling, passive when stopped, overheat melts rack
+  components and locks racks (also the mode switch). Waila values reset while inactive (manual shutdown too).
 
 ## Machines
 
 ### MTDTPF
-- Extends `MTWirelessMultiMachineBase`.
-- Wireless availability: AAF in controller slot + tier >= 5 (`detecttier()`).
-- Wireless mode: no-overclock, 0.75 EU/duration modifier, wireless parallel selector.
+- Extends `MTWirelessMultiMachineBase`; wireless needs an AAF in the controller slot + tier >= 5 (`detecttier()`),
+  then no-overclock, 0.75 EU/duration modifier, wireless parallel selector.
 - Runtime ramp: `running_time` 3600s to full efficiency; decay when idle.
-- Recipe validation order (original design):
-  1. validate machine tier / recipe voltage;
-  2. cap wireless parallel by wireless balance;
-  3. `validateWirelessPowerForRecipe(...)` — insufficient -> return insufficient power;
-  4. `onRecipeStart` -> `startWirelessRecipe(...)` — deduct power + consume inputs -> start.
+- Validation order (original design): 1. machine tier / recipe voltage; 2. cap wireless parallel by wireless
+  balance; 3. `validateWirelessPowerForRecipe(...)` — insufficient -> insufficient power; 4. `onRecipeStart` ->
+  `startWirelessRecipe(...)` — deduct power + consume inputs -> start.
 
 ### MTNQDAFReactor
-- Extends `MTGeneratorMultiBase` (generator + optional wireless output).
-- Structure uses Naquadah-fuel reactor casings/coils; no energy input; dynamo or wireless.
-- Work efficiency: starts 100%, +1% per 30 s running, max 400%; a fuel batch burns
-  `baseDuration * efficiency / 100` ticks. Idle decay follows DTPF/Plasma Forge style, floor 100%.
-- Fluid mechanics copied from Large Naquadah Reactor:
-  - Liquid Air: 1,000,000 L/s while running.
-  - Coolant: IC2/Super Coolant/Cryotheum/Tachyon -> 105/150/275/500% output.
-  - Excited liquids: Caesium/U-235/Naquadah/Atomic Separation Catalyst/Space ->
-    2/3/4/16/64x output and fuel usage.
+- Extends `MTGeneratorMultiBase` (generator + optional wireless output); Naquadah-fuel reactor casings/coils, no
+  energy input, dynamo or wireless.
+- Work efficiency: 100% at start, +1% per 30 s running, max 400%; a fuel batch burns
+  `baseDuration * efficiency / 100` ticks; idle decay DTPF/Plasma Forge style, floor 100%.
+- Fluids (from Large Naquadah Reactor): Liquid Air 1,000,000 L/s while running; coolant
+  IC2/Super Coolant/Cryotheum/Tachyon -> 105/150/275/500% output; excited liquids
+  Caesium/U-235/Naquadah/Atomic Separation Catalyst/Space -> 2/3/4/16/64x output and fuel usage.
 - Coil tier I-IV gives 1x-4x EU/t output multiplier.
-- Auto parallel: fuel amount / per-batch fuel requirement decides parallel (capped by the GT
-  power-panel parallel override); each parallel multiplies fuel consumption, EU/t, and byproducts.
-- Spacetime: input molten spacetime to freeze efficiency decay for 30 s; cost doubles per dose,
-  starts at 1 L/s (one drain per dose), max 1,073,741,824 L/s. It does **not** pause efficiency growth.
-- No dynamo hatch in `checkMachine` -> auto enables wireless output mode (`MTGeneratorMultiBase`).
+- Auto parallel = fuel amount / per-batch fuel requirement (capped by the GT power-panel parallel override); each
+  parallel multiplies fuel consumption, EU/t and byproducts.
+- Spacetime: molten spacetime freezes efficiency decay 30 s; cost doubles per dose, from 1 L/s (one drain per dose)
+  to max 1,073,741,824 L/s; does **not** pause efficiency growth.
+- No dynamo hatch in `checkMachine` -> auto enables wireless output (`MTGeneratorMultiBase`).
 
 ### MTReactor (nuclear reactor)
-- Generation: `EU/t = core output × 5 × IC2's balance/energy/generator/nuclear × 2` (`MTReactor#getEuPerOutput()`;
-  the trailing `× 2` is `MESSTECH_OUTPUT_MULTIPLIER`). GTNH's `config/IC2.ini` sets `nuclear = 5.0`, so one output
-  point is worth 25 EU/t like in IC2 - the factor IC2's own `TileEntityNuclearReactorElectric#getOfferedEnergy()` and
-  GT5U's NEI nuclear fake recipe use, and what makes a GT quad uranium rod (12 pulses × `sEnergy` 2 = 24 output)
-  generate 600 EU/t in IC2's own reactor. MessTech doubles that to 1200 EU/t: the `× 2` is a deliberate maintainer
-  balance decision, not a config value, so it is named instead of being an unexplained literal - do not treat it as a
-  defect (see `docs/GT5U-NOTES.md` §15).
-- **Heat lives per page, and a page is anchored on its access hatch block.** `MTReactorHeatSystem` keeps
-  `Map<ChunkCoordinates, int[]>` keyed by the coordinates of the owning `MTReactorAccessHatch`
-  (`MTReactorHeatSystem.PageOwner#mtReactorKey()`), not an `int[]` indexed by the global page order over all access
-  hatches. That array renumbered every following page whenever one access hatch was added, removed or moved (the order
-  came from sorting the hatches by their block coordinates), so stored heat silently migrated from one hatch's page to
-  another hatch's page. `retainOnly()` drops the heat and the countdown of a hatch that left the structure, so a
-  removed hatch cannot hand its heat to a hatch that later occupies the same position.
-- **The heat cycle runs in `onPostTick()`, not in `checkProcessing()`**, which the base class skips while the machine
-  is switched off: the cycle, the passive cooling and the meltdown countdown keep running there. Only the fuel and the
-  energy output are gated by the power switch, through `isAllowedToWork()` -> `couldRun()` -> the `mLastCouldRun` flag
-  that `ReactorContext#produceEnergy()` reports; IC2's fuel rods test that method themselves, so a switched-off reactor
-  burns no fuel and produces nothing while its heat still moves.
-- **Meltdown countdown instead of an instant explosion:** a page at or over its ceiling arms a
-  `MTReactorHeatSystem.MELTDOWN_COUNTDOWN_TICKS = 600` tick (30 s) deadline. `armCountdowns()` runs at the end of
-  every material cycle and keeps the original deadline of a page that is still too hot (pinning the heat at the ceiling
-  cannot postpone the meltdown forever), `clearCountdown()` drops a page that came back under its ceiling, and
-  `resetCountdown()` cancels every countdown (a player action such as changing the heat hatch or toggling fluid mode).
-  The deadline is an absolute game tick that `explodeExpiredCountdowns()` checks every tick in `onPostTick()`, so a
-  page detonates 600 ticks after it first crossed the ceiling. A running countdown is **persisted as its remaining
-  ticks** (`mtReactorArmedCountdowns`) and re-anchored onto the machine's tick counter on load (`setLoadClock()` ->
-  `refreshCountdownClock()`), so a chunk unload or a server restart resumes the meltdown exactly where it stopped
-  instead of dropping or restarting it, and it only ticks down while the chunk is loaded. Since that payload holds the
-  remainder and nothing else, a reload can neither extend nor shorten the 30 s window.
-- **A ceiling change rescales the stored heat instead of detonating the machine** (`onCapacityChanged()`): every
-  page's heat is multiplied by `new ceiling / old ceiling`, so a reactor at 90% of its old ceiling ends up at 90% of
-  the new one. Before, the effect check was a plain `heat / maxHeat` ratio, so swapping a UHV heat hatch for an EV one
-  (or removing it) detonated the reactor on the very next cycle.
-- **Reactor plating counts again, IC2 style.** `ReactorContext#setMaxHeat()` is live and feeds
-  `MTReactorHeatSystem.setPageMaxHeat()`: plating raises the ceiling of *its own* 9x6 page on top of the heat control
-  hatch value (a page with platings must not raise the ceiling of a page without any), and within a page the largest
-  plating bonus wins, so the result does not depend on the component layout. `getPageMaxHeat()` is that page's
-  ceiling; a single item is bounded by `MAX_HEAT_BONUS_PER_ITEM` and the sum by `MAX_HEAT_CAPACITY`. `resetPageBonus()`
-  re-collects the bonus before that page's heat pass, so a removed plating stops contributing immediately. It used to
-  be a no-op that left plating with only its heat effect modifier (more heat per cycle) and a bigger explosion - a
-  pure downside.
-- **Passive cooling** comes from the heat control hatch tier (table in `docs/GT5U-NOTES.md` §15): every tick
-  `MTReactorHeatSystem.tick()` removes `rate / 20` HU, accumulated fractionally so no tier's rate is rounded away, from
-  the pages that carry at least 5% of the hottest page's heat (the empty pages of a large structure do not absorb the
-  budget), halved while a meltdown countdown is running, and it runs while the machine is switched off too - it is the
-  only way to bring an already hot reactor back down.
-- **World heat effects run once per cycle, not once per page:** `applyHeatEffects()` uses the hottest page's ratio and
-  that page's heat effect modifier, so an N-page reactor no longer irradiates the same entity and ignites the same air
-  block N times. Which page melts down is still decided per page.
-- **Multi-cycle prediction (`STABILITY_PREDICTION_CYCLES = 20`)**: `predictFuture()` repeats the heat pass on copies
-  of every page until the heat stops rising (the page found its equilibrium) or crosses the ceiling, so the GUI/Waila
-  can report how many cycles are left (`getCyclesToMeltdown()`, `-1` = stable) instead of the old boolean that could
-  only answer "is the next cycle fatal".
-- **Rated vs actually injected EU/t:** `getRatedEUPerTick()` is what the last completed cycle accumulated,
-  `getActualEUPerTick()` is how much of it the dynamo hatches really swallowed; a dynamo that cannot take the output
-  silently loses it, so both are shown and a shortfall below 90% of the rated value that persists for
-  `OUTPUT_SHORTFALL_REPORT_TICKS = 20` ticks is reported (`hasOutputShortfall()`). A page that explodes still settles
-  the EU/t the cycle had accumulated before the detonation.
-- **Fluid ("wet") mode** is toggled per controller with a screwdriver (`onScrewdriverRightClick`) and needs a coolant
-  input hatch and a hot coolant output hatch, otherwise the machine soft-stops. The loop mirrors IC2's: 1 mB of
-  `ic2coolant` per 1 HU of buffered component heat (`MTReactorHeatSystem.coolantForHeat()`,
-  `COOLANT_PER_BUFFER_UNIT = 1` - MessTech's own ratio rather than IC2's 2 mB/HU `huOutputModifier`, so the feed rate
-  reads as "as much coolant per second as the core makes heat per second"), the same amount of `ic2hotcoolant` is
-  filled, and if the output hatch cannot take all of it the drained coolant is refunded, so the loop can neither
-  duplicate nor delete fluid. `addEmitHeat`/`isFluidCooled` are live now, which is what makes the mode matter: IC2's
-  vents (`ItemReactorVent` / `ItemReactorVentSpread`) hand the heat they removed to the fluid buffer instead of losing
-  it, and MOX fuel (`ItemReactorMOX#getFinalHeat`) doubles its heat output above 50% heat. Neither is mode-gated on
-  the component side - the condensators, lithium cells and heat switches never asked about the mode at all. Dry mode
-  does not lose the buffered heat either: half of it is pushed back onto the core, IC2's `addHeat(huOutput / 2)`.
-- **A locked slot holding a full durability component is never pre-emptively output** (P21): only a component that
-  already lost durability is salvaged before a cycle that the prediction says destroys it. A fresh component dying in
-  the next cycle means the layout itself is wrong, so swapping it cannot help - the machine stays soft-stopped instead
-  of consuming input items.
-- **The explosion power limit is a config option now** (`Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT`, default 45, IC2's
-  own `protection/reactorExplosionPowerLimit`): it used to be a hardcoded `45.0F` and it is the value the summed
-  component influence is clamped to before it is mapped onto the DE power scale (`REACTOR_EXPLOSION_DE_POWER_LIMIT`,
-  40). `explodeReactor()` also clears the heat of every page on purpose - the controller tile entity and its heat store
-  survive the `explodeMultiblock()` call for the rest of the tick, so a hot store would otherwise be left behind on a
-  dead machine - and it settles the EU/t the cycle had accumulated first.
-- Controller face: the face art of GoodGenerator's neutron activator - `icons/NeutronActivator_Off` / `_On` and their
-  two optional glow layers from the gregtech assets (five animated 16x16 frames each, `frametime: 8`) - over the casing
-  that was already under the face (`Casings.AssemblyLineCasing`); the other five faces stay
-  `Casings.AssemblerMachineCasing`. Only the overlay is taken from the other machine: the base layer is unchanged, the
-  neutron activator would otherwise bring a casing texture of its own (`getCasingTextureForId(49)`) along. The art is a
-  12x12 panel inside a two pixel transparent border, so that border is where the casing shows through.
-- Tooltip: `machine.mtreactor.tooltip.*`, laid out the way TST writes its machine tooltips - a `desc` line plus a
-  flavour line, then the `§6` group headings 结构 / 堆芯 / 发电 / 细节, with `addSeparator()` between the groups. The
-  colour emphasis lives in the lang text itself (`§b` for values, `§c` for the danger thresholds, `§e` for the hatch
-  tiers), so the Java side is one `addInfo(translate(key))` per line, and the structure block/`toolTipFinisher` follow
-  unchanged. Reuse this layout (and key naming) for the other machines. The reactor tooltip has no muffler hatch line:
-  the structure never accepted one, and the old line advertised a hatch the player could not usefully place.
-- Data stick copy (`MTReactorAccessHatch implements IDataCopyable`): the GT5U pattern of `MTEHatchOutputBus` /
-  `MTEHatchConfigurableBase` - left click with an `ItemList.Tool_DataStick` saves, right click loads, and a constant
-  `"type"` string (`DATA_STICK_DATA_TYPE`) is checked on paste. Safe on a GT machine block: `MaterialMachines` is
-  `setRequiresTool()` and the harvest tool is a wrench, so a data stick deals no block damage.
-- The payload is settings only - a version (`ver`), the source page count (`page`) and a sparse `locks` list of
-  `{slot, threshold, item}` for the locked slots. **The components themselves are never stored or written**: a paste
-  only touches this hatch's lock state (`mSlotState` / `mSlotMemory`), a slot the config leaves unlocked is unlocked
-  here, and a page this hatch does not have keeps no lock. A locked slot that is empty is reported
-  (`copy.empty_slots`) - the lock stands and works as soon as the component is put in.
-- **The component type decides where a lock lands, not the slot number** (`remapLocks()`): a stick written on one
-  layout and pasted onto another holds the same parts in different slots, so a pure slot-number replay locked the wrong
-  slots. Every entry is resolved in three passes: (1) a slot that already holds that component type - the only place
-  the existing inventory is read, (2) its original slot number when that slot does not already carry another lock,
-  (3) any other free slot on the same page. An occupied slot that carries a lock is never overwritten, a lock that
-  cannot be placed anywhere is dropped and reported (`copy.remap_dropped`), and `copy.remapped` reports how many locks
-  the paste applied over how many pages.
-- Two earlier revisions were wrong and must not come back: (a) storing the components and writing them into the target
-  (that is not a settings copy), and (b) matching the config against the target's items by type and *skipping* every
-  entry that did not line up - that locked nothing whenever the comparison failed and made the paste depend on the
-  inventory. The type-first placement above is not that attempt: it only decides *where* a lock lands and falls back to
-  the slot number and then to any free slot on the page, so no entry is lost just because the target layout differs.
-- If a paste replays nothing, the hatch logs (logger `MessTech`, WARN) how many lock entries the stick carried, how many
-  survived `loadItemStackFromNBT` and how many pages were usable. A bare JVM cannot resolve Forge item ids, so this log
-  is the field diagnostic.
-- Pages map 0..N-1 one to one: a smaller hatch ignores the pages it does not have (`copy.pages_dropped`). The version
-  field exists so a stick written by an earlier layout is refused (`copy.invalid`) instead of half applied. The stick
-  itself performs no tier validation - it only carries and replays settings, and whether the target structure may hold
-  that hatch is the controller's job (`MTReactor.checkAccessHatchTier()` caps the access hatch tier with the heat
-  control hatch tier), so replaying a stick from a large hatch onto a lower tier one is legal and just drops pages.
-- **The meltdown is Draconic Evolution's reactor explosion, ported** (`MTExplosionDE` + `MTExplosionDETrace`, 1:1 out
-  of `tmp/Draconic-Evolution-master`): one block ring per tick out to `power * 10` blocks, one trace per ring block
-  which then blasts its whole vertical column, instead of IC2's `ExplosionIC2` (whose ray count does not scale - a 450
-  power explosion fires ~25 million rays and freezes the server before the first block breaks). What DE does *not* have
-  in that process is a visual, and neither had this port: DE triggers the fireball from the tile entity
-  (`TileReactorCore#goBoom` sends `(int) (power * 10F)`, the client answers with
-  `Particles.ReactorExplosionParticle`). MessTech has no packet channel, so the same effect is spawned as a synced
-  entity instead - `MTEntityDEBlast`, drawn by `MTDEBlastRenderer`, both documented with DE's own line numbers. Every
-  `MTExplosionDE` gets it, the meltdown and the bow's DE mode alike, and its boom is played client side at tick 3,
-  exactly where DE's particle plays its sound.
+- Generation (`MTReactor#getEuPerOutput()`): `EU/t = core output × 5 × IC2's balance/energy/generator/nuclear × 2`;
+  `× 2` = `MESSTECH_OUTPUT_MULTIPLIER`, a maintainer balance decision, not config - named on purpose, not a defect
+  (`docs/GT5U-NOTES.md` §15). GTNH `config/IC2.ini` `nuclear = 5.0` -> 1 output point = 25 EU/t as in IC2
+  (`TileEntityNuclearReactorElectric#getOfferedEnergy()`, GT5U's NEI nuclear fake recipe); quad uranium rod
+  12 pulses × `sEnergy` 2 = 24 output -> 600 EU/t, 1200 here.
+- **Heat per page, anchored on the access hatch block**: `Map<ChunkCoordinates, int[]>` keyed by the owning
+  `MTReactorAccessHatch` (`MTReactorHeatSystem.PageOwner#mtReactorKey()`); the old global-order `int[]` renumbered on
+  add/remove/move (block-coordinate sort) -> heat migrated silently. `retainOnly()` drops a departed hatch's heat +
+  countdown.
+- **Cycle in `onPostTick()`, not `checkProcessing()`** (the base skips that while off): cycle, cooling and countdown
+  run; only fuel/energy are gated, via `isAllowedToWork()` -> `couldRun()` -> `mLastCouldRun`
+  (`ReactorContext#produceEnergy()`, tested by IC2's fuel rods) -> off reactor burns nothing, heat still moves.
+- **Countdown, not explosion**: a page at/over its ceiling arms `MTReactorHeatSystem.MELTDOWN_COUNTDOWN_TICKS = 600`
+  (30 s); `armCountdowns()` per material cycle keeps the original deadline (ceiling pinning cannot postpone it),
+  `clearCountdown()` a page back under, `resetCountdown()` all (player action: heat hatch change, fluid toggle);
+  `explodeExpiredCountdowns()` per `onPostTick()` on an absolute tick. Persisted as remaining ticks
+  (`mtReactorArmedCountdowns`), re-anchored on load (`setLoadClock()` -> `refreshCountdownClock()`), ticking only
+  while loaded.
+- **Ceiling change rescales heat, no detonation** (`onCapacityChanged()`): × `new ceiling / old ceiling` (90% stays
+  90%); the old `heat / maxHeat` check detonated next cycle on a UHV -> EV heat hatch swap.
+- **Plating counts again (IC2 style)**: live `ReactorContext#setMaxHeat()` -> `MTReactorHeatSystem.setPageMaxHeat()`;
+  plating lifts *its own* 9x6 page's ceiling over the heat control hatch value, largest bonus per page wins
+  (layout-independent); `getPageMaxHeat()` = ceiling, `MAX_HEAT_BONUS_PER_ITEM` per item, `MAX_HEAT_CAPACITY` for the
+  sum; `resetPageBonus()` per page pass -> a removed plating stops at once. Before: no-op, so plating was heat effect
+  modifier + bigger explosion only.
+- **Passive cooling** = heat control hatch tier (`docs/GT5U-NOTES.md` §15): `MTReactorHeatSystem.tick()` removes
+  `rate / 20` HU per tick, fractionally accumulated (no rate rounded away), from pages holding >= 5% of the hottest
+  page's heat (empty pages must not eat the budget), halved during a countdown; runs while off too.
+- **World heat effects once per cycle, not per page**: `applyHeatEffects()` on the hottest page's ratio + heat effect
+  modifier (no N-fold irradiation/ignition); meltdown still per page.
+- **`STABILITY_PREDICTION_CYCLES = 20`**: `predictFuture()` repeats the heat pass on page copies until equilibrium or
+  the ceiling -> GUI/Waila `getCyclesToMeltdown()` (`-1` = stable), not a "next cycle fatal" boolean.
+- **Rated vs injected EU/t**: `getRatedEUPerTick()` = last cycle's accumulation, `getActualEUPerTick()` = what the
+  dynamos took (untakeable output is lost silently, so both are shown); shortfall under 90% of rated for
+  `OUTPUT_SHORTFALL_REPORT_TICKS = 20` ticks -> `hasOutputShortfall()`. An exploding page still settles its EU/t.
+- **Fluid ("wet") mode** (`onScrewdriverRightClick`, per controller): coolant input + hot coolant output hatch, else
+  soft-stop; 1 mB `ic2coolant` per 1 HU component heat (`MTReactorHeatSystem.coolantForHeat()`,
+  `COOLANT_PER_BUFFER_UNIT = 1` - MessTech's ratio, not IC2's 2 mB/HU `huOutputModifier`), same `ic2hotcoolant`
+  out, refund if the hatch cannot take it (no dupe/loss). Live `addEmitHeat`/`isFluidCooled`: vents
+  (`ItemReactorVent` / `ItemReactorVentSpread`) feed removed heat to the buffer, MOX (`ItemReactorMOX#getFinalHeat`)
+  doubles output above 50% heat; not mode-gated per component. Dry mode: half the buffer back on the core
+  (`addHeat(huOutput / 2)`).
+- **A locked slot with a full durability component is never pre-emptively output** (P21): only an already damaged
+  component is salvaged before a predicted-destroying cycle; a fresh one dying next cycle = wrong layout, so swapping
+  cannot help -> soft-stop instead of eating inputs.
+- **Explosion limit is a config** (`Config.REACTOR_IC2_EXPLOSION_POWER_LIMIT`, default 45 = IC2's
+  `protection/reactorExplosionPowerLimit`, was hardcoded `45.0F`): clamps summed component influence before the DE
+  power scale (`REACTOR_EXPLOSION_DE_POWER_LIMIT`, 40). `explodeReactor()` also clears every page's heat
+  (controller TE + heat store survive `explodeMultiblock()` for the rest of the tick) and settles the accumulated
+  EU/t first.
+- Controller face: GoodGenerator's neutron activator art (`icons/NeutronActivator_Off` / `_On` + two optional glow
+  layers, gregtech assets, five animated 16x16 frames, `frametime: 8`) over the casing already under the face
+  (`Casings.AssemblyLineCasing`), other five `Casings.AssemblerMachineCasing`; overlay only, base layer unchanged
+  (the activator would otherwise bring its own casing, `getCasingTextureForId(49)`); art = 12x12 panel in a two pixel
+  transparent border where the casing shows through.
+- Tooltip `machine.mtreactor.tooltip.*`, TST style: `desc` + flavour, then `§6` groups 结构 / 堆芯 / 发电 / 细节 with
+  `addSeparator()`; colours in the lang text (`§b` values, `§c` danger thresholds, `§e` hatch tiers) -> one
+  `addInfo(translate(key))` per line, structure block / `toolTipFinisher` untouched. Reuse this layout + key naming.
+  No muffler hatch line: never accepted, and the old line advertised a hatch that could not be placed usefully.
+- Data stick copy (`MTReactorAccessHatch implements IDataCopyable`), GT5U's `MTEHatchOutputBus` /
+  `MTEHatchConfigurableBase` pattern: left click with an `ItemList.Tool_DataStick` saves, right click loads, constant
+  `"type"` (`DATA_STICK_DATA_TYPE`) checked on paste; safe on a GT machine block (`MaterialMachines` is
+  `setRequiresTool()`, wrench harvest tool).
+- Payload = **settings only**: version (`ver`), source page count (`page`), sparse `locks` of
+  `{slot, threshold, item}`. **Components are never stored or written** - a paste touches only this hatch's lock
+  state (`mSlotState` / `mSlotMemory`), an unlocked slot is unlocked here, a page this hatch lacks keeps no lock; an
+  empty locked slot is reported (`copy.empty_slots`) and works once the component is put in.
+- **Component type decides where a lock lands, not the slot number** (`remapLocks()`): the same parts sit in other
+  slots across layouts, so a slot-number replay locked the wrong slots. Three passes per entry: (1) a slot already
+  holding that type (the only inventory read), (2) its original slot number if it carries no other lock, (3) any
+  other free slot on that page. A locked occupied slot is never overwritten; an unfittable lock is dropped and
+  reported (`copy.remap_dropped`); `copy.remapped` = locks applied over pages.
+- Do not reintroduce: (a) storing components and writing them into the target (not a settings copy), (b) type
+  matching that *skips* mismatches (locked nothing; paste depended on the inventory). Type-first placement only
+  decides *where* a lock lands (then slot number, then any free slot), so no entry is lost across layouts.
+- A paste that replays nothing logs (`MessTech`, WARN) entries carried, `loadItemStackFromNBT` survivors and usable
+  pages (a bare JVM cannot resolve Forge item ids, so this is the field diagnostic).
+- Pages map 0..N-1 one to one; a smaller hatch ignores pages it lacks (`copy.pages_dropped`); the version field
+  refuses an earlier layout's stick (`copy.invalid`) rather than half apply it. The stick validates no tier - the
+  controller does (`MTReactor.checkAccessHatchTier()` caps the access hatch tier with the heat control hatch tier),
+  so a large-hatch stick onto a lower tier one is legal and just drops pages.
+- **Meltdown = Draconic Evolution's reactor explosion, ported** (`MTExplosionDE` + `MTExplosionDETrace`, 1:1 from
+  `tmp/Draconic-Evolution-master`): one block ring per tick out to `power * 10` blocks, one trace per ring block
+  blasting its whole vertical column - not IC2's `ExplosionIC2` (a 450 power explosion fires ~25 million rays and
+  freezes the server before the first block breaks). DE's process has no visual: it fires the fireball from the tile
+  entity (`TileReactorCore#goBoom` sends `(int) (power * 10F)`, the client answers
+  `Particles.ReactorExplosionParticle`); MessTech has no packet channel -> synced entity `MTEntityDEBlast`, drawn by
+  `MTDEBlastRenderer`, both documented with DE's own line numbers, for every `MTExplosionDE` (meltdown, bow's DE
+  mode), boom client-side at tick 3 - where DE's particle plays its sound.
+
+### MTLargeProcessingFactory (LPF, ported from GT++ 5.09.51.242)
+- Port of `MTEIndustrialMultiMachine` (deleted from GT5U by PR 4384). Extends `MTModuleMultiMachineBase`: base parallel
+  `2 × GTUtility.getTier(getMaxInputVoltage())`, duration ×1/3.5 ("250% faster"), EU ×0.8; a parallel module **adds** to
+  the base (`isModuleParallelAdditive()`), speed/EU modules multiply the base.
+- Three machine modes (metal / fluid / misc) × circuit 20/21/22 select one of nine recipe maps (`POOLS`).
+  `getRecipeMap()` is null and a custom `ProcessingLogic` picks the pool from the found circuit, dropping
+  `CompressionTierKey` recipes like the original; `getAvailableRecipeMaps()` returns all nine for NEI.
+- Misc mode keeps the GT++ solidifier hatch: `checkRecipeForCustomHatches` feeds its mold + circuit 22 to the logic and
+  `getStoredFluidsForColor` hides that hatch's own fluid from the pool search. Like the original, input separation is on
+  by default (`getDefaultInputSeparationMode() = true`), so each input bus (and the solidifier hatch) is matched on its own.
+- Structure: 3×3×3 shell of GT++ Multi-Use Casing (`Casings.MultiUseCasing`, texture id 98), 6 casing minimum; every
+  casing takes the IO hatches, the energy hatch, the muffler and the module hatch (`MTModuleHatchElement.Module`).
+- Pollution 400 / 400 / 600 gibbl/s per mode (GT5U's removed `PollutionConfig` defaults). Controller faces are the GT++
+  `industrialMultiMachine(Active)` PNGs copied to `assets/messtech/textures/blocks/iconsets/controllerFaces`. GT5U had no
+  recipe for it, `GTRecipes#addLegacyMachineRecipes()` adds the assembler one.
+
+### MTLargeEssentiaGenerator (LEG, ported from GoodGenerator 5.09.51.242)
+- Port of `MTELargeEssentiaGenerator` (deleted from GT5U by PR 4387). Extends `MTGeneratorMultiBase` with wireless
+  output **hard off** (`setEnableWirelessFunc(false)` in the constructors and after every structure check).
+- Structure 9×9×3 (offsets 4,0,4): 25 Essentia Diffusion Cells (`Loaders.essentiaCell`) + Magic Casing + TC amber bricks
+  (`ConfigBlocks.blockCosmeticOpaque:1`) + arcane stone bricks (`blockCosmeticSolid:7`). The cells are one
+  `ofBlocksTiered` element wrapped in `GTStructureChannels.LES_ESSENTIA_CELL`, so **all 25 must be the same tier**
+  (like the Large Essentia Smeltery) and a blueprint can pick that tier with the `essentia_cell` sub-channel; stable
+  points 1/2/5/10 and the hatch cap EV/IV/LuV - Grandmaster cells (meta 3) remove the cap (`mTierLimit =
+  Integer.MAX_VALUE`). EU per essentia unit = base fuel value × auxiliary fluid multiplier × `mStableValue / 25`.
+  `checkMachine` resets the tier field before `checkPiece` and derives both numbers from it afterwards.
+- Exactly one dynamo hatch, normal / multi-amp / **or laser** (`HatchElement.Dynamo.or(ExoticDynamo).or(LaserSource)`):
+  `getVoltageLimit()` / `getAmpLimit()` follow it, `lEUt` is `voltage × amps` as a long, so the per-tick output can pass
+  the MAX tier voltage. The original rejected laser hatches (`checkNoLaser`); allowing them is intentional here, so the
+  multi-amp/laser output is what "generates past MAX" means. Wireless output stays off. Fuel table =
+  `assets/messtech/data/essentia.json` (GoodGenerator's file) through
+  `MTEssentiaEnergyData`; `checkProcessing()` keeps `mMaxProgresstime = 1` and calls `convertEssentia(...)` every tick,
+  burning until `voltage × amps` and carrying the rest in `mLeftEnergy`.
+- Hatch counts are checked by hand in `checkMachine` (the structure hatch element is a preview filter only, see
+  `GT5U-NOTES.md` §4): exactly one input hatch, exactly one dynamo, at least one essentia hatch; errors are
+  `machine.leg.structure.error.*`.
+- Upgrades: right-click the controller with `MTEssentiaUpgradeItem` meta 1..9 to set its category bit (`mUpgrade` starts at
+  1 = NORMAL); the bits go to every essentia hatch's `mState`. `MTEssentiaHatchTileEntity` (own block
+  `MTEssentiaHatchBlock`) holds 1,000 essentia, pulls one unit per tick from adjacent TC tubes, right-click locks it to
+  a jar's aspect / empty hand clears it.
+- **ME essentia input hatch** (`MTEssentiaHatchMETileEntity` / `essentiaHatchME`, a subclass of the normal hatch, only
+  registered when **Thaumic Energistics** is loaded via `MTThaumcraftME.register()`): an `IGridProxyable` AE network
+  device (one channel); right-click with an essentia container marks the aspect as on the normal hatch, empty hand opens
+  its ModularUI2 GUI. Every tick it extracts up to the configured limit (`maxInput`, NBT, default 64) of that aspect from
+  the network's essentia monitor (`getMEMonitor(AEEssentiaStackType.ESSENTIA_STACK_TYPE)` +
+  `extractItems(..., MachineSource)`) and stores it like any other essentia hatch, so the LEG burns it unchanged. The GUI
+  shows stored/capacity, network online state and the marked aspect, and has a clear-filter button
+  (`registerSyncedAction`).
+- ME hatch capacity is per hatch (`capacity` + `maxInput` in the tile entity NBT, default 1,000): the HV assembler
+  recipe (normal essentia hatch + AE parts) makes the default one; the **int-capacity upgrade** is a UV assembler recipe
+  (1× ME hatch + 4× KekzTech ichor essentia jar + 8× ThE essentia storage bus + 64× UV circuit, 60 s) whose output item
+  carries `capacity = maxInput = Integer.MAX_VALUE` in its NBT. Like GT's ME hatches (`setItemNBT`), the block copies
+  those settings into the dropped item (`onBlockPreDestroy` -> `getDrops`) and reads them back on placement
+  (`onBlockPlacedBy`), so breaking and replacing does not lose the upgrade; `MTEssentiaHatchMEItemBlock` shows both
+  numbers in its tooltip. `dependencies.gradle` has ThE as `compileOnly` + `runtimeOnlyNonPublishable` (KekzTech ships
+  inside GT5U: `kekztech.common.Blocks.jarIchor`).
+- Thaumcraft is a hard dependency (`required-after:Thaumcraft` in `@Mod`, `compileOnly thaumcraft:...:dev` in
+  `dependencies.gradle`). Hatch block/item, upgrade item textures (`textures/items/upgradeEssentia/`) and the hull texture
+  come from GT5U 5.09.51.242 (the PRs deleted Java, not PNGs).
+
+### Thaumcraft research tab (混乱科技 / MessTech)
+- `MTThaumcraftResearch` registers its own `messtech` category (`ResearchCategories.registerCategory`, run from
+  `CommonProxy#postInit` after Thaumcraft's own postInit thanks to the hard dependency) and eleven research entries with
+  the original LEG recipes: infusion for the essentia hatch, cell T1, cell T2/T3/T4 and the nine upgrades; arcane crafting
+  for the magic casing and the empty upgrade. Keys are `messtech.*`, lang keys `tc.research_name.<key>` /
+  `tc.research_text.<key>[/.<n>]` (the page texts are the ones GT5U removed in PR 4387, both languages).
+- GT5U's Large Essentia Smeltery research still owns the cells and the magic casing recipes, so they are duplicated here
+  on purpose: the LEG tab has to be craftable on its own.
+- Tab icon `MTResearchTabIcon` (client): uploads a `DynamicTexture` under `MTThaumcraftResearch.TAB_ICON` - the Chaos
+  Matter gear (`materialicons/chaos/gearGt.png`, nearest-neighbour to 32×32) plus an overlay animation (ten hue-cycling
+  sparks orbiting it and a pulsing halo ring), redrawn every other client tick from the FML client tick bus.
 
 ### Machine tooltips (house style)
-- Every machine controller tooltip is one `addInfo(translate(key))` per line with the keys
-  `<namespace>.tooltip.desc` / `.flavour`, then two or more `.<group>.header` + `.<group>.<bullet>`
-  groups with `addSeparator()` between them, then `.details` / `.details.hint`. The whole look lives in
-  the lang text: `§6` heading ending in a colon, `§7· ` bullets (the space is part of the style),
-  `§b` values, `§e` tiers/hatches/coils, `§c` dangers, `§a` buffs, `§d` details. No colour code and no
-  concatenation on the Java side, no `§r`, no passing one tooltip key's text into another key as an
-  argument. The structure block calls stay byte-identical; a machine type that used to be a hardcoded
-  English string moves into `<namespace>.machinetype`.
-- Tooling in `tools/mttooltip` (gitignored, like every harness): `machines.py` lists the refactored
-  machines with their key namespaces and frozen `beginStructureBlock` arguments, `verify_tooltips.py`
-  enforces the style above (Java layout, lang text of every line, placeholder/`%` handling, frozen
-  structure block, no orphan tooltip key), `merge_fragments.py` splices a machine's pending
-  `tmp/mttooltip/frag_<id>.{zh,en}.lang` fragment into both lang files and deletes the old keys that no
-  Java file references any more.
-- Chinese terminology: proper nouns - blocks, casings, hatches, buses, coils, fluids, items - have to be
-  copied verbatim from the GTNH Chinese localisation that ships under `../tmp/Translation-GTNH`: `GregTech_zh_CN.lang`
-  plus the per-mod overrides in `config/txloader/forceload/<Mod>[<id>]/lang/zh_CN.lang`
-  (`GregTech[gregtech]`, `GregTech[tectech]`, `GregTech[goodgenerator]`, `GregTech[gtnhlanth]`, ...).
-  `python tools/mttooltip/zh_terms.py lookup <regex>` searches that library, `... check` fails on a wrong
-  variant of a canonical name and on a raw code identifier leaking into the text - it caught
+- One `addInfo(translate(key))` per line, keys `<namespace>.tooltip.desc` / `.flavour`, then two or more
+  `.<group>.header` + `.<group>.<bullet>` groups with `addSeparator()` between them, then `.details` / `.details.hint`.
+  The look lives in the lang text: `§6` heading ending in a colon, `§7· ` bullets (the space is part of the style),
+  `§b` values, `§e` tiers/hatches/coils, `§c` dangers, `§a` buffs, `§d` details. No colour code or concatenation in
+  Java, no `§r`, no passing one key's text into another key as an argument; structure block calls stay
+  byte-identical, and a hardcoded English machine type moves into `<namespace>.machinetype`.
+- Tooling `tools/mttooltip` (gitignored like every harness): `machines.py` = refactored machines, key namespaces,
+  frozen `beginStructureBlock` arguments; `verify_tooltips.py` enforces the style (Java layout, lang text of every
+  line, placeholder/`%` handling, frozen structure block, no orphan tooltip key); `merge_fragments.py` splices a
+  pending `tmp/mttooltip/frag_<id>.{zh,en}.lang` into both lang files and deletes keys no Java file references.
+- Chinese terminology: proper nouns (blocks, casings, hatches, buses, coils, fluids, items) verbatim from the GTNH
+  Chinese localisation under `../tmp/Translation-GTNH`: `GregTech_zh_CN.lang` plus per-mod overrides in
+  `config/txloader/forceload/<Mod>[<id>]/lang/zh_CN.lang` (`GregTech[gregtech]`, `GregTech[tectech]`,
+  `GregTech[goodgenerator]`, `GregTech[gtnhlanth]`, ...). `python tools/mttooltip/zh_terms.py lookup <regex>` searches
+  it, `... check` fails on a wrong variant of a canonical name and on a raw code identifier in the text - it caught
   相干性保持 -> 相干性维持等离子导管, 电磁隔离外壳 -> 电磁隔离机械方块, 和平执行外壳 -> 和平执行机械方块,
   凝聚态转化线圈 -> 凝聚态物质转换线圈, 极寒凛冰 -> 极寒之凛冰, 数据棒 -> 闪存, 纯化水 -> 净化水,
   奇点纳米收容总线 -> 奇点纳米蜂群收容总线, 消音仓 -> 消声仓.
@@ -407,187 +371,147 @@ MTMultiMachineBase<T>
 ### MTChemicalTwister
 - Structure: `A` containment field machine casing, `B` fusion coil block, `C` **heating coils**, `D` chemically inert
   machine casing with the hatches.
-- Controller face/casing: both follow **the structure that is formed**, not the mode (see the structure level below).
-  Level 1 draws the face of GT's Large Chemical Reactor - `createTextureWithCasing` with the four
-  `OVERLAY_FRONT_LARGE_CHEMICAL_REACTOR*` overlays (idle/running plus their glow layers) - on
-  `Casings.ChemicallyInertMachineCasing`, i.e. the casing the machine itself (element `D`) and the LCR are built from.
-  Level 2 draws the face of GT++'s Quantum Force Transformer (the four `TexturesGtBlock.oMCAQFT*` icon containers) on
-  `Casings.BulkProductionFrame` (`blockCasings2Misc:12`), the casing its shell (element `F`) is made of - so a machine
-  built as 概率毁灭者 looks like the QFT it took the recipes from. `getCasingTexture()` publishes that casing, so the
-  controller is a proper GT face and not a bare casing.
-- Element `C` is `GTStructureChannels.HEATING_COIL.use(activeCoils(ofCoil(this::setCoilLevel, this::getCoilLevel)))`,
-  i.e. the EBF wiring: the `coil` channel (StructureLib can hint/register the tiers with it), the active-coil
-  bookkeeping for the coil upgrades, and GT's coil element, which rejects a ring of mixed coil levels.
-- Coil/heat API: `getCoilLevel()` / `setCoilLevel(HeatingCoilLevel)` (the pair `ofCoil` calls, as in the EBF),
-  `getCoilHeat()` (the raw `HeatingCoilLevel#getHeat()`) and `getHeatingCapacity()` (the heat the recipes are checked
-  against).
-- `checkMachine` forgets the coil level, the heat *and* the structure level before it checks the structure, reports a
-  missing coil with GT's own `StructureErrorRegistry.COIL_LEVEL_NOT_ENOUGH`, and then computes
-  `getHeatingCapacity() = getCoilHeat() + 100 * (GTUtility.getTier(getMaxInputVoltage()) - 2)` - the EBF formula, so
-  MV energy is the neutral tier: a cupronickel ring on LV energy gives 1701 K, on MV energy 1801 K.
-- Structure level 2 (概率毁灭者): `structure_tier2` is registered as the piece `tier2` (same bounding box and the same
-  controller spot as level 1, so the `8, 8, 0` offsets work for both). Its letters are **F-J**, not the comment's A-E:
-  StructureLib binds one element map to the whole structure definition, and level 1 already means other casings with
-  A-E, so a collision would make both pieces accept each other's blocks (and let hatches be placed anywhere).
-  Mapping: F `BulkProductionFrame`, G `QuantumForceTransformerCoilCasing`, **H `SpaceTimeContinuumRipper` + the hatches
-  of that piece**, I `SpaceTimeBendingCore`, J `ForceFieldGlass` (only the letters were moved, the geometry is
-  untouched). The piece has **no heating coil ring**, so level 1 keeps the EBF heat
-  formula and the coil error, while level 2 runs at the fixed `MTRecipeMaps.QFT_PROBABILITY_DESTROYER_HEAT = 12601`
-  (Hypogen) and needs no coil. `checkMachine` checks level 2 first, speculatively (`null` error list).
-- Machine modes: `totalMachineMode() = 2` (mode 0 化学扭曲, mode 1 概率毁灭者); the base class then enables the GUI
-  button, the NBT round-trip and the Waila line, and the screwdriver (`onScrewdriverRightClick`, refused while the
-  machine runs) switches. `getRecipeMap()` picks `MTRecipeMaps.qftProbabilityDestroyerRecipes` in mode 1 and
-  `MTRecipeMaps.MTChemicalTwisterRecipes` in mode 0; `getAvailableRecipeMaps()` lists both, so NEI shows the machine as
-  the catalyst for either page. A mode 1 recipe asks for structure level 2, so switching mode without the tier-2
-  structure is reported as `insufficientMachineTier(2)` instead of running; mode 0 still runs on the level 2 structure
-  (level 2 >= 1, heat 12601). `construct`/`survivalConstruct` build the piece of the selected mode.
-- Structure level in the NEI preview / build hints: the piece is chosen from the trigger's stack size
-  (`MTChemicalTwister.STRUCTURE_LEVEL_TIER2 = 2`: tier 1 = level 1, tier >= 2 = level 2), with the machine's mode as
-  the fallback. That is GT's usual structure tier switch (the PCB Factory picks its tier 1/2/3 the same way) and it is
-  what makes BlockRenderer6343's preview offer its **Tier slider** for this machine: BR6343 finds the tiers by calling
-  `construct()` with `stackSize = 1, 2, 3, ...` until the world stops changing (`ObserverWorld#estimateTier`), then
-  creates its tier slider up to the highest tier that changed, and rebuilds with
-  `survivalConstruct(getBuildTriggerStack(), ...)` / `construct(trigger, false)`. So sliding that slider to 2 shows the
-  level 2 (概率毁灭者) shell, and 1 shows the level 1 shell. The machine also offers its own "Heating Coil" channel
-  slider (the coil element is channel wrapped), which is why the tier slider's range can go above 2 - any value >= 2
-  means level 2. No mixin and no extra dependency on BlockRenderer6343 is involved; the in-game hologram projector
-  follows the same rule (scroll it to tier 2 for the level 2 hints).
-- The level reaches the client through GT's own update-data byte: `getUpdateData()` returns `mStructureLevel`, and GT's
-  `BaseMetaTileEntity` compares it every tick server side (`handleUpdateDataChangeServer`), sends
-  `CHANGE_CUSTOM_DATA` when it changed, writes it into the tile data packet (`tileWriteToStream`, read back as
-  `receiveClientEvent(..., buffer.readByte() & 0x7F)` when the chunk loads) and hands it to `onValueUpdate(byte)`, which
-  stores it. That is the only way the client can know: `MTEMultiBlockBase#checkStructure` returns early on the client, so
-  a client copy never finds the level itself. The byte is masked with `0x7F` - keep the value below 128 (here 0/1/2).
-- A build hint / preview publishes the level it is showing itself: `construct`/`survivalConstruct` call
-  `updatePreviewStructureLevel(trigger)` (a *formed* machine is skipped - its level is the structure-checked one). The
-  BlockRenderer6343 preview is a dummy multiblock in a dummy world that is never ticked (`DummyWorld.isRemote` is even
-  `false`, so GT considers that copy server side), so its controller can only learn the tier from the trigger: moving its
-  Tier slider to 2 now switches both the shape and the face of the previewed controller.
-- The 概率毁灭者 pool (`mt.recipe.qft_probability_destroyer`, NEI name `概率毁灭者(QFT)`): an independent copy of
-  `RecipeMaps.quantumForceTransformerRecipes` filled by `MTRecipeMaps.populateQftProbabilityDestroyerRecipes()` (called
-  from `CommonProxy.serverStarted`, idempotent like the other populate* methods) with **all item and fluid output
-  chances at 10000 = 100%**, `metadata(CHEMICAL_TWISTER_STRUCTURE_LEVEL, 2)`, `specialValue(12601)` (QFT recipes carry
-  their focus tier in `mSpecialValue` through `GTRecipeMapUtil.SPECIAL_VALUE_ALIASES`, which this machine would read as
-  heat, so it is set explicitly), the QFT catalyst turned into a **non-consumed input** (stackSize 0: GT requires it in
-  the bus but does not consume it) and the QFT metadata kept for NEI. Page: `maxIO(9, 9, 9, 9)`, `LargeNEIFrontend`,
-  height 166, MessTech logo.
-- Recipes ask for a level with `MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL` (a `RecipeMetadataKey<Integer>` whose
-  `drawInfo` draws "Required Structure Level: N" on the NEI page; a recipe without it needs
-  `MTRecipeMaps.DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL = 1`). The processing logic checks the level *before* the
-  heat and refuses a too big recipe with `CheckRecipeResultRegistry.insufficientMachineTier(requiredLevel)`.
-- `createProcessingLogic()` refuses a recipe whose heat requirement (`mSpecialValue`) is above the available heat with
-  `CheckRecipeResultRegistry.insufficientHeat(...)`, and overclocks a recipe that asks for heat with the EBF's
-  `.setRecipeHeat(...).setMachineHeat(...).setHeatOC(true).setHeatDiscount(true)`. A recipe without a heat requirement
-  (`mSpecialValue == 0`, e.g. the assembler recipes of the template) keeps the standard overclocking.
-- The heat is published to the scanner/sensor card/metrics with `getExtraInfoData` under GT's own `GT5U.EBF.heat.s`.
-- Registered as `MTItemList.MTChemicalTwister` by `MTMachineLoader` (lang key `machine.largechemicaltwister.name`),
-  with its own recipe map `MTRecipeMaps.MTChemicalTwisterRecipes`.
-- The pool is a normal GT recipe map, so it registers itself: `MTRecipeMap` -> `RecipeMap.ALL_RECIPE_MAPS`
-  (duplicate names throw) plus a default `RecipeCategory`, i.e. a NEI page. The NEI tab name is
-  `mt.recipe.chemicaltwister` (lang keys exist in `en_US`/`zh_CN`), its icon comes from
-  `neiHandlerInfo(setDisplayStack(MTItemList.MTChemicalTwister.get(1)))`, and the machine becomes the NEI recipe
-  catalyst automatically because `MTEMultiBlockBase` is a `RecipeMapWorkable` (through
-  `IControllerWithOptionalFeatures` -> `IRecipeLockable`) and `MTChemicalTwister.getRecipeMap()` returns this pool.
-  `MTRecipeMaps` is class-initialised from `GTRecipes.loadRecipes()` (FMLLoadComplete), i.e. before NEI loads its
-  plugins when a world is entered, so the category is registered in time. The pool uses
-  `neiSpecialInfoFormatter(HeatingCoilSpecialValueFormatter.INSTANCE)` so NEI shows the heat requirement exactly like
-  the EBF page.
-- NEI page layout: the map uses GT's `LargeNEIFrontend` with `maxIO(15, 15, 15, 15)` (a 3 x 5 slot grid per block),
-  `logo(MTRecipeMaps.MT_LOGO)` and `setShiftY(8).setHeight(240)`, i.e. the layout family the Large Chemical Reactor and
-  the Plasma Forge use - item inputs top left with the fluid inputs *below* them (y = 8 + item rows * 18) and item
-  outputs top right with the fluid outputs below them. With 5 item rows and 5 fluid rows the background is 170x190
-  (items y = 8..80, fluids y = 98..170) and the description text is drawn below it, so the handler needs ~240.
-  `MT_LOGO` is the GregTech/ModularUI flavour of the MessTech logo texture
-  (`UITexture.fullImage("messtech", "gui/picture/mt_logo")`); `OneStepCircuitPoolFrontend` reuses the same
-  constant. `LargeNEIFrontend` only overrides the logo *position* (80, 62), not the texture.
-  The default frontend must not be used here: `UIHelper.getFluidInputPositions` pins every fluid slot to the fixed row
-  y=62 while `UIHelper.getItemInputPositions` grows the item grid downward from y=6, so with a big `maxIO` (the old
-  `18, 18, 12, 12`) the item slots and the fluid row are drawn on top of each other. `maxIO` is display-only ("does not
-  actually restrict the number of items that can be used in recipes"), but it does size that phantom grid, so it has to
-  be raised together with any recipe that outgrows it. The geometry was checked against both layouts as the GT
-  sources build them: the old config overlaps, the new one does not, everything fits the background and the text
-  area, maxIO is the requested 3 x 5 grid, and the logo is ours.
-- Recipe classes: the pool's recipes live in `com.MessTech.common.recipe.MTChemicalTwisterRecipes`
-  (`addChemicalTwisterRecipes()`, called once from `GTRecipes.loadRecipes()` at FMLLoadComplete) plus
-  `loadRecipePostInit()` (called once from `CommonProxy.postInit()`) for recipes that have to wait for other mods (the
-  H2O2 one). Every builder grabs the pool as `RecipeMap<RecipeMapBackend> MT = MTRecipeMaps.MTChemicalTwisterRecipes;`
-  and ends with `.addTo(MT)`. The whole pool was audited: exactly one call site (no double registration), all builders
-  added to `MT`, duration/EU/t/heat/structure-level present on every recipe, no >64 stack clamped by the stack
-  factories, no >64 stack inside a plain `itemInputs`, every recipe fits the NEI grid and no two recipes share the
-  same input signature.
-- One-step platinum-group-metal recipe in that pool (the first builder of `addChemicalTwisterRecipes()`): 45
-  `WerkstoffLoader.PTMetallicPowder` + NaOH/saltpeter/zinc/calcium + 81 potassium disulfate dust (the chain burns
-  11579 mB of the molten form; 1 dust == 144 mB, so it is fed as dust to keep the fluid list short) + ammonia/HCl/HNO3/
-  CO/salt water -> 32 Pt, 21 Pd, 10 Ir, 24 Ru, 7 Rh, 1 Os **plus the whole net byproduct list of the line** (every
-  species nothing in the chain consumes again): 162288 mB chlorine, 144737 mB NO2, 51265 mB water, 30000 mB calcium
-  chloride (fluid), 10338 mB ethylene, 3333 mB steam, 2105 mB molten potassium, and 172 sodium nitrate / 69 zinc
-  sulfate / 48 calcium chloride / 22 salt / 10 + 10 PGS residue dust. At `RECIPE_IV` (7680 EU/t) / 256 s / heat
-  requirement 2701 K / required structure level 1 (`.metadata(MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL, 1)`).
-  Werkstoff ingredients must be built with `Werkstoff#get`; `GTOreDictUnificator.get(prefix, werkstoff, amount)` looks
-  the ore dictionary up by `Werkstoff#toString`, which a Werkstoff does not override, so it returns `null` silently.
-- Stack sizes above 64 go through `GTUtility.copyAmountUnsafe(amount, stack)` (that is exactly what it is for -
-  `copyAmount`/`Materials#getDust` clamp to 64) **and the builder must be `itemInputsUnsafe(...)`**: the plain
-  `itemInputs(ItemStack...)` re-copies every input through `GTUtility.copyAmount` (`fixItemArray(inputs, false)` ->
-  `GTOreDictUnificator.setStackArray(.., false, ..)`), which would silently clamp 124 back to 64, while
-  `itemInputsUnsafe` is the `copyAmountUnsafe` branch. Outputs are stored as they are (`itemOutputs`), so 172/69 survive
-  there. `GTRecipe#buildItemInputCache` merges duplicate inputs of the same type by summing, so the old "two 62 stacks"
-  form matched identically, but NEI draws one slot per recipe input entry, i.e. it showed two slots; a single unsafe
-  stack keeps every ingredient on one NEI slot (NaOH 124, K2S2O7 81, sodium nitrate 172, zinc sulfate 69).
+- Face + `getCasingTexture()` = **the formed structure**, not the mode. Level 1: GT LCR face
+  (`createTextureWithCasing`, four `OVERLAY_FRONT_LARGE_CHEMICAL_REACTOR*` overlays, idle/running + glow) on
+  `Casings.ChemicallyInertMachineCasing` (element `D`, also the LCR's casing). Level 2: GT++ QFT face (four
+  `TexturesGtBlock.oMCAQFT*` icon containers) on `Casings.BulkProductionFrame` (`blockCasings2Misc:12`, element `F`) -
+  概率毁灭者 looks like the QFT its recipes come from; the published casing keeps it a proper GT face.
+- Element `C` = `GTStructureChannels.HEATING_COIL.use(activeCoils(ofCoil(this::setCoilLevel, this::getCoilLevel)))` -
+  EBF wiring: `coil` channel (StructureLib can hint/register tiers), active-coil bookkeeping, GT coil element (rejects
+  mixed-level rings). API: `getCoilLevel()` / `setCoilLevel(HeatingCoilLevel)` (what `ofCoil` calls), `getCoilHeat()`
+  (raw `HeatingCoilLevel#getHeat()`), `getHeatingCapacity()` (heat limit for recipes).
+- `checkMachine`: forgets coil level, heat *and* structure level; missing coil -> GT's
+  `StructureErrorRegistry.COIL_LEVEL_NOT_ENOUGH`; then
+  `getHeatingCapacity() = getCoilHeat() + 100 * (GTUtility.getTier(getMaxInputVoltage()) - 2)` (EBF formula, MV the
+  neutral tier: cupronickel = 1701 K on LV energy, 1801 K on MV).
+- Level 2 (概率毁灭者): `structure_tier2` = piece `tier2`, same bounding box/controller spot as level 1 (`8, 8, 0`
+  offsets work for both). Letters **F-J**, not A-E: one element map per definition, level 1 uses A-E, a collision would
+  let each piece accept the other's blocks (hatches anywhere). F `BulkProductionFrame`, G
+  `QuantumForceTransformerCoilCasing`, **H `SpaceTimeContinuumRipper` + that piece's hatches**, I
+  `SpaceTimeBendingCore`, J `ForceFieldGlass`; geometry untouched. No coil ring: level 1 keeps EBF formula + coil
+  error, level 2 runs at `MTRecipeMaps.QFT_PROBABILITY_DESTROYER_HEAT = 12601` (Hypogen); `checkMachine` checks level 2
+  first, speculatively (`null` error list).
+- Modes: `totalMachineMode() = 2` (0 化学扭曲, 1 概率毁灭者); base class adds GUI button, NBT round-trip, Waila line,
+  screwdriver (`onScrewdriverRightClick`, refused while running) switches. `getRecipeMap()` =
+  `MTRecipeMaps.qftProbabilityDestroyerRecipes` (mode 1) / `MTRecipeMaps.MTChemicalTwisterRecipes` (mode 0);
+  `getAvailableRecipeMaps()` lists both (NEI catalyst on either page). Mode 1 recipes need level 2 -> a switch without
+  the tier-2 structure gives `insufficientMachineTier(2)`; mode 0 still runs there (level 2 >= 1, heat 12601).
+  `construct`/`survivalConstruct` build the selected mode's piece.
+- Level in NEI preview / build hints: trigger stack size (`MTChemicalTwister.STRUCTURE_LEVEL_TIER2 = 2`: 1 = level 1,
+  >= 2 = level 2), mode as fallback - GT's usual structure tier switch (PCB Factory picks 1/2/3 the same way). Hence
+  BlockRenderer6343's **Tier slider**: BR6343 calls `construct()` with `stackSize = 1, 2, 3, ...` until the world stops
+  changing (`ObserverWorld#estimateTier`), slider up to the highest tier that changed, rebuild via
+  `survivalConstruct(getBuildTriggerStack(), ...)` / `construct(trigger, false)`; 2 = 概率毁灭者 shell, 1 = level 1.
+  Own "Heating Coil" channel slider (coil element channel wrapped) can exceed 2 - any value >= 2 is level 2. No mixin,
+  no extra dependency on BlockRenderer6343; hologram projector same rule (scroll to tier 2).
+- Client: `getUpdateData()` returns `mStructureLevel`; GT's `BaseMetaTileEntity` compares it every tick server side
+  (`handleUpdateDataChangeServer`), sends `CHANGE_CUSTOM_DATA` on change, writes it into the tile data packet
+  (`tileWriteToStream`, read back as `receiveClientEvent(..., buffer.readByte() & 0x7F)` at chunk load), calls
+  `onValueUpdate(byte)` - nothing else works, `MTEMultiBlockBase#checkStructure` returns early on the client. Masked
+  with `0x7F`, so keep it below 128 (here 0/1/2). Previews publish their own level: `construct`/`survivalConstruct` call
+  `updatePreviewStructureLevel(trigger)` (*formed* machine skipped); BR6343's dummy multiblock (never ticked,
+  `DummyWorld.isRemote` even `false` -> GT sees server side) learns the tier only from the trigger.
+- 概率毁灭者 pool (`mt.recipe.qft_probability_destroyer`, NEI name `概率毁灭者(QFT)`): independent copy of
+  `RecipeMaps.quantumForceTransformerRecipes`, filled by `MTRecipeMaps.populateQftProbabilityDestroyerRecipes()`
+  (`CommonProxy.serverStarted`, idempotent) with **all item and fluid output chances at 10000 = 100%**,
+  `metadata(CHEMICAL_TWISTER_STRUCTURE_LEVEL, 2)`, `specialValue(12601)` (QFT recipes carry the focus tier in
+  `mSpecialValue` via `GTRecipeMapUtil.SPECIAL_VALUE_ALIASES`, read as heat here, hence explicit), QFT catalyst as a
+  **non-consumed input** (stackSize 0: required in the bus, never consumed), QFT metadata for NEI. Page:
+  `maxIO(9, 9, 9, 9)`, `LargeNEIFrontend`, height 166, MessTech logo.
+- Recipe level: `MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL` (`RecipeMetadataKey<Integer>`, `drawInfo` draws
+  "Required Structure Level: N"; absent = `MTRecipeMaps.DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL = 1`), checked *before*
+  the heat; too big -> `CheckRecipeResultRegistry.insufficientMachineTier(requiredLevel)`.
+- `createProcessingLogic()`: heat requirement (`mSpecialValue`) above the available heat ->
+  `CheckRecipeResultRegistry.insufficientHeat(...)`; heat recipes overclock through the EBF's
+  `.setRecipeHeat(...).setMachineHeat(...).setHeatOC(true).setHeatDiscount(true)`; `mSpecialValue == 0` (e.g. the
+  template's assembler recipes) keeps standard overclocking. Heat -> scanner/sensor card/metrics via `getExtraInfoData`,
+  key `GT5U.EBF.heat.s`.
+- Registered as `MTItemList.MTChemicalTwister` by `MTMachineLoader` (lang key `machine.largechemicaltwister.name`) with
+  its own map `MTRecipeMaps.MTChemicalTwisterRecipes`. A normal GT map registers itself: `MTRecipeMap` ->
+  `RecipeMap.ALL_RECIPE_MAPS` (duplicate names throw) + default `RecipeCategory` = NEI page. Tab
+  `mt.recipe.chemicaltwister` (lang keys in `en_US`/`zh_CN`), icon
+  `neiHandlerInfo(setDisplayStack(MTItemList.MTChemicalTwister.get(1)))`; NEI catalyst automatic -
+  `MTEMultiBlockBase` is a `RecipeMapWorkable` (via `IControllerWithOptionalFeatures` -> `IRecipeLockable`) and
+  `MTChemicalTwister.getRecipeMap()` returns it. `MTRecipeMaps` class-initialised from `GTRecipes.loadRecipes()`
+  (FMLLoadComplete), before NEI loads its plugins on world enter;
+  `neiSpecialInfoFormatter(HeatingCoilSpecialValueFormatter.INSTANCE)` shows heat like the EBF page.
+- NEI layout: `LargeNEIFrontend`, `maxIO(15, 15, 15, 15)` (3 x 5 slots per block), `logo(MTRecipeMaps.MT_LOGO)`,
+  `setShiftY(8).setHeight(240)` - LCR / Plasma Forge family: item inputs top left, fluid inputs *below*
+  (y = 8 + item rows * 18), outputs top right with fluids below; 5 + 5 rows -> 170x190 (items y = 8..80, fluids
+  y = 98..170), text below, handler ~240. `MT_LOGO` = GregTech/ModularUI flavour of the MessTech logo
+  (`UITexture.fullImage("messtech", "gui/picture/mt_logo")`), reused by `OneStepCircuitPoolFrontend`;
+  `LargeNEIFrontend` overrides only the logo *position* (80, 62). Not the default frontend:
+  `UIHelper.getFluidInputPositions` pins fluid slots to row y=62, `UIHelper.getItemInputPositions` grows the item grid
+  down from y=6, so a big `maxIO` (the old `18, 18, 12, 12`) overlaps them; `maxIO` is display-only ("does not
+  actually restrict the number of items that can be used in recipes") but sizes that phantom grid - raise it when a
+  recipe outgrows it.
+- Recipe classes: `com.MessTech.common.recipe.MTChemicalTwisterRecipes` (`addChemicalTwisterRecipes()`, once from
+  `GTRecipes.loadRecipes()` at FMLLoadComplete) + `loadRecipePostInit()` (once from `CommonProxy.postInit()`) for recipes
+  waiting on other mods (the H2O2 one). Builders grab `RecipeMap<RecipeMapBackend> MT = MTRecipeMaps.MTChemicalTwisterRecipes;`
+  and end with `.addTo(MT)`. Audit: one call site (no double registration), all builders on
+  `MT`, duration/EU/t/heat/structure-level on every recipe, no >64 stack clamped by the stack factories, no >64 stack in
+  a plain `itemInputs`, every recipe fits the NEI grid, no shared input signature.
+- One-step platinum-group-metal recipe (first builder): 45 `WerkstoffLoader.PTMetallicPowder` +
+  NaOH/saltpeter/zinc/calcium + 81 potassium disulfate dust (the chain burns 11579 mB molten; 1 dust == 144 mB, so dust
+  keeps the fluid list short) + ammonia/HCl/HNO3/CO/salt water -> 32 Pt, 21 Pd, 10 Ir, 24 Ru, 7 Rh, 1 Os **plus the
+  whole net byproduct list of the line** (every species nothing consumes again): 162288 mB chlorine, 144737 mB NO2,
+  51265 mB water, 30000 mB calcium chloride (fluid), 10338 mB ethylene, 3333 mB steam, 2105 mB molten potassium, and 172
+  sodium nitrate / 69 zinc sulfate / 48 calcium chloride / 22 salt / 10 + 10 PGS residue dust. `RECIPE_IV` (7680 EU/t) /
+  256 s / heat 2701 K / level 1 (`.metadata(MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL, 1)`). Werkstoff ingredients
+  need `Werkstoff#get`; `GTOreDictUnificator.get(prefix, werkstoff, amount)` resolves the ore dict by
+  `Werkstoff#toString` (not overridden) -> silently `null`.
+- Stack sizes above 64: `GTUtility.copyAmountUnsafe(amount, stack)` (`copyAmount`/`Materials#getDust` clamp to 64)
+  **and `itemInputsUnsafe(...)`** - plain `itemInputs(ItemStack...)` re-copies through `GTUtility.copyAmount`
+  (`fixItemArray(inputs, false)` -> `GTOreDictUnificator.setStackArray(.., false, ..)`), silently clamping 124 to 64.
+  Outputs stay as stored (`itemOutputs`), so 172/69 survive. `GTRecipe#buildItemInputCache` merges duplicate inputs of a
+  type by summing: the old "two 62 stacks" form matched identically, but NEI draws one slot per input entry; one unsafe
+  stack keeps an ingredient on one NEI slot (NaOH 124, K2S2O7 81, sodium nitrate 172, zinc sulfate 69).
 - That recipe is the *net* stoichiometry of the whole GT5U platinum line (`bartworks` `PlatinumSludgeRecipes`), not a
-  guess: every recipe of the line was transcribed as a stoichiometric vector, all cyclic intermediates are balanced
-  exactly, everything the line produces but never eats again is dropped, and the remaining free directions were fixed
-  by requiring a physically realisable steady state (no negative recipe runs). The numbers were re-derived from the
-  chain and cross-checked against the Java recipe, the pool registration and the heat semantics.
-- Notes on the derivation: Platinum Metallic Powder is the only metal feed - the Pt line's "palladium enriched
-  ammonia" byproduct carries the palladium, so no Palladium Metallic Powder (palladium ore) is needed. The Pd line's
-  circuit-2 recipe (`PDAmmonia` -> `PDSalt`) is deliberately excluded: it turns the loop into a palladium printer
-  (ammonia in, palladium out), which is not the intended flow and would make the recipe ratio meaningless. Sifter
-  yields are taken at their expected value (0.95). The final amounts are rounded from the exact ratio (worst case
-  6 %, rhodium 6.6 -> 7) and the sodium hydroxide is written as two 62 dust stacks because `Materials#getDust` caps a
-  stack at 64.
-- Heat: the recipe asks for 2701 K (Kanthal), and at IV energy the machine reaches 3001 K, so a Kanthal ring is the
-  minimum coil; a cupronickel ring at IV only reaches 2101 K and is refused. The IV EU/t of the recipe itself needs an
-  IV energy hatch (the recipe search only returns recipes the machine's voltage can pay for).
+  guess: each recipe as a stoichiometric vector, cyclic intermediates balanced exactly, everything produced but never
+  eaten again dropped, free directions fixed by requiring a physically realisable steady state (no negative recipe
+  runs), cross-checked against the Java recipe, pool registration and heat semantics. Platinum Metallic Powder is the
+  only metal feed - the Pt line's "palladium enriched ammonia" byproduct carries the palladium, so no Palladium Metallic
+  Powder (palladium ore). The Pd line's circuit-2 recipe (`PDAmmonia` -> `PDSalt`) is excluded on purpose: a palladium
+  printer (ammonia in, palladium out) would make the ratio meaningless. Sifter yields at expected value (0.95), amounts
+  rounded from the exact ratio (worst case 6 %, rhodium 6.6 -> 7), sodium hydroxide as two 62 dust stacks because
+  `Materials#getDust` caps a stack at 64.
+- Heat: 2701 K asked for and IV energy reaches 3001 K, so Kanthal is the minimum coil; cupronickel at IV reaches only
+  2101 K and is refused. The IV EU/t needs an IV energy hatch (the search only returns payable recipes).
 
 ### MTHugeChemicalReactor (巨型化学反应釜)
 
-- The first machine on the module base: it runs the **Large Chemical Reactor's pool**
-  (`RecipeMaps.chemicalReactorRecipes`) and enables **perfect overclock** (`isEnablePerfectOverclock()` returns
-  `true`, so `MTMultiMachineBase#createProcessingLogic` calls `setOverclock(4, 4)` - EU/t x4 and duration /4 per
-  overclock, which leaves the total energy of a craft untouched).
-- It has no bonus of its own: the `getBase*` hooks of `MTModuleMultiMachineBase` stay at 1, so `getSpeedBonus()`,
-  `getEuModifier()` and `getMaxParallelRecipes()` are exactly what the linked modules supply (the speed and EU
-  modules multiply, the parallel module replaces). At most one parallel control module is taken (`addModule`), any
-  number of speed and EU modules.
-- The module slot is element `'B'` of the structure: its `HatchElementBuilder.atLeast(...)` list ends with
-  `MTModuleHatchElement.Module`, whose adder is `MTModuleMultiMachineBase#addModuleHatchToMachineList`, so the
-  structure scan links the hatch and refuses a module the machine does not take (or a second parallel module).
-- `checkMachineStructure` (the base's hook - `checkMachine` itself is final) forgets the coil level first and then
-  checks the piece plus `checkHasAnyInput/Output/Energy`; the base clears the module list before the call, so both the
-  coil and the modules are properties of the current structure.
-- The coil band (element `'A'`) is
-  `GTStructureChannels.HEATING_COIL.use(activeCoils(ofCoil(this::setCoilLevel, this::getCoilLevel)))`: a heating
-  coil of **any** tier is accepted, the level is kept in `mCoilLevel` (`getCoilLevel()`) and published as the coil
-  sub channel - that channel is what gives the hologram preview and BlockRenderer6343 the coil slider. No recipe of
-  the chemical reactor pool asks for the level, so the band is a structure requirement, not a heat source.
-- Tooltip: house style, every line one `addInfo(translate(key))` with the text and colours in the lang files
+- First machine on the module base: the **Large Chemical Reactor's pool** (`RecipeMaps.chemicalReactorRecipes`) with
+  **perfect overclock** (`isEnablePerfectOverclock()` -> `true`, so `MTMultiMachineBase#createProcessingLogic` calls
+  `setOverclock(4, 4)`: EU/t x4, duration /4, total energy untouched).
+- No bonus of its own: the `getBase*` hooks of `MTModuleMultiMachineBase` stay 1, so `getSpeedBonus()`,
+  `getEuModifier()` and `getMaxParallelRecipes()` are exactly what the modules supply (speed and EU multiply, the
+  parallel module replaces). One parallel control module at most (`addModule`), any number of speed/EU modules.
+- Module slot = element `'B'`: its `HatchElementBuilder.atLeast(...)` list ends with `MTModuleHatchElement.Module`,
+  adder `MTModuleMultiMachineBase#addModuleHatchToMachineList` - the scan links the hatch and refuses a module the
+  machine does not take (or a second parallel one).
+- `checkMachineStructure` (base hook - `checkMachine` is final) forgets the coil level, then checks the piece plus
+  `checkHasAnyInput/Output/Energy`; the base clears the module list first, so coil and modules belong to the current
+  structure.
+- Coil band (element `'A'`) =
+  `GTStructureChannels.HEATING_COIL.use(activeCoils(ofCoil(this::setCoilLevel, this::getCoilLevel)))`: any tier taken,
+  level in `mCoilLevel` (`getCoilLevel()`) and published as the coil sub channel that gives the hologram preview and
+  BlockRenderer6343 their coil slider. No pool recipe asks for the level - structure requirement, not a heat source.
+- Tooltip: house style, one `addInfo(translate(key))` per line, text/colours in the lang files
   (`machine.hugechemicalreactor.machinetype`, `machine.hugechemicalreactor.tooltip.*`: 配方 / 模块 / 结构 groups plus
-  the `details` pair). The structure it describes is the written 5x5x5 shape: a shell of chemically inert machine
-  casing that hosts the hatches, a cross of PTFE pipe casing in the middle of the chamber and 8 heating coils on the
-  face opposite the controller.
-- Face: the controller wears the Large Chemical Reactor's face (idle and running, each with its glow layer,
+  the `details` pair). The written 5x5x5: chemically inert machine casing shell with the hatches, a cross of PTFE pipe
+  casing in the chamber middle, 8 heating coils on the face opposite the controller.
+- Face: the Large Chemical Reactor's (idle + running, each with glow layer,
   `Textures.BlockIcons#createTextureWithCasing` + `ICasingTextureProvider#getCasingTexture` =
-  `Casings.ChemicallyInertMachineCasing.getCasingTexture()`), so it looks like the reactor it runs, on the casing of
-  its own shell - the same face the Chemical Twister's level 1 uses.
-- Crafted in the **assembler** (`RecipeMaps.assemblerRecipes`, in `GTRecipes#loadRecipes`, right after the Chemical
-  Twister): 64 `Machine_Multi_LargeChemicalReactor`, 4 `Machine_IV_ChemicalReactor`, 4
-  `Casing_Pipe_Polytetrafluoroethylene`, 8 `Casing_Coil_Cupronickel` (the level 1 coil), 16 IV circuits
-  (`new Object[] { OrePrefixes.circuit.get(Materials.IV), 16 }`, the form GT5U itself uses for a tier's circuit) and
-  18432 L molten PTFE (`Materials.Polytetrafluoroethylene.getMolten(144 * 128)`), integrated circuit 17,
-  `eut(RECIPE_IV)`, `duration(MINUTES * 2)`, one Huge Chemical Reactor out. The PTFE pipes and the coils are the two
-  ingredients its own structure is built from.
-- Registered as `MTItemList.MTHugeChemicalReactor` by `MTMachineLoader` under `MT_ID + 34` with the lang key
-  `machine.hugechemicalreactor.name`. Its brand line names no author:
+  `Casings.ChemicallyInertMachineCasing.getCasingTexture()`) - the Chemical Twister's level 1 face.
+- Assembler (`RecipeMaps.assemblerRecipes`, in `GTRecipes#loadRecipes`, right after the Chemical Twister): 64
+  `Machine_Multi_LargeChemicalReactor`, 4 `Machine_IV_ChemicalReactor`, 4 `Casing_Pipe_Polytetrafluoroethylene`, 8
+  `Casing_Coil_Cupronickel` (the level 1 coil), 16 IV circuits
+  (`new Object[] { OrePrefixes.circuit.get(Materials.IV), 16 }`, GT5U's own form), 18432 L molten PTFE
+  (`Materials.Polytetrafluoroethylene.getMolten(144 * 128)`), integrated circuit 17, `eut(RECIPE_IV)`,
+  `duration(MINUTES * 2)` -> one Huge Chemical Reactor. PTFE pipes and coils are the two ingredients its own structure
+  is built from.
+- Registered as `MTItemList.MTHugeChemicalReactor` by `MTMachineLoader` under `MT_ID + 34`, lang key
+  `machine.hugechemicalreactor.name`. Brand line names no author:
   `AuthorDynamic.registerAddon(AuthorDynamic.MODULE_PROJECT, () -> translateToLocal("messtech.moduleProject"), ...)`
   prints `添加模组: ModularProject` with the word wearing the modular animation, see `MTModuleProjectText`.
 
@@ -603,382 +527,286 @@ MTMultiMachineBase<T>
 
 ### MTAssFactory
 - Extends `MTMultiMachineBase` (not wireless).
-- Modes:
-  - 0 = Component Assembly Line: generic `ProcessingLogic` recipe map lookup; recipe casing tier
-    (`mSpecialValue`) limited by `MTMultiMachineBase#getEnergyHatchTier()` (the highest energy hatch tier, exotic
-    hatches included), so laser/multi-amp hatches count and the best hatch sets the limit. The same tier drives
-    the Tier 1 parallel count.
-  - 1 = Assembly Line: data-stick / Data Access; LevelTier 2 required; unordered input matching by
-    `MTAssemblyLineMatcher` instead of a recipe map lookup (not the original ordered AL), and no
-    single-recipe locking (`supportsSingleRecipeLocking()` is false there, like GT's own Assembly Line).
-- Structure `F` accepts Data Access hatch.
-- Independent Assembly Line recipe map `MTRecipeMaps.assFactoryAssemblyLineRecipes` holds **only fake NEI
-  pages**, one per `RecipeAssemblyLine` definition (alternatives kept, so NEI cycles them in one slot); it has
-  no runnable recipes on purpose. See `docs/GT5U-NOTES.md` § 11.6.
-- `MTAssemblyLineMatcher` resolves an authorised definition against the current input buses on every recipe
-  check: every bus is read as one unordered pool (wildcard-damage alias included, NBT ignored), and each slot
-  takes the alternative that leaves the most parallels, so the ingredients may sit in any bus in any order and
-  a slot written as "A or B" is satisfied by whichever is there. The resulting concrete ingredient list goes
-  through the normal `ProcessingLogic` pipeline, so parallels, perfect overclock, void protection, debug/ME
-  buses and the consumption itself stay the shared code.
-- Front texture: Advanced Molecular Casing base + Quantum Force Transformer face overlay.
-- Tooltips mention modes, data access, energy tier limit.
+- Mode 0 = Component Assembly Line: generic `ProcessingLogic` recipe map lookup; recipe casing tier (`mSpecialValue`)
+  capped by `MTMultiMachineBase#getEnergyHatchTier()` (highest energy hatch tier, exotic hatches included) - so
+  laser/multi-amp hatches count, the best hatch sets the limit, and that tier also drives the Tier 1 parallel count.
+- Mode 1 = Assembly Line: data-stick / Data Access, LevelTier 2, unordered input matching by `MTAssemblyLineMatcher`
+  instead of a recipe map lookup (not the original ordered AL), no single-recipe locking
+  (`supportsSingleRecipeLocking()` false, like GT's own Assembly Line).
+- Structure `F` accepts the Data Access hatch.
+- `MTRecipeMaps.assFactoryAssemblyLineRecipes` = independent Assembly Line map holding **only fake NEI pages**, one per
+  `RecipeAssemblyLine` definition (alternatives kept, NEI cycles them in one slot), no runnable recipes on purpose - see
+  `docs/GT5U-NOTES.md` § 11.6.
+- `MTAssemblyLineMatcher` resolves an authorised definition per recipe check against the input buses: each bus one
+  unordered pool (wildcard-damage alias in, NBT ignored), each slot taking the alternative leaving the most parallels -
+  ingredients may sit in any bus in any order, "A or B" satisfied by whichever is there. That list then runs the normal
+  `ProcessingLogic` pipeline: parallels, perfect overclock, void protection, debug/ME buses and consumption stay shared
+  code.
+- Front texture: Advanced Molecular Casing base + Quantum Force Transformer face overlay; tooltips mention modes, data
+  access, energy tier limit.
 
 ### MTInventoryInputBusME / MTInventoryInputHatchME
-- New ME hatches registered as `32407` (item bus) and `32408` (fluid hatch).
-- They extend the GT5U advanced stocking ME bus/hatch classes, so they use the advanced GUI with the
-  auto-pull toggle (only the first 16 entries are shown in the GUI).
-- In auto-pull mode they snapshot the whole AE storage list at every `startRecipeProcessing()`; every
-  distinct ME item/fluid type meeting the configured minimum stock size/amount is exposed to the
-  multiblock during one recipe check. This mirrors the original GT5U stocking hatch's per-recipe-check
-  pull notification, so machines can be fed continuously.
-- `autoPullRefreshTime` continues to govern the parent GT5U GUI's first-16 auto-refresh; it does not
-  throttle the per-recipe-check full snapshot.
-- In manual mode (auto-pull off) they behave like the normal GT5U stocking bus and only expose the
-  manually configured 16 slots; no automatic full-network pull happens.
-- End-of-processing extracts only the consumed difference from AE (`endRecipeProcessing`).
-- Registered in `MTMachineLoader` and `MTItemList`.
+- ME hatches `32407` (item bus) / `32408` (fluid hatch); extend the GT5U advanced stocking ME bus/hatch classes ->
+  advanced GUI with auto-pull toggle (only the first 16 entries shown).
+- Auto-pull: every `startRecipeProcessing()` snapshots the whole AE storage, exposing every distinct ME item/fluid type
+  above the configured minimum stock size/amount for one recipe check - the original stocking hatch's per-recipe-check
+  pull, so machines feed continuously.
+- `autoPullRefreshTime` still governs the parent GUI's first-16 auto-refresh, not the full snapshot.
+- Manual mode: normal GT5U stocking bus, only the manually configured 16 slots, no full-network pull.
+- `endRecipeProcessing` extracts only the consumed difference from AE; registered in `MTMachineLoader` and
+  `MTItemList`.
 
 ### MTWirelessVacuumConveyorInput / MTWirelessVacuumConveyorOutput
-- Registered as `32409` (wireless input) and `32410` (wireless output).
-- Extend the normal GT5U VCI/VCO classes so existing NAC module structure code accepts them.
-- Wireless pairing uses string frequency + optional owner UUID (private), mirroring advanced wireless
-  redstone covers. The hatch dye colour is also part of the match, so NAC colour routing from VCI to
-  VCO is preserved. Uncoloured hatches (`color == -1`) do not form wireless links.
-- A dedicated registry tracks all wireless hatches because `VacuumFactoryGrid.vertices` only contains
-  elements that already have an edge.
-- `getNeighbours()` returns every registered wireless hatch with the same colour/frequency/private key.
-- `canConnectOnSide()` is false so normal Vacuum Conveyor Pipes cannot connect to these hatches.
-- The wireless input overrides `onPostTick()` to allow cross-NAC output extraction (no `mainController`
-  equality requirement) while keeping the original 1:1 output rule. It queries the dedicated registry
-  directly instead of depending on `VacuumFactoryGrid` edge formation, so isolated wireless pairs still
-  transfer reliably.
-- Same GUI as the GT5U vacuum hatch plus frequency/popup and private toggle controls.
+- Registered as `32409` (input) / `32410` (output); extend the normal GT5U VCI/VCO classes, so existing NAC module
+  structure code accepts them. Same GUI as the GT5U vacuum hatch plus frequency/popup and private toggle.
+- Pairing: string frequency + optional owner UUID (private), like the advanced wireless redstone covers; the hatch dye
+  colour is part of the match, so NAC colour routing VCI -> VCO survives. `color == -1` (unpainted) never links.
+- Dedicated registry for all wireless hatches (`VacuumFactoryGrid.vertices` only holds elements that already have an
+  edge); `getNeighbours()` = every registered hatch with the same colour/frequency/private key. `canConnectOnSide()`
+  false, so normal Vacuum Conveyor Pipes cannot connect.
+- The wireless input overrides `onPostTick()` for cross-NAC output extraction (no `mainController` equality, 1:1 output
+  rule kept) and queries the registry directly instead of `VacuumFactoryGrid` edge formation - isolated pairs still
+  transfer.
 
 ### MTWirelessBeamlineInput / MTWirelessBeamlineOutput / MTWirelessBeamlineAdvancedOutput
-- Registered as `32470` (input), `32471` (output) and `32472` (filtered output). They extend GT5U's
-  `MTEHatchInputBeamline` / `MTEHatchOutputBeamline` / `MTEHatchAdvancedOutputBeamline`, so every beam machine
-  (LHC, beam splitter, beam crafter, target chamber, LINAC, source chamber, synchrotron, beam mirror, beam
-  stabilizer) accepts them unchanged: the structure adders and `BeamHatchElement` only test `instanceof` /
-  `mteClasses()`, so a subclass is accepted. Caveat: the machines that build their slots with
-  `buildBeamline*Hatch(...)`/`hatchId(...)` (LHC, beam splitter, beam crafter, LINAC, beam mirror,
-  stabilizer) filter the *hologram* by MTE id, so a correctly placed wireless hatch is flagged by the
-  "show errors" channel and autoplace can only pull the wired hatch from inventory. The structure itself
-  still validates and the machine runs; place these hatches by hand.
-- The pairing key is **only the hatch dye colour** (`getBaseMetaTileEntity().getColorization()`, where `-1` means
-  unpainted and never links; the value is re-read live, so repainting re-pairs immediately).
-  `WirelessBeamlineUtil` keeps a dedicated registry, because two isolated hatches have no beamline pipe edge
-  that could carry the connection; pairing therefore works across machines and dimensions **as long as both
-  chunks are loaded** - a chunk unload unregisters the hatch (`onUnload`), so an unloaded counterpart counts as
-  "no counterpart" and the beam is dropped instead of being pushed into an unloaded tile entity.
-- 1:1 is enforced at push time instead of being assumed: the colour channel must contain **exactly one output and
-  exactly one input**, otherwise the packet is dropped and never handed to an arbitrary hatch. `moveBeam()`
-  replaces the wired hatch's pipe walk and is invoked from the same `MOVE_AT` hook (`tick % 20 == 4`), so the
-  transfer cadence is identical to a wired beamline.
-- `canConnect()` is false on both sides, so beamline pipes neither connect to nor render a connection for them.
-  The wired output hatch does not consult `canConnect` when it walks its line of sight, so the wireless input
-  additionally overrides `setContents()` and only accepts the packet its own 
-  `WirelessBeamlineUtil.moveBeam()` is handing over at that moment: a wired hatch parked in front of the
-  wireless input cannot inject a beam that bypasses the colour channel.
-- The input keeps GT's inherited expiry logic: a beam that is not refreshed within one move tick is dropped, so
-  repainting a hatch or breaking the pair stops the machine instead of caching a stale particle stream.
-- The filtered variant inherits the LHC/beam splitter particle blacklist: the machine writes `acceptedInputMap`
-  and `dataPacket`, and GT5U's ModularUI edits the map. Nothing about the filter was changed, only the transport.
-- Scanner info (`getInfoData()`) gains two lines and stays inside the eight documented by
-  `IGregTechDeviceInformation`: the colour name (GT5U's `GT5U.infinite_spray_can.color.*` key with a `Dyes` name
-  fallback) and the live link state (unpainted / no counterpart / conflict / linked). They are emitted through
-  `IGregTechDeviceInformation.encode(...)` / `translatable(...)` - or as a bare lang key - so the client
-  translates them in its own language, and the registry state itself stays server-side only.
-- Lang lives in `machine.wirelessbeamline.*`. The hatches carry `@IMetaTileEntity.SkipGenerateDescription`
-  because their description is handed straight to the tooltip: without the annotation GT5U dumps one instance's
-  description into `GregTech.lang` at client setup, which is why the older `MTWirelessVacuumConveyor*` tooltips
-  show a frozen frequency line.
-- Crafting recipes live in `GTRecipes.loadRecipes()`, one assembler recipe per hatch, each built on its wired
-  counterpart (`LanthItemList.LUV_BEAMLINE_INPUT_HATCH` / `LUV_BEAMLINE_OUTPUT_HATCH`, filtered variant on
-  `ItemList.AdvancedBeamlineOutputHatch`) and reusing the wireless vacuum conveyor kit verbatim: AE2
-  `item.ItemMultiMaterial` 8:47 x8, `ItemList.WormholeGenerator`, UIV sensor (input) or emitter (output) x4,
-  UIV circuit x4, `wireGt16` SuperconductorUIV x64 and the advanced redstone receiver (input) / transmitter
-  (output) cover, on `MUTATED_LIVING_SOLDER` (input) or `Lubricant` (output), UIV, 2 minutes. The kit is not
-  retiered to the hatch's own LuV/UV tier, so the wireless upgrade is priced as a UIV build.
+- Registered as `32470` (input), `32471` (output), `32472` (filtered output); extend GT5U's
+  `MTEHatchInputBeamline` / `MTEHatchOutputBeamline` / `MTEHatchAdvancedOutputBeamline`, so every beam machine (LHC,
+  beam splitter, beam crafter, target chamber, LINAC, source chamber, synchrotron, beam mirror, beam stabilizer) accepts
+  them unchanged - the structure adders and `BeamHatchElement` only test `instanceof` / `mteClasses()`. Caveat: machines
+  building slots with `buildBeamline*Hatch(...)`/`hatchId(...)` (LHC, beam splitter, beam crafter, LINAC, beam mirror,
+  stabilizer) filter the *hologram* by MTE id, so a correctly placed wireless hatch is flagged by the "show errors"
+  channel and autoplace can only pull the wired hatch; the structure still validates and the machine runs - place them
+  by hand.
+- Pairing key = **only the hatch dye colour** (`getBaseMetaTileEntity().getColorization()`, `-1` = unpainted, never
+  links; re-read live, so repainting re-pairs immediately). `WirelessBeamlineUtil` keeps a dedicated registry because two
+  isolated hatches have no beamline pipe edge; pairing works across machines and dimensions **as long as both chunks are
+  loaded** - a chunk unload unregisters the hatch (`onUnload`), so an unloaded counterpart counts as "no counterpart"
+  and the beam is dropped instead of being pushed into an unloaded tile entity.
+- 1:1 is enforced at push time: the colour channel must hold **exactly one output and exactly one input**, else the
+  packet is dropped, never handed to an arbitrary hatch. `moveBeam()` replaces the wired hatch's pipe walk on the same
+  `MOVE_AT` hook (`tick % 20 == 4`), so the cadence matches a wired beamline.
+- `canConnect()` false on both sides, so beamline pipes neither connect to nor render a connection for them. The wired
+  output hatch ignores `canConnect` when walking its line of sight, so the wireless input also overrides `setContents()`
+  and only accepts the packet its own `WirelessBeamlineUtil.moveBeam()` is handing over: a wired hatch parked in front
+  cannot bypass the colour channel.
+- The input keeps GT's inherited expiry logic: a beam not refreshed within one move tick is dropped, so repainting a
+  hatch or breaking the pair stops the machine instead of caching a stale particle stream.
+- The filtered variant inherits the LHC/beam splitter particle blacklist: the machine writes `acceptedInputMap` and
+  `dataPacket`, GT5U's ModularUI edits the map - only the transport changed.
+- Scanner info (`getInfoData()`) gains two lines and stays inside the eight documented by `IGregTechDeviceInformation`:
+  the colour name (GT5U's `GT5U.infinite_spray_can.color.*` key with a `Dyes` name fallback) and the live link state
+  (unpainted / no counterpart / conflict / linked), emitted through `IGregTechDeviceInformation.encode(...)` /
+  `translatable(...)` - or as a bare lang key - so the client translates them; registry state stays server-side.
+- Lang in `machine.wirelessbeamline.*`. The hatches carry `@IMetaTileEntity.SkipGenerateDescription` because their
+  description goes straight to the tooltip: without it GT5U dumps one instance's description into `GregTech.lang` at
+  client setup, which is why older `MTWirelessVacuumConveyor*` tooltips show a frozen frequency line.
+- Crafting: one assembler recipe per hatch in `GTRecipes.loadRecipes()`, each on its wired counterpart
+  (`LanthItemList.LUV_BEAMLINE_INPUT_HATCH` / `LUV_BEAMLINE_OUTPUT_HATCH`, filtered variant on
+  `ItemList.AdvancedBeamlineOutputHatch`) reusing the wireless vacuum conveyor kit verbatim: AE2
+  `item.ItemMultiMaterial` 8:47 x8, `ItemList.WormholeGenerator`, UIV sensor (input) / emitter (output) x4, UIV
+  circuit x4, `wireGt16` SuperconductorUIV x64 and the advanced redstone receiver (input) / transmitter (output) cover,
+  on `MUTATED_LIVING_SOLDER` (input) or `Lubricant` (output), UIV, 2 minutes. Not retiered to the hatch's own LuV/UV
+  tier, so the wireless upgrade is priced as a UIV build.
 
 ### MTNanoScaleFoundry and the one-step circuit pool
 - Registered as `32411`, extends `TickableParallelismAcrossMultiMachineBase`, 3x3x3 structure.
-- 11 threads/circuits 1-11 map to the 11 normal NAC pools (`getMaxThreadCount()` = 11). The old 12th thread is gone:
-  the former "24" pool is now **machine mode 1**.
-- **Modes** (`totalMachineMode()` = 2, mode 0 is the default): consuming an Astral Array from an input bus
-  (`consumeAstralArrayFromBuses()`, persisted in NBT) unlocks mode 1, i.e. `supportsMachineModeSwitch()` returns
-  `astralArrayUnlocked`. `getGui()` only registers the MUI2 mode icons while it is true, so the mode button appears
-  and disappears with the unlock; the screwdriver (`onScrewdriverRightClick`) switches the same way. Both refuse a
-  switch while the machine is **active** (`isMachineActive()` = `IGregTechTileEntity#isActive`; GT sets that flag from
-  `mMaxProgresstime > 0` and mode 0 keeps a one-second cycle going, so a machine in mode 0 is active whenever it is
-  switched on). `setMachineMode` also refuses mode 1 without the array. Entering mode 1 **drops** whatever the
-  threads still held (`clearAllTasks()`, inputs are not refunded) instead of making the player wait for every thread
-  to finish; since a running machine never reaches that point, what gets dropped is what the threads held when the
-  machine was switched off - their tasks sit frozen there because `checkProcessing` stops ticking them. The GUI
-  refusal is silent - the icon and the `gt.interact.desc.mb.mode` / Waila running-mode lines simply keep their value -
-  while the screwdriver writes a chat line from `machine.nanoscale.*`.
-- Mode 1 disables every thread and delegates to `super.checkProcessing()`, so the machine's **main thread** runs one
-  recipe through the shared GT pipeline (`mMaxProgresstime` / `mOutputItems` / `lEUt`). `getRecipeMap()` returns the
-  one-step pool there and `canUseControllerSlotForRecipe()` is false, so the selector comes from an input bus circuit
-  slot like an independent machine. `shouldDisplayCheckRecipeResult()` is true only in mode 1.
-- GUI/Waila in mode 1: the per-thread rows and the per-thread Waila list are hidden.
-  `getWailaNBTData` writes only the `oneStepMainThread` flag, and `getWailaBody` adds one
-  `machine.nanoscale.status.mainthread` line ("机器主线程运行" / "Machine main thread running") under GT's own
-  progress bar and the "running mode" line that `MTMultiMachineBase#getWailaNBTData` writes while the mode switch is
-  supported.
-- `onWireCutterRightClick` refuses to take the Astral Array out while mode 1 is running, and a successful extraction
-  drops the machine back to mode 0 - the array is what mode 1 exists for.
-- Binding in mode 0 is **per input source**: each input bus is bound by its own circuit slot, and each pattern buffer
-  of a programmable hatch by the circuit it carries. There is no machine-wide pool selector - the controller slot does
-  not select a pool - so several pools run simultaneously and items cannot cross between pools.
-- **Programmable hatches** (e.g. Programmable-Hatches' pattern input hatches) are `IDualInputHatch` implementations,
-  and GT routes every `IDualInputHatch` into `mDualInputHatches`, **never** into `mInputBusses`. The thread scheduler
-  must read `mDualInputHatches` as well or such a hatch is invisible. Each `IDualInputInventory` is its own input
-  source (`DualInputBinding`): one buffer per AE pattern carrying its own unwrapped circuit next to the pattern's
-  items, so one hatch feeds several pools. The circuit is a zero-sized integrated circuit
-  (`BufferedDualInputHatch.DualInvBuffer#programLocal`); a buffer's own marker wins over the hatch-wide one, which
-  falls back to the hatch's shared (ghost) circuit slot. Circuit markers are filtered out of the ingredient list.
-- Consumption from a programmable hatch **is** the stack decrement: `getItemInputs()` hands out the buffer's live
-  stacks, so `depleteThreadItems` shrinks them and the hatch refills them when the AE job pushes the pattern again -
-  the same way GT's own pipeline consumes a dual hatch's stacks. Calling `removeResource` on top would deduct twice.
-  Fluid from the same buffer is drained the same way, and the Board Processor's immersion tank also drains it.
-- `checkProcessing()` keeps mode 0 on a one-second GT cycle and calls the thread scheduler
-  inside the standard `checkRecipe()` wrapper, so `startRecipeProcessing()` / `endRecipeProcessing()`
-  are active for ME input buses/hatches. `lEUt` is set from running task totals so GT drains energy
-  normally.
+- 11 threads/circuits 1-11 = the 11 normal NAC pools (`getMaxThreadCount()` = 11); the old 12th thread is gone - the
+  former "24" pool is **machine mode 1**.
+- **Modes** (`totalMachineMode()` = 2, mode 0 default): an Astral Array consumed from an input bus
+  (`consumeAstralArrayFromBuses()`, NBT-persisted) unlocks mode 1 (`supportsMachineModeSwitch()` ->
+  `astralArrayUnlocked`); `getGui()` adds the MUI2 mode icons only then, the screwdriver (`onScrewdriverRightClick`)
+  switches too. Both refuse while **active** (`isMachineActive()` = `IGregTechTileEntity#isActive`, from
+  `mMaxProgresstime > 0`; mode 0's one-second cycle keeps it active when on); `setMachineMode` refuses mode 1 without
+  the array. Entering mode 1 **drops** the held tasks (`clearAllTasks()`, no refund), only reachable switched off since
+  `checkProcessing` stops ticking them. Silent GUI refusal (icon, `gt.interact.desc.mb.mode`, Waila running-mode line),
+  `machine.nanoscale.*` chat line from the screwdriver.
+- Mode 1 disables every thread, delegates to `super.checkProcessing()` -> the **main thread** runs one recipe through
+  the shared GT pipeline (`mMaxProgresstime` / `mOutputItems` / `lEUt`); `getRecipeMap()` = the one-step pool,
+  `canUseControllerSlotForRecipe()` false -> selector from an input bus circuit slot like an independent machine;
+  `shouldDisplayCheckRecipeResult()` only true here.
+- Mode 1 GUI/Waila: per-thread rows and Waila list hidden; `getWailaNBTData` writes only `oneStepMainThread`,
+  `getWailaBody` adds `machine.nanoscale.status.mainthread` ("机器主线程运行" / "Machine main thread running") under GT's
+  progress bar and the `MTMultiMachineBase#getWailaNBTData` "running mode" line.
+- `onWireCutterRightClick` refuses to remove the Astral Array while mode 1 runs; a successful extraction drops back to
+  mode 0.
+- Mode 0 binds **per input source**: an input bus by its own circuit slot, a programmable hatch's pattern buffer by its
+  carried circuit; no machine-wide selector (the controller slot selects nothing) - several pools at once, items never
+  cross.
+- **Programmable hatches** (`IDualInputHatch`, e.g. Programmable-Hatches' pattern hatches) go into
+  `mDualInputHatches`, **never** `mInputBusses` - the scheduler must read both or the hatch is invisible. Each
+  `IDualInputInventory` is its own source (`DualInputBinding`): one buffer per AE pattern with its own unwrapped circuit
+  beside the items, so one hatch feeds several pools; that circuit is zero-sized
+  (`BufferedDualInputHatch.DualInvBuffer#programLocal`), a buffer marker beating the hatch-wide one, which falls back to
+  the shared (ghost) slot. Markers never enter the ingredient list.
+- Consumption from such a hatch **is** the stack decrement: `getItemInputs()` hands the live buffer stacks,
+  `depleteThreadItems` shrinks them, the hatch refills on the next AE push - GT's own dual-hatch behaviour;
+  `removeResource` on top would deduct twice. Buffer fluid drains the same way (Board Processor immersion tank too).
+- `checkProcessing()` keeps mode 0 on a one-second GT cycle and calls the scheduler inside the standard `checkRecipe()`
+  wrapper, so `startRecipeProcessing()` / `endRecipeProcessing()` run for ME buses/hatches; `lEUt` from running task
+  totals so GT drains energy normally.
 - Input-bus circuit numbers are snapshotted in `onPostTick` (`duringProcessing = false`) and at the top of
-  `checkProcessing()` (`duringProcessing = true`), because an ME bus only exposes its circuit while the recipe check
-  is active and its slot moves to the second-to-last virtual position (`getSizeInventory() - 2`) - GT's fixed 16+2
-  layout and variable-size ME bus subclasses both satisfy that. Reading the wrong slot binds the bus to an arbitrary
-  AE item or to no pool at all.
-- **Renamed items are matched the way GT matches them**: `inputSatisfies` ignores NBT exactly when the recipe is not
-  NBT sensitive and the ingredient is not one of the three items GT always compares by NBT - the IC2 universal fluid
-  cell, the GT data stick and the data orb (`GTRecipe#shouldCheckNBT`, mirrored from `MTParallelHelper`). So an item
-  renamed by the Forming Press with a Mold (Name) - which writes `display.Name` into the stack - satisfies the
-  recipe's tag-free input, while a data stick still has to hold the right data. Without this the recipe lookup still
-  matched, but the machine's own pre-consumption check rejected it and the thread silently reported 空闲. The
-  consumption side has to hand the bus its **own** stack (`findThreadResourceInBus` returns it, `depleteThreadItems`
-  passes `found.copy()` to `removeResource`), because GT's removal compares with NBT and the recipe's tag-free copy of
-  a renamed item would match nothing.
-- Each thread currently runs one active recipe at a time.
-- Board Processor uses per-thread internal immersion tanks (`BoardTankState`), not direct recipe fluid depletion: one
-  tank per legal immersion fluid, **five** since GT5U 5.09.54.183 added UU-Matter (`MTEBoardProcessorModule#LEGAL_FLUIDS`
-  is the source; UU-Matter's impurity is UU-Amplifier). The type list, the fluid each type takes and the impurity it
-  turns into all live in `MTNanoScaleFoundry`'s `BOARD_TANK_FLUIDS` / `boardTankFluid` / `boardTankImpurity`, and the
-  GUI's tank grid and Waila both read `getBoardTankTypeCount()`, so the next fluid is one table entry plus its GUI row.
-  The tank is filled by draining fluid hatches, and it also drains the pattern buffers bound to the Board pool, so a
-  pattern that carries its own immersion fluid can feed it.
-- Waila sends per-thread name/index/active/progress/EU/parallel, the first task's output item names/counts, the board
-  tanks and `isSneaking` (the same flag AE's `WirelessDataProvider` uses for its connected-device list). Collapsed the
-  body prints **one** machine-wide progress bar - the sum over the running threads through GT's
-  `GTWaila.getMachineProgressString`, so it reads like any other multiblock - and sneaking expands it into the
-  per-thread lines, the board tank lines and the output item lines. That whole block only exists in mode 0.
-- The 11 per-module NEI pools (`mt.recipe.nanoscale.*`, one per original NAC pool) copy GT5U's own maps 1:1,
-  `maxIO` included. Four envelopes grew in GT5U 5.09.54.183 and are mirrored here: Part Processor (its ident is still
-  `smdprocessor`, GT renamed the module in that version) 1/1/0/0 -> 6/4/3/0, Etching Array 2/1/2/0 -> 2/2/2/0,
-  Wire Tracer 1/1/0/0 -> 2/4/0/0 and Encasement Wrapper 4/1/0/0 -> 4/1/2/0. `maxIO` is only the NEI page's envelope -
-  `RecipeMapBackend#doAdd` validates the minimums, never the maximums - so a stale value mis-draws the wider recipes
-  outside the panel instead of losing them. The one-step pool flattens GT5U's own maps, not these copies, so its
-  recipes are unaffected either way.
-- `MTRecipeMaps.oneStepCircuitPoolRecipes` is the renamed one-step pool
-  (`mt.recipe.nanoscale.onestepcircuitpool`, display stack = the controller), using the custom
-  `OneStepCircuitPoolFrontend`: 9 slots per row, the progress bar / single item output / logo sharing the header row,
-  the item inputs in a 9x6 grid under it and the fluid inputs in a 9x6 grid below that. The selector circuit is a
-  normal recipe input now, so there is no special slot any more.
-- The pool's recipes are registered as **fake** recipes (`addFakeRecipe`): `RecipeMapBackend#filterFindRecipe` and
-  `GTRecipeLookupBuilder#add` both skip `mFakeRecipe`, which is what keeps pages with up to 54 item + 54 fluid inputs
-  out of `GTRecipeLookup`. Mode 1 therefore resolves its own match: `createProcessingLogic()` overrides
-  `findRecipeMatches(map)` and scans `oneStepCircuitPoolRecipes.getAllRecipes()` with
-  `GTRecipe#isRecipeInputEqual(false, false, inputFluids, inputItems)`, then hands the winner to the shared pipeline -
-  the same shape `MTAssFactory` uses for its Assembly Line definitions, so parallels, overclock, void protection, ME
-  buses and the input consumption stay GT's code. `findRecipeQuery` never sees these recipes.
-- `populateOneStepCircuitPoolRecipes()` recursively flattens every original Assembly Matrix
-  recipe through Assembly Matrix + all module pools down to `CircuitComponent.realComponent` real
-  inputs. It keeps the whole Crystal/Wetware/Bio/Optical line (Processor/Assembly/Supercomputer/
-  Mainframe) plus the independent special circuits Pico/Quantum/Planck.
-  Board Processor fluid inputs are removed (machine-internal/NEI display only); other module fluids and
-  Assembly Matrix fluids are kept; duplicate item/fluid inputs are merged and recipes are deduplicated.
-- `packMaterialInputs()` then packs the raw material components. `MOLTEN_PREFIXES` = `bolt`, `foil`,
-  `frameGt`, `itemCasing`, `plate`, `screw`, `wireFine` become the same material's molten fluid (a bolt, a fine wire
-  or a screw is `M / 8` = 18 mB, a foil `M / 4` = 36 mB, a casing `M / 2` = 72 mB, a plate `M * 1` = 144 mB, a
-  frame box `M * 2` = 288 mB, converted with `prefix.getMaterialAmount() * INGOTS / GTValues.M`). The wire rule is
-  separate: a 1x wire only becomes a 16x wire (16:1, remainder left as 1x) when its material name starts with
-  `Superconductor` - the `CircuitComponent` entries SuperconductorLuV..UMV - and every other wire melts instead, which
-  is what the NAC chains' SpaceTime (时空) and Infinity (无尽) wires do. `packChips()` then wraps every part GT has a
-  wrap for: it walks `bartworks.system.material.CircuitGeneration.CircuitWraps#VALUES` (chip -> wrap, cached in
-  `chipWraps`), so 16 of any wrapped part - RAM/NOR/NAND chips, the CPUs, the circuit boards, the SMD parts - become
-  one wrap plus `1 * HALF_INGOTS` = 72 mB molten polyethylene, i.e. exactly what GT's own assembler recipe for a wrap
-  spends (`CircuitWraps#registerWrapRecipe`: 16 parts + circuit 16 + 1 * HALF_INGOTS molten polyethylene; the circuit
-  is that recipe's selector and the machine's own circuit slot already carries the pool selector, so it is not
-  repeated). Each pack keeps the material amount identical (`16 x 1x wire == 1 x 16x wire`, wrap = 16 parts + the
-  polyethylene), same-material entries merge into one fluid, and a remainder keeps its item form. No molten form means
-  the item is kept as is.
-  `populateOneStepCircuitPoolRecipes()` builds `chipWraps` first and defers the whole build while that table is empty
-  (GT registers the wraps during its postload), so the server-started fallback builds the pool with the wraps in place
-  instead of baking plain chips into every page.
-  Material lookup goes through `GTOreDictUnificator.getAssociation()` first; GT++ materials (Rhugnor, Quantum,
-  AstralTitanium, ...) are **not** GT `Materials` and their items carry no `ItemData`, so `moltenOfName()` falls
-  back to parsing the ore dictionary name (`boltRhugnor`, `screwQuantum`) and resolves it through `Materials.get()`
-  / a case-insensitive `Materials.values()` scan, then through GT++'s own `Material.mMaterialsByName` /
-  `mMaterialCache` (`getFluidStack`).
-- Input order is normalised after packing: entries are merged again (packing can duplicate 16x/leftover wires) and
-  sorted by display name - so a whole part family (both RAM chips, every superconductor wire, every board) is
-  adjacent instead of one chip landing in slot 1 and the next family member in slot 10 - then by ore dictionary
-  signature, item and amount for determinism. Fluids sort by localized name.
-- The NEI page list is ordered by `recipeComparator`: selector levels 1-5 (Processor/Assembly/Supercomputer/
-  Mainframe, then the original GT ladder), with the level-6 special Pico/Quantum/Planck chains last.
-- The selector is 1-6, and every flattened recipe carries it as a real `GTRecipeBuilder.circuit(n)` input, so the
-  machine matches it the way any GT machine matches its circuit: the bus circuit slot satisfies the input and the bus
-  never consumes its own circuit slot. `getOneStepCircuitLevel()` returns 5 for `CircuitCalibration.PRIMITIVE` (the
-  original GT circuit ladder: Nand chip / Microprocessor / IntegratedProcessor / NanoProcessor / QuantumProcessor) and
-  `MTRecipeMaps.ONE_STEP_SPECIAL_CIRCUIT_LEVEL` (= 6) for the special independent chains.
-- Measured max IO before packing: 61 distinct item inputs / 24 distinct fluid inputs (PlanckCircuit, after the
-  producer lookup learned to follow every output slot of a multi-output module recipe). Packing moves entries from
-  the item grid into the fluid grid, so the map is declared as `maxIO(54, 1, 54, 0)` = 9x6 item rows + 9x6 fluid
-  rows; the even split keeps the page height at 254 while both sides have room. Those 61/24 were measured with
-  packing switched off and do not describe the pool any more - the post-packing peaks are nowhere recorded, which is
-  fine because only the capacity matters. The circuit input takes one of the 54 item slots.
-  `OneStepCircuitPoolFrontend` owns those constants - `maxIO`, every slot position, the recipe background
-  (170x254) and the NEI panel height are all derived from them - and `populateOneStepCircuitPoolRecipes()` logs
-  the recipe's name with both counts if a flattened recipe ever grows past the capacity, so that warning is the only
+  `checkProcessing()` (`duringProcessing = true`): an ME bus exposes its circuit only during the recipe check, at the
+  second-to-last virtual slot (`getSizeInventory() - 2`) - fine for GT's fixed 16+2 layout and variable-size ME bus
+  subclasses; a wrong slot binds the bus to an arbitrary AE item or no pool.
+- **Renamed items match like GT**: `inputSatisfies` ignores NBT exactly when the recipe is not NBT sensitive and the
+  ingredient is not one of GT's three NBT-always items (IC2 universal fluid cell, GT data stick, data orb;
+  `GTRecipe#shouldCheckNBT`, mirrored from `MTParallelHelper`) - a Forming-Press Mold (Name) rename (`display.Name`)
+  satisfies the tag-free input, a data stick must still carry the right data. Without it the lookup matched but the
+  pre-consumption check rejected (thread reported 空闲). Consumption hands the bus its **own** stack
+  (`findThreadResourceInBus`, then `found.copy()` into `removeResource` via `depleteThreadItems`), GT's removal
+  comparing NBT.
+- Each thread runs one active recipe at a time.
+- Board Processor uses per-thread internal immersion tanks (`BoardTankState`), not recipe fluid depletion: one per legal
+  fluid, **five** since GT5U 5.09.54.183 added UU-Matter (`MTEBoardProcessorModule#LEGAL_FLUIDS`; its impurity is
+  UU-Amplifier). Type list, fluid and resulting impurity live in `MTNanoScaleFoundry`'s `BOARD_TANK_FLUIDS` /
+  `boardTankFluid` / `boardTankImpurity`; GUI tank grid and Waila read `getBoardTankTypeCount()`, so a new fluid is one
+  table entry plus a GUI row. Tanks fill from fluid hatches and from the Board pool's pattern buffers.
+- Waila sends per-thread name/index/active/progress/EU/parallel, first task's output item names/counts, board tanks,
+  `isSneaking` (AE's `WirelessDataProvider` flag); collapsed: **one** machine-wide progress bar (sum over running
+  threads, GT's `GTWaila.getMachineProgressString`), sneaking expands per-thread, board tank and output item lines.
+  Mode 0 only.
+- The 11 per-module NEI pools (`mt.recipe.nanoscale.*`, one per original NAC pool) copy GT5U's maps 1:1, `maxIO`
+  included. Four envelopes grew in GT5U 5.09.54.183 and are mirrored: Part Processor (ident still `smdprocessor`) 1/1/0/0
+  -> 6/4/3/0, Etching Array 2/1/2/0 -> 2/2/2/0, Wire Tracer 1/1/0/0 -> 2/4/0/0, Encasement Wrapper 4/1/0/0 -> 4/1/2/0.
+  `maxIO` is only the NEI envelope (`RecipeMapBackend#doAdd` validates minimums, never maximums), so a stale value
+  mis-draws wider recipes outside the panel. The one-step pool flattens GT5U's own maps, not these copies.
+- `MTRecipeMaps.oneStepCircuitPoolRecipes` = the renamed one-step pool (`mt.recipe.nanoscale.onestepcircuitpool`,
+  display stack = controller) with `OneStepCircuitPoolFrontend`: 9 slots per row, progress bar / single item output /
+  logo on the header row, item inputs 9x6 under it, fluid inputs 9x6 below; the selector circuit is a normal recipe
+  input, no special slot.
+- Its recipes are **fake** (`addFakeRecipe`): `RecipeMapBackend#filterFindRecipe` and `GTRecipeLookupBuilder#add` skip
+  `mFakeRecipe`, keeping pages with up to 54 item + 54 fluid inputs out of `GTRecipeLookup`. Mode 1 resolves its own
+  match: `createProcessingLogic()` overrides `findRecipeMatches(map)`, scans
+  `oneStepCircuitPoolRecipes.getAllRecipes()` with `GTRecipe#isRecipeInputEqual(false, false, inputFluids, inputItems)`
+  and hands the winner to the shared pipeline - `MTAssFactory`'s Assembly Line shape, so parallels, overclock, void
+  protection, ME buses and consumption stay GT's. `findRecipeQuery` never sees them.
+- `populateOneStepCircuitPoolRecipes()` recursively flattens every original Assembly Matrix recipe through Assembly
+  Matrix + all module pools down to `CircuitComponent.realComponent` real inputs; keeps the Crystal/Wetware/Bio/Optical
+  line (Processor/Assembly/Supercomputer/Mainframe) plus the special Pico/Quantum/Planck circuits; drops Board Processor
+  fluid inputs (machine-internal/NEI display only), keeps other module and Assembly Matrix fluids, merges duplicates and
+  deduplicates recipes.
+- `packMaterialInputs()`: `MOLTEN_PREFIXES` = `bolt`, `foil`, `frameGt`, `itemCasing`, `plate`, `screw`, `wireFine` ->
+  the same material's molten fluid (bolt/fine wire/screw `M / 8` = 18 mB, foil `M / 4` = 36 mB, casing `M / 2` = 72 mB,
+  plate `M * 1` = 144 mB, frame box `M * 2` = 288 mB, computed as `prefix.getMaterialAmount() * INGOTS / GTValues.M`).
+  Wires: 1x -> 16x (16:1, remainder stays 1x) only for `Superconductor*` (`CircuitComponent` SuperconductorLuV..UMV);
+  the rest melt, as the NAC chains' SpaceTime (时空) and Infinity (无尽) wires do. `packChips()`: walks
+  `bartworks.system.material.CircuitGeneration.CircuitWraps#VALUES` (chip -> wrap, cached in `chipWraps`) - 16 wrapped
+  parts (RAM/NOR/NAND chips, CPUs, circuit boards, SMD parts) = one wrap + `1 * HALF_INGOTS` = 72 mB molten
+  polyethylene, exactly GT's `CircuitWraps#registerWrapRecipe` (16 parts + circuit 16 + 1 * HALF_INGOTS; that circuit is
+  its selector, the machine's own slot already carrying the pool selector). Amounts identical
+  (`16 x 1x wire == 1 x 16x wire`, wrap = 16 parts + polyethylene); same-material entries merge, a remainder keeps its
+  item form, no molten form -> item kept. `chipWraps` is built first and the build deferred while empty (GT registers
+  the wraps in postload), so the server-started fallback has them instead of baking plain chips in. Lookup:
+  `GTOreDictUnificator.getAssociation()`, else `moltenOfName()` parses the ore dictionary name (`boltRhugnor`,
+  `screwQuantum`) -> `Materials.get()` / case-insensitive `Materials.values()` -> GT++ `Material.mMaterialsByName` /
+  `mMaterialCache` (`getFluidStack`) - GT++ materials (Rhugnor, Quantum, AstralTitanium, ...) are **not** GT `Materials`
+  and carry no `ItemData`.
+- Input order is normalised after packing: merged again (packing can duplicate 16x/leftover wires) and sorted by
+  display name, so a part family (both RAM chips, every superconductor wire, every board) stays adjacent, then by ore
+  dictionary signature, item and amount; fluids by localized name.
+- NEI page order from `recipeComparator`: selector levels 1-5 (Processor/Assembly/Supercomputer/Mainframe, then the
+  original GT ladder), level-6 special Pico/Quantum/Planck chains last.
+- Selector 1-6; every flattened recipe carries it as a real `GTRecipeBuilder.circuit(n)` input, so it matches like any
+  GT machine (the bus circuit slot satisfies the input and is never consumed). `getOneStepCircuitLevel()` returns 5 for
+  `CircuitCalibration.PRIMITIVE` (original GT ladder: Nand chip / Microprocessor / IntegratedProcessor / NanoProcessor /
+  QuantumProcessor) and `MTRecipeMaps.ONE_STEP_SPECIAL_CIRCUIT_LEVEL` (= 6) for the special independent chains.
+- Measured max IO before packing: 61 distinct item inputs / 24 distinct fluid inputs (PlanckCircuit, after the producer
+  lookup learned to follow every output slot of a multi-output module recipe). Packing moves entries from the item grid
+  into the fluid grid, so the map is declared `maxIO(54, 1, 54, 0)` = 9x6 item + 9x6 fluid rows; the even split keeps
+  the page height at 254 with room on both sides. The 61/24 were measured with packing off and no longer describe the
+  pool; only the capacity matters. The circuit input takes one of the 54 item slots. `OneStepCircuitPoolFrontend` owns
+  the constants (`maxIO`, slot positions, recipe background 170x254, NEI panel height), and
+  `populateOneStepCircuitPoolRecipes()` logs a recipe's name with both counts if it grows past the capacity - the only
   place a current peak shows up.
 
 ### Ultimate Pattern Terminal (终极样板编码终端)
-- An AE **cable part**, not a block: `PartUltimatePatternTerminal extends PartPatternTerminal` and implements
-  `IPatternTerminalEx` itself - AE's extended pattern terminal is only a behavior template for it now: the
-  `GUI_PATTERN_TERMINAL_EX` bridge, the forced processing mode, `exPatternTerminalCall`'s orientation pick, the NBT
-  keys and the GUI icon are copied from AE's `PartPatternTerminalEx` into this part (the GTNL bullet below says why it
-  must not extend that class). `ItemUltimatePatternTerminal` is its `IPartItem`. The item is placed with AE's own
-  `ApiPart#placeBus`, so the part attaches to a cable bus on the clicked side and AE's `BusRenderer` draws it in the
-  inventory; there is no block and no tile entity of this mod - the part's host tile is AE's cable bus. It takes a
-  channel, pulls blank patterns out of the network and writes AE's own encoded pattern item back, exactly like AE's
-  part. Of the GT-Not-Leisure original it started from, the second (Avaritia 9x9) crafting mode, its
-  `DireCraftPattern` item, the mode button and the two NEI overlay entries are all gone: none of them belongs to the
-  terminal this is a copy of.
-- The one deliberate difference from AE's part is the **input** grid: 4x4 x `INPUT_PAGES` (8) = 128 cells instead of
-  AE's 4x4 x 2 = 32, which is what the Nano-Scale Foundry one-step circuit pool (up to 54 item plus 54 fluid
-  inputs) needs. The
-  **outputs** keep AE's own 4x4 x 2 = 32 cells and AE's own placement. The inverted flag and the active page live in
-  this part's own fields, so nothing is thrown away when the layout flips: AE's `PartPatternTerminalEx#setInverted`
-  would clear every input cell past the collapsed layout, and this terminal's grid is four times as large.
-- The part deliberately does **not** extend AE's `PartPatternTerminalEx`, and that keeps other mods'
-  `instanceof PartPatternTerminalEx` gates away from it. GT-Not-Leisure's processing-pattern capacity feature
-  (`enableProcessingPatternCapacityMixin`, on by default) resizes the `crafting`/`output` `IAEStackInventory` of
-  **every** `PartPatternTerminalEx` to its own `16 x multiplier` cells when the container is constructed - and limits
-  the saved NBT to the same count. That shrank this terminal's 128-cell input grid to 32 while the GUI still laid out
-  its eight pages, so drawing page three threw
-  `ArrayIndexOutOfBoundsException: Index 32 out of bounds for length 32` (`IAEStackInventory#getAEStackInSlot` behind
-  a virtual pattern slot). A plain `PartPatternTerminal` is not seen by that resize; GTNL's other pattern-terminal
-  mixins (container/GUI page counts) stay harmless here because this mod's own container and GUI override the page
-  counts in subclasses, and mixins on AE's classes only touch AE's own class bodies.
-- The GUI and container are this mod's own, not mixins on AE's shared classes (the old
-  `MixinContainerPatternTermEx` / `MixinGuiPatternTermEx` pair and the `Mixins.ULTIMATE_PATTERN_TERMINAL` group are
-  gone):
-  - `GuiUltimatePatternTerminal` is a whole copy of AE rv3-beta-1080-GTNH's `GuiPatternTermEx` (it still
-    `extends GuiPatternTerm`): background, item list, view cells, buttons, invert button, scroll bar and page
-    syncing are that class' code. The copy owns the two things AE's GUI cannot be told by subclassing - the private
-    `processingScrollBar` range (now the container's page count, eight pages) and the client-side container class it
-    constructs.
-  - `ContainerUltimatePatternTerminal extends ContainerPatternTermEx` answers **both** page counts from the part
-    (AE inlines the constants `PartPatternTerminalEx.exPatternInputsPages` = 2 / `exPatternOutputPages` = 2 into its
-    methods, so the overrides are the clean way). The outputs stay at 2, but answering them too keeps another mod's
-    page-count mixin (GTNL's, for one) from changing what the GUI lays out. Both sides construct the container:
-    `CommonProxy` for the server, the GUI for the client. Everything else - sync handlers, pattern slots, the
-    virtual-slot write path - is AE's own code.
-  Netting: this mod no longer patches any shared AE class for this terminal, so AE's own extended pattern terminal
-  (and AE2FC's fluid one, and any addon's) cannot be affected by it.
-- `GuiUltimatePatternTerminal` also owns the input arrangement: AE's own loop over the container's page count, with
-  the inverted single column's row index wrapped (`activePage % rows`, because eight pages do not fit AE's four
-  rows). The outputs are the one place that does **not** stay AE's loop: the eight input pages are grouped four per
-  output page, so the normal layout's four-cell output column walks all 32 output cells in order (pages 0-3 show
-  outputs 0-15, pages 4-7 show outputs 16-31) and the inverted layout's 16-cell output page stays on output page 0
-  for input pages 0-3 and on output page 1 for pages 4-7. AE's own loop wraps page 4 back to the first page's
-  outputs (`activePage % outputRows` / `% outputPages`), which is the "Page 4 shows page 1's output" bug.
-- The terminal opens through Forge instead of AE's `GuiBridge`: the bridge maps a container class to a GUI class by
-  name, so a new terminal cannot be added to it without touching AE's own. `PartUltimatePatternTerminal#onPartActivate`
-  packs its side into the bits above `GUI_ULTIMATE_PATTERN_TERMINAL` (20) and calls `player.openGui` for every click,
-  sneaking included - AE's own GUI/container path is no longer taken, because it would report AE's two input pages
-  and show only a quarter of this terminal's grid;
-  `CommonProxy`/`ClientProxy` resolve the part back from the cable bus with `Platform.getPartFromTE` and hand the
-  server `ContainerUltimatePatternTerminal`, with the `ContainerOpenContext` a GUI opened through Forge's
-  `IGuiHandler` has to set itself (AE only fills it in `Platform#openGUI`, and without it AE's middle-click "how
-  many to craft" path on the blank pattern slot NPEs). The inherited `getGui(player)` is consulted first, so the
-  craft permission stays AE's own check.
-- The pattern NBT is exactly what AE writes (`PatternEncodingHelper`: `in`/`out` lists of
-  `IAEStack#toNBTGeneric()`, no `crafting` key, item `encodedUltimatePattern`). The expected outputs are placed by
-  hand or imported from NEI - there is no crafting page left to derive them from.
-- Artwork: the item wears AE's own `appliedenergistics2:ItemPart.PatternTerminalEx` sprite with sprite number 0 (the
-  block atlas, where that sprite lives), and the part draws AE's `PartPatternTerm_Bright` face on the cable; the GUI
-  is AE's own `pattern3.png`/`pattern4.png`. **A texture name must not carry a `blocks/` prefix**: both atlases
-  already prepend `textures/blocks`, so `appliedenergistics2:PartPatternTerm_Bright` is
-  `assets/appliedenergistics2/textures/blocks/PartPatternTerm_Bright.png` while `appliedenergistics2:blocks/...`
-  looks for a `textures/blocks/blocks/` folder that does not exist and silently lands on the purple-black missing
-  texture. `CableBusTextures.registerIcon` names it the same way.
-- The recipe is unchanged (a titanium frame around AE's own extended pattern terminal part, two Engineering
-  Processors, a Calculation Processor and a Pattern Capacity Card) and now produces the part item; its registry name
-  stays
-  `UltimatePatternTerminal`. An existing world loses the old block - there is no migration.
-- NEI: `NEI_MessTechConfig` makes **every GT machine recipe page** transferable into this terminal - the Nano-Scale
-  Foundry one-step circuit pool is one of them - by walking `RecipeCategory.ALL_RECIPE_CATEGORIES` and taking the
-  categories whose
-  frontend registers NEI pages, exactly like NotEnoughEnergistics picks the idents it serves. Each one gets both
-  `API.registerGuiOverlay` (NEI draws that page over this GUI; `RecipeInfo` looks the pair up by the GUI's exact class
-  and the page's unlocalized name) and `API.registerGuiOverlayHandler` (the transfer button). A page whose ident is not
-  registered simply gets no button, and the terminal is deliberately **not** an `addRecipeCatalyst` anywhere: it is a
-  pattern terminal, not a machine that runs those recipes.
-- Which handler packs the page depends on the pack: with **NotEnoughEnergistics** loaded - the GTNH transfer for AE's
-  pattern terminals, and now a dependency - its `NEEPatternTerminalHandler.instance` is registered for this GUI over
-  NEU's own ident set (`RecipeProcessor`'s processors plus a null ident, minus the two crafting idents, since this
-  terminal is built on AE's extended part and cannot craft), so the terminal behaves like AE's under NEU and NEU's
-  options apply. Without NEU, this mod's own `PatternImportOverlayHandler` takes the GT categories alone: it reads GT's
-  `FixedPositionedStack` flags, which a non-GT page does not have. NEU registers itself only for AE's own terminal
-  classes and NEI looks a transfer up by exact class, which is why this terminal has to ask for those idents itself.
-- The import packs the page's ingredients into input cells 0, 1, 2 .. in the order the page reads them (top to bottom,
-  left to right), instead of copying the panel positions into a matching cell layout. That layout does not exist here:
-  the terminal's pages are four cells wide while a GT page's panels are much wider, so a position-for-position copy
-  would scatter a handful of ingredients over pages of empty cells. Which stacks count as ingredients is asked of GT
-  itself (`PatternImportOverlayHandler#isIngredient`): every item and fluid input of a GT NEI page is a
-  `GTNEIDefaultHandler.FixedPositionedStack` built with `isInput` true, while outputs are built with it false. Of the
-  inputs, `isNotConsumed()` keeps the "required but not consumed" ones out (a mold, a programming circuit ...), which
-  GT itself marks with a zero size or amount: a pattern holding them would consume them. NEU makes the same choice by
-  default for the AE terminals it serves.
-  **Never test that by position against the frontend's constants**: GT's NEI slots sit at the frontend position plus
-  `GTNEIDefaultHandler.WINDOW_OFFSET` (`(-5, -11)`, the recipe panel's interior offset) plus the one pixel
-  `FixedPositionedStack` adds, so the pool's item panel starts at `rely` 16, not at `ITEM_Y` 26, and the first column of
-  both panels is at `relx` -1. A filter built from `ITEM_X`/`ITEM_Y`/`itemRows()`/`fluidRows()` therefore dropped the
-  whole first item row (9 of 9), the first item of every following row and the first fluid of every fluid row - the
-  imported grid started at the recipe's **eleventh** item - and a page whose item inputs fit into those ten slots lost
-  every item and kept only its fluids. The same offset is also why the extra rows GT adds for a recipe wider than the
-  pool's `maxIO` are now imported for free: nothing is measured against the pool's rectangles any more.
-- The recipe's result is imported too, but **not** from `IRecipeHandler#getResultStack` alone: GT5U's
-  `GTNEIDefaultHandler.CachedDefaultRecipe#getResult()` answers `null` and the page draws its item output as an
-  "other stack" instead, so `getResultStack` and `getOtherStacks` are both read into the output cells in that order.
-  NEI hands results over separately from the ingredients, and reading only the first is why importing a page left the
-  terminal's output grid empty - AE then encoded an input-only tunnel pattern instead of a processing one.
-- What travels to the server (`PatternImportHandler`) is one compound holding `in` and `out`, each a map of cell
-  index to ItemStack, so the server side needs no geometry at all. It finds the target through
-  `player.openContainer instanceof ContainerPatternTerm` plus the part check - AE's own container is what the terminal
-  opens - and marks its `inputsSync`/`outputsSync` dirty. The overlay recognises its GUI by class.
-- Every cell carries its real item count **again** under `PatternImportHandler.COUNT_KEY` (`MTCount`, a long), written
-  by `PatternImportHandler#writeCell` and restored by `#readCell`. 1.7.10 stores `ItemStack`'s count in the NBT
-  **byte** `Count` (`ItemStack#writeToNBT` line 178) and reads it back as a byte, so a count outside -128..127
-  round-trips as a different number: 1024 and 4096 both come back as 0, 1025 and 4097 as 1. The pool's flattened
-  recipes do use such counts inside a single cell (reported from the Planck chain's page: 1024 Optical Fiber Cables,
-  4096 ASoC RAMs), which is why an imported cell showed a bare item instead of its amount: AE only draws the amount
-  for `stackSize > 1`, and its `AEItemStack#drawInGui` draws the icon with the count forced to 1
-  (`AEStack#drawOverlayInGui`, reached from the pattern slot's `VirtualMESlot#drawStackAndOverlay`), so a destroyed
-  count is indistinguishable from one item. The encoded pattern was worse: the cell became `Cnt: 0`, i.e. the material
-  itself was gone from the pattern. AE cannot help here: its own writes put the real size in the long `Cnt` and write
-  `Count: 0` on purpose (`PatternHelper` restores the size from `Cnt` when it reads 0), so the count is only ever
-  correct while a stack stays an AE stack - the NEI payload is the one hop that goes through a vanilla `ItemStack`.
-  `readCell` settles a missing or zero count on one (a zero-count cell is not encodable) and a cell the inventory has
-  no room for is reported instead of silently dropped.
-- The import also puts the container into **processing** mode (`ContainerPatternTerm#setCraftingMode(false)`) before
-  it writes, the same thing NotEnoughEnergistics does for a processing transfer. A pool page is a machine recipe, so
-  it can only become a processing pattern, and while AE's container is in crafting mode its next
-  `detectAndSendChanges()` mirrors the first nine cells into the crafting matrix (`copyToMatrix`) - clamping them to
-  one and clearing them when they are not items. `PartPatternTerminalEx` already defaults to processing mode, so this
-  only guards a terminal the player switched by hand.
+- AE **cable part**, not a block: `PartUltimatePatternTerminal extends PartPatternTerminal` + `IPatternTerminalEx`;
+  `ItemUltimatePatternTerminal` = `IPartItem`; `ApiPart#placeBus` on the clicked side's cable bus, AE's `BusRenderer` draws
+  it in the inventory; host tile = AE's cable bus. Takes a channel, pulls blank patterns, writes AE's encoded pattern item back.
+- Copied from AE's `PartPatternTerminalEx` (template, not superclass - GTNL bullet): `GUI_PATTERN_TERMINAL_EX` bridge,
+  forced processing mode, `exPatternTerminalCall`'s orientation pick, NBT keys, GUI icon. Not carried over from
+  GT-Not-Leisure: Avaritia 9x9 crafting mode, `DireCraftPattern`, mode button, both NEI overlays.
+- **Input** grid 4x4 x `INPUT_PAGES` (8) = 128 cells (AE: 4x4 x 2 = 32) for the Nano-Scale Foundry one-step pool (54 item +
+  54 fluid inputs); **outputs** = AE's 4x4 x 2 = 32 cells and placement; inverted flag + active page in own fields, so a flip
+  loses nothing (AE's `PartPatternTerminalEx#setInverted` clears every input cell past the collapsed layout).
+- Not extending `PartPatternTerminalEx` also dodges other mods' `instanceof PartPatternTerminalEx` gates. GTNL's
+  `enableProcessingPatternCapacityMixin` (default on) resizes **every** `PartPatternTerminalEx`'s `crafting`/`output`
+  `IAEStackInventory` to `16 x multiplier` cells when the container is constructed, clamping saved NBT to it -> 128 to 32
+  cells under an eight-page GUI -> page three threw `ArrayIndexOutOfBoundsException: Index 32 out of bounds for length 32`
+  (`IAEStackInventory#getAEStackInSlot`, virtual pattern slot). Plain `PartPatternTerminal` escapes it; GTNL's
+  container/GUI page-count mixins are harmless (own container + GUI override the counts in subclasses).
+- GUI + container own, no AE mixins (`MixinContainerPatternTermEx` / `MixinGuiPatternTermEx`, group
+  `Mixins.ULTIMATE_PATTERN_TERMINAL`: gone):
+  - `GuiUltimatePatternTerminal` = copy of AE rv3-beta-1080-GTNH's `GuiPatternTermEx` (`extends GuiPatternTerm`) owning
+    what subclassing cannot reach: the private `processingScrollBar` range (container page count, eight pages) and the
+    client-side container class.
+  - `ContainerUltimatePatternTerminal extends ContainerPatternTermEx` answers **both** page counts from the part (AE inlines
+    `PartPatternTerminalEx.exPatternInputsPages` = 2 / `exPatternOutputPages` = 2); outputs stay 2, answering them keeps
+    GTNL's mixin out. `CommonProxy` builds it server-side, the GUI client-side; sync handlers, pattern slots, virtual-slot
+    write path = AE's.
+  Netting: no shared AE class patched -> AE's extended terminal (AE2FC's fluid one, addons') unaffected.
+- Input layout (`GuiUltimatePatternTerminal`): AE's page-count loop, inverted column's row index wrapped
+  (`activePage % rows`; eight pages vs AE's four rows). Outputs differ - 8 input pages grouped four per output page: the
+  normal four-cell output column walks all 32 cells (pages 0-3 -> outputs 0-15, 4-7 -> 16-31), the inverted 16-cell output
+  page on output page 0 for input pages 0-3, page 1 for 4-7. AE's loop wraps page 4 to page 1's outputs
+  (`activePage % outputRows` / `% outputPages`) - the "Page 4 shows page 1's output" bug.
+- Open path: Forge, not AE's `GuiBridge` (container->GUI class by name; a new terminal would touch AE's own):
+  `PartUltimatePatternTerminal#onPartActivate` packs the side above `GUI_ULTIMATE_PATTERN_TERMINAL` (20) and
+  `player.openGui`s every click incl. sneak (AE's path -> AE's two input pages = a quarter of the grid).
+  `CommonProxy`/`ClientProxy`: `Platform.getPartFromTE` for the part, `ContainerUltimatePatternTerminal` to the server, plus
+  the `ContainerOpenContext` a Forge `IGuiHandler` GUI must set itself (AE fills it only in `Platform#openGUI`; missing ->
+  middle-click "how many to craft" on the blank pattern slot NPEs). `getGui(player)` first -> craft permission stays AE's.
+- Pattern NBT = AE's (`PatternEncodingHelper`: `in`/`out` of `IAEStack#toNBTGeneric()`, no `crafting` key, item
+  `encodedUltimatePattern`); expected outputs hand-placed or NEI-imported - no crafting page.
+- Artwork: AE's `appliedenergistics2:ItemPart.PatternTerminalEx` sprite (number 0, block atlas), cable face
+  `PartPatternTerm_Bright`, GUI `pattern3.png`/`pattern4.png`. **No `blocks/` prefix in a texture name**: both atlases
+  prepend `textures/blocks`, so `appliedenergistics2:PartPatternTerm_Bright` ->
+  `assets/appliedenergistics2/textures/blocks/PartPatternTerm_Bright.png`; `appliedenergistics2:blocks/...` wants a
+  non-existent `textures/blocks/blocks/` -> purple-black missing texture (`CableBusTextures.registerIcon` names it alike).
+- Recipe unchanged (titanium frame around AE's extended pattern terminal part, two Engineering Processors, one Calculation
+  Processor, one Pattern Capacity Card) -> part item, registry name `UltimatePatternTerminal`; existing worlds lose the old
+  block, no migration.
+- NEI: `NEI_MessTechConfig` makes **every GT machine recipe page** transferable (Nano-Scale Foundry one-step pool included)
+  via `RecipeCategory.ALL_RECIPE_CATEGORIES`, taking categories whose frontend registers NEI pages (like
+  NotEnoughEnergistics picks idents); each gets `API.registerGuiOverlay` (`RecipeInfo` matches GUI exact class + page
+  unlocalized name) + `API.registerGuiOverlayHandler` (transfer button). Unregistered ident -> no button; no
+  `addRecipeCatalyst` deliberately - pattern terminal, not a machine.
+- Handler by pack: **NotEnoughEnergistics** (GTNH transfer, now a dependency) registers `NEEPatternTerminalHandler.instance`
+  over NEU's idents (`RecipeProcessor`'s processors + a null ident, minus the two crafting idents - no crafting), so NEU's
+  options apply; without NEU this mod's `PatternImportOverlayHandler` takes GT categories only (reads GT's
+  `FixedPositionedStack` flags, absent elsewhere). NEU registers only for AE's terminal classes, NEI matches by exact class
+  -> explicit idents here.
+- Import into input cells 0, 1, 2 .. in page reading order (top to bottom, left to right), not by panel position: pages are
+  four cells wide, GT panels much wider, so a positional copy scatters ingredients over empty cells. Ingredients from GT
+  (`PatternImportOverlayHandler#isIngredient`): item/fluid inputs = a `GTNEIDefaultHandler.FixedPositionedStack` with
+  `isInput` true, outputs false; `isNotConsumed()` drops "required but not consumed" ones (mold, programming circuit ...) -
+  GT marks them zero size/amount, a pattern holding them would consume them; NEU defaults alike.
+- **Never test that by position against the frontend's constants**: GT NEI slots = frontend position +
+  `GTNEIDefaultHandler.WINDOW_OFFSET` (`(-5, -11)`, panel interior) + the pixel `FixedPositionedStack` adds -> item panel at
+  `rely` 16, not `ITEM_Y` 26, both panels' first column at `relx` -1; a filter from
+  `ITEM_X`/`ITEM_Y`/`itemRows()`/`fluidRows()` misses the whole first item row (9 of 9), the first item of every following
+  row and the first fluid of every fluid row, and a page whose item inputs fit those ten slots lost every item, keeping only
+  fluids. The same offset imports for free the extra rows GT adds beyond the pool's `maxIO` - nothing is measured against the
+  pool's rectangles any more.
+- Result too, but **not** from `IRecipeHandler#getResultStack` alone: `GTNEIDefaultHandler.CachedDefaultRecipe#getResult()`
+  answers `null` (the item output is drawn as an "other stack"), so `getResultStack` + `getOtherStacks`, in that order -
+  first only left the output grid empty and AE encoded an input-only tunnel pattern, no processing pattern.
+- Server payload (`PatternImportHandler`): one compound, `in` + `out`, cell index -> ItemStack, so no geometry server side;
+  target via `player.openContainer instanceof ContainerPatternTerm` + part check, then `inputsSync`/`outputsSync` dirty; the
+  overlay recognises its GUI by class.
+- Count **again** per cell under `PatternImportHandler.COUNT_KEY` (`MTCount`, a long) by
+  `PatternImportHandler#writeCell`/`#readCell`: 1.7.10 stores `ItemStack`'s count in the NBT **byte** `Count`
+  (`ItemStack#writeToNBT` line 178) and reads it as a byte, so outside -128..127 it changes (1024 and 4096 -> 0, 1025 and
+  4097 -> 1), and the flattened pool uses those (Planck chain's page: 1024 Optical Fiber Cables, 4096 ASoC RAMs). Such a
+  cell then showed a bare item (AE draws an amount only for `stackSize > 1`; `AEItemStack#drawInGui` forces the icon count
+  to 1 via `AEStack#drawOverlayInGui`, from `VirtualMESlot#drawStackAndOverlay`) and the encoded pattern got `Cnt: 0` -
+  material gone. AE's writes keep the size in the long `Cnt` with `Count: 0` on purpose (`PatternHelper` restores from
+  `Cnt`), so counts survive only inside AE stacks; the NEI payload is the one hop through a vanilla `ItemStack`. `readCell`
+  settles a missing/zero count on 1 (zero-count is not encodable) and reports a cell with no inventory room.
+- Import sets **processing** mode first (`ContainerPatternTerm#setCraftingMode(false)`), like NotEnoughEnergistics: a pool
+  page is a machine recipe, and in crafting mode AE's next `detectAndSendChanges()` mirrors the first nine cells into the
+  matrix (`copyToMatrix`), clamping to 1 and clearing non-items. `PartPatternTerminalEx` already defaults to it - this guards
+  hand-switched terminals.
 ### Blocks
 - `AssMatrixBlock` (Tier 1) / `AdvAssMatrixBlock` (Tier 2).
 - Static helpers: `getBlock()`, `getItem()`, `getItemStack()`, `getItemStack(int)`.
@@ -986,97 +814,83 @@ MTMultiMachineBase<T>
 
 ## GT5U API knowledge
 
-- Upstream `MTEMultiBlockBase#getWailaBody` reads `tag.getString("mode")`. Write mode as a string name,
-  not integer, to avoid `运行模式: 0/1`.
+- Upstream `MTEMultiBlockBase#getWailaBody` reads `tag.getString("mode")` - write the mode as a string name, not an integer,
+  to avoid `运行模式: 0/1`; `tag.setString("mode", getMachineModeName(...))`.
 - `ProcessingLogic#findRecipeMatches` uses `findRecipeQuery`; fake recipes are not found.
 - NEI `GTNEIDefaultHandler` reads `getRecipesByCategory(defaultCategory)`. Re-tag copied recipes.
 - `MTEHatchDataAccess#getAssemblyLineRecipes()` reads data sticks in the hatch.
-- Original Assembly Line is ordered by input bus slots; unordered AL must use `ProcessingLogic` /
-  `getStoredInputs`.
-- `MTEHatchInputBusDebug` phantom inventory: `getStackInSlot()` returns copies with huge stack size;
-  standard `getStoredInputs()` / `depleteInput()` handle it.
+- Original Assembly Line is ordered by input bus slots; unordered AL must use `ProcessingLogic` / `getStoredInputs`.
+- `MTEHatchInputBusDebug` phantom inventory: `getStackInSlot()` returns copies with huge stack size; the standard
+  `getStoredInputs()` / `depleteInput()` handle it.
 - `COAL_CASING_TIER` aliased to `GTRecipe.mSpecialValue`.
 - `RecipeMaps.scannerFakeRecipes` / `assemblylineVisualRecipes` are visual/NEI pools.
-- Wireless network helpers: `processInitialSettings`, `getUserEU`, `addEUToGlobalEnergyMap`.
-- Safe wireless order: validate balance first, then deduct + consume.
+- Wireless helpers: `processInitialSettings`, `getUserEU`, `addEUToGlobalEnergyMap`; safe order = validate balance first,
+  then deduct + consume.
 
 ## Own-code conventions
 
-1. Always reuse existing GT methods (`depleteInput`, `ProcessingLogic`, `getStoredInputs`,
-   `findRecipeQuery`) instead of manual inventory/fluid manipulation.
-2. Waila mode display uses string `tag.setString("mode", getMachineModeName(...))`.
-3. Real recipes for processing; fake recipes only for NEI.
-4. Re-tag copied recipes to the target map's default `RecipeCategory`.
-5. Registration stays in one path: `postInit -> MTMachineLoader.loadMachines()`.
-6. Do not commit randomly; `git fetch origin` was requested, not `git commit`.
-7. A borrowed face art keeps the machine's own casing as the base layer: `MTNQDAFReactor` draws the Antimatter
-   Generator's fusion overlay on Naquadah Fuel Refinery Casing, `MTReactor` the neutron activator art on the casing it
-   already had. Never import the donor's casing with the overlay. When the *machine itself* changes structure, though,
-   the layer may change with it - `MTChemicalTwister` draws the QFT face on the BulkProductionFrame, which is the casing
-   its level 2 shell is built from, so the look stays self-consistent.
-8. `HatchElementBuilder#casingIndex` only accepts values > 0, and `Casings#getTextureId()` throws for every casing that
-   is declared with `-1` (the GT++ casings such as `SpaceTimeContinuumRipper`, `ForceFieldGlass`, `BulkProductionFrame`,
-   `SpaceTimeBendingCore`, `NeutronShieldingCore` ... have no entry in the GT casing texture pages). Passing such a
-   `textureId` happens in the structure definition's static initialiser, so it fails mod loading with
-   `ExceptionInInitializerError: IllegalArgumentException` (this crashed once in `MTChemicalTwister`).
-   Use `TAE.getIndexFromPage(page, slot)` instead: GT++ registers its casings into the casing texture pages at
-   `64 + page * 16 + slot` (e.g. `TAE.getIndexFromPage(0, 10)` = 74, the index GT++'s Quantum Force Transformer uses
-   for the hatch host of the SpaceTimeContinuumRipper). A texture-less casing is still fine as a plain
-   `.asElement()` or as the `buildAndChain` block - only the hatch texture index needs a real one.
-   A casing with `textureId == -1` usually has **no** registered slot of its own either (e.g. `BulkProductionFrame` =
-   `blockCasings2Misc:12`, and `GregtechMetaCasingBlocks2` skips meta 12, so
-   `getCasingTextureForId(TAE.getIndexFromPage(1, 12))` would return null). For those, copy the block with
-   `TextureFactory.of(casing.getBlock(), casing.getBlockMeta())` instead of looking up an id - that is what the level 2
-   controller casing does.
-9. An `IIconContainer` created lazily is never stitched: `TexturesGtBlock.CustomIcon` adds itself to
-   `GregTechAPI.sGTBlockIconload` in its constructor and GT only walks that list in `BlockMachines#registerBlockIcons`
-   during the icon load phase. Reading such a field inside `getTexture(...)` (i.e. on the first frame) therefore leaves
-   it `null`, so icon containers that are not already forced by the donor mod must be held in `static final` fields of a
-   class that is loaded while the mods load (our machines are, `MTMachineLoader` is called from `postInit`, and
-   `postInit` runs before the client's first resource reload). `MTAssFactory` reads `TexturesGtBlock.oMCAQFT*` inline -
-   that only works because the class is loaded early by such a field, so do not copy that part of it.
-10. A machine state that only changes how it renders belongs in `getUpdateData()`/`onValueUpdate(byte)` rather than in a
-   custom packet: GT compares that byte every tick (`handleUpdateDataChangeServer`), sends `CHANGE_CUSTOM_DATA` when it
-   changes and writes it into the tile data packet, so it survives a chunk reload for free. Values are masked with
-   `0x7F`, and multiblock structure checks never run on the client - the client has to be told.
-11. Verify with the build, not with harnesses: `gradlew compileJava` is the check for a change, and the user does
-    not want harness work for it - do not add new `tools/**` verifiers (or extend the existing ones) unless asked,
-    and do not run the `tools/**` sweep. The wider `gradlew spotlessApply spotlessCheck checkstyleMain
-    processResources` is for when a full build is asked for or when the work is being handed over as finished. The
-    existing harnesses stay in `tools/**` and are only run on request - their results are not part of the normal
-    loop any more. (This supersedes the earlier "pick the harnesses by the file that was touched" rule; see also
-    `AGENTS.md`.)
-12. An item **count** never travels in a vanilla `ItemStack` NBT tag: 1.7.10 writes `Count` as a byte and reads it
-    back as one, so anything outside -128..127 comes out as a different number (1024 and 4096 both become 0). GTNH
-    recipes do use those amounts - the Nano-Scale Foundry one-step circuit pool has 1024-count and 4096-count
-    inputs - so any
-    client to server transfer of stacks carries the count in its own `long` tag next to the vanilla NBT
-    (`PatternImportHandler#writeCell`/`#readCell`, the same thing NotEnoughEnergistics does in
-    `ItemUtils#writeItemStackToNBT`/`#loadItemStackFromNBT`). AE's own NBT is not affected: it writes the real size
-    into the long `Cnt` and leaves `Count` at 0 on purpose.
+1. Reuse GT methods (`depleteInput`, `ProcessingLogic`, `getStoredInputs`, `findRecipeQuery`), never manual inventory/fluid
+   code.
+2. Waila mode as a string, never an integer (see above).
+3. Real recipes for processing, fake ones only for NEI.
+4. Re-tag copied recipes to the target map's `RecipeCategory`.
+5. One registration path: `postInit -> MTMachineLoader.loadMachines()`.
+6. Do not commit randomly: `git fetch origin` was requested, not `git commit`.
+7. Borrowed face art keeps the machine's own casing as base layer: `MTNQDAFReactor` = Antimatter Generator fusion overlay on
+   Naquadah Fuel Refinery Casing, `MTReactor` = neutron activator art on its existing casing; never import the donor's
+   casing. When the *machine itself* changes structure the layer may follow: `MTChemicalTwister` = QFT face on the
+   BulkProductionFrame, its level 2 shell's casing.
+8. `HatchElementBuilder#casingIndex` > 0 only, and `Casings#getTextureId()` throws for casings declared `-1` (GT++:
+   `SpaceTimeContinuumRipper`, `ForceFieldGlass`, `BulkProductionFrame`, `SpaceTimeBendingCore`, `NeutronShieldingCore` ...
+   have no GT casing texture page entry). Such a `textureId` sits in the structure definition's static initialiser -> mod
+   loading fails with `ExceptionInInitializerError: IllegalArgumentException` (crashed once in `MTChemicalTwister`). Use
+   `TAE.getIndexFromPage(page, slot)`: GT++ casings live at `64 + page * 16 + slot` (e.g. `TAE.getIndexFromPage(0, 10)` = 74,
+   GT++'s Quantum Force Transformer index for the SpaceTimeContinuumRipper's hatch host). Texture-less casings are fine as
+   `.asElement()` or the `buildAndChain` block - only the hatch texture index needs a real one. `textureId == -1` usually
+   means **no** registered slot either (`BulkProductionFrame` = `blockCasings2Misc:12`; `GregtechMetaCasingBlocks2` skips
+   meta 12, so `getCasingTextureForId(TAE.getIndexFromPage(1, 12))` is null): copy the block with
+   `TextureFactory.of(casing.getBlock(), casing.getBlockMeta())`, as the level 2 controller casing does.
+9. A lazily created `IIconContainer` is never stitched: `TexturesGtBlock.CustomIcon` adds itself to
+   `GregTechAPI.sGTBlockIconload` in its constructor and GT walks that list only in `BlockMachines#registerBlockIcons`
+   during the icon load phase, so reading such a field in `getTexture(...)` (first frame) leaves it `null`. Icon containers
+   not forced by the donor mod belong in `static final` fields of a class loaded while the mods load (ours are:
+   `MTMachineLoader` runs from `postInit`, before the client's first resource reload). `MTAssFactory`'s inline
+   `TexturesGtBlock.oMCAQFT*` reads work only because such a field loads the class early - do not copy that.
+10. Render-only machine state -> `getUpdateData()`/`onValueUpdate(byte)`, not a custom packet: GT compares the byte every tick
+   (`handleUpdateDataChangeServer`), sends `CHANGE_CUSTOM_DATA` on change and writes it into the tile data packet, so it
+   survives a chunk reload for free. Values masked with `0x7F`; structure checks never run on the client, so the client has
+   to be told.
+11. Verify with the build, not harnesses: `gradlew compileJava` is the check; no new `tools/**` verifiers, no extending
+    existing ones, no `tools/**` sweep unless asked. `gradlew spotlessApply spotlessCheck checkstyleMain processResources` =
+    full build or hand-over. Harnesses stay in `tools/**`, on request only (see `AGENTS.md`).
+12. Item **count** never rides in a vanilla `ItemStack` NBT tag: 1.7.10 writes `Count` as a byte, so outside -128..127 it
+    changes (1024 and 4096 -> 0). GTNH recipes use those (Nano-Scale Foundry one-step circuit pool: 1024 and 4096 counts), so
+    client->server transfers carry the count in their own `long` tag next to the vanilla NBT
+    (`PatternImportHandler#writeCell`/`#readCell`, like NotEnoughEnergistics in
+    `ItemUtils#writeItemStackToNBT`/`#loadItemStackFromNBT`). AE's NBT unaffected: size in the long `Cnt`, `Count` 0 on
+    purpose.
 
 ## Known pending / open items
 
-- The module system (`MTModuleMultiMachineBase`) has its three standard hatches with TST's values and a
-  `IHatchElement`, but no machine uses it yet: the module slot still has to be wired into a real structure, and the
-  composite plus the optional cross recipe / wireless modules are still open, see its section above.
+- The module system (`MTModuleMultiMachineBase`) has its three standard hatches with TST's values and an `IHatchElement`, but
+  no machine uses it yet: the module slot still needs wiring into a real structure, and the composite plus the optional cross
+  recipe / wireless modules are open (see its section above).
 - Overclock GUI / button sizing may still need visual verification.
-- `ParallelismAcrossMultiMachineBase` currently has a trivial `getMaxParallelRecipes()` fallback;
-  subclasses should override.
-- Generic `wirelessModeProcessOnce()` order may differ from strict "validate before consume" for some
-  machines; DTPF already implements the strict order in its own processing logic.
+- `ParallelismAcrossMultiMachineBase` has a trivial `getMaxParallelRecipes()` fallback; subclasses should override.
+- Generic `wirelessModeProcessOnce()` order may differ from strict "validate before consume"; DTPF implements the strict order
+  in its own processing logic.
 
 ## SpaceModule Infinity machines (latest)
 
-- `SpaceModulePumpInfinity` / `SpaceModuleMinerInfinity`
-- Extend `SpaceModuleInfinityBase<T>` which extends `ParallelismAcrossMultiMachineBase<T>`.
-- Always wireless (`EnableWirelessFunc=true`, `EnableWireless=true`), draws directly from wireless network.
+- `SpaceModulePumpInfinity` / `SpaceModuleMinerInfinity` extend `SpaceModuleInfinityBase<T>`, itself extending
+  `ParallelismAcrossMultiMachineBase<T>`.
+- Always wireless (`EnableWirelessFunc=true`, `EnableWireless=true`), drawing directly from the wireless network.
 - GUI parallel selector (`SpaceModuleInfinityGui`): default 1, max Integer.MAX_VALUE, synced via `wirelessParallel`.
-- Power formula: base 1A MAX (`GTValues.V[14]`), each extra parallel adds 1A UXV (`GTValues.V[13]`).
+- Power: base 1A MAX (`GTValues.V[14]`), each extra parallel +1A UXV (`GTValues.V[13]`).
 - `checkProcessing()`: validates wireless balance, deducts cost, sets `lEUt` and 20-tick duration.
 
 ### Tick-batched output framework (latest)
-- `SpaceModuleInfinityBase` now owns a shared tick-batched output framework:
+- `SpaceModuleInfinityBase` owns a shared tick-batched output framework:
   - `batchRemainingTasks`, `batchItemOutputs`, `batchFluidOutputs`
   - `startBatchedProcessing()`, `generateOneBatchTask()`, `getMainBatchDuration()`
 - A batch runs as one continuous main recipe:
@@ -1086,1006 +900,759 @@ MTMultiMachineBase<T>
 - Shutdown is deferred until all sub-outputs finish (`shutdownRequestedDuringBatch`).
 
 ### Mixin / elevator mounting (latest)
-- New late Mixin infra:
+- Late Mixin infra:
   - `com.MessTech.common.mixin.LateMixinPlugin` (implements `ILateMixinLoader`, `@LateMixin`)
   - `com.MessTech.common.mixin.Mixins` (registry with target-mod filter)
   - `com.MessTech.common.mixin.TargetMod` (`gtnhintergalactic`)
   - `src/main/resources/mixins.MessTech.late.json`
-- `MixinTileEntitySpaceElevator` adds a separate `mMessTechModuleHatches` list of
-  `ISpaceElevatorModule` and:
-  - accepts `ISpaceElevatorModule` in `addProjectModuleToMachineList` (without changing original list)
+- `MixinTileEntitySpaceElevator` adds a separate `mMessTechModuleHatches` list of `ISpaceElevatorModule`:
+  - accepts `ISpaceElevatorModule` in `addProjectModuleToMachineList` (without changing the original list)
   - clears/disconnects/charges/connects them like the original modules
   - includes them in `getNumberOfModules` and the module-slot limit check
-  - includes active MessTech miners in `getAvailableDataForModules()` computation split
+  - includes active MessTech miners in the `getAvailableDataForModules()` computation split
 
 ### Pump port status (latest)
-- `SpaceModulePumpInfinity` now uses real `SpacePumpingRecipes.RECIPES`; `getRecipeMap()` returns
-  `null` because the pump has no GT RecipeMap (custom map only).
-- NBT saves/loads all 4 recipe sub-panels (planet/gas/parallel arrays) and batch size.
-- GUI: `SpaceModulePumpInfinityGui` has separate Parallel / Planet Type / Gas Type buttons/panels.
-- Structure: the module slot of the Space Elevator (2 wide x 2 deep x 5 tall, controller on the second layer of
-  the first row), built from `SpaceModuleInfinityBase#buildModuleStructure` so the elevator registers the module
-  through its own structure check. The module is 2 wide and 5 long, so only the orientation that runs its long
-  axis along the slot fits.
-- Linkage is `SpaceModuleInfinityBase#isMountedOnFormedElevator()` - `parent != null && parent.getMotorTier() >=
-  getNeededMotorTier()`, where `parent` is set by the elevator's `connect(this)` every 20 ticks. The modules no
-  longer search their neighbourhood for an elevator.
-- `checkMachine` reports the linkage through `checkElevatorLinkage(errors, "V")` and tells the two reasons apart:
-  `machine.spacemodule.elevator_not_linked` when no elevator has taken the module in, and
-  `machine.spacemodule.elevator_level_too_low` (with the required `MK-<level>`) when it is mounted but the
-  elevator's motor tier is short.
-- `checkProcessing()`: looks up fluid by `(planetType, gasType)`, validates/deducts wireless EU,
-  outputs `fluid * parallel`, 20-tick duration.
-- `checkProcessing()` refuses to run while `isMountedOnFormedElevator()` is false, i.e. without a Tier V elevator.
-- Textures now use the original pump module front screen + `OVERLAY_SIDE_PUMP_MODULE` engraving.
+- `SpaceModulePumpInfinity` uses the real `SpacePumpingRecipes.RECIPES`; `getRecipeMap()` returns `null` - the pump has no GT
+  RecipeMap (custom map only).
+- NBT saves/loads all 4 recipe sub-panels (planet/gas/parallel arrays) and the batch size.
+- GUI: `SpaceModulePumpInfinityGui` with separate Parallel / Planet Type / Gas Type buttons/panels.
+- Structure: the Space Elevator module slot (2 wide x 2 deep x 5 tall, controller on the second layer of the first row),
+  built from `SpaceModuleInfinityBase#buildModuleStructure` so the elevator registers the module through its own structure
+  check. Module is 2 wide and 5 long - only the orientation running its long axis along the slot fits.
+- Linkage `SpaceModuleInfinityBase#isMountedOnFormedElevator()` = `parent != null && parent.getMotorTier() >=
+  getNeededMotorTier()`, where `parent` is set by the elevator's `connect(this)` every 20 ticks; no neighbourhood search any
+  more.
+- `checkMachine` reports the linkage through `checkElevatorLinkage(errors, "V")`, telling two reasons apart:
+  `machine.spacemodule.elevator_not_linked` (no elevator took the module in) and
+  `machine.spacemodule.elevator_level_too_low` (with the required `MK-<level>`) when mounted but the motor tier is short.
+- `checkProcessing()`: looks up the fluid by `(planetType, gasType)`, validates/deducts wireless EU, outputs
+  `fluid * parallel`, 20-tick duration; refuses to run while `isMountedOnFormedElevator()` is false, i.e. without a Tier V
+  elevator.
+- Textures: original pump module front screen + `OVERLAY_SIDE_PUMP_MODULE` engraving.
 
 ### Miner port status (latest)
-- `SpaceModuleMinerInfinity` now uses the real `IGRecipeMaps.spaceMiningRecipes` pool.
-- Structure: the Space Elevator module slot (see the pump section above); hatches are an optional casing plus any
-  of Input Hatch / Input Bus / Output Bus / Data Input hatch.
-- Recipe lookup applies the same two gates as the native miner: `MODULE_TIER` metadata not above
-  `getModuleTier()`, and the asteroid's `minDistance..maxDistance` range covering the effective distance. The
-  module is constructed with `tModuleTier = 5`, so the tier gate currently passes every asteroid in the pool
-  (the pool's own `minModuleTier` values only go up to 3).
-- Requires a local Data Input hatch for computation input; if no packet is present it falls back to
-  the parent elevator's shared computation (`getAvailableDataForModule()`).
-- GUI: full port of the original GT5U Miner GUI — Filter (64-slot whitelist/blacklist + asteroid
-  buttons), Calculator, Utility asteroid list, drone selectors, asteroid info panels, plus the
-  wireless Parallel button and Distance/Overdrive/Cycle/Range/Step controls.
-- Textures now use the original miner module front screen + `OVERLAY_SIDE_MINER_MODULE` engraving.
+- `SpaceModuleMinerInfinity` uses the real `IGRecipeMaps.spaceMiningRecipes` pool.
+- Structure: the Space Elevator module slot (see the pump section); hatches = one optional casing plus any of Input Hatch /
+  Input Bus / Output Bus / Data Input hatch.
+- Recipe lookup applies the native miner's two gates: `MODULE_TIER` metadata not above `getModuleTier()`, and the asteroid's
+  `minDistance..maxDistance` range covering the effective distance. Constructed with `tModuleTier = 5`, so the tier gate
+  passes every asteroid (the pool's `minModuleTier` values only go up to 3).
+- Needs a local Data Input hatch for computation input; without a packet it falls back to the parent elevator's shared
+  computation (`getAvailableDataForModule()`).
+- GUI: full port of the original GT5U Miner GUI - Filter (64-slot whitelist/blacklist + asteroid buttons), Calculator,
+  Utility asteroid list, drone selectors, asteroid info panels, plus the wireless Parallel button and
+  Distance/Overdrive/Cycle/Range/Step controls.
+- Textures: original miner module front screen + `OVERLAY_SIDE_MINER_MODULE` engraving.
 - `checkProcessing()`:
-  - requires Tier V elevator
-  - uses existing `getStoredInputsNoSeparation()` / `getStoredFluidsWithDualInput()` for inputs
+  - requires a Tier V elevator
+  - uses the existing `getStoredInputsNoSeparation()` / `getStoredFluidsWithDualInput()` for inputs
   - filters/randomly picks a real space mining recipe by effective distance
   - supports distance cycling (`cycle/range/step`) and overdrive time/bonus modifiers
   - applies Asteroid Outpost computation/plasma discounts when the team project is finished
-  - caps parallels by wireless parallel, local/parent computation, plasma, and input stack sizes
-  - validates/deducts wireless EU, consumes inputs via `recipe.consumeInput` + `depleteInput` for plasma,
-    generates weighted ore outputs and applies whitelist/blacklist filtering
-- NBT saves/loads distance, overdrive, cycle/range/step, cycleDistance, whitelist flag, and filter inventory.
-- Remaining relative to original: full asteroid info/calculator panels and 64-slot filter grid (GUI
-  currently uses a compact 8-slot filter).
+  - caps parallels by wireless parallel, local/parent computation, plasma and input stack sizes
+  - validates/deducts wireless EU, consumes inputs via `recipe.consumeInput` + `depleteInput` for plasma, generates weighted
+    ore outputs and applies whitelist/blacklist filtering
+- NBT saves/loads distance, overdrive, cycle/range/step, cycleDistance, the whitelist flag and the filter inventory.
+- Remaining vs the original: full asteroid info/calculator panels and the 64-slot filter grid (GUI has a compact 8-slot
+  filter).
 
 ### Space apiary modules (太空蜂箱, latest)
 - `SpaceModuleApiary` + inner `MK1`..`MK4`, registered as `MT_ID + 73..76` (`MTItemList.SpaceModuleApiaryMK1..4`).
-- Four tiers, each one class, re-seated on this GT5U's 16-entry `GTValues.V` (TST asks for tiers 18/25, which do
-  not exist here): MK-I UEV (tier 10) 256 parallel / 16 slots / motor tier 1; MK-II UIV (12) 4096 / 32 / 2;
-  MK-III MAX (14) 32768 / 64 / 3; MK-IV tier 15 `Integer.MAX_VALUE` / 128 / 4.
-- Structure: the Space Elevator module slot (2 wide x 2 deep x 5 tall; see the pump section above), hatches are
-  one optional casing plus input bus / output bus / input hatch. `checkMachine` reports the linkage through
-  `checkElevatorLinkage(errors, getNeedElevatorLevel())` (the level is `I`..`IV` per MK) and the elevator is
-  mounted only while its motor tier is at least `getNeededMotorTier()`.
-- `checkProcessing_EM()` runs one 100-tick cycle (`CYCLE_TICKS`): queens are pulled from the input bus into the free
-  bee slots by `takeBeesFromInputs()` and are **never consumed**; every occupied slot runs once through
-  `MTBeeSimulator.simulate(queen, world, t)` with `t = MTBeeSimulator.voltageTierExact(getTier())`, and the drops are
-  multiplied by `getMaxParallelRecipes()` (wireless parallel capped by the module's own ceiling).
-- Power is wireless only: `GTValues.V[tier] * CYCLE_TICKS * parallel` EU is taken from the player's global energy map
-  in one lump via `addEUToGlobalEnergyMap`, then `lEUt = 0` so the machine does not also drain its own hatches.
-  `validateWirelessPowerForRecipe` runs first; no energy hatch and no liquid DNA are involved.
-- No recipe map: `getRecipeMapImpl()` returns `null` (the same as TST's `TST_SpaceApiary`), the module produces from
-  the bee slots and not from a pool.
+- Four tiers, one class each, re-seated on this GT5U's 16-entry `GTValues.V` (TST asks for tiers 18/25, which do not exist
+  here): MK-I UEV (tier 10) 256 parallel / 16 slots / motor tier 1; MK-II UIV (12) 4096 / 32 / 2; MK-III MAX (14) 32768 / 64
+  / 3; MK-IV tier 15 `Integer.MAX_VALUE` / 128 / 4.
+- Structure: the Space Elevator module slot (see the pump section), hatches = one optional casing plus input bus / output bus
+  / input hatch. `checkMachine` reports the linkage through `checkElevatorLinkage(errors, getNeedElevatorLevel())` (level
+  `I`..`IV` per MK); mounted only while the elevator's motor tier is at least `getNeededMotorTier()`.
+- `checkProcessing_EM()` runs one 100-tick cycle (`CYCLE_TICKS`): `takeBeesFromInputs()` pulls queens from the input bus into
+  the free bee slots and they are **never consumed**; every occupied slot runs once through
+  `MTBeeSimulator.simulate(queen, world, t)` with `t = MTBeeSimulator.voltageTierExact(getTier())`, drops multiplied by
+  `getMaxParallelRecipes()` (wireless parallel capped by the module's own ceiling).
+- Power is wireless only: `GTValues.V[tier] * CYCLE_TICKS * parallel` EU taken from the player's global energy map in one
+  lump via `addEUToGlobalEnergyMap`, then `lEUt = 0` so the machine does not also drain its hatches.
+  `validateWirelessPowerForRecipe` first; no energy hatch, no liquid DNA.
+- No recipe map: `getRecipeMapImpl()` returns `null` (like TST's `TST_SpaceApiary`); the module produces from the bee slots,
+  not from a pool.
 - Bee slots live in the machine (`ItemStack[] beeSlots`, NBT key `beeSlots`, size 1 each) so they survive a reload.
 - Structure hooks: `construct(...)` -> `buildPiece("main", stackSize, hintsOnly, 0, 1, 0)` **and**
   `survivalConstruct(stackSize, elementBudget, ISurvivalBuildEnvironment)` ->
-  `survivalBuildPiece("main", stackSize, 0, 1, 0, elementBudget, env, false, true)`, the same pair the miner and the
-  pump use. The `ISurvivalBuildEnvironment` variant must build for real: BlockRenderer6343 (the NEI structure preview)
-  places the machine in a dummy world and calls it with a **fake player**, and neither `TileEntityModuleBase` nor
-  GT's multiblock bases override that variant - delegating to `super` therefore lands in StructureLib's interface
-  default, which answers `-2` ("not supported") for a fake player and leaves the preview with nothing but the
-  controller.
-- Recipes: four Space Assembler recipes (`GTRecipes.addSpaceApiaryRecipes()`), one per tier, `specialValue(1)`
-  (inert: the assembler's tier gate reads the `MODULE_TIER` metadata, which neither mod sets, so all four count as
-  module tier 1). Each spends 4 stacks of 64 Industrial Apiaries + 4 stacks of 64 upgraded acceleration upgrades, 16 of
-  that tier's Field Generator / Conveyor / Robot Arm / Electric Pump, 64 tier circuits, a solder fluid and Honey
-  (doubling per tier), at RECIPE_UHV/UEV/UIV/UMV and 20*300*scale ticks.
-  - MK-III/MK-IV pay **UU-Matter** (1000*128*scale) and MK-I/MK-II pay **Mutated Living Solder** (16 ingots * scale,
-    i.e. 2304 / 4608 mB). TST fills the same pool (`IGRecipeMaps.spaceAssemblerRecipes`) with its `SpaceApiaryT1..T4`,
-    and MK-I/MK-II originally spent exactly what TST's T1/T2 spend (same parts, circuit, UU-Matter, honey, EU/t and
-    duration, only the output different) - so a Space Assembler holding those components matched both and took
-    whichever recipe the lookup yielded first, leaving one mod's module unobtainable. MK-III/MK-IV never collided
-    because their circuit differs from TST's (ours UXV/MAX, TST's UMV/UXV). The solder is what makes MK-I/MK-II
-    mutually exclusive with TST's - **adding** an item or fluid would not, since a recipe matches as soon as its
-    inputs are present. 16 ingots doubling follows the pool's own module ladder (Pump Module MK-I 9 ingots, MK-II 32,
-    MK-III 1 stack, `MachineRecipes:279/297/332`) and is a fraction of one GT++ solder batch
+  `survivalBuildPiece("main", stackSize, 0, 1, 0, elementBudget, env, false, true)` (the miner/pump pair). The
+  `ISurvivalBuildEnvironment` variant must build for real: BlockRenderer6343 (NEI structure preview) calls it with a **fake
+  player**, and neither `TileEntityModuleBase` nor GT's multiblock bases override it - `super` lands in StructureLib's
+  interface default, which answers `-2` ("not supported"), leaving the preview with only the controller.
+- Recipes: four Space Assembler recipes (`GTRecipes.addSpaceApiaryRecipes()`), one per tier, `specialValue(1)` (inert: the
+  assembler's tier gate reads the `MODULE_TIER` metadata, which neither mod sets, so all four count as module tier 1). Each
+  spends 4 stacks of 64 Industrial Apiaries + 4 stacks of 64 upgraded acceleration upgrades, 16 of that tier's Field
+  Generator / Conveyor / Robot Arm / Electric Pump, 64 tier circuits, a solder fluid and Honey (doubling per tier), at
+  RECIPE_UHV/UEV/UIV/UMV and 20*300*scale ticks.
+  - MK-III/MK-IV pay **UU-Matter** (1000*128*scale), MK-I/MK-II **Mutated Living Solder** (16 ingots * scale, i.e. 2304 /
+    4608 mB). TST fills the same `IGRecipeMaps.spaceAssemblerRecipes` pool with `SpaceApiaryT1..T4`, and MK-I/MK-II once
+    spent exactly what TST's T1/T2 spend (same parts, circuit, UU-Matter, honey, EU/t, duration, only the output different),
+    so one assembler matched both and took whichever came first - one mod's module unobtainable. MK-III/MK-IV never collided
+    (our circuit UXV/MAX, TST's UMV/UXV). The solder is what makes MK-I/MK-II exclusive with TST's - **adding** an item or
+    fluid would not, a recipe matching as soon as its inputs are present. 16 ingots doubling follows the pool's ladder (Pump
+    Module MK-I 9 ingots, MK-II 32, MK-III 1 stack, `MachineRecipes:279/297/332`) and is a fraction of one GT++ solder batch
     (`RecipeLoaderGenericChem:163` yields 4 stacks + 24 ingots).
-- GUI: `SpaceModuleApiaryGui extends SpaceModuleInfinityGui`. The terminal area toggles between the standard status
-  text and a scrollable grid of `SlotLikeButtonWidget`s (10 per row); the toggle is the button the GUI adds to the
-  right of the panel gap.
-  - The grid shows the bee slots the way the Mega Industrial Apiary does: queens sharing a species, secondary species
-    and speed allele collapse into **one** button carrying their number (`MTBeeSimulator.speciesKey`, drawn with
-    `GuiDraw.drawStandardSlotAmountText`), and the remaining capacity is the single empty button at the end. Buttons
-    for entries that do not exist are disabled; a disabled button collapses in its row and an empty row collapses in
-    the `ListWidget`, so the grid needs no rebuilding.
-  - The apiary has one parallel knob and one bee cycle, so `shouldShowCrossRecipeParallelField()` is `false` and the
-    cross-recipe parallel field is hidden.
-  - `createButtonColumn` is overridden to drop the controller slot the shared space-module GUI adds. That slot takes
-    anything and nothing in this machine reads it, and it was the only shift-click target - so a shift-clicked queen
-    landed there instead of in a bee slot.
-  - Shift-click is instead served by an invisible one-item **queen buffer** slot (`ItemSlotSH` over a 1-slot
-    `ItemStackHandler`, `singletonSlotGroup(SlotGroup.STORAGE_SLOT_PRIO)`, filter = queen and a free bee slot). MUI2
-    finds transfer targets through the slot group, so the buffer needs no widget; its change listener moves what it
-    receives straight into the first free bee slot.
-  - Slot contents are one `GenericListSyncHandler<ItemStack>` over the machine's array (null-safe item serialization,
-    change listener invalidating the aggregation) and every edit travels as a single encoded integer
-    (`apiaryBeeClick`, `allowC2S`) handled on the server. The encoding is `((slot + 2) << 4) | button | shift`, where
-    `slot = -1` means the empty entry and the server resolves it to its first free slot. Click takes the queen to the
-    cursor, shift-click sends it to the player inventory, a held queen swaps, right-click inserts a single queen and
-    filling continues into the following empty slots, middle-click is the creative pick.
-- Liquid DNA is intentionally not used, unlike TST's optional `SpaceApiaryCycleTime` addition.
-- Forestry is a hard dependency (`implementation(gtnhDev("ForestryMC"))` in `dependencies.gradle`); simulations go
-  through `forestry.api.apiculture.BeeManager`.
+- GUI: `SpaceModuleApiaryGui extends SpaceModuleInfinityGui`. The terminal area toggles between the standard status text and
+  a scrollable grid of `SlotLikeButtonWidget`s (10 per row), toggled by a button right of the panel gap.
+  - The grid shows bee slots like the Mega Industrial Apiary: queens sharing species, secondary species and speed allele
+    collapse into **one** button carrying their number (`MTBeeSimulator.speciesKey`, `GuiDraw.drawStandardSlotAmountText`),
+    remaining capacity = the single empty button at the end. Missing entries are disabled; a disabled button collapses in
+    its row and an empty row in the `ListWidget`, so no rebuild is needed.
+  - One parallel knob, one bee cycle: `shouldShowCrossRecipeParallelField()` is `false`, so the cross-recipe parallel field
+    is hidden.
+  - `createButtonColumn` is overridden to drop the controller slot the shared space-module GUI adds: it takes anything,
+    nothing reads it, and it was the only shift-click target - a shift-clicked queen landed there, not in a bee slot.
+  - Shift-click goes to an invisible one-item **queen buffer** slot (`ItemSlotSH` over a 1-slot `ItemStackHandler`,
+    `singletonSlotGroup(SlotGroup.STORAGE_SLOT_PRIO)`, filter = queen and a free bee slot). MUI2 finds transfer targets
+    through the slot group, so no widget; its change listener moves what it receives into the first free bee slot.
+  - Slot contents: one `GenericListSyncHandler<ItemStack>` over the machine's array (null-safe item serialization, change
+    listener invalidating the aggregation); every edit travels as one encoded integer (`apiaryBeeClick`, `allowC2S`) handled
+    on the server - `((slot + 2) << 4) | button | shift`, `slot = -1` meaning the empty entry (server resolves it to its
+    first free slot). Click = queen to cursor, shift-click = to player inventory, held queen swaps, right-click = single
+    queen (filling continues into the following empty slots), middle-click = creative pick.
+- Liquid DNA intentionally not used, unlike TST's optional `SpaceApiaryCycleTime` addition.
+- Forestry is a hard dependency (`implementation(gtnhDev("ForestryMC"))` in `dependencies.gradle`); simulations go through
+  `forestry.api.apiculture.BeeManager`.
 
 ## Mess Food (混乱大杂烩)
 
 - Item: `com.MessTech.common.item.ItemMessFood`, registered as `MessFood` in `MTItems`, texture
   `assets/messtech/textures/items/food.png`.
-- NBT key `Ingredients` stores the ordered ingredient list (one `ItemStack` with stack size 1 per
-  entry), which is also the food's identity.
-- Recipe: `com.MessTech.common.recipe.RecipeMessFood` — a custom `IRecipe` appended to the crafting
-  manager in `CommonProxy.init()`. It is shapeless but order sensitive: any 2-9 AppleCore foods may
-  be placed anywhere in the grid, and the ingredients are recorded in crafting slot order
-  (top-left -> bottom-right). Every ingredient must be distinct (item + damage + NBT), so duplicates
-  such as apple+apple are rejected. Mess Food itself is excluded, so it cannot be used to craft
-  another mess food. Appending keeps every pre-existing recipe's priority.
-- Hunger: the sum of the ingredients' AppleCore hunger values. Saturation: the sum of the
-  ingredients' saturation increments, converted back into a `FoodValues` modifier. Implemented with
-  AppleCore `IEdible#getFoodValues` plus `func_150905_g`/`func_150906_h` overrides.
-- Display name: localized base name plus `(ingredient1,ingredient2,...)`, e.g.
-  `Mess Food(apple,bread)` / `混乱大杂烩(苹果,面包)`. Key: `item.messtech.messFood.display=%s(%s)`,
-  so Spice of Life's journal can tell every variant apart.
+- NBT key `Ingredients` stores the ordered ingredient list (one `ItemStack` with stack size 1 per entry), also the food's
+  identity.
+- Recipe: `com.MessTech.common.recipe.RecipeMessFood`, a custom `IRecipe` appended to the crafting manager in
+  `CommonProxy.init()`. Shapeless but order sensitive: any 2-9 AppleCore foods anywhere in the grid, recorded in crafting
+  slot order (top-left -> bottom-right). Every ingredient distinct (item + damage + NBT), so apple+apple is rejected; Mess
+  Food itself excluded, so it cannot craft another. Appending keeps every pre-existing recipe's priority.
+- Hunger = sum of the ingredients' AppleCore hunger values; saturation = sum of their saturation increments, converted back
+  into a `FoodValues` modifier, via AppleCore `IEdible#getFoodValues` plus `func_150905_g`/`func_150906_h` overrides.
+- Display name: localized base name plus `(ingredient1,ingredient2,...)`, e.g. `Mess Food(apple,bread)` /
+  `混乱大杂烩(苹果,面包)`. Key `item.messtech.messFood.display=%s(%s)`, so Spice of Life's journal tells every variant apart.
 - Tooltip: ingredient names one per line, in crafting order.
-- Spice of Life compat (late mixins, applied only when `SpiceOfLife` is loaded):
+- Spice of Life compat (late mixins, only when `SpiceOfLife` is loaded):
   - `MixinFoodEaten` adds the NBT tag to `FoodEaten.equals`/`hashCode` for Mess Foods only.
-  - `MixinFoodHistory` redirects `ItemStack.isItemEqual` to `MessFoodHelper.sameFoodIdentity` in
-    `getFoodCountForFoodGroup`, `containsFoodOrItsFoodGroups` and `getTotalFoodValuesForFoodGroup`.
-  - Result: every ordered combination has its own journal entry, diminishing-returns counter and
-    extra-heart milestone.
-- `AppleCore` was added as a required mod dependency (`required-after:AppleCore`).
-- Dev smoke test (temporary, already removed): NBT round trip, order sensitivity, hunger/saturation
-  sums, 2-9 food recipe matching, identity/hash consistency.
+  - `MixinFoodHistory` redirects `ItemStack.isItemEqual` to `MessFoodHelper.sameFoodIdentity` in `getFoodCountForFoodGroup`,
+    `containsFoodOrItsFoodGroups` and `getTotalFoodValuesForFoodGroup`.
+  - Result: every ordered combination gets its own journal entry, diminishing-returns counter and extra-heart milestone.
+- `AppleCore` is a required mod dependency (`required-after:AppleCore`).
+- Dev smoke test (temporary, already removed): NBT round trip, order sensitivity, hunger/saturation sums, 2-9 food recipe
+  matching, identity/hash consistency.
 
 ## A Piggy + MTDynamicItemHelper (dynamic items)
 
-- Item: `com.MessTech.common.items.MTItemPiggy`, registered as `MTItemPiggy` in `MTItems`, creative tab
-  `tabMisc`, 7 damage variants (one per effect), icons from `pigs/pig` (relative to `textures/items`).
-- Helper: `com.MessTech.common.util.MTDynamicItemHelper`. "Dynamic" means: one item whose look (icon +
-  renderer) is selected by `ItemStack#getItemDamage()`, so no renderer class is needed per item.
-  - `Effect` enum, ordinal == damage value: `NONE` (plain pig), `TRANSCENDENT_METAL`, `INFINITY`,
-    `MAGMATTER`, `ETERNITY`, `UNIVERSIUM`, `SIX_PHASED_COPPER`. `NONE` has to stay at index 0, it is the
-    fallback for out-of-range damage (old worlds, /give with a random meta).
-  - `registerIcons(register, basePath)` registers `<basePath><iconSuffix>` per effect, e.g.
-    `pigs/pig` + `TranscendentMetal` -> `textures/items/pigs/pigTranscendentMetal.png`.
-  - **Icon names must not start with `items/`**: `TextureMap` resolves registered names as
-    `basePath/<name>.png` with `basePath` = `textures/items` (that is the `textures/items-atlas` line in the
-    log), so `items/pigs/pig` would look for `textures/items/items/pigs/pig.png`. The same rule applies to
-    blocks (`textures/blocks`); `MTFuelRod` (`messtech:FuelRod/...`) and GT's own item icons confirm it.
-    A wrong path is silent — 1.7.10 commented out the "using missing texture" error
-    (`TextureMap` line 189) and only feeds FML's `trackMissingTexture`, which is why such a typo shows up
-    as the purple/black checker board with nothing in the log. `registerIcons` therefore looks every icon up
-    through `IResourceManager.getResource` (the 1.7.10 way; there is no `resourceExists`) and logs the warning
-    itself.
-  - `registerItemRenderer(item)` registers one shared `IItemRenderer`; `getEffect`/`setEffect`/
-    `cycleEffect` are server safe, everything icon/renderer related is `@SideOnly(Side.CLIENT)`.
-  - `Style` picks the drawing code, each one a copy of the matching GT5U renderer:
-    - `TUMBLE`: `TranscendentMetalRenderer` — quad tumbled around (0.3, 0.5, 0.2) by 3.5 degrees per
-      client tick, angle from `GTMod.clientProxy().getAnimationRenderTicks()`.
-    - `HALO_PULSE`: `InfinityRenderer` — inventory only (GT5U does the same): `Textures.ItemIcons.HALO`
-      behind the icon plus a gaussian scaled 60% alpha copy. GT5U wires Infinity, Eternity and MagMatter
-      to this renderer; their own texture strip is the animated part.
-    - `UNIVERSIUM`: `UniversiumRenderer` — icon first, then gtnhlib's `UniversiumShader` star field
-      (`setRenderInInventory()` inside the GUI, `GL_EQUAL` depth + `GL20.glUseProgram` restore outside).
-      The shader writes its own colour wherever the icon is opaque and keeps only the icon's alpha
-      (`gl_FragColor = vec4(col * shade, mask.a * opacity)` in `universium.frag`), i.e. the icon becomes a
-      window into the sky and *everything* the sprite draws ends up behind the stars.
-    - `GLITCH`: `GlitchEffectRenderer` — red/cyan ghost copies, 10 ms frames, glitching on frames
-      0-40 of every 200.
-  - `registerUniversiumOverlay(item, register, basePath)` is the way back from that: it registers
-    `<basePath>UniversiumFace` (the pig's `pigs/pigUniversiumFace.png`) and remembers it per item, and the
-    `UNIVERSIUM` pass draws it as a third pass, after `UniversiumShader.clear()`/`unbind()`, so the item's
-    details land in front of the finished sky. It has to be the *untinted* art: the sky is dark, so a feature
-    in the material's own colour would be invisible on it. Items without an overlay render exactly as before.
-    Both ends of that map are client only, which is why it lives in the client-only inner renderer class.
-  - The overlay is a cut-out of the pig's **features only**, not of its face: the two eyes, the snout with its
-    nostrils and the pig's own ears, copied pixel for pixel out of the plain sprite. Every other pixel stays
-    transparent, so the star field keeps painting the whole body - an earlier version put a patch of plain pig
-    skin around the face, which does dissolve the edge but reads as a sticker over the stars. The ears (the
-    pink crescent at 3..5, 7..12 and the pink ring at 14..18, 11..15) need the pass as much as the face does:
-    the shader only keeps the icon's alpha, so they would otherwise be swallowed by the body.
-  - The eyes are the one thing a plain copy cannot carry. The sky's own background is
-    `bgColor = (0.10, 0.225 +- 0.075, 0.30 +- 0.05)`, and the pig's near black eye (luma 0.17) is exactly as
-    bright, so a bare dark dot disappears into it. The 2x2 pupils are kept and the 12 pixels around each get a
-    pale rim (`#cfe4f2` at alpha 190), which reads whether a star or the plain background sits behind it.
-    Contrast holds at every point of the background's pulse, and no plain skin pixel ever creeps back into the
-    overlay.
-  - GT5U's accessibility switches are honoured: `Client.render.renderTransMetalFancy`,
-    `renderInfinityFancy`, `renderUniversiumFancy`, `renderGlitchFancy` fall back to the plain icon.
-- Shift + right click cycles the effect. The damage value is written on both sides, the oink is played
-  server side (so it is heard once) and the chat line is sent client side (so it uses the client language).
-- Right click throws the piggy and does not consume it - the stack comes back untouched - which is why the item
-  stacks to **one**: it is a pet and a hat, not ammunition. The projectile itself is unchanged
-  (`MTEntityPiggy`, effect in the damage value of the thrown stack).
-- The piggy fits into the **helmet slot**: `MTItemPiggy#isValidArmor` answers true for armor type `0`, i.e. the hook
-  vanilla's `ContainerPlayer.SlotArmor#isItemValid` asks (`Item#isValidArmor` numbers the slots 0 helmet, 1 chest,
-  2 legs, 3 boots - *not* the numbering of `InventoryPlayer#armorItemInSlot`, where the helmet is 3). Without that
-  override the slot only takes armour, pumpkins and skulls.
-- Wearing it is drawn by `common/entity/MTPiggyHatRenderer` (client only, registered from `ClientProxy.preInit`):
-  1.7.10 has no renderer for a plain item on the head - `RenderPlayer#renderEquippedItems` only knows `ItemBlock`
-  blocks (the pumpkin) and skulls - so the handler watches `RenderPlayerEvent.Specials.Post`, which is posted at the
-  end of exactly that method, i.e. **inside the model of the player**, in the same space vanilla draws the pumpkin
-  and the skull in. It reads `inventory.armorItemInSlot(3)` and, if that stack is a piggy, puts the model on the
-  head: `event.renderer.modelBipedMain.bipedHead.postRender(0.0625F)` - the head part carries the whole pose of the
-  head, its angles are the head's own yaw and pitch - then 8 px (half a block, the height of the head box) up onto
-  the top of the head, and finally scales by `SCALE / 0.9375` so the pig is `SCALE = 0.5` blocks tall in the world.
-  Because the pose comes from the head part itself, yaw, pitch, the crouch (whose head pivot drops a pixel), riding,
-  the death pose and the `0.125` a sneaking player that is not the camera is dropped by all come along by
-  themselves; sleeping, dead and invisible players are skipped.
-- The three facts that space is made of (all of them read out of the decompiled Minecraft sources, not guessed):
-  `RendererLivingEntity#doRender` flips the model (`glScalef(-1, -1, 1)`) before it hands it to the renderer, so
-  **`-Y` is up in the world, the face of the wearer points along `-Z` and one unit is a sixteenth of the model**
-  (`postRender` takes its `0.0625`); `RenderPlayer#preRenderCallback` scales everything by `0.9375`, which the
-  pig divides back out so `SCALE` keeps meaning blocks; and the rotation point of `bipedHead` is the **neck**, not
-  the top of the head - the head box grows 8 px up from it. With the half block of `HEAD_HEIGHT` added, the feet of
-  the pig end up exactly where the pumpkin and the skull are built around and where the old billboard put them,
-  `(24 + 8) / 16 * 0.9375 + 0.9375 / 128 = 1.8823` blocks above the feet (one pixel lower when crouching).
-- What stands on the head is `MTDynamicItemHelper#renderOnHead(wearer, stack)`: the sprite of
-  `Item#getIcon(stack, 0)` drawn standing on the origin of the matrix the hat renderer set up, facing `-Z`, so a
-  player in front of the wearer sees the pig's face. Neither the mirrored X of the model space nor the turn into the
-  facing direction flips it - the two cancel out - so the texture is not mirrored. The style of the stack's effect is
-  drawn on top of that sprite, which is what makes the hat the item and not a still picture:
-  - `TUMBLE` (Transcendent Metal) tumbles exactly like the item does: 3.5 degrees per client tick from
-    `GTMod.clientProxy().getAnimationRenderTicks()` about the oblique axis `(0.3, -0.5, -0.2)` - the mirrored copy
-    of GT5U's `(0.3, 0.5, 0.2)`, because the model space has Y and Z flipped, which keeps the tumble turning the way
-    it does in the hand - about the centre of the sprite.
-  - `UNIVERSIUM` runs its three passes again: the sprite, then gtnhlib's cosmic shader over the same geometry with
-    the depth function at `GL_EQUAL` (so the stars land on the sprite and not on the head behind it) and finally the
-    stack's overlay (`pigUniversiumFace`) in front of the finished sky.
-  - `HALO_PULSE` and `GLITCH` stay the plain sprite on the head: GT5U draws the halo, the pulse and the glitch
-    ghosts in the inventory only, and the animated strips of Infinity/MagMatter/Eternity animate by themselves. GT5U's
-    fancy switches are honoured on the head as well (`isFancyEnabled` falls back to the plain sprite).
-  - The items atlas is bound by the helper (no vanilla item pass did that for this draw) and culling is off for the
-    single quad, with `GL_ENABLE_BIT` pushed and popped around the whole thing.
-- **A Transcendent Metal pig tumbles the wearer with it.** `MTPiggyHatRenderer` also watches
-  `RenderPlayerEvent.Pre`/`Post`, which wrap the whole `RenderPlayer#doRender`, and turns the player model by the
-  same `MTDynamicItemHelper#tumbleAngle()` about the same oblique axis `(0.3, 0.5, 0.2)`. The pivot is the middle
-  of the body: at `Pre` the matrix is still the one the camera left, so the model's own origin is the interpolated
-  entity position the renderer is handed (`lastTickPos + (pos - lastTickPos) * partialTicks` minus
-  `RenderManager.renderPosX/Y/Z`, and minus `Entity.yOffset` the way `RenderPlayer#doRender` drops it), lifted by
-  `TUMBLE_PIVOT_Y = 0.9` - half of the 1.8 blocks a player is tall, the same thing the pig does about the middle of
-  its sprite.
-  - The push and the pop have to be a pair, and `RenderPlayerEvent.Pre` is `@Cancelable` while its `Post` is only
-    posted for a `Pre` that was not cancelled. `Pre` is therefore registered at `EventPriority.LOWEST` - every
-    other handler has run, so a cancel is already visible - and `onRenderWorldLast` is the net under the remaining
-    case (a cancel from a handler that runs after this one): it pops the leftover push at the end of the world
-    render, where that push is still the top of the stack, so the matrix stack cannot leak.
-  - The pig keeps its own tumble as well, so on the head the two compose; pinning the pig to the head instead would
-    mean dropping the transform in `MTDynamicItemHelper#renderOnHead` for the wearer case. The whole thing is the
-    client-side look switch `Config.PIGGY_TUMBLES_WEARER` (default on).
-- The thrown piggy is unchanged by all of this: it stays the camera facing billboard of
-  `MTRenderPiggy`, scaled to 0.6 and spinning around the view axis.
-- Textures: `assets/messtech/textures/items/pigs/pig*.png`, built from the
-  GT5U material icons (`assets/gregtech/textures/items/materialicons/...`): the material icon is
-  in-painted to full coverage, tinted with the material colour and multiplied by the pig's own shading
-  plus a fake top/bottom bevel.
-  - Animated materials keep their frame strip and get `{"animation":{"frametime":1}}` as `.mcmeta`:
-    `pigInfinity` 18 frames, `pigMagMatter` 8, `pigEternity` 20; `pig`, `pigTranscendentMetal`,
-    `pigUniversium` and `pigSixPhasedCopper` are single frame. Animated sprites in the item atlas work
-    in 1.7.10; GT5U's own animated material icons do exactly this.
-  - The pattern is normalised against the whole strip, never per frame: per-frame normalisation cancels
-    an animation whose frames only move, which is what flattened MagMatter (its grey pattern keeps its
-    mean brightness). MagMatter also uses `pattern_weight = 1.0` so the flow stays visible on the pig.
-  - MagMatter is the one material whose look *is* its grain, so its icon is not averaged 2x2 and blown up like the
-    others: `pattern_tile = 2` walks the 16x16 icon across the 32x32 pig 1:1 and mirrored (the second copy runs
-    backwards, so no seam shows). That roughly doubles the speckle density - mean neighbour difference 12.4 -> 22.3,
-    "edges" 27% -> 47% - while the face stays legible and the sprite is
-    about 5% darker from the sharper grain. Every other mode still uses tile 1 with smoothing and their PNGs are
-    byte identical to before the change.
-  - `pig.png` itself was recovered from the hero render `tmp/pig_hero.png`
-    (grid snapped, eyes to 2x2 and both nostrils to 1x2 blocks so the face is symmetric).
-  - `pigUniversiumFace.png` is the one icon that is not a material build: it is the plain pig's face (both
-    eyes, the snout, the nostrils - copied, not re-tinted) inside a feathered superellipse that the shader is
-    not allowed to paint over, and it is what keeps the Universium pig from being a faceless hole into space.
-    The patch is a superellipse rather than an ellipse because the eyes sit in the upper right and the snout in
-    the lower left of the face, i.e. in two opposite corners; its edge fades over 2 px with a smoothstep so the
-    skin dissolves into the stars. The patch covers every eye/nostril/snout pixel at full alpha, stays on the pig's
-    silhouette and is feathered, and the eyes stay readable against the face (see
-    `tmp/piggen/universium_face_preview.png`, a before/after composite with an approximated star field, since the
-    real shader needs the GPU).
-- Any other item can reuse the same look by calling `registerIcons` + `registerItemRenderer` and adding
-  its own `item.<unlocalized>.<effect>.name` and `messtech.itemEffect.<effect>` language entries.
-- The renderers are copies, so the same GL state leaks GT5U has are kept on purpose: the halo layer
-  leaves depth/alpha test disabled for the item pass, exactly like `InfinityRenderer` does.
+- `com.MessTech.common.items.MTItemPiggy` (`MTItems`, tab `tabMisc`): 7 damage variants, icons `pigs/pig` under
+  `textures/items`.
+- `com.MessTech.common.util.MTDynamicItemHelper`: one item, look (icon + renderer) from `ItemStack#getItemDamage()`, so
+  no renderer class per item.
+  - `Effect` enum, ordinal == damage value: `NONE` (plain pig), `TRANSCENDENT_METAL`, `INFINITY`, `MAGMATTER`,
+    `ETERNITY`, `UNIVERSIUM`, `SIX_PHASED_COPPER`; `NONE` = index 0, fallback for out-of-range damage (old worlds,
+    `/give` with a random meta).
+  - `registerIcons(register, basePath)` -> `<basePath><iconSuffix>` per effect (`pigs/pig` + `TranscendentMetal` =
+    `textures/items/pigs/pigTranscendentMetal.png`).
+  - **No `items/` in icon names**: `TextureMap` resolves `basePath/<name>.png`, `basePath` = `textures/items` (the
+    `textures/items-atlas` log line), so `items/pigs/pig` = `textures/items/items/pigs/pig.png`; same for
+    `textures/blocks`, cf. `MTFuelRod` (`messtech:FuelRod/...`). Wrong path: silent - 1.7.10 commented out the "using
+    missing texture" error (`TextureMap` line 189), only FML's `trackMissingTexture` is fed (checker board, empty log).
+    `registerIcons` therefore checks icons via `IResourceManager.getResource` (no `resourceExists` in 1.7.10) and logs.
+  - `registerItemRenderer(item)`: one shared `IItemRenderer`; `getEffect`/`setEffect`/`cycleEffect` server safe, icon +
+    renderer code `@SideOnly(Side.CLIENT)`.
+  - `Style` = drawing code, a copy of the matching GT5U renderer:
+    - `TUMBLE` (`TranscendentMetalRenderer`): tumbled about (0.3, 0.5, 0.2), 3.5 degrees per client tick, angle from
+      `GTMod.clientProxy().getAnimationRenderTicks()`.
+    - `HALO_PULSE` (`InfinityRenderer`): inventory only, as GT5U - `Textures.ItemIcons.HALO` behind the icon plus a
+      gaussian 60% alpha copy; Infinity/Eternity/MagMatter use it.
+    - `UNIVERSIUM` (`UniversiumRenderer`): icon, then gtnhlib's `UniversiumShader` star field
+      (`setRenderInInventory()` in the GUI, `GL_EQUAL` depth + `GL20.glUseProgram` restore outside); it writes its own
+      colour where the icon is opaque, keeping only its alpha
+      (`gl_FragColor = vec4(col * shade, mask.a * opacity)` in `universium.frag`) - a window into the sky, *everything*
+      the sprite draws behind the stars.
+    - `GLITCH` (`GlitchEffectRenderer`): red/cyan ghosts, 10 ms frames, glitching on frames 0-40 of every 200.
+  - `registerUniversiumOverlay(item, register, basePath)`: registers `<basePath>UniversiumFace`
+    (`pigs/pigUniversiumFace.png`), remembers it per item, `UNIVERSIUM` draws it third (after
+    `UniversiumShader.clear()`/`unbind()`) in front of the sky. *Untinted* art only (sky is dark); no overlay =
+    unchanged; client only at both ends, hence the client-only inner class.
+  - Overlay = **features only**: eyes, snout + nostrils, own ears, pixel for pixel from the plain sprite, rest
+    transparent so the stars paint the body (a skin patch reads as a sticker). Ears (pink crescent 3..5, 7..12; pink
+    ring 14..18, 11..15) too: the shader keeps only alpha, they would be swallowed.
+  - Eyes: the sky's `bgColor = (0.10, 0.225 +- 0.075, 0.30 +- 0.05)` is as bright as the near black eye (luma 0.17), so
+    a dark dot vanishes; 2x2 pupils kept, a pale rim (`#cfe4f2` at alpha 190) around each, readable over star or
+    background through the pulse.
+  - GT5U accessibility switches honoured: `Client.render.renderTransMetalFancy`, `renderInfinityFancy`,
+    `renderUniversiumFancy`, `renderGlitchFancy` -> plain icon.
+- Shift + right click cycles: damage value both sides, oink server side (heard once), chat line client side.
+- Right click throws without consuming - hence **one** per stack (pet and hat, not ammunition); projectile
+  `MTEntityPiggy`, effect in the thrown stack's damage value.
+- **Helmet slot**: `MTItemPiggy#isValidArmor` true for armor type `0`, the hook `ContainerPlayer.SlotArmor#isItemValid`
+  asks (`Item#isValidArmor`: 0 helmet, 1 chest, 2 legs, 3 boots - *not* `InventoryPlayer#armorItemInSlot`, helmet = 3);
+  without it only armour, pumpkins and skulls fit.
+- Worn: `common/entity/MTPiggyHatRenderer` (client only, `ClientProxy.preInit`). 1.7.10 has no plain head-item renderer
+  (`RenderPlayer#renderEquippedItems`: `ItemBlock` blocks and skulls only), so it hangs on
+  `RenderPlayerEvent.Specials.Post` (end of that method, **inside the player model**): `inventory.armorItemInSlot(3)` ->
+  `event.renderer.modelBipedMain.bipedHead.postRender(0.0625F)` (head pose included), 8 px up (half a block, head box
+  height), `SCALE / 0.9375` -> `SCALE = 0.5` blocks tall. Crouch, riding, death pose, the `0.125` sneak drop: free;
+  sleeping/dead/invisible skipped.
+- Space facts: `RendererLivingEntity#doRender` flips the model (`glScalef(-1, -1, 1)`) first: **`-Y` up, face along
+  `-Z`, one unit = a sixteenth of the model** (`postRender`'s `0.0625`); `RenderPlayer#preRenderCallback` scales
+  `0.9375`, divided back out (`SCALE` in blocks); `bipedHead` turns about the **neck**, head box growing 8 px up. With
+  the half block of `HEAD_HEIGHT` the feet land where pumpkin and skull are built around,
+  `(24 + 8) / 16 * 0.9375 + 0.9375 / 128 = 1.8823` blocks above the feet (one pixel lower crouching).
+- `MTDynamicItemHelper#renderOnHead(wearer, stack)`: `Item#getIcon(stack, 0)` on the origin of the hat matrix, facing
+  `-Z` (player in front sees the face); mirrored X and the turn into the facing direction cancel, so the texture is not
+  mirrored. Effect style on top:
+  - `TUMBLE`: 3.5 degrees per client tick from `getAnimationRenderTicks()` about `(0.3, -0.5, -0.2)` - the mirrored copy
+    of GT5U's `(0.3, 0.5, 0.2)`, model space having Y and Z flipped - about the sprite centre.
+  - `UNIVERSIUM` in three passes: sprite, cosmic shader over the same geometry at depth `GL_EQUAL` (stars on the sprite,
+    not the head), then `pigUniversiumFace` in front of the sky.
+  - `HALO_PULSE`/`GLITCH` stay plain (GT5U draws those in the inventory only; Infinity/MagMatter/Eternity strips animate
+    themselves); fancy switches apply (`isFancyEnabled`).
+  - Helper binds the items atlas, culling off for the single quad, `GL_ENABLE_BIT` pushed/popped.
+- **A Transcendent Metal pig tumbles the wearer.** `MTPiggyHatRenderer` also watches `RenderPlayerEvent.Pre`/`Post`
+  (wrapping `RenderPlayer#doRender`), turning the model by the same `MTDynamicItemHelper#tumbleAngle()` about
+  `(0.3, 0.5, 0.2)`. Pivot = body middle: at `Pre` the matrix is the camera's, so the origin is the interpolated entity
+  position (`lastTickPos + (pos - lastTickPos) * partialTicks` minus `RenderManager.renderPosX/Y/Z`, minus
+  `Entity.yOffset` as `RenderPlayer#doRender` drops it), lifted by `TUMBLE_PIVOT_Y = 0.9` (half of 1.8 blocks).
+  - Push/pop are a pair: `Pre` is `@Cancelable`, `Post` only posted for an uncancelled `Pre`; `Pre` at
+    `EventPriority.LOWEST` (all handlers done, a cancel visible), `onRenderWorldLast` pops a leftover push at the end of
+    the world render - no leak.
+  - The pig keeps its own tumble, so the two compose; pinning it to the head would mean dropping the transform in
+    `MTDynamicItemHelper#renderOnHead`. Client-side switch `Config.PIGGY_TUMBLES_WEARER` (on).
+- Textures `assets/messtech/textures/items/pigs/pig*.png` from the GT5U material icons
+  (`assets/gregtech/textures/items/materialicons/...`): in-painted to full coverage, tinted with the material colour,
+  multiplied by the pig's shading plus a fake top/bottom bevel.
+  - Frames: `pigInfinity` 18, `pigMagMatter` 8, `pigEternity` 20, `.mcmeta` `{"animation":{"frametime":1}}`; `pig`,
+    `pigTranscendentMetal`, `pigUniversium`, `pigSixPhasedCopper` single (animated atlas sprites work in 1.7.10).
+  - Pattern normalised over the whole strip, never per frame: per frame cancels motion (it flattened MagMatter, grey
+    pattern keeping its mean brightness); MagMatter `pattern_weight = 1.0`.
+  - MagMatter (look = grain): `pattern_tile = 2` walks the 16x16 icon across the 32x32 pig 1:1 and mirrored (second copy
+    backwards, no seam) - speckle density up (mean neighbour difference 12.4 -> 22.3, "edges" 27% -> 47%), face legible,
+    about 5% darker; others keep tile 1 with smoothing, PNGs byte identical.
+  - `pig.png` from the hero render `tmp/pig_hero.png` (eyes 2x2, nostrils 1x2, symmetric); `pigUniversiumFace.png` is
+    the plain pig's face (eyes, snout, nostrils) in a feathered superellipse the shader cannot paint over, so the pig is
+    not a hole into space: eyes upper right, snout lower left, 2 px smoothstep fade, full alpha there
+    (`tmp/piggen/universium_face_preview.png`; GPU needed for the real shader).
+- Other items reuse the look via `registerIcons` + `registerItemRenderer` plus `item.<unlocalized>.<effect>.name` and
+  `messtech.itemEffect.<effect>` lang entries.
+- Renderers are copies, so GT5U's GL state leaks are kept on purpose (halo layer leaves depth/alpha test disabled for the
+  item pass, like `InfinityRenderer`).
 
 ### The thrown piggy
 
-- `com.MessTech.common.entity.MTEntityPiggy`: a plain `EntityThrowable`. `CommonProxy.preInit` registers it
-  (`MTEntityPiggy.register()`, entity id 0, tracking 64 / update 10, velocity updates on) and
-  `ClientProxy.preInit` gives it `com.MessTech.common.entity.MTRenderPiggy`.
-  - `EntityRegistry.registerModEntity` wants the mod object itself, which is what `MessTech.instance` is for.
-  - Plain right click throws one (one item is consumed, not in creative mode), shift + right click still
-    cycles the look. The effect (the damage value) travels in data watcher id 20 and in NBT (`Effect`), so the
-    projectile on the client draws exactly the icon that was held.
-  - Impact is vanilla style: the server flags `setEntityState(this, 3)` and every client spawns the heart puff
-    and the oink itself. The renderer draws the effect icon as a billboard
-    (`TextureMap.locationItemsTexture`, so animated effects animate on their own), scaled to 0.6 and spinning
-    24 degrees per tick around the view axis.
-- `MTKillBase` (`common/util`) is the "true kill" ladder behind it - shared, because every kind of protection gives
-  up somewhere else, and split into one branch per weapon: `MTPiggyKill` for the piggy, `MTBowKill` for the Voidstar
-  Piercer. A branch says only two things: how its kills read (the death message key and the "could not kill" line,
-  handed to the base constructor) and whom it refuses (`accepts`, overridden only by the bow). The ladder itself is
-  branch-less and `kill()` is `final`; each branch is a singleton (`MTPiggyKill.INSTANCE.kill(...)`).
-  `MessTech.MT_LOG.debug("[Piggy] true kill of ... needed step N")` reports which step did the kill, with the
-  branch name in the brackets ("Piggy", "Bow"), so a test can be traced in the log.
-  1. `attackEntityFrom` with exactly `Float.MAX_VALUE`, damage type `"infinity"`, `setDamageIsAbsolute()` and
-     **neither** armour piercing **nor** creative mode. Set based immunity cancels its hurt/attack/death events
-     for every damage type *except* that one, and the shielded armour sets escalate on exactly that amount by
-     re-attacking with their own internal `ADMIN_KILL` source (which their own death handler skips) — that is how
-     those mods keep `/kill` and their own weapons working. Keeping this source plain is essential: with
-     `setDamageBypassesArmor()` or `setDamageAllowedInCreativeMode()` their damage adjuster doubles the amount
-     instead of escalating, and the escalation never happens. It is also deliberately *indirect*: an indirect
-     source has no player as its attacker, so an Infinity Sword in the thrower's hand cannot turn the amount into
-     a fixed 300 instead of an escalation. The cost of that choice is that the game credits the piggy, not the
-     player, so a mob killed by it counts as "not hit by a player" and drops no loot. Do not "fix" the argument
-     order of `EntityDamageSourceIndirect` without checking that trade off again.
-  2. The same, but with `setDamageBypassesArmor().setDamageAllowedInCreativeMode()`: catches creative mode
+- `com.MessTech.common.entity.MTEntityPiggy`, a plain `EntityThrowable`: `CommonProxy.preInit` registers it
+  (`MTEntityPiggy.register()`, entity id 0, tracking 64 / update 10, velocity updates on), `ClientProxy.preInit` gives it
+  `com.MessTech.common.entity.MTRenderPiggy`; `EntityRegistry.registerModEntity` needs the mod object, hence
+  `MessTech.instance`.
+- Plain right click throws one (one item consumed, not creative), shift + right click cycles the look; effect (damage
+  value) in data watcher id 20 and NBT (`Effect`), so the client projectile draws the held icon.
+- Impact vanilla style: server `setEntityState(this, 3)`, every client spawns heart puff and oink; the renderer draws the
+  effect icon as a billboard (`TextureMap.locationItemsTexture`, so animated effects animate), scaled to 0.6, spinning 24
+  degrees per tick around the view axis.
+- `MTKillBase` (`common/util`): the shared "true kill" ladder (every protection gives up elsewhere), one branch per weapon
+  (`MTPiggyKill` piggy, `MTBowKill` Voidstar Piercer). A branch says only how its kills read (death message key, "could
+  not kill" line, into the base constructor) and whom it refuses (`accepts`, bow only); the ladder is branch-less,
+  `kill()` `final`, each branch a singleton (`MTPiggyKill.INSTANCE.kill(...)`).
+  `MessTech.MT_LOG.debug("[Piggy] true kill of ... needed step N")` names the step and branch ("Piggy", "Bow").
+  1. `attackEntityFrom` with exactly `Float.MAX_VALUE`, type `"infinity"`, `setDamageIsAbsolute()`, **neither** armour
+     piercing **nor** creative mode: set based immunity skips every other type, and shielded armour sets escalate on
+     exactly that amount through their internal `ADMIN_KILL` source (their death handler skips it) - how those mods keep
+     `/kill`. Plain matters: the bypass/creative flags make their adjuster double it instead, and *indirect* keeps an
+     Infinity Sword in the thrower's hand from fixing it at 300 - cost: the piggy's credit, no loot. Do not "fix" the
+     `EntityDamageSourceIndirect` argument order.
+  2. Same with `setDamageBypassesArmor().setDamageAllowedInCreativeMode()`: creative mode
      (`EntityPlayer.attackEntityFrom` needs `canHarmInCreative()`, MC source line 1110) and source filters.
-  3. The same, but marked with `setFireDamage()`, repeated `FIRE_ATTEMPTS` (6) times, each time as a hit and, if
-     that is refused, as a forced death. Some death gates only open for one specific kind of hit: Witchery's
-     vampire (`CreatureUtil.checkForVampireDeath`) dies to fire, sunlight, the void and a wall, and refuses every
-     sword, and `ItemVampireClothes.isFlameProtectionActive` *rolls* for a vampire wearing its clothes (one in
-     four) instead of deciding it. This is also exactly how Avaritia's infinity sword finishes a vampire
-     (`setHealth(0)` + `onDeath(new EntityDamageSource("infinity", player).setFireDamage())`,
-     `ItemSwordInfinity.hitEntity`). The hit comes first because it keeps the vanilla path (hurt animation,
-     knockback, `recentlyHit` bookkeeping) complete; the forced death behind it is what reaches a target whose
-     health a refused death already left at zero, because `attackEntityFrom` returns immediately at that point.
-  4. `setHealth(0)` + `onDeath(source)` by hand, i.e. without calling `attackEntityFrom` at all. An entity level
-     invulnerability flag, damage caps and custom `attackEntityFrom` overrides cannot intercept this; it is the
-     same call GT5U uses in `EIGSeedBucket` for forced kills.
-  5. For players that are still alive: everything they carry is taken away (armour + the whole main inventory +
-     the optional bauble inventory, looked up reflectively so no extra dependency is needed) and the player is
-     hit again. That is what removes set based immunity (the set is no longer complete) and item based "second
-     life" protection (the item is no longer in the inventory). Slots are cleared directly and the stacks are
-     spawned as `EntityItem`s with a 40 tick pickup delay, because an item tossed with the vanilla helper can be
-     handed straight back to its owner by its own handler; going through the bauble inventory (instead of the
-     array behind it) also makes the removed item run its own "on unequipped" hook.
-  6. Players again: three more death events, which is what counts down single use protection.
-  7. Everything else: `setDead()` + `World#removeEntity`. Multi part bosses are resolved through
-     `EntityDragonPart#entityDragonObj` first, so the boss is killed and not the part.
-  - **The thrower is not exempt in this branch.** Throwing the piggy straight up and letting it land on your own head kills you,
-    which is the whole point of the item; previously the ladder returned early for `target == thrower`. Vanilla's
-    `EntityThrowable` already keeps the thrower safe for the first five ticks in air (`entity1 != getThrower() ||
-    ticksInAir >= 5`, MC `EntityThrowable.onUpdate` line 196), so a piggy thrown at your feet still does not blow
-    up in your face.
-  - **A death counts only when the death path of the target ran.** `MTKillBase.init()` (called from
-    `CommonProxy.preInit`) subscribes to `LivingDeathEvent` at `EventPriority.LOWEST` with
-    `receiveCanceled = true`, i.e. it sees the final cancel state of the whole handler chain, and records the
-    entity when the event was *not* cancelled. A canceled post *removes* the record again: the death of a player
-    posts the event more than once (`EntityPlayerMP.onDeath` -> `EntityPlayer.onDeath` ->
-    `EntityLivingBase.onDeath`, only the innermost one decides), and a death gate that rolls per post — the flame
-    protection of the vampire clothes does — could otherwise leave a "half dead" record behind and the ladder would
-    stop on a player still standing at zero health. The ladder stops on that record, not on the health:
-    `EntityLivingBase.onDeath` can be refused (Witchery cancels the death of a vampire player unless
-    `CreatureUtil.checkForVampireDeath` agrees) and a death gate can leave a walking entity at zero health
-    (Witchery's `EntityVampire` even puts its own health back to `1.0F` and returns). Checking the health instead
-    was the reported bug: the first step "succeeded" on a vampire that was still walking. The record is only
-    trusted while the health of the entity still agrees with it, so a respawned player or a revived mob is a
-    target again instead of being skipped forever, and a dying entity is not killed twice (which would run drops
-    and the death event twice). A target that survives the whole ladder is put back to `1.0F` when a refused death
-    left it at zero, so a failed kill does not leave a walking corpse behind.
-  - **NaN is repaired after every step.** `Float.MAX_VALUE` overflows to infinity in
-    `EntityLivingBase.applyArmorCalculations` (MC source line 1192: `damage * (25 - armour)`), and of the two
-    absorption bookkeeping values of `damageEntity` (lines 1266-1274) the first is
-    `absorption - (infinity - infinity)`, i.e. NaN. From there `Math.max(NaN, 0)` is NaN, so the *next* hit turns
-    `health - NaN` into a NaN health, and `MathHelper.clamp_float` passes that NaN straight through. The entity
-    then is unkillable for good: `health <= 0` is false for NaN, so not even a normal death check of the game ever
-    fires again, and the health bar just looks empty. `MTKillBase.repair` therefore drops a NaN (or infinite)
-    absorption to zero and a NaN health to zero after every hit, after every forced death and before the removal
-    step - this is the exact "0 health, `HealF` NaN" state of the report.
-  - If every step fails the thrower gets `messtech.piggy.kill.failed` in chat instead of a silent no-op, and the
-    target is healed back to `1.0F` if the ladder left it at zero.
-  - **The kill is announced by the piggy.** The damage *type* cannot change (see step 1: the armour sets let exactly
-    `infinity` through), and the game derives the death message from exactly that type —
-    `DamageSource#func_151519_b` builds the key `death.attack.<type>`. As it is, the piggy would be announced with
-    `death.attack.infinity`, the key Avaritia's `DamageSourceInfinitySword` uses for its own sword: translating that
-    key in the language files of the mod would relabel every infinity sword kill as a piggy kill. The source therefore
-    replaces the *message* instead of the type: the nested `TrueKillDamageSource` of `MTKillBase` overrides `func_151519_b` with a key of
-    its own (`death.attack.messtech.piggy`) — the same trick Avaritia uses for its sword. The victim is handed over as
-    `%1$s` and the piggy as `%2$s`; the mod ships `%1$s被猪猪创飞了` (zh_CN) and
-    `%1$s was knocked flying by a Piggy` (en_US). A death message is a `ChatComponentTranslation` that travels to the
-    clients and is translated *there* (`EntityPlayerMP.onDeath` -> `ServerConfigurationManager#sendChatMsg`), so each
-    player reads it in the language of their own client, and a client that has no translation for the key would read
-    the raw key — which is why both language files carry it.
-  - **A forced death leaves the piggy as the cause of the death.** `forceDeath` runs `setHealth(0)` + `onDeath` without
-    going through `EntityLivingBase.damageEntity`, and that method is what fills the combat tracker the death message
-    is built from (`CombatTracker#func_151521_b` uses the *last* tracked hit). `forceDeath` therefore writes the piggy
-    into the tracker by hand (`func_94547_a`) before it runs the death. Without that, the targets that only die there —
-    the ones whose hit never reaches the damage pipeline — would be announced with the last hit somebody else landed on
-    them, or with the generic `death.attack.generic`.
-  - `tmp/mtkill` is the harness for all of this: it compiles the shipped ladder against mirrors of the
-    vanilla damage pipeline (`build/rfg/minecraft-src`) and of the two Witchery halves (`EntityVampire.onDeath` +
-    `GenericEvents.onLivingDeath`), and asserts the reported bugs (NaN absorption/health, the unkillable vampire,
-    the self hit) as well as the old steps. The mirrors include the chat side
-    (`ChatComponentTranslation`, `StatCollector`, `CombatTracker`, `DamageSource#func_151519_b`), so the death message
-    is asserted end to end against the real `.lang` files of the mod: its key, its two arguments, the reported Chinese
-    sentence, the English one, the fallback of an untranslated key and the fact that `death.attack.infinity` stays
-    untranslated.
-    **It has not been ported to the branches yet**: it still names `MTTrueKill` and calls the ladder statically, and
-    that class no longer exists (`MTKillBase` is abstract now, and the calls are `MTPiggyKill.INSTANCE.kill(...)` /
-    `MTBowKill.INSTANCE.kill(...)`). `tools/**` is only touched on request, so it is left exactly as it was; porting
-    it means renaming the type and routing the calls through the piggy branch. Its command was
+  3. Same plus `setFireDamage()`, `FIRE_ATTEMPTS` (6) times, each as a hit and, if refused, a forced death. Some gates
+     open for one kind of hit: Witchery's vampire (`CreatureUtil.checkForVampireDeath`) dies to fire, sunlight, the void,
+     a wall, refuses every sword, and `ItemVampireClothes.isFlameProtectionActive` *rolls* (one in four); Avaritia's
+     infinity sword lands it the same way (`setHealth(0)` +
+     `onDeath(new EntityDamageSource("infinity", player).setFireDamage())`, `ItemSwordInfinity.hitEntity`). Hit first
+     keeps the vanilla path (hurt animation, knockback, `recentlyHit`); the forced death reaches a target already at zero
+     health, where `attackEntityFrom` returns at once.
+  4. `setHealth(0)` + `onDeath(source)` by hand, no `attackEntityFrom`: entity level invulnerability, damage caps and
+     custom overrides cannot intercept it; same call GT5U uses in `EIGSeedBucket`.
+  5. Alive players: everything carried is taken (armour + main inventory + optional bauble inventory, looked up
+     reflectively) and the player hit again - set based immunity gone (set incomplete), item based "second life" gone.
+     Slots cleared directly, stacks spawned as `EntityItem`s with a 40 tick pickup delay (a vanilla toss can be handed
+     back by the item's own handler); through the bauble inventory its "on unequipped" hook also runs.
+  6. Players: three more death events, counting down single use protection.
+  7. Everything else: `setDead()` + `World#removeEntity` after resolving `EntityDragonPart#entityDragonObj` - the boss,
+     not the part.
+  - **The thrower is not exempt** (`target == thrower` used to return early): a piggy thrown straight up that lands on
+    you kills you - the point of the item. Vanilla `EntityThrowable` shields the thrower five ticks in air
+    (`entity1 != getThrower() || ticksInAir >= 5`, MC `EntityThrowable.onUpdate` line 196), so one at your feet is safe.
+  - **A death counts only when the death path ran.** `MTKillBase.init()` (from `CommonProxy.preInit`) subscribes to
+    `LivingDeathEvent` at `EventPriority.LOWEST` with `receiveCanceled = true` (final cancel state) and records only
+    uncancelled deaths; a canceled post *removes* the record. Player death posts several times (`EntityPlayerMP.onDeath`
+    -> `EntityPlayer.onDeath` -> `EntityLivingBase.onDeath`, innermost decides) and a per-post roll (vampire flame
+    protection) would leave a "half dead" record - so record, not health: `EntityLivingBase.onDeath` can be refused
+    (Witchery, unless `CreatureUtil.checkForVampireDeath` agrees) and a gate can leave a walking entity at zero health
+    (`EntityVampire` restores `1.0F` and returns), which made step 1 "succeed" on a walking vampire. Trusted only while
+    health agrees, so a respawned player or revived mob is a target again and nothing is killed twice.
+  - **NaN repaired after every step.** `Float.MAX_VALUE` overflows to infinity in
+    `EntityLivingBase.applyArmorCalculations` (MC source line 1192: `damage * (25 - armour)`), and of the two absorption
+    values of `damageEntity` (lines 1266-1274) the first is `absorption - (infinity - infinity)` = NaN; `Math.max(NaN, 0)`
+    is NaN, so the next hit makes `health - NaN` a NaN health which `MathHelper.clamp_float` passes through - then
+    `health <= 0` is false forever, no death check fires, the bar just looks empty. `MTKillBase.repair` drops NaN (or
+    infinite) absorption and NaN health to zero after every hit, every forced death and before removal (the reported
+    "0 health, `HealF` NaN"). If every step fails: `messtech.piggy.kill.failed` in chat.
+  - **The piggy announces the kill.** The damage *type* cannot change (step 1: only `infinity` passes the armour sets)
+    and `DamageSource#func_151519_b` builds `death.attack.<type>`, so the piggy would read as `death.attack.infinity` -
+    the key Avaritia's `DamageSourceInfinitySword` uses - and translating it would relabel every infinity sword kill.
+    The *message* is replaced instead: the nested `TrueKillDamageSource` of `MTKillBase` overrides `func_151519_b` with
+    `death.attack.messtech.piggy`. Victim `%1$s`, piggy `%2$s`; shipped `%1$s被猪猪创飞了` (zh_CN) and
+    `%1$s was knocked flying by a Piggy` (en_US). A `ChatComponentTranslation` is translated on the *clients*
+    (`EntityPlayerMP.onDeath` -> `ServerConfigurationManager#sendChatMsg`), so a client without the key reads the raw
+    key - hence both `.lang` files.
+  - **A forced death leaves the piggy the cause.** `forceDeath` runs `setHealth(0)` + `onDeath` without
+    `EntityLivingBase.damageEntity`, which fills the combat tracker (`CombatTracker#func_151521_b` uses the *last* hit),
+    so it writes the piggy in by hand (`func_94547_a`) first; otherwise targets that only die there are announced with
+    somebody else's hit or `death.attack.generic`.
+  - `tmp/mtkill` harness: the shipped ladder against mirrors of `build/rfg/minecraft-src` and the Witchery halves
+    (`EntityVampire.onDeath` + `GenericEvents.onLivingDeath`), asserting those bugs and the old steps, chat side too
+    (`ChatComponentTranslation`, `StatCollector`, `CombatTracker`). Stale and not ported: still names `MTTrueKill` and
+    calls the ladder statically (`MTPiggyKill.INSTANCE.kill(...)` / `MTBowKill.INSTANCE.kill(...)`), `tools/**` on
+    request. Command:
     `javac -d tmp/mtkill/out -sourcepath tmp/mtkill/stubs src/main/java/com/MessTech/common/util/MTTrueKill.java tmp/mtkill/*.java`
-    followed by `java -cp tmp/mtkill/out MTKillHarness`.
+    then `java -cp tmp/mtkill/out MTKillHarness`.
 
 ## The "PigTech" text animation (`MTPigTechText` / `MTPigTech`)
 
-- `MTPigTechText` (`common/util`) renders the animation of a string, `MTPigTech` puts it on an item tooltip, and
+- `MTPigTechText` (`common/util`) renders the animation of a string, `MTPigTech` puts it on an item tooltip;
   `ClientProxy.preInit` calls `MTPigTech.pigRegisterOn(new ItemStack(MTItems.piggy, 1, OreDictionary.WILDCARD_VALUE))`,
-  where the wildcard damage covers all seven piggy variants.
-- The line reads exactly like MessTech's: a static "Add by:" prefix (`messTech.addBy`, the same lang key
-  `AuthorDynamic` uses) and then the animated name. `MTPigTechText.frame(prefix, text, millis)` copies the prefix into
-  every frame verbatim - it is byte for byte identical for the whole loop and never animates - and puts
-  `PREFIX_SEPARATOR` (one space) in front of the animated band. The word comes from the lang key `messtech.pigTech`, so
-  changing the translation changes what is animated.
-- `pigRegisterOn` is the "PigRegisterOn" entry point and adds **only** that line: unlike `AuthorDynamic.registerOn`
-  there is no author line.
-- Mechanism: gtnhlib's `AnimatedTooltipHandler` keeps one `Supplier<String>` per `ItemStack` and re-evaluates it once
-  per frame, and the whole animation *is* the string the supplier returns - there is no renderer and no per frame
-  state.
-- What a tooltip line can and cannot do (this is why the animation looks the way it does):
-  - A tooltip line is drawn glyph by glyph at a fixed height, so text cannot move up or down and glyphs cannot be
-    scaled. **Spaces are the only size control the medium has**: the gaps between the letters open (stretch) and
-    close (squash), and the whole word travels sideways by up to one space (charge).
-  - Every line keeps the same glyphs and the same number of spaces in every frame, so the rendered width never
-    changes: the tooltip box cannot pump and the word can never leave its own frame. The band is `letters - 1 + 2`
-    spaces wide and keeps `MIN_MARGIN` (one space) of margin on each side in *every* frame, so the gap after the
-    prefix is never smaller than two spaces (~8 px), however hard the pig squashes. The empty room to the right of the
-    word at rest is that reservation: it is what the stretch and the charge expand into.
-  - `§l` (impacts) and `§o` (leaning into the charge) do not change the advance either. In Minecraft a **colour code
-    clears bold and italic**, so the style codes are emitted after each letter's colour code.
-  - The line is a **single line**: there is no ground bar and no second tooltip line under the word any more. A jump
-    cannot be drawn without a vertical axis, so take off and landing are told by the squash and stretch, the ear twitch
-    and the impact flash instead. The ears are `^` (top row of the font) and the snout puffs are `.` (bottom row).
-  - Only ASCII glyphs are used: `ascii.png` is a CP437 layout, so e.g. `°` would render as a shade block, while
-    `^ .` look the same in both built-in fonts.
-  - Everything that has to appear and disappear keeps its slot in the string and is painted `§0`: black is invisible
-    on the dark tooltip background, and the width stays constant.
+  the wildcard damage covering all seven variants.
+- Reads like MessTech's: static "Add by:" prefix (`messTech.addBy`, the lang key `AuthorDynamic` uses) then the animated
+  name. `MTPigTechText.frame(prefix, text, millis)` copies the prefix into every frame verbatim (byte for byte
+  identical, never animates) and puts `PREFIX_SEPARATOR` (one space) in front of the animated band; the word comes from
+  `messtech.pigTech`, so the translation changes what is animated. `pigRegisterOn` is the "PigRegisterOn" entry point and
+  adds **only** that line - unlike `AuthorDynamic.registerOn`, no author line.
+- Mechanism: gtnhlib's `AnimatedTooltipHandler` keeps one `Supplier<String>` per `ItemStack`, re-evaluated once per
+  frame; the animation *is* the returned string - no renderer, no per frame state.
+- A tooltip line, and why it looks like this:
+  - Glyph by glyph at fixed height: no vertical motion, no glyph scaling. **Spaces are the only size control** - letter
+    gaps open (stretch) and close (squash), the word travels sideways one space (charge).
+  - Same glyphs and space count in every frame, so the width never changes: box cannot pump, word cannot leave its frame.
+    Band `letters - 1 + 2` spaces wide, `MIN_MARGIN` (one space) each side in *every* frame, so the gap after the prefix
+    stays over two spaces (~8 px); the empty room right of the word is that reservation, which stretch and charge fill.
+  - `§l` (impacts) and `§o` (leaning into the charge) do not change the advance; a **colour code clears bold and
+    italic**, so style codes come after each letter's colour code.
+  - **Single line**: no ground bar, no second tooltip line. A jump needs a vertical axis, so take off and landing are
+    told by squash and stretch, the ear twitch and the impact flash - ears `^` (top font row), snout puffs `.` (bottom
+    row).
+  - ASCII glyphs only: `ascii.png` is CP437, so `°` would render as a shade block, while `^ .` look the same in both
+    built-in fonts.
+  - Anything that must appear and disappear keeps its slot and is painted `§0` (invisible on the dark background,
+    constant width).
 - Timeline (2 s, seamless): wind up 0.00-0.40 (two side swings, an impatient shiver, then loaded), charge and impact
   0.40-0.70 (lunge and stretch, the two snout puffs, then jam shut with a white flash on the wall), recoil and jump
-  0.70-1.10 (spring back, ear twitches), landing 1.10-1.40 (squash, two bounces, white flash) and settle 1.40-2.00
-  (one slow breath). The last frame is exactly frame 0, so the loop never jumps. Every beat is a `curve(...)` or
-  `pulse(...)` keyframe, so the timing can be retuned in one place.
-- The colour band steps every 100 ms through a four entry pink/white/gold/white palette. 2000 / 100 = 20 steps and the
-  palette divides 20, so the colours also line up when the loop restarts.
-- `MTPigTechText` deliberately has no Minecraft imports: `tmp/pigtext/PigTechFrames.java` compiles it on its own with
-  `javac` and checks the single line, the static prefix, the loop, the constant layout, the reserved margins, the
-  travel limit and every phase against the real strings (22866 checks, no game needed).
+  0.70-1.10 (spring back, ear twitches), landing 1.10-1.40 (squash, two bounces, white flash), settle 1.40-2.00 (one slow
+  breath). Last frame is exactly frame 0, so the loop never jumps; every beat is a `curve(...)` or `pulse(...)` keyframe,
+  so timing is retuned in one place.
+- Colour band steps every 100 ms through a four entry pink/white/gold/white palette; 2000 / 100 = 20 steps, which the
+  palette divides, so colours line up when the loop restarts.
+- `MTPigTechText` deliberately has no Minecraft imports: `tmp/pigtext/PigTechFrames.java` compiles it with `javac` and
+  checks single line, static prefix, loop, constant layout, reserved margins, travel limit and every phase against the
+  real strings (22866 checks, no game needed).
 
 ### The "ModuleProject" tooltip animation (`MTModuleProjectText` / `MTModuleProjectTextRenderer`)
 
-- The modular machine look: the word is read as a rack of modules of `MODULE_SIZE` (3) characters
-  ("Mod|ula|rPr|ojc|et"). One 1.6 s loop powers it up - the scan walks the rack module by module (`POWER_UP_MS` 900 ms), the rack flashes
-  white twice at full load (`FLASH_MS` 250 ms), is held (`HOLD_MS` 150 ms) and then goes dark again, left to right
-  (`POWER_DOWN_MS` 300 ms). A dark module is `§8§l`, a loaded one `§3§l` with a data flicker up to `§b§l`, the module
-  under the scan is `§b§l` and the flash is `§f§l`; bold and colour codes never move the advance, so the line width
-  is constant.
-- Nothing is stored: `lit(millis)` (the fraction of the rack that is powered), `head(millis, modules)` (the module
-  being loaded, -1 while the scan is parked) and `flashing(millis)` are pure functions of the clock, which is what
-  lets the renderer compute the exact phase of the frame the tooltip was drawn with - the chips and the letters can
-  never drift apart.
-- `MTModuleProjectTextRenderer` (client only, the renderer is registered in `MTAnimatedTooltipHandler#init`) draws the
-  hardware around the letters, it does not replace them (`replacesText()` stays false): a chip row two pixels below
-  the glyphs, one chip per module, lit in step with the letters with a brighter packet on the module being loaded; a
-  scan line with a trailing tail above it; and a bracket at either end of the word. `Gui#drawRect` is protected, so
-  the rects go through a small `Gui` subclass, the same trick `MTAnimatedTooltipHandler`'s tooltip box uses.
-- Only the word is decorated: the line is `添加模组: <word>`, so the renderer measures the translated
-  `messTech.addBy` prefix plus `MTPigTechText.PREFIX_SEPARATOR` with the font and starts its chips at the first glyph
-  of the word. A line without that prefix is decorated whole.
-- **Every width comes from the font, never from a hand sum of `getCharWidth`.** A bold character advances one pixel
-  further than its glyph width (`FontRenderer#renderStringAtPos` adds the bold copy to the advance, `++f`, and
-  `#getStringWidth` does the same with `if (flag && k > 0) ++i`), and the animation draws *every* character bold, so
-  a hand summed word comes out one pixel per character short - on a 13 character word the right bracket landed two
-  glyphs inside it, exactly at the `e` of `Project`, which is how this was found. `moduleEdges` therefore measures
-  drawn substrings (formatting codes included, which is what makes the font count the bold advance) and `rawIndex`
-  maps a visible index onto the drawn line, so the chips and the brackets share the glyphs' own geometry.
-- It is the brand line of `MTHugeChemicalReactor`, registered with
-  `AuthorDynamic.registerAddon(MODULE_PROJECT, ...)` - the add-on line with no author line - and the word comes from
-  the lang key `messtech.moduleProject`, so a resource pack can rename it.
+- The modular machine look: the word is a rack of modules of `MODULE_SIZE` (3) characters ("Mod|ula|rPr|ojc|et"). One
+  1.6 s loop powers it up - the scan walks the rack module by module (`POWER_UP_MS` 900 ms), the rack flashes white twice
+  at full load (`FLASH_MS` 250 ms), is held (`HOLD_MS` 150 ms), then goes dark left to right (`POWER_DOWN_MS` 300 ms).
+  Dark module `§8§l`, loaded `§3§l` with a data flicker up to `§b§l`, module under the scan `§b§l`, flash `§f§l`; bold
+  and colour codes never move the advance, so the width is constant.
+- Nothing is stored: `lit(millis)` (fraction powered), `head(millis, modules)` (module being loaded, -1 while parked) and
+  `flashing(millis)` are pure functions of the clock, so the renderer computes the exact phase of the frame the tooltip
+  was drawn with - chips and letters cannot drift apart.
+- `MTModuleProjectTextRenderer` (client only, registered in `MTAnimatedTooltipHandler#init`) draws the hardware around the
+  letters, it does not replace them (`replacesText()` stays false): a chip row two pixels below the glyphs, one chip per
+  module, lit with the letters and a brighter packet on the loading module; a scan line with a trailing tail; a bracket at
+  either end of the word. `Gui#drawRect` is protected, so the rects go through a small `Gui` subclass, the trick
+  `MTAnimatedTooltipHandler`'s box uses.
+- Only the word is decorated: the line is `添加模组: <word>`, so the renderer measures the translated `messTech.addBy`
+  plus `MTPigTechText.PREFIX_SEPARATOR` and starts its chips at the first glyph of the word; a line without the prefix is
+  decorated whole.
+- **Every width comes from the font, never a hand sum of `getCharWidth`.** A bold character advances one pixel further
+  than its glyph width (`FontRenderer#renderStringAtPos` adds the bold copy, `++f`; `#getStringWidth` the same with
+  `if (flag && k > 0) ++i`) and the animation draws *every* character bold, so a hand summed word is one pixel per
+  character short - on a 13 character word the right bracket landed two glyphs inside it, at the `e` of `Project`.
+  `moduleEdges` therefore measures drawn substrings (formatting codes included, which makes the font count the bold
+  advance) and `rawIndex` maps a visible index onto the drawn line, so chips and brackets share the glyphs' geometry.
+- Brand line of `MTHugeChemicalReactor`, registered with `AuthorDynamic.registerAddon(MODULE_PROJECT, ...)` (the add-on
+  line, no author line); the word comes from `messtech.moduleProject`, so a resource pack can rename it.
 
 ## Animated tooltips with a renderer (`MTAnimatedTooltipHandler` / `MTTextAnimation`)
 
-- gtnhlib's `AnimatedTooltipHandler` can only add **strings** to a tooltip: its registry is
-  `ItemStack -> Supplier<String>` and the animation *is* the string. An effect that has to touch the letters
-  themselves - rotate them, darken them, blend them - has nowhere to run there, so MessTech has its own
-  `MTAnimatedTooltipHandler` (`common/util`). It keeps the same registration shape (`addItemTooltip(stack, line)`,
-  re-evaluated once per frame, split on `'\n'`), remembers an animation per line, and is the handler
-  `AuthorDynamic` writes through. `MTPigTech` still uses gtnhlib's handler; both add their lines in
-  `ItemTooltipEvent`, so they coexist.
-- The split that makes this work on both sides: `MTTextAnimation` is the **common** half - it only answers "what
-  does the line look like this frame", so the machine loader can register animated lines while running on the
-  server too - and `MTTextRenderer` is the **client** half, the drawing. `registerRenderer(animation, renderer)`
-  pairs them client-side; `init()` (called from `ClientProxy.preInit`) registers the built-in pair and the event
-  handler. An animation without a renderer is a pure formatting animation, which is what `MTPigTechText` is.
-- **The client half must not live in the class's static initializer.** `SideTransformer`
-  (`cpw.mods.fml.common.asm.transformers.SideTransformer#transform`, the field loop at lines 53-65 and the method
-  loop at 66-78) deletes every `@SideOnly(Side.CLIENT)` **field and method** from the class on a dedicated server,
-  but it never touches `<clinit>`, which carries no annotation. A client-only field *with an initializer* keeps its
-  `putstatic` in the initializer of a class that common code loads, and the server then dies on the
-  POSTINITIALIZATION -> AVAILABLE transition with `NoSuchFieldError: RENDERERS` in
-  `MTAnimatedTooltipHandler.<clinit>`. That is why the renderer map and the tooltip box are built by
-  `renderers()` / `background()` on first use; the nested `Background` class would be loaded by `<clinit>`
-  as well and then rejected by the side check (`Attempted to load class ... for invalid side`). Client-only state
-  built lazily inside client-only methods is safe: the two entry points common code uses, `addItemTooltip` and
-  `addAnimatedText`, never touch it.
-- Drawing: when a tooltip of a stack with a *rendered* animation is about to be drawn, the handler takes the
-  tooltip over through gtnhlib's `RenderTooltipEvent#alternativeRenderer`, redraws the vanilla box (the nine
-  `drawGradientRect`s, then `font.drawStringWithShadow` per line) and calls the renderer of every line that wears
-  one. A renderer with `replacesText()` draws the line itself and the plain font copy is skipped for it, so an
-  effect can turn the letters instead of drawing a second copy over them; everything else stays a normal line.
-  The same event is posted by NEI (`RenderTooltipEventHelper`, NEI 2.7.8-GTNH and newer), so it works in the
-  inventory and in the NEI panels. A stack whose lines carry no renderer is left completely alone (the vanilla
-  tooltip is not touched), an already set `alternativeRenderer` is never fought over, and NEI's paging for
-  taller-than-screen tooltips is not reproduced (vanilla layout instead).
-- Which line gets which renderer is decided by **visible text**, not by index: NEI inserts its second display
-  name at index 1, so positions move. `MTTextAnimation.visibleText` strips the `§x` pairs and the entry whose
-  frame has the same visible text wins, which also makes the animation immune to whatever colour codes a supplier
-  such as `author_czqwq()` brings along.
-- `AuthorDynamic.register(animation, author, stack)` is the new entry point (arg order: animation, author text,
-  stack), with `register(animation, stack)` for the default name: it animates the *visible* text of the author
-  supplier with `animation.frame(...)` and adds the line - plus the usual animated "Add by: MessTech" line - to
-  the stack. `registerOn(...)` is unchanged behaviourally: it now goes through the same handler with no animation.
-- `TRANSCENDENT_METAL` is the built-in rendered animation, GT5U's Transcendent Metal look worn by a whole line:
-  - `MTTranscendentMetalText.frame` recolours every character with a dark grey / grey / white / grey band that
-    advances one character per 90 ms, so the letters read as polished metal before anything moves.
-  - `MTTranscendentMetalTextRenderer` **replaces** the line (`replacesText()`): it draws it itself, turned about
-    its own centre by GT5U's own transform, verbatim - `glRotatef(angle, 0.3, 0.5, 0.2)` with
-    `angle = getAnimationRenderTicks() * 3.5 % 360` - so the word turns exactly like a Transcendent Metal item
-    lying next to it. The turning copy is the only copy: a still line with a turning one over it shows both at
-    once. The metal itself is the frame's own band with the font's shadow, plus the same glyphs one pixel along
-    with additive blending, which is the glint of the turned plate.
-  - The turn is one way round, continuously: no folding, no bounce and no reset at a quarter turn. The plate is
-    edge-on (invisible) once per revolution, exactly like the item. The line swings with it - a long word tips
-    diagonally out of its own tooltip row at times, the way the item's quad leaves its slot - because the motion
-    is the item's and nothing is tamed down.
-  - `MTTranscendentMetalText.showsBack` drives the one thing a flat plate needs and an item quad gets from its
-    back face: while the plate faces away, the letters are mirrored back (`glScalef(-1, 1, 1)`) so they read the
-    same way round on both sides. With the oblique axis the z part of the plate normal is
-    `cos(a) + z^2 / (x^2 + y^2 + z^2) * (1 - cos(a))`, so the switch lands where that is zero - the edge-on pose,
-    where the plate has no visible area and the flip cannot be seen.
-- Verification: by the repository rule this is `gradlew compileJava`, and `tools/textanim` (the source+behaviour
-  harness of the first, folding version) is stale since that version was replaced - do not run it as is; refresh
-  it only if a check of the turning text is wanted again.
-- The bigger version of this idea, which this repo deliberately does not take: render the effect at the **font**
-  level - an inline marker in the string, a `FontRenderer` mixin that parses it, glyph masks and GLSL, with the
-  marker stripped again wherever the text is measured, wrapped or typed (chat, text fields, NEI search fields,
-  Angelica-style batched font renderers). That is what makes an effect show up in chat, item names and search
-  fields as well, but it needs a mixin into every font consumer, which is only worth it for effects that must
-  appear outside tooltips. This repo uses the smaller shape instead: an effect is a registered renderer, and the
-  animation data stays common while the drawing stays client-only.
-
+- gtnhlib's `AnimatedTooltipHandler` only adds **strings**: registry `ItemStack -> Supplier<String>`, the animation *is*
+  the string. An effect that has to touch the letters - rotate, darken, blend - has nowhere to run, so MessTech has its
+  own `MTAnimatedTooltipHandler` (`common/util`): same shape (`addItemTooltip(stack, line)`, once per frame, split on
+  `'\n'`), one animation per line, the handler `AuthorDynamic` writes through. `MTPigTech` keeps gtnhlib's handler; both
+  add lines in `ItemTooltipEvent`, so they coexist.
+- The split: `MTTextAnimation` is the **common** half ("what does the line look like this frame"), so the machine loader
+  registers animated lines on the server too; `MTTextRenderer` is the **client** half, the drawing.
+  `registerRenderer(animation, renderer)` pairs them client-side, `init()` (from `ClientProxy.preInit`) registers the
+  built-in pair and the event handler. An animation without a renderer is pure formatting, which is what `MTPigTechText`
+  is.
+- **The client half must not live in the static initializer.** `SideTransformer`
+  (`cpw.mods.fml.common.asm.transformers.SideTransformer#transform`, field loop 53-65, method loop 66-78) deletes every
+  `@SideOnly(Side.CLIENT)` **field and method** on a dedicated server but never `<clinit>` (no annotation): a client-only
+  field *with an initializer* keeps its `putstatic` in the initializer of a class common code loads, and the server dies
+  on the POSTINITIALIZATION -> AVAILABLE transition with `NoSuchFieldError: RENDERERS` in
+  `MTAnimatedTooltipHandler.<clinit>`. Hence `renderers()` / `background()` build map and box on first use; the nested
+  `Background` class would also be loaded by `<clinit>` and rejected by the side check
+  (`Attempted to load class ... for invalid side`). Lazy client-only state in client-only methods is safe: the two entry
+  points common code uses, `addItemTooltip` and `addAnimatedText`, never touch it.
+- Drawing: a stack with a *rendered* animation has its tooltip taken over via gtnhlib's
+  `RenderTooltipEvent#alternativeRenderer`; the vanilla box is redrawn (nine `drawGradientRect`s, then
+  `font.drawStringWithShadow` per line) and each line's renderer called. `replacesText()` means the renderer draws the line
+  itself and the font copy is skipped, so an effect can turn the letters instead of drawing over them. NEI posts the same
+  event (`RenderTooltipEventHelper`, NEI 2.7.8-GTNH and newer), so it works in the inventory and NEI panels. A stack
+  without a rendered line is left alone, an existing `alternativeRenderer` is never fought over, and NEI's paging for
+  taller-than-screen tooltips is not reproduced (vanilla layout).
+- Which renderer a line gets follows **visible text**, not index: NEI inserts its second display name at index 1, so
+  positions move. `MTTextAnimation.visibleText` strips the `§x` pairs and the entry with the same visible text wins -
+  also immune to colour codes a supplier such as `author_czqwq()` brings along.
+- `AuthorDynamic.register(animation, author, stack)` is the entry point (arg order: animation, author text, stack),
+  `register(animation, stack)` for the default name: it animates the *visible* text of the author supplier with
+  `animation.frame(...)` and adds the line plus the usual animated "Add by: MessTech" line. `registerOn(...)` is
+  behaviourally unchanged, same handler, no animation.
+- `TRANSCENDENT_METAL`, the built-in rendered animation (GT5U's Transcendent Metal look worn by a whole line):
+  - `MTTranscendentMetalText.frame` recolours every character with a dark grey / grey / white / grey band advancing one
+    character per 90 ms, so the letters read as polished metal before anything moves.
+  - `MTTranscendentMetalTextRenderer` **replaces** the line and draws it itself, turned about its own centre by GT5U's
+    transform - `glRotatef(angle, 0.3, 0.5, 0.2)`, `angle = getAnimationRenderTicks() * 3.5 % 360` - so the word turns
+    like a Transcendent Metal item lying next to it. The turning copy is the only copy (a still line under a turning one
+    shows both). The metal is the frame's band with the font's shadow plus the same glyphs one pixel along with additive
+    blending - the glint of the turned plate.
+  - One way round, continuously: no folding, no bounce, no reset at a quarter turn. The plate is edge-on (invisible) once
+    per revolution, exactly like the item, and the line swings with it (a long word tips out of its tooltip row at times,
+    as the item's quad leaves its slot).
+  - `MTTranscendentMetalText.showsBack` is the flat plate's substitute for an item's back face: while the plate faces away
+    the letters are mirrored back (`glScalef(-1, 1, 1)`), so they read the same way on both sides. With the oblique axis
+    the z part of the normal is `cos(a) + z^2 / (x^2 + y^2 + z^2) * (1 - cos(a))`, so the switch lands where that is zero
+    - the edge-on pose, where the flip cannot be seen.
+- Verification: per repo rule `gradlew compileJava`; `tools/textanim` is stale since the version it tests was replaced -
+  do not run it as is.
+- The bigger version this repo deliberately does not take: render at the **font** level (inline marker, `FontRenderer`
+  mixin, glyph masks, GLSL, marker stripped again wherever text is measured, wrapped or typed - chat, text fields, NEI
+  search fields, Angelica-style batched font renderers). It shows up outside tooltips too, but needs a mixin into every
+  font consumer. This repo keeps the smaller shape: an effect is a registered renderer, animation data common, drawing
+  client-only.
 
 ## Chaos Matter (混乱物质) material and the stacked-renderer look
-- A normal GregTech material that MessTech registers itself (through GT's `MaterialBuilder`, not through a copy of GT's
-  pools), so GT generates the items: `gt.metaitem.01` carries `ingotChaosMatter`, its dusts, plates and gears plus the
-  ore dictionary entries, because `MetaGeneratedItemX32` walks `GregTechAPI.sGeneratedMaterials` and honours the
-  METAL/DUST/GEAR generation bits the builder sets.
-- **Registration timing is the whole trick.** GT runs `Materials.init()` in its own preInit (`GTMod.java:343`), which is
-  *before* this mod's preInit, and `IMaterialHandler#onMaterialsInit` is only ever called from inside it
-  (`Materials.java:1576`, right after `MaterialsIDMap#register()` handed every GT material its `mMetaItemSubID` and
-  before the material list is frozen at `initMaterialProperties()`). `MTChaosMatter.register()` therefore runs from
-  the `@Mod` constructor, which FML calls during mod construction - before any preInit has run.
-- **The id, with room left for GT.** `MaterialsIDMap` is GT's hardcoded 0..999 table, has no free-id API for addons,
-  and `fillGeneratedMaterialsMap()` throws when two materials share an id. `findFreeId()` reads the ids that are
-  actually taken (`Materials.getMaterialsMap()` -> `mMetaItemSubID`), looks for the widest run of unused ids inside
-  `100..949` (the top of the table is where GT registers its newest materials - Infinity, SpaceTime, the Halkonites -
-  and is left alone), requires at least 8 free ids in a row so a lone hole is not squatted, and takes the **middle** of
-  that run, leaving GT roughly the same amount of room on both sides. The pick is logged with the run and the counts
-  left below and above.
-- **The textures live in this mod.** `TextureSet`'s constructors hardcode `Mods.GregTech.resourceDomain` and an addon
-  cannot put files into another mod's domain, so `chaosTextureSet()` builds a normal set and then rewrites its
-  (public, element-mutable) `mTextures` array with `Textures.ItemIcons/BlockIcons.textureSet("messtech", "chaos", ...)`
-  containers. The 16x16 icons are drawn as a grey base with messy multi-colour speckles - the ingot is every alloy and
-  element at once - and live in `assets/messtech/textures/items/materialicons/chaos/`; any slot without a file falls
-  back to GT's global `NONE` set inside the container, and the `VOID` slots keep GT's shared void icon. GT's metal
-  *blocks* use the shared `Textures.BlockIcons.STORAGE_BLOCKS*` arrays, not a material set, so no block art is needed.
-- **The look is several of GT's renderers playing at the same time** (`MTChaosMatterRenderer`, attached to
-  `Materials.renderer` from the client proxy exactly like `Materials.initClient()` does for GT's own materials). GT's
-  material effects fall into four kinds and they combine differently:
-  - *geometry* - `TranscendentMetalRenderer` only rotates the matrix (0.3/0.5/0.2, 3.5 degrees per client tick); that
-    tumble is copied into `applySpin` (plus a second slower axis) but is **currently disabled**: the call in
-    `renderItem` is commented out on request, so the icon is drawn straight and only the effects below animate.
-  - *colour modulation* - `GaiaSpiritRenderer` (hue over 180 ticks) and `RainbowOverlayRenderer` (base colour x hue
-    over 90 ticks) only set `glColor`; both hues are mixed into the single icon draw, each on its own random period and
-    phase (see the playback bullet below).
+- `MaterialBuilder` registers a normal GT material of MessTech's own (no copy of GT's pools), so GT generates the items:
+  `gt.metaitem.01` carries `ingotChaosMatter`, dusts, plates, gears and ore dictionary entries - `MetaGeneratedItemX32`
+  walks `GregTechAPI.sGeneratedMaterials` and honours the METAL/DUST/GEAR bits the builder sets.
+- **Timing is the trick**: GT runs `Materials.init()` in its own preInit (`GTMod.java:343`, before this mod's) and
+  `IMaterialHandler#onMaterialsInit` is only called from inside it (`Materials.java:1576`, after
+  `MaterialsIDMap#register()` set every `mMetaItemSubID`, before `initMaterialProperties()` freezes the list) - so
+  `MTChaosMatter.register()` runs from the `@Mod` constructor.
+- **The id, room left for GT**: `MaterialsIDMap` is GT's hardcoded 0..999 table with no free-id API;
+  `fillGeneratedMaterialsMap()` throws on a duplicate. `findFreeId()` reads the taken ids
+  (`Materials.getMaterialsMap()` -> `mMetaItemSubID`), takes the widest unused run in `100..949` (top = GT's newest
+  materials, Infinity/SpaceTime/Halkonites), needs 8 free in a row, and picks its **middle** so GT keeps equal room on
+  both sides; run and counts logged.
+- **Textures live here**: `TextureSet` hardcodes `Mods.GregTech.resourceDomain`, so `chaosTextureSet()` rewrites the
+  (public, element-mutable) `mTextures` with `Textures.ItemIcons/BlockIcons.textureSet("messtech", "chaos", ...)`
+  containers. 16x16 icons (grey base, messy multi-colour speckles = every alloy and element at once) in
+  `assets/messtech/textures/items/materialicons/chaos/`; a missing file falls back to GT's global `NONE` set, `VOID`
+  slots keep GT's void icon. Metal *blocks* use `Textures.BlockIcons.STORAGE_BLOCKS*`: no block art.
+- **Several GT renderers at once** (`MTChaosMatterRenderer`, on `Materials.renderer` from the client proxy like
+  `Materials.initClient()`), four kinds combined differently:
+  - *geometry* - `TranscendentMetalRenderer` only rotates the matrix (0.3/0.5/0.2, 3.5 degrees per client tick), copied
+    into `applySpin` (+ a slower second axis) but **disabled** (the `renderItem` call commented out on request).
+  - *colour modulation* - `GaiaSpiritRenderer` (hue over 180 ticks) and `RainbowOverlayRenderer` (base colour x hue over
+    90 ticks) only set `glColor`; both hues mix into the one icon draw, each on its own random period and phase.
   - *translucent extra passes* - `InfinityRenderer#renderHalo`/`renderPulse`, `CosmicNeutroniumRenderer#renderHalo` and
-    `GlitchEffectRenderer#applyRedGlitchEffect`/`applyCyanGlitchEffect` are public statics in inventory space, so they
-    are drawn every frame on top of the icon: genuinely simultaneous.
-  - *whole-icon replacements* - `UniversiumRenderer` (a shader over the sprite), `CosmicNeutroniumRenderer` and
-    `InfinityRenderer` draw the icon themselves, so two of them cannot be stacked without one hiding the other; the
-    renderer plays one of them per window over the base, blended either additively (the "everything at once" burst) or
-    normally.
-  - *the playback is random, not a rotation* - `rollWindow(tick)` re-rolls everything when a window runs out: the layer
-    (never the one that just played), the window length (10..39 ticks), whether the window is an additive burst (35%),
-    whether the CosmicNeutronium halo joins in (50%) and when within the window the glitch burst starts (60% chance,
-    8 ticks, ghost offset re-rolled every 2 ticks). Both hue cycles also get a random period and phase per session
-    (`gaiaPeriod`/`rainbowPeriod`/`gaiaPhase`/`rainbowPhase`), so nothing in the look repeats on a fixed clock.
-  This is deliberately the opposite of `MTDynamicItemHelper`, which picks exactly one effect per damage value and
-  documents that stacking several renderers on one stack is not supported there.
-- The display name is the lang key `Material.chaosmatter` in both lang files, which is what
-  `IOreMaterial#getLocalizedName()` looks up (`"Material." + name.toLowerCase()`); `mDefaultLocalName` is only the
-  fallback for a missing translation.
+    `GlitchEffectRenderer#applyRedGlitchEffect`/`applyCyanGlitchEffect`, public statics in inventory space, drawn every
+    frame on top: genuinely simultaneous.
+  - *whole-icon replacements* - `UniversiumRenderer` (shader over the sprite), `CosmicNeutroniumRenderer` and
+    `InfinityRenderer` draw the icon themselves, so two cannot stack; one plays per window over the base, additively (the
+    "everything at once" burst) or normally.
+  - *playback is random, not a rotation* - `rollWindow(tick)` re-rolls per window: layer (never the one just played),
+    length (10..39 ticks), additive burst (35%), CosmicNeutronium halo (50%), where the glitch burst starts (60% chance,
+    8 ticks, ghost offset re-rolled every 2 ticks). Hue cycles get a random period and phase per session
+    (`gaiaPeriod`/`rainbowPeriod`/`gaiaPhase`/`rainbowPhase`): nothing repeats on a fixed clock.
+  The opposite of `MTDynamicItemHelper` (one effect per damage value; stacking renderers not supported).
+- Name: lang key `Material.chaosmatter` in both lang files, looked up by `IOreMaterial#getLocalizedName()`
+  (`"Material." + name.toLowerCase()`); `mDefaultLocalName` only the fallback.
 
 ## Galacticraft hook: 高速上升自动开星系 GUI (`MTGalacticraftSpaceHandler`)
-- What it does: a **player** who crosses the altitude a rocket would leave the atmosphere at, while climbing at
-  **256 格/s 或更高**, is shown Galacticraft's celestial selection screen pinned to **tier 0**, i.e. Earth is the only
-  destination. Server side only - the screen itself arrives over GC's `C_UPDATE_DIMENSION_LIST` packet.
-- **Overworld only:** gated on `player.dimension == ConfigManagerCore.idDimensionOverworld` (GC's own field rather than
-  a hardcoded 0, so a pack that moves the Overworld still works). A fast climb on the Moon or in orbit does nothing.
-- Where GC does the same thing: `EntitySpaceshipBase#onUpdate` (`posY > IExitHeight#getYCoordinateToTeleport()`, or
-  `1200` when the dimension does not implement `IExitHeight`) -> `onReachAtmosphere()` ->
-  `EntityTieredRocket#onReachAtmosphere` -> `WorldUtil#toCelestialSelection(player, stats, getRocketTier(),
-  MapMode.TRAVEL)`. Only `WorldProviderOrbit` implements `IExitHeight` in GC core, so the Overworld's exit altitude is
-  the 1200 fallback. This hook copies that altitude rule verbatim so the two agree - with the Overworld-only gate it
-  normally resolves to 1200, but staying a copy means a pack whose Overworld provider does implement `IExitHeight`
-  cannot make the two disagree.
-- **256 格/s can never be a rocket**, which is why the trigger has to be the player: `EntityTier1Rocket` sets
-  `motionY = -d * cos(...)` with `d = min(timeSinceLaunch / 150, 1)`, i.e. at most **1 格/tick = 20 格/s**. Getting a
-  player up there with the launch still doing ≥ 12.8 格/tick (256 格/s) at `y = 1200` needs **50 TNT** at their feet
-  from sea level (~798 格/s off the pad, 267 格/s when it crosses); **49 falls short at 247.7 格/s**, and 40 is the
-  smallest pile that reaches 1200 at all (`tmp/tnt-launch/reach1200.py`).
-- **It is a living-player feature.** `Explosion` applies damage and knockback in the same block, so the first of those
-  50 TNT already deals 46 damage and kills; the corpse goes on flying with the full impulse, but the handler skips
-  players that are not `isEntityAlive()`. In practice the screen therefore shows up in **creative**, where the knockback
-  is unchanged and the damage is not taken.
-- Why tier 0 means Earth only: `WorldUtil#getPossibleDimensionsForSpaceshipTier` always adds the Overworld and filters
-  every planet through `IGalacticraftWorldProvider#canSpaceshipTierPass` - the Moon already needs tier 1.
-- Implementation notes: registered from `CommonProxy#preInit` **only when `Loader.isModLoaded("GalacticraftCore")`**
-  (GC only reaches this mod transitively through Galaxy Space, so its classes must not be touched otherwise), on the
-  **FML bus** (`TickEvent.PlayerTickEvent` is an FML event, unlike `MTProcessHandler`'s Forge-bus `WorldEvent`).
-  The trigger is the upward crossing alone - `prevPosY <= exit < posY` with `motionY >= 256 / 20` - which fires once
-  per flight without any per-player state. Both things that could fake a crossing move `prevPosY` and `posY`
-  *together*: `Entity#setPositionAndRotation` (`Entity.java:1259-1261`) is what a teleport and the client's own
-  movement packet (`NetHandlerPlayServer#processPlayer:394`) go through, and neither can leave `prevPosY` below the
-  altitude while `posY` is above it. That packet is handled outside the entity tick (`MinecraftServer#tick`:
-  `worldserver.tick()` at 696 vs `networkTick()` at 730) while `PlayerTickEvent.END` fires inside `EntityPlayer#onUpdate`,
-  so whichever of the two runs first, exactly one tick still sees the crossing.
-  `player.motionY` is the server-side impulse the explosion applied to the `EntityPlayerMP`.
-- Off switch: `Config.GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI` (category `General`, default `true`).
+- A **player** crossing a rocket's atmosphere-leave altitude while climbing at **256 格/s 或更高** gets GC's celestial
+  selection screen pinned to **tier 0** (Earth only), server side; the screen arrives over GC's
+  `C_UPDATE_DIMENSION_LIST` packet.
+- **Overworld only**: `player.dimension == ConfigManagerCore.idDimensionOverworld` (GC's field, not a hardcoded 0). On
+  the Moon or in orbit nothing happens.
+- GC's own site: `EntitySpaceshipBase#onUpdate` (`posY > IExitHeight#getYCoordinateToTeleport()`, or `1200` when the
+  dimension does not implement `IExitHeight`) -> `onReachAtmosphere()` -> `EntityTieredRocket#onReachAtmosphere` ->
+  `WorldUtil#toCelestialSelection(player, stats, getRocketTier(), MapMode.TRAVEL)`. Only `WorldProviderOrbit` implements
+  `IExitHeight` in GC core, so the Overworld's altitude is the 1200 fallback - copied verbatim, so a pack's own provider
+  cannot disagree with it.
+- **256 格/s can never be a rocket**, hence the player: `EntityTier1Rocket` sets `motionY = -d * cos(...)` with
+  `d = min(timeSinceLaunch / 150, 1)` = at most **1 格/tick = 20 格/s**. `y = 1200` at still >= 12.8 格/tick needs **50
+  TNT** at the feet from sea level (~798 格/s off the pad, 267 格/s at the crossing); **49 falls short at 247.7 格/s**; 40
+  is the smallest pile reaching 1200 at all (`tmp/tnt-launch/reach1200.py`).
+- **A living-player feature**: `Explosion` applies damage and knockback together, so the first of the 50 TNT deals 46
+  damage and kills; the corpse flies on, but non-`isEntityAlive()` players are skipped. Hence **creative**.
+- Tier 0 = Earth only: `WorldUtil#getPossibleDimensionsForSpaceshipTier` always adds the Overworld and filters planets
+  through `IGalacticraftWorldProvider#canSpaceshipTierPass` - the Moon already needs tier 1.
+- Registered from `CommonProxy#preInit` **only when `Loader.isModLoaded("GalacticraftCore")`** (GC arrives only through
+  Galaxy Space, so its classes must not be touched otherwise), on the **FML bus**: `TickEvent.PlayerTickEvent` is FML,
+  unlike `MTProcessHandler`'s Forge-bus `WorldEvent`. Trigger is the upward crossing alone (`prevPosY <= exit < posY`,
+  `motionY >= 256 / 20`), once per flight, no state. Both fake-crossing paths move `prevPosY` and `posY` *together*
+  (`Entity#setPositionAndRotation`, `Entity.java:1259-1261`, is the path of a teleport and of the client's movement packet
+  `NetHandlerPlayServer#processPlayer:394`), and that packet is handled outside the entity tick (`MinecraftServer#tick`:
+  `worldserver.tick()` at 696 vs `networkTick()` at 730) while `PlayerTickEvent.END` fires inside `EntityPlayer#onUpdate` -
+  either order leaves exactly one tick seeing the crossing. `player.motionY` is the server-side impulse the explosion
+  applied to the `EntityPlayerMP`.
+- Off switch `Config.GALACTICRAFT_FAST_ASCENT_OPENS_SPACE_GUI` (category `General`, default `true`).
 - **Caveat for non-host players:** `NetHandlerPlayServer#processPlayer` (`build/rfg/minecraft-src`) rejects a reported
   move when `max(|dx|, |motionX|)^2 + max(|dy|, |motionY|)^2 + max(|dz|, |motionZ|)^2 > 100` **and** the player is not
-  the single-player host, teleporting them back to `lastPos`. A 12.8 格/tick climb clears that threshold on its own, so
-  the host of an integrated server is exempt and the flight runs, while on a dedicated server / LAN guest the correction
-  may fight the ascent before it ever reaches 1200. That half is a source reading, not an in-game test. The limit is
-  raiseable - see "Vanilla 'moved too quickly' 上限" below.
+  the single-player host, teleporting to `lastPos`. 12.8 格/tick clears it alone: the integrated-server host flies, a
+  dedicated server / LAN guest may be corrected below 1200 (a source reading, not an in-game test). Raiseable - see
+  "Vanilla 'moved too quickly' 上限".
 
 ## Vanilla "moved too quickly" 上限 (`MixinNetHandlerPlayServer_MovedTooQuickly`)
-- **那行判定是 Forge 的构建期源码补丁，不是任何模组**：`forgepatches.zip` 里的
-  `net/minecraft/network/NetHandlerPlayServer.java.patch` 把原版的 `Math.min` 换成了 `Math.max`（注释
-  `//BUGFIX: min -> max, grabs the highest distance`），所以 `processPlayer` 比较的平方距离是"客户端上报位移"和
-  "实体自身 motion"**逐轴取大者**（结果见 `build/rfg/minecraft-src/.../NetHandlerPlayServer.java:341-347`，阈值在同一
-  方法的 347 行）。Forge 不为它提供任何开关，本地 528 个 GTNH 模组 jar 里也没有别的模组改这一行。
-- 阈值由本 mod 的 late mixin `MixinNetHandlerPlayServer_MovedTooQuickly` 抬高，配置项
-  `Config.MOVED_TOO_QUICKLY_THRESHOLD`（category `General`，**默认 `2000.0`**）。**只升不降**：
-  `configured > original` 才返回配置值，所以设成 100 及以下就退回原版行为，等于功能关闭。
-- **和 Hodgepodge 共存而不是二选一**：Hodgepodge 的 `MixinNetHandlerPlayServer_DisableMovedTooQuickly` 用同一条
-  `@ModifyConstant(method = "processPlayer", constant = @Constant(doubleValue = 100.0D, ordinal = 0))`，且只在
-  `FixesConfig.movedTooQuicklyThreshold > 100.0` 时才应用（配置在 `config/hodgepodge.cfg` 的 `[fixes]` 段，键
-  `D:movedTooQuicklyThreshold`）。两个 `@ModifyConstant` 打在同一常量上是**串接**而不是冲突——会冲突的是
-  `@Redirect`/`@Overwrite`，那种情况游戏直接起不来。因此最终上限 = max(原版 100、Hodgepodge 的值、本 mod 的值)；
-  本 mixin 用 `priority = 1500`（Hodgepodge 是 Mixin 默认的 1000）保证后应用，能在 Hodgepodge 的结果上继续抬。
-- 配置值是在 `processPlayer` **运行时**读的，而不是在 mixin 收集时用 `setApplyIf` 判定，所以与 GTNHMixins 何时收集
-  late mixin 列表无关（本 mod 的配置要到 `preInit` 才读，而那之前静态字段还是各自的初始值）。
-- 默认值的锚点：50 个 TNT 在脚下起爆瞬间 |motionY| = 50 x 0.7975 = 39.875 格/tick → 平方 1590.016，这是整段爬升里
-  检查看到的**最大值**（只在起飞那一 tick 出现，之后单调衰减，飞到 y=1200 时只剩 ~13.4 格/tick）。默认 `2000.0`
-  = 44.72 格/tick，比所需的 1590 多约 26% 冗余，约等于 56 个 TNT；`1.7976931348623157E308` 是彻底关掉。
-  判定在**服务端**，所以生效的是服务端那份配置。
+- **那行判定是 Forge 的构建期源码补丁，不是任何模组**：`forgepatches.zip` 的
+  `net/minecraft/network/NetHandlerPlayServer.java.patch` 把 `Math.min` 换成 `Math.max`（注释
+  `//BUGFIX: min -> max, grabs the highest distance`），所以 `processPlayer` 的平方距离是"客户端上报位移"与"实体自身
+  motion"**逐轴取大者**（见 `build/rfg/minecraft-src/.../NetHandlerPlayServer.java:341-347`，阈值在同方法 347 行）。
+  Forge 无开关，本地 528 个 GTNH 模组 jar 也没别的模组改这行。
+- 阈值由本 mod 的 late mixin `MixinNetHandlerPlayServer_MovedTooQuickly` 抬高：`Config.MOVED_TOO_QUICKLY_THRESHOLD`
+  （category `General`，**默认 `2000.0`**），**只升不降**（`configured > original` 才用配置值，设成 100 及以下等于
+  关闭）。配置值在 `processPlayer` **运行时**读，不是收集时用 `setApplyIf` 判定，所以与 GTNHMixins 何时收集 late
+  mixin 列表无关（本 mod 配置要到 `preInit` 才读）。
+- **和 Hodgepodge 共存**：它的 `MixinNetHandlerPlayServer_DisableMovedTooQuickly` 也改同一常量
+  （`@ModifyConstant(method = "processPlayer", constant = @Constant(doubleValue = 100.0D, ordinal = 0))`，只在
+  `FixesConfig.movedTooQuicklyThreshold > 100.0` 时应用，配置在 `config/hodgepodge.cfg` 的 `[fixes]` 段键
+  `D:movedTooQuicklyThreshold`）。同一常量上的两个 `@ModifyConstant` 是**串接**而非冲突（冲突的是
+  `@Redirect`/`@Overwrite`，游戏起不来），故最终上限 = max(原版 100、Hodgepodge、本 mod)；本 mixin 用
+  `priority = 1500`（Hodgepodge 继承默认 1000）保证后应用。
+- 默认值锚点：50 个 TNT 脚下起爆瞬间 |motionY| = 50 x 0.7975 = 39.875 格/tick → 平方 1590.016，是整段爬升里检查看到
+  的**最大值**（只出现在起飞那 tick，之后单调衰减，y=1200 时约 13.4 格/tick）。默认 `2000.0` = 44.72 格/tick，比
+  1590 多约 26% 冗余（≈56 个 TNT）；`1.7976931348623157E308` 是彻底关掉。判定在**服务端**，生效的是服务端那份配置。
 
 ## `/messtech GoUp [秒数]` (`MTCommand` / `MTGoUpFlight`)
-- 指令本体 `MTCommand`：根指令 `messtech`，`GoUp` 是唯一的子命令，参数是秒数（默认 30）。权限等级 2（OP），
-  发送者必须是玩家（没有目标选择器，控制台没有可抛的对象）。注册在 `CommonProxy#serverStarting`
-  （`FMLServerStartingEvent#registerServerCommand`），飞行处理器在 `preInit` 里 `MTGoUpFlight.init()`。
-- 效果：把玩家以**固定速度 14.0 格/tick = 280 格/s** 抛向空中，持续 N 秒（默认 30 s = 600 tick）。不是"给一次冲量"，
-  而是**每 tick 重设 `motionY` 并推进位置**，所以重力和阻力都改不了它。
-- 为什么是 14.0：钩子的线是 256 格/s = 12.8 格/tick（`MTGalacticraftSpaceHandler`），14.0 超过去；即使被原版物理衰减
-  一 tick（`(14 - 0.08) * 0.98 = 13.64` 格/tick = 272.8 格/s）仍 > 12.8，所以两个 `PlayerTickEvent` 处理器谁先谁后
-  都不影响判定；而它的平方 196 又远低于 `MOVED_TOO_QUICKLY_THRESHOLD` 的默认 2000。到 y=1200 约 82 tick（4.1 s），
-  默认 30 s 绰绰有余（30 s 大约到 8400 格）。
-- **为什么必须 `setPositionAndUpdate` 而不能只设 `motionY`**：1.7.10 里玩家位置由客户端权威
-  （`NetHandlerPlayServer#processPlayer` 最后会 `setPositionAndRotation(客户端上报位置)`），服务端单方面设 `motionY`
-  会被下一个 `C03PacketPlayer` 顶掉。`EntityPlayerMP#setPositionAndUpdate` → `setPlayerLocation`
-  （`NetHandlerPlayServer.java:443-451`）会移动服务端实体、把 `hasMoved` 置 false（于是本次上报的客户端位置不被采用，
-  浮空踢人检查也走不到）并回发 `S08PacketPlayerPosLook` 钉住客户端。
-- S08 的 Y 特意写成 `y + 1.62`，正好抵消客户端 `posY → boundingBox.minY` 的 1.62 偏移，所以客户端下一包上报的 Y 会
-  落在服务端 `lastPosY` 上（`processPlayer` 的 `hasMoved` 追赶判定要求 `Δy² < 0.01`），`hasMoved` 于是每 tick 都能
-  重新变 true —— **移动包路径照常运行，钩子依赖的 `PlayerTickEvent` 也就照常触发**，这正是指令存在的目的。
-- 处理器挂在 `TickEvent.ServerTickEvent` 的 END（世界与移动包都处理完之后，位置以它为准），并会跳过已死亡、世界为空
-  或已登出的玩家，避免 map 里长期持有实体。
-- 与配置的耦合：14 格/tick 的平方是 196，**高于原版的 100**，所以这个指令本身就依赖 `MOVED_TOO_QUICKLY_THRESHOLD`
-  被抬高（默认 2000 满足）；配置低于该值时指令会额外发一条警告（`command.messtech.goup.threshold.low`），
-  而不是让玩家莫名被拉回去。
-- 副作用提醒：30 s 飞完玩家在约 8400 格高处，掉下来要很久，落地/掉出世界都按原版规则处理。
+- `MTCommand`：根指令 `messtech`，唯一子命令 `GoUp`，参数秒数（默认 30），权限等级 2（OP），发送者必须是玩家（没有
+  目标选择器）。注册在 `CommonProxy#serverStarting`（`FMLServerStartingEvent#registerServerCommand`），飞行处理器
+  在 `preInit` 里 `MTGoUpFlight.init()`。
+- 效果：以**固定速度 14.0 格/tick = 280 格/s** 抛向空中 N 秒（默认 30 s = 600 tick）。不是给一次冲量，而是**每 tick
+  重设 `motionY` 并推进位置**，重力和阻力都改不了它。
+- 为什么是 14.0：钩子的线是 256 格/s = 12.8 格/tick（`MTGalacticraftSpaceHandler`），14.0 超过去；被原版物理衰减一
+  tick（`(14 - 0.08) * 0.98 = 13.64` 格/tick = 272.8 格/s）仍 > 12.8，所以两个 `PlayerTickEvent` 谁先谁后都不影响；
+  平方 196 又远低于 `MOVED_TOO_QUICKLY_THRESHOLD` 的默认 2000。到 y=1200 约 82 tick（4.1 s），默认 30 s 约到 8400 格。
+- **为什么必须 `setPositionAndUpdate` 而不能只设 `motionY`**：1.7.10 里玩家位置客户端权威
+  （`NetHandlerPlayServer#processPlayer` 最后 `setPositionAndRotation(客户端上报位置)`），服务端单方面设 `motionY` 会被
+  下一个 `C03PacketPlayer` 顶掉。`EntityPlayerMP#setPositionAndUpdate` → `setPlayerLocation`
+  （`NetHandlerPlayServer.java:443-451`）会移动服务端实体、把 `hasMoved` 置 false（本次上报位置不被采用，浮空踢人
+  检查也走不到）并回发 `S08PacketPlayerPosLook` 钉住客户端。
+- S08 的 Y 特意写成 `y + 1.62`，抵消客户端 `posY → boundingBox.minY` 的 1.62 偏移，客户端下一包上报的 Y 就落在
+  `lastPosY` 上（`processPlayer` 的 `hasMoved` 追赶判定要求 `Δy² < 0.01`），于是 `hasMoved` 每 tick 都能重新变
+  true —— **移动包照常跑，钩子依赖的 `PlayerTickEvent` 照常触发**，这正是指令存在的目的。
+- 处理器挂在 `TickEvent.ServerTickEvent` 的 END（世界与移动包之后，位置以它为准），跳过已死亡、世界为空或已登出的
+  玩家，避免 map 里长期持有实体。
+- 与配置耦合：平方 196 **高于原版的 100**，指令本身就依赖 `MOVED_TOO_QUICKLY_THRESHOLD` 被抬高（默认 2000 满足）；
+  配置更低时额外发一条警告（`command.messtech.goup.threshold.low`），而不是让玩家莫名被拉回去。
+- 副作用：30 s 飞完在约 8400 格，掉下来要很久，落地/掉出世界按原版规则处理。
 
 ## 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`)
-- Name: `混沌终焉·虚无贯星弓` / `Chaos Finale: Voidstar Piercer` (`item.messtech.voidstarBow.name`), registry name
-  `VoidstarBow`, unlocalized `messtech.voidstarBow`, creative tab `tabCombat`, **max stack 1**, durability
-  1,024 (`MTItemVoidstarBow.MAX_DAMAGE`, i.e. under three stacks of arrows).
-- It is a plain `ItemBow` in everything but its **draw length** and its **sub-modes**: the `f < 0.1` minimum draw that
-  does not fire, arrow consumption, the Infinity enchantment that replaces it, Power / Punch / Flame and the
-  enchantment table are all vanilla's. Only the projectile, the charging effect, the icons, the glint, the draw
-  length and the two sub-modes are this mod's.
-- **Sub-modes (`MTItemVoidstarBow.MODE_PIERCE` / `MODE_DE`), switched with sneak + right click.** The mode lives in
-  the stack's own NBT (`MTVoidstarMode`), so two bows can be in different modes and it survives a relog; anything
-  missing or out of range reads as `MODE_PIERCE`, i.e. a bow that has never been switched behaves exactly like it did
-  before the modes existed. The switch is `onItemRightClick`: it **must not fall through to `super`** (vanilla's
-  `ItemBow` starts the draw in that very method, so a switch that did would fire an arrow when shift is released),
-  both sides return early so neither starts a use, and only the server writes the mode. The chat message is a
-  `ChatComponentTranslation` rather than a translated string, so the key travels to the client and each player reads
-  it in their own language; the keys are `messtech.voidstarBow.mode.pierce` / `.mode.de` and the tooltip shows the
-  current one through `messtech.voidstarBow.tooltip.mode` + `.modeName.*`. A block with its own right-click GUI takes
-  the click before the item does (`ItemInWorldManager#activateBlockOrUseItem` calls `onBlockActivated` first) - that
-  is the platform, the same in every GTNH tool, so switch the mode while aiming at air.
-- **DE mode's one explosion.** In `MODE_DE` the arrow's first block contact calls `MTExplosionDE` (the port of DE's
-  reactor explosion, see the reactor section) centred on the block it touched, with
-  `Config.VOIDSTAR_BOW_DE_POWER` power - default **20**, which is DE's own full reactor
-  ({@code 2 + fuelFraction * 18}, i.e. 2 for empty and 20 for full), i.e. a 200 block radius - and then removes
-  itself. None of the tunnel machinery runs: no piece is blasted and no block is drilled, which is the whole
-  difference to pierce mode. A shot that hits nothing at all still detonates when its flight ticks run out (the arrow
-  must not simply vanish after 600 blocks); an entity hit is unaffected by the mode and still goes through
-  `MTBowKill`.
-- **The draw is `Config.VOIDSTAR_BOW_DRAW_TICKS` ticks, 80 by default, i.e. four seconds** where vanilla's bow takes
-  one. `onPlayerStoppedUsing` keeps vanilla's own curve (`f = (f*f + 2f)/3`, the `f < 0.1` floor that does not fire
-  and the cap at 1) and only divides by the configured length instead of vanilla's hardcoded `20.0F`, so the arrow's
-  speed (`1.2 + 1.8 * draw`, see the arrow below), the `isCritical` mark at a full draw and the magic circle's unfold
-  all stretch with it: the minimum draw that fires at all is the same fifth of the charge, about 0.7 seconds. The
-  four seconds are the number the charge effect was designed around - the Yes Steve Model pack it was copied from
-  spreads its own unfold over four seconds. **One pose does not follow it**: vanilla's first person bow pose ramps
-  over twenty ticks in `ItemRenderer` line 466 (`f11 = f10 / 20.0F`), a hardcoded constant of the client renderer
-  that only a coremod could change, so a four second draw finishes its arm movement after the first second and keeps
-  charging after that. The config file and the class comment both say so.
-- **Icons** (`assets/messtech/textures/items/bow/`): `voidstarBow_standby` plus `_pulling_0/1/2`, each a
-  **16 x 256** PNG, i.e. a strip of 16 frames of 16x16 with `{"animation": {"frametime": 2}}` as its `.mcmeta`
-  (32 ticks per loop). Animated icons in the item atlas work in 1.7.10; this is the same mechanism as the animated
-  piggy strips (see "A Piggy + MTDynamicItemHelper"). The frame alpha of all four strips is bit-identical to the
-  corresponding vanilla `bow_standby`/`bow_pulling_N.png` (64/64 frames checked), so the bow is exactly as big as
-  vanilla's and only its colours move.
-  - The art is the vanilla bow recoloured into a void-metal ramp (`#2a1140` to `#a462e8`, keeping vanilla's own
-    shading structure) with a cyan-to-white energy string and a white-lilac shimmer travelling along the arc once
-    per 16-frame loop, plus a void-glow pulse that completes two cycles over the same loop, so frame 15 -> frame 0
-    does not jump. Generator: `tmp/chaosbow/gen_voidstar_textures.py` (deterministic; reads the vanilla icons out of
-    the 1.7.10 client jar). Review sheet: `tmp/chaosbow/preview_voidstar.png`.
-  - **The pull frames can only come from the Forge hook.**
-    `EntityPlayer#getItemIcon` (line 2051 in `build/rfg/minecraft-src`) selects the draw frame only for
-    `itemStackIn.getItem() == Items.bow` - an identity check a subclass never passes - and otherwise falls through to
-    `itemStackIn.getItem().getIcon(itemStackIn, pass, this, itemInUse, itemInUseCount)` (line 2070), i.e. Forge's
-    player sensitive `Item#getIcon(ItemStack, int, EntityPlayer, ItemStack, int)`. `MTItemVoidstarBow` overrides
-    exactly that, with vanilla's own cut-offs: >= 18 ticks drawn is `_pulling_2`, > 13 is `_pulling_1`, > 0 is
-    `_pulling_0`. Those two cut-offs are kept as *fractions* of the draw (90% and 65%) and applied to
-    `Config.VOIDSTAR_BOW_DRAW_TICKS`, so the three frames spread over the whole four second charge rather than over
-    the first second. Because the state the hook is handed is the *player's* (`itemInUse`), the pull animation also shows
-    for **other** players: `EntityOtherPlayerMP#onUpdate` (lines 86-96) rebuilds `itemInUse` from the "eating" flag
-    that `EntityPlayer#setItemInUse` sets server side (`EntityPlayer.java:2183`), which is what vanilla's own
-    third-person bow pose relies on as well.
-- **The glint**: `Item#hasEffect(ItemStack)` is overridden to `true`, so vanilla draws the purple enchantment glint
-  over the bow wherever it is rendered (`ItemRenderer.java:132` for the item in hand,
-  `RenderItem.java:561` for the inventory), whether it is enchanted or not. The animated strip is the static half of
-  the "enchanted" look, the glint the moving one.
-- **The magic circle** (`MTMagicCircleRenderer`, client only, registered on `MinecraftForge.EVENT_BUS` from
-  `ClientProxy#preInit`): textured quads in world space, drawn in `RenderWorldLastEvent` - **not** a particle. The
-  first version was a ring of rune particles, which read as a dotted circle; the quads are the circle itself.
-  Its construction is copied from the bow charge effect of the Yes Steve Model pack `wine_fox / 05_magical`
-  (`animations/arm.animation.json` -> `use_mainhand:bow`, the `ysmGlowdamofazhen` / `ysmGlowmofazhen*` bones of
-  `models/main.json`, sprites at `191,191` and `161,50` of `textures/magic.png`). That pack is a *model*, not a
-  renderer, so what is copied is its design, rebuilt as world space quads:
-  - **Two motifs.** `misc/magicRing.png` is the big circle (a ring of 24 segments, an inscribed square with corner
-    marks, an inner circle), `misc/magicFlower.png` is the small one (a four pointed compass flower with four short
-    diagonal petals). Thin violet line art, drawn by `tmp/chaosbow/gen_voidstar_ysm_circles.py` (256x256, 2x
-    supersampled). The pack's own pixels are another author's art under CC BY-NC-SA: same motifs, **not** the same
-    file - do not paste `magic.png` into this repo.
-  - **Every circle is two quads.** The pack's small circle bones carry a 27 unit plane and a 16.2 unit plane - 60% -
-    turned 45 degrees around its own centre (`INNER_RATIO` / `INNER_ANGLE`). That turned inner copy is what makes it
-    read as a magic circle rather than as a decal, and every circle here has one.
-  - **One big circle with four around it.** The pack parents four circle bones to the big one, nine units off its
-    pivot, i.e. `1.33` big radii (`CORNER_DISTANCE`), each `0.70` big radii across (`CORNER_RADIUS`). Being children
-    they are carried **around** it by its own spin, which is reproduced by turning the corner positions with the big
-    circle's angle.
-  - **The spin rates are the pack's own**, in degrees per second: the big circle 18 (`BIG_SPIN_PER_SECOND` - its keys
-    are 0 -> 90 degrees over five seconds), the small ones 180 (`SMALL_SPIN_PER_SECOND`), alternating direction.
-  - **The unfold is the pack's too.** Every small circle **bursts**: its scale keys start it at 3 and 4, collapse it
-    to 0 and then settle it on its resting value (`burstScale()`, `BURST_SCALE` / `BURST_COLLAPSE`), and the pack
-    slides them along the weapon axis while they do it (position keys like `0,0,38` to `0,0,-24`), which
-    `AXIAL_FLIGHT` brings back. The corners start at 10%, 17%, 24% and 31% of the draw and settle over the following
-    35% each; the big circle joins at 62% (`BIG_FIRST`) and flies forward out of the bow as it grows (`BIG_GROWTH`),
-    the way its own position keys do (`0,0,-42` to `0,0,13`).
-  - **The card** hangs `1.90` blocks in front of the eyes (`DISTANCE`, lowered `0.25` below the eye) in the plane
-    perpendicular to the player's `getLook(partialTicks)`, built from `right = normalize((-fz, 0, fx))` and
-    `up = right x forward` (a player looking straight up or down has no such right vector and falls back to the
-    world's x axis). Two batches, one per sprite, with the depth mask off and the depth test left on, so walls hide
-    the circle exactly like they hide the arrow.
-  - **The blending is the pack's**: plain alpha (`GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA`, its `entityTranslucent`
-    render type), not the additive of the first version, and with culling off so a circle shows from both sides. The
-    one deliberate deviation is `setBrightness(0xF000F0)`: the pack leaves those bones to the world light, while a
-    circle the player summons should glow in a cave instead of turning grey.
-  - Everything is a pure function of the draw (`getMaxItemUseDuration() - getItemInUseCount()`, divided by
-    `Config#VOIDSTAR_BOW_DRAW_TICKS` - four seconds, i.e. 80 ticks), so the animation can never drift out of step
-    with the bow: at a full draw it is one circle in the middle, four in the diagonal corners around it, all of it
-    still turning. The four-second draw is what makes the unfold read exactly like the pack's: the corners burst at
-    0.4 / 0.7 / 1.0 / 1.2 seconds and settle by 2.6, the big circle joins at 2.5 and is complete at 3.7.
+- `item.messtech.voidstarBow.name` = `混沌终焉·虚无贯星弓` / `Chaos Finale: Voidstar Piercer`; registry `VoidstarBow`,
+  unlocalized `messtech.voidstarBow`, tab `tabCombat`, max stack 1, durability 1,024 (`MTItemVoidstarBow.MAX_DAMAGE`,
+  under three stacks of arrows).
+- Plain `ItemBow` except **draw length** and **sub-modes**: `f < 0.1` no-fire floor, arrow consumption, the Infinity
+  enchantment, Power / Punch / Flame and the enchantment table are vanilla's; projectile, charge effect, icons, glint,
+  draw length and sub-modes are this mod's.
+- **Sub-modes (`MTItemVoidstarBow.MODE_PIERCE` / `MODE_DE`) via sneak + right click.** Mode in the stack's NBT
+  (`MTVoidstarMode`): per-bow, survives a relog, missing or out of range = `MODE_PIERCE`. `onItemRightClick` **must not
+  fall through to `super`** (vanilla's `ItemBow` starts the draw there, so it would fire on shift release), returns early
+  on both sides, only the server writes. `ChatComponentTranslation` message (not a translated string) so each player reads
+  their own language: `messtech.voidstarBow.mode.pierce` / `.mode.de`, tooltip `messtech.voidstarBow.tooltip.mode` +
+  `.modeName.*`. A block GUI takes the click first (`ItemInWorldManager#activateBlockOrUseItem` ->
+  `onBlockActivated`): switch while aiming at air.
+- **DE mode's one explosion**: first block contact calls `MTExplosionDE` (DE's reactor explosion port) on that block with
+  `Config.VOIDSTAR_BOW_DE_POWER` - default **20**, DE's full reactor, {@code 2 + fuelFraction * 18} (2 empty, 20 full),
+  a 200 block radius - then removes the arrow. No tunnel: nothing blasted, nothing drilled, the whole difference to pierce
+  mode. A shot hitting nothing still detonates when its flight ticks run out (never vanishes after 600 blocks); an entity
+  hit ignores the mode and still goes through `MTBowKill`.
+- **Draw = `Config.VOIDSTAR_BOW_DRAW_TICKS` ticks, 80 by default (four seconds)** against vanilla's one.
+  `onPlayerStoppedUsing` keeps vanilla's curve (`f = (f*f + 2f)/3`, the `f < 0.1` floor, cap 1) and only divides by the
+  configured length instead of `20.0F`, so arrow speed (`1.2 + 1.8 * draw`), the `isCritical` mark and the circle's unfold
+  stretch with it; the firing minimum stays the same fifth (~0.7 s). Four seconds is what the charge effect was designed
+  around (the Yes Steve Model pack unfolds over four seconds). **One pose does not follow**: vanilla's first-person bow
+  pose ramps over twenty ticks in `ItemRenderer` line 466 (`f11 = f10 / 20.0F`), a hardcoded client constant only a coremod
+  could change, so the arm stops after 1 s while the charge goes on - the config file and the class comment both say so.
+- **Icons** (`assets/messtech/textures/items/bow/`): `voidstarBow_standby` + `_pulling_0/1/2`, each a **16 x 256** PNG =
+  16 frames of 16x16, `.mcmeta` `{"animation": {"frametime": 2}}` (32 ticks per loop) - animated item-atlas icons work in
+  1.7.10, like the piggy strips (see "A Piggy + MTDynamicItemHelper"). Frame alpha of all four is bit-identical to vanilla's
+  `bow_standby`/`bow_pulling_N.png` (64/64 frames): vanilla's size, colours only.
+  - Art: vanilla bow in a void-metal ramp (`#2a1140` to `#a462e8`, vanilla's shading), cyan-to-white energy string,
+    white-lilac shimmer along the arc once per loop, void-glow pulse of two cycles per loop (no 15 -> 0 jump). Generator
+    `tmp/chaosbow/gen_voidstar_textures.py` (deterministic, reads the 1.7.10 client jar); sheet
+    `tmp/chaosbow/preview_voidstar.png`.
+  - **The pull frames can only come from the Forge hook**: `EntityPlayer#getItemIcon` (line 2051 in
+    `build/rfg/minecraft-src`) picks the draw frame only for `itemStackIn.getItem() == Items.bow`, an identity check a
+    subclass never passes, else
+    `itemStackIn.getItem().getIcon(itemStackIn, pass, this, itemInUse, itemInUseCount)` (line 2070) - Forge's player
+    sensitive `Item#getIcon(ItemStack, int, EntityPlayer, ItemStack, int)`, which `MTItemVoidstarBow` overrides with
+    vanilla's cut-offs (>= 18 ticks `_pulling_2`, > 13 `_pulling_1`, > 0 `_pulling_0`) kept as *fractions* (90%, 65%) of
+    `Config.VOIDSTAR_BOW_DRAW_TICKS`. It is handed the *player's* `itemInUse`, so others see the pull too:
+    `EntityOtherPlayerMP#onUpdate` (lines 86-96) rebuilds it from the "eating" flag `EntityPlayer#setItemInUse` sets server
+    side (`EntityPlayer.java:2183`).
+- **The glint**: `Item#hasEffect(ItemStack)` returns `true`, so the purple enchantment glint is drawn wherever the bow
+  renders (`ItemRenderer.java:132` in hand, `RenderItem.java:561` in the inventory), enchanted or not.
+- **The magic circle** (`MTMagicCircleRenderer`, client only, on `MinecraftForge.EVENT_BUS` from `ClientProxy#preInit`):
+  world-space textured quads in `RenderWorldLastEvent`, **not** a particle (v1 was rune particles, a dotted circle). Design
+  from the Yes Steve Model pack's bow charge effect `wine_fox / 05_magical` (`animations/arm.animation.json` ->
+  `use_mainhand:bow`, `ysmGlowdamofazhen` / `ysmGlowmofazhen*` bones of `models/main.json`, sprites `191,191` / `161,50` of
+  `textures/magic.png`) - a *model*, not a renderer, so it is rebuilt as world space quads:
+  - Two motifs, thin violet line art by `tmp/chaosbow/gen_voidstar_ysm_circles.py` (256x256, 2x supersampled):
+    `misc/magicRing.png` big (24 segment ring, inscribed square with corner marks, inner circle), `misc/magicFlower.png`
+    small (four pointed compass flower, four short diagonal petals). The pack's pixels are another author's CC BY-NC-SA art:
+    same motifs, **not** the same file - do not paste `magic.png` here.
+  - Two quads per circle: a 27 unit plane + a 16.2 unit plane (60%) turned 45 degrees about its centre (`INNER_RATIO` /
+    `INNER_ANGLE`); that turned inner copy is what reads as a magic circle rather than a decal.
+  - Four bones parented to the big one, nine units off its pivot = `1.33` big radii (`CORNER_DISTANCE`), each `0.70` big
+    radii across (`CORNER_RADIUS`), carried **around** it by its spin - reproduced by turning the corner positions with the
+    big circle's angle.
+  - Pack spin rates, degrees per second: big 18 (`BIG_SPIN_PER_SECOND`, keys 0 -> 90 over five seconds), small 180
+    (`SMALL_SPIN_PER_SECOND`), alternating direction. Every small circle **bursts** (scale keys 3 and 4, collapse to 0,
+    settle: `burstScale()`, `BURST_SCALE` / `BURST_COLLAPSE`) while sliding along the weapon axis (`0,0,38` to `0,0,-24`,
+    `AXIAL_FLIGHT`). Corners start at 10%, 17%, 24%, 31% of the draw, settling over the next 35% each; the big circle joins
+    at 62% (`BIG_FIRST`) and flies forward as it grows (`BIG_GROWTH`, keys `0,0,-42` to `0,0,13`).
+  - The card hangs `1.90` blocks ahead (`DISTANCE`, `0.25` below the eye), perpendicular to `getLook(partialTicks)`, from
+    `right = normalize((-fz, 0, fx))` and `up = right x forward` (straight up/down: the world's x axis). Two batches, one
+    per sprite, depth mask off, depth test on.
+  - Pack blending: plain alpha (`GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA`, its `entityTranslucent` render type), not v1's
+    additive, culling off. One deviation, `setBrightness(0xF000F0)`: the pack uses world light, a summoned circle should
+    glow in a cave.
+  - Pure function of the draw (`getMaxItemUseDuration() - getItemInUseCount()` over `Config#VOIDSTAR_BOW_DRAW_TICKS` = 80
+    ticks): full draw = one circle centred, four in the diagonal corners, all turning (corners burst at 0.4 / 0.7 / 1.0 /
+    1.2 s, settled by 2.6; big circle joins at 2.5, complete at 3.7).
 - **The arrow** (`MTEntityVoidstarArrow`, entity id 1, registered in `CommonProxy#preInit`, rendered with vanilla's
-  `RenderArrow` by `ClientProxy#preInit`):
-  - **Straight flight.** The launch direction is the shooter's `getLook(1.0F)` and its spread is zero (the vanilla
-    `setThrowableHeading` jitter of up to 0.0075 per axis is not applied); the speed is `1.2 + 1.8 * draw` blocks per
-    tick. The motion is written back from that aim **at the start and at the end of every tick**, so the two things
-    vanilla's arrow does at the end of its own tick - `motion *= 0.99` and `motionY -= 0.05` (`EntityArrow.java`
-    lines 454-457) - never reach the next move. A full draw therefore travels exactly 3.0 blocks per tick along the
-    line the crosshair points at, with no drop at all; writing it before the move is what makes the flight straight,
-    writing it after is what keeps the motion constant for `EntityTrackerEntry` (a motion that changed every tick
-    would be re-sent as a velocity update every tick).
-  - **It drills on instead of exploding where it hits.** The contact itself is recognised exactly as before -
-    vanilla's own ray trace stops the arrow against a block and its entity scan kills the arrow on a mob, so a mob in
-    front of a block is still hit first - and the tick of a block contact is the tick that advanced by less than the
-    arrow's own speed (`advance < speed * 0.995`; vanilla backs the arrow off by 0.05 blocks, i.e. 4.2% of `MIN_SPEED`
-    and 1.7% of `MAX_SPEED`, while an open tick advances by exactly the speed because `applyAim` overwrote the
-    motion). On that tick `onBlockContact` blasts the piece of tunnel between the last blast and the face in front of
-    the arrow (`World#func_147447_a` from where the arrow sits along its own aim) and **does not remove the arrow**:
-    the block vanilla stuck it into is gone, so vanilla's own in-ground branch finds a different block on the next
-    tick, clears its in-ground flag and releases the arrow, which flies on with the aim written back. Every contact
-    therefore extends the same tunnel and one shot fired into a mountain carves a corridor through it until
-    `MAX_FLIGHT_TICKS` (200 ticks = 600 blocks at a full draw) runs out.
-    - The pieces are handed out back to back: `blastX/Y/Z` starts at the muzzle and is moved to the face of every
-      contact, so no block is ever scanned twice (the tunnel is only ever blasted forwards).
-    - `stuckTicks` counts the ticks the arrow spent held up by blocks; above `MAX_STUCK_TICKS` (6) the flight ends
-      with the bang (`finish`) instead of the arrow sitting in a wall for the rest of its life. Two of those ticks
-      always belong to a contact that *did* go through (the tick vanilla stopped the arrow, and the tick it releases
-      itself again), so a bedrock wall - or a protection plugin, or an explosion resistant block - is what the limit
-      is for.
-    - A tick in which vanilla *bounced* the arrow (an entity that refused the damage, e.g. a player in creative mode:
-      the motion ends up pointing backwards) is an entity hit, not a block one, and it is handled by the bow's kill.
-  - **The client does not know the aim: it takes it from the velocity the server sends.** `MTEntityVoidstarArrow`
-    implements FML's `IThrowableEntity` for exactly that reason - `FMLMessage.EntitySpawnMessage#toBytes` only writes
-    the velocity into the spawn packet for an `IThrowableEntity` (the `instanceof` branch next to the data watcher
-    stream) and `EntitySpawnHandler#spawnEntity` reads it back and calls `setVelocity`, while vanilla's own
-    `EntityArrow` is not one. **Before that interface was there, this was a real bug in game**: the freshly created
-    client copy of the arrow had a motion of zero, `applyAim` wrote this class's *default* aim into it - `(0, 0, 1)`,
-    i.e. due south and perfectly level - and the copy flew off sideways at three blocks per tick until the position
-    updates of the server dragged it back onto the real line. That reads as a curving arrow (a model that points
-    away from the aim for a moment and then swings onto it), which is what a report of "the arrow flies flat and to
-    my right, then corrects" was. `adoptSyncedAim` now takes `aim`/`speed` from the client's own motion at the start
-    of every tick, and the tick before the first velocity arrives (`MIN_AIM_LENGTH`, at most the first tick) holds
-    the orientation the spawn packet brought instead of letting vanilla recompute a rotation from a motion of zero -
-    `atan2(0, 0)` is 0, i.e. yaw 0 and pitch 0.
-  - **A hit on an entity kills it with the bow's true kill.** Vanilla's hit (damage, knockback, the sound) happens
-    first inside `super.onUpdate`, and the arrow is then dead - which is how the entity hit is recognised at all,
-    since a block contact never kills the arrow any more. The target is found again by `findHitEntity`, which repeats
-    exactly the scan vanilla ran a moment ago on the same step: candidates in the box around the step, every box
-    expanded by `0.3` blocks, `AxisAlignedBB#calculateIntercept`, closest intercept wins, the shooter excluded. The
-    kill is `MTBowKill.INSTANCE.kill(victim, shooter, this)`, i.e. the same branch of the `MTKillBase` ladder the
-    tunnel uses (see below), so the two kill paths of this weapon cannot drift apart. A bounce counts as a hit too:
-    the ladder does not care that the entity refused the damage.
-  - The arrow is never pickable (`canBePickedUp = 0`). Aim, speed, muzzle, the last blast point and the stuck
-    counter are saved to NBT, so an arrow saved mid-air by a chunk unload resumes on the same line and does not blast
-    its own tunnel a second time.
-- **The tunnel** (`MTExplosionTunnel#blast`, server side only; the client learns about it from the ordinary block
-  change packets and from the deaths): every block whose centre is within `Config.VOIDSTAR_BOW_TUNNEL_RADIUS`
-  (default **6.0**, i.e. a thirteen by thirteen hole; the minimum 0.5 is the single column of blocks the line passes
-  through, 1.5 is three by three and 2.5 is five by five) of the blasted piece is destroyed, and every living thing
-  within the same radius of it is killed by the bow's branch of the true kill ladder, `MTBowKill` (see below).
-  - The line is walked in one block steps and every step only opens a cube of `ceil(radius)` around the point it
-    reached - not the bounding box of the whole segment, which for a 128 block flight fired at 45 degrees would be a
-    90 x 90 x 90 box (729,000 blocks) scanned to destroy a few hundred. Half a block of slack per step is what makes
-    `ceil(radius)` enough to cover a block whose centre can be within the radius.
-  - Survives: air, fluids (vanilla explosions do not destroy them either), anything with
-    `getBlockHardness < 0` (bedrock, the portal, GT's unbreakable blocks) and anything with
-    `getExplosionResistance > 100` (obsidian is 600, stone 30, GT machine casings 10-20, so "everything a player can
-    mine, nothing that is meant to be blast proof"). **Nothing is dropped** - the tooltip says so out loud.
-  - **The living things inside the tunnel are killed by `MTBowKill`, the bow's branch of `MTKillBase`.** Both kill
-    paths of the weapon - a direct hit (`onEntityHit`) and this sweep - go through that one branch, so they can never
-    behave differently. What the ladder does is described in the piggy's section above: the plain `Float.MAX_VALUE`
-    hit with the `"infinity"` damage type first (which is what walks past the armour sets that cancel the events of
-    every other type), then armour piercing and creative mode, then the fire hit against death gates that only open
-    for fire, and finally zero health plus `onDeath` by hand, which no damage cap or invulnerability flag can
-    intercept. A target that survives the whole ladder is handed back alive (`restore`) and the thrower is told so
-    with `messtech.voidstarBow.kill.failed`.
-    - **A previous version of this weapon did not use the ladder.** It "killed" its targets with the overheal
-      exploit: `heal(1 << 31)` - the amount the item's tooltip used to quote - which on a classpath without Forge's
-      heal patch is the instant kill of vanilla's Instant Health potion, and which this mod then had to follow with
-      a hand written `setHealth` and `onDeath`. Two platform facts were behind that: Forge patched the vanilla half
-      away (`EntityLivingBase#heal`, lines 795-805, starts with
-      `amount = ForgeEventFactory.onLivingHeal(this, amount); if (amount <= 0) return;`, so a wrapped heal does
-      nothing) and 1.7.10 only runs `onDeath` from inside `attackEntityFrom` (`EntityLivingBase.java:931-941`), so
-      zero health alone is a walking corpse. **That class (`MTOverheal`) is gone**: the ladder reaches everything the
-      overheal reached and more, because it does not skip the damage pipeline of the target when the target can be
-      killed through it.
-    - The bow's branch overrides `accepts` to refuse the shooter: the tunnel starts at the muzzle, which is inside
-      the player who fired, so without that rule every shot would kill its own archer. The tunnel pass skips
-      `victim == source` as well, and the arrow's `findHitEntity` excludes the shooter, so the rule is enforced
-      three times over - but only the branch's copy is the one the weapon depends on.
-    - The two messages of the branch are `death.attack.messtech.voidstar` (`%1$s` is the victim; the archer is
-      deliberately not named) and `messtech.voidstarBow.kill.failed`. They are the branch's whole reason to exist:
-      they are handed to the base constructor by `MTBowKill`, and they are what keeps a bow kill from being announced
-      with the piggy's line.
-    - An entity's own size counts as well as its position: the reach is `radius + max(width, height) / 2`, so a
-      horse or a boss whose centre sits outside the tunnel is still caught when half of it is inside.
-    - Anything already dead or dying (`isDead` or health <= 0) is skipped, so the ladder is not asked to kill a
-      corpse (an entity at zero health whose death path never ran cannot be killed by a second call either - the
-      ladder's own `isDead` would not see a completed death).
+  `RenderArrow` from `ClientProxy#preInit`):
+  - **Straight flight**: `getLook(1.0F)` direction, zero spread (no `setThrowableHeading` jitter of up to 0.0075 per axis),
+    speed `1.2 + 1.8 * draw` blocks per tick, written into the motion at the start *and* end of every tick so vanilla's
+    `motion *= 0.99` and `motionY -= 0.05` (`EntityArrow.java` lines 454-457) never apply - a full draw is exactly 3.0
+    blocks per tick, no drop. Writing after the move keeps the motion constant for `EntityTrackerEntry`.
+  - **It drills on**: contact is vanilla's (ray trace stops the arrow on a block, entity scan kills it on a mob, so a mob in
+    front of a block is hit first); a block contact tick is the one that advanced less than the arrow's speed
+    (`advance < speed * 0.995` - vanilla backs off 0.05 blocks, 4.2% of `MIN_SPEED` and 1.7% of `MAX_SPEED`, while an open
+    tick advances exactly the speed because `applyAim` overwrote the motion). Then `onBlockContact` blasts the piece between
+    the last blast and the face ahead (`World#func_147447_a` from where the arrow sits along its aim) and **does not remove
+    the arrow**: the block it was stuck in is gone, so vanilla's in-ground branch finds another block next tick, clears the
+    flag and releases it. One shot into a mountain carves a corridor until `MAX_FLIGHT_TICKS` (200 ticks = 600 blocks at
+    full draw).
+    - Pieces back to back: `blastX/Y/Z` starts at the muzzle and moves to the face of every contact, so no block is scanned
+      twice.
+    - `stuckTicks` counts ticks held by blocks; above `MAX_STUCK_TICKS` (6) the flight ends with the bang (`finish`). Two of
+      those ticks belong to a contact that *did* go through, so the limit is for bedrock, a protection plugin or an
+      explosion resistant block.
+    - A tick where vanilla *bounced* the arrow (an entity refusing the damage, e.g. a creative player: the motion ends up
+      backwards) is an entity hit, handled by the bow's kill.
+  - **The client does not know the aim: it takes the spawn velocity.** FML's `IThrowableEntity` is why:
+    `FMLMessage.EntitySpawnMessage#toBytes` writes velocity only for one (the `instanceof` branch next to the data watcher
+    stream) and `EntitySpawnHandler#spawnEntity` calls `setVelocity`; vanilla's `EntityArrow` is not one. **Without it a real
+    bug in game**: zero motion on the fresh client copy, `applyAim` wrote the *default* `(0, 0, 1)` (due south, level), so
+    the arrow flew sideways at three blocks per tick until position updates dragged it back - "the arrow flies flat and to
+    my right, then corrects". `adoptSyncedAim` now takes `aim`/`speed` from the client's motion each tick, and
+    `MIN_AIM_LENGTH` (at most the first tick) holds the spawn packet's orientation instead of recomputing from zero motion
+    (`atan2(0, 0)` is 0: yaw 0, pitch 0).
+  - **Entity hits use the bow's true kill**: vanilla's hit (damage, knockback, sound) happens inside `super.onUpdate` and the
+    arrow is then dead, which is how an entity hit is recognised at all (a block contact never kills the arrow now).
+    `findHitEntity` repeats vanilla's scan on the same step: box around the step, every box expanded by `0.3` blocks,
+    `AxisAlignedBB#calculateIntercept`, closest intercept, shooter excluded. The kill is
+    `MTBowKill.INSTANCE.kill(victim, shooter, this)`, the same `MTKillBase` branch the tunnel uses, so the two kill paths
+    cannot drift apart. A bounce counts too.
+  - Never pickable (`canBePickedUp = 0`). Aim, speed, muzzle, last blast point and stuck counter go to NBT: an arrow saved
+    mid-air by a chunk unload resumes on the same line without re-blasting its tunnel.
+- **The tunnel** (`MTExplosionTunnel#blast`, server side; the client learns of it from block change packets and deaths):
+  blocks whose centre is within `Config.VOIDSTAR_BOW_TUNNEL_RADIUS` (default **6.0** = thirteen by thirteen; 0.5 = the
+  line's single column, 1.5 = three by three, 2.5 = five by five) of a blast piece are destroyed, and every living thing
+  within that radius dies by `MTBowKill`.
+  - One block steps, each opening only a `ceil(radius)` cube around the point reached - not the segment's bounding box,
+    which for a 128 block flight at 45 degrees would be 90 x 90 x 90 (729,000 blocks) scanned to destroy a few hundred. Half
+    a block of slack per step is what makes `ceil(radius)` enough.
+  - Survives: air, fluids (vanilla explosions do not destroy them either), `getBlockHardness < 0` (bedrock, the portal, GT's
+    unbreakable blocks), `getExplosionResistance > 100` (obsidian 600, stone 30, GT machine casings 10-20: "everything a
+    player can mine, nothing meant to be blast proof"). **Nothing is dropped** - the tooltip says so.
+  - **Living things die by `MTBowKill`, the bow's branch of `MTKillBase`**, shared by both kill paths - a direct hit
+    (`onEntityHit`) and this sweep. Ladder (see the piggy's section): `Float.MAX_VALUE` with the `"infinity"` type (walks
+    past armour sets that cancel every other type), armour piercing + creative mode, the fire hit for fire-only death gates,
+    then zero health + `onDeath` by hand (no damage cap or invulnerability flag intercepts). A survivor is handed back
+    (`restore`) and the thrower told with `messtech.voidstarBow.kill.failed`.
+    - **v1 used the overheal exploit instead**: `heal(1 << 31)` (the old tooltip amount) plus hand written `setHealth` and
+      `onDeath`, because `EntityLivingBase#heal` (lines 795-805) starts with
+      `amount = ForgeEventFactory.onLivingHeal(this, amount); if (amount <= 0) return;` (a wrapped heal does nothing) and
+      1.7.10 runs `onDeath` only from `attackEntityFrom` (`EntityLivingBase.java:931-941`). `MTOverheal` is gone; the ladder
+      reaches everything it did and more.
+    - The branch's `accepts` refuses the shooter (the tunnel starts at the muzzle, inside the archer); the tunnel pass also
+      skips `victim == source` and `findHitEntity` excludes the shooter - three times over, but only the branch's copy is
+      load-bearing.
+    - The branch exists for its two messages, `death.attack.messtech.voidstar` (`%1$s` is the victim, the archer
+      deliberately not named) and `messtech.voidstarBow.kill.failed`: `MTBowKill` hands them to the base constructor, so a
+      bow kill is not announced with the piggy's line.
+    - Size counts as well as position: reach = `radius + max(width, height) / 2`, so half a horse or boss inside is caught.
+    - Already dead or dying (`isDead` or health <= 0) is skipped - an entity at zero health whose death path never ran
+      cannot be killed by a second call either.
   - **Letting go heals the archer to full** (`Config.VOIDSTAR_BOW_HEALS_SHOOTER`, default **true**,
-    `MTItemVoidstarBow#onPlayerStoppedUsing`). It is `player.heal(max - current)`, i.e. a real heal of the
-    difference rather than a health assignment, so the game's heal path runs (the Forge heal event and healing
-    effects included) and the archer can never be pushed past their own maximum. It happens in the same
-    `!world.isRemote` branch that spawns the arrow, so a shot that does not happen - a draw too weak to fire, no
-    arrow in the inventory - heals nothing.
-  - A shot fired by a player posts the standard `BlockEvent.BreakEvent` per block and leaves it standing when a
-    protection mod cancels it; the vanilla "block destroyed" effect (`World#playAuxSFX` id 2001, what `Explosion`
-    sends per block) is only sent for blocks within 12 blocks of the impact, because one packet per block over a
-    long tunnel is the thing that makes big explosions lag.
-  - A blasted piece longer than `Config.VOIDSTAR_BOW_TUNNEL_LENGTH` (default **128** blocks) keeps its far end and
-    drops the near one: the wall the arrow is pressed against is what the player is looking at. The cap is per
-    piece, so it only ever applies to a shot that flew further than that before meeting its first block; the pieces
-    of the drilling that follow are a few blocks long each.
-  - `Config.VOIDSTAR_BOW_BREAKS_BLOCKS` (default **true**, category `VoidstarBow`) turns the whole block destruction
-    off; the arrow is then still straight and still trails, it just stops at the wall. The two passes of the tunnel
-    have independent switches: `Config.VOIDSTAR_BOW_ANNIHILATES_LIVING` (default **true**) turns the true kill of the
-    living things off, so a server can have the tunnel without them, or the kills without the block damage. A third
-    switch, `Config.VOIDSTAR_BOW_HEALS_SHOOTER` (default **true**), turns the heal the archer gets on release off.
-- **Particles** (`MTEntityFXVoidstar`, `MTVoidstarFx`): the trail spawns three sparks along the step the arrow just
-  took (at 3 blocks per tick, one per position would be a dotted line), every drilled block gets a small burst at the
-  face, and the end of the flight gets the big one - a flash at the wall, sparks through the whole tunnel (the muzzle
-  position travels in data watcher ids 20/21/22, which is why every client can draw the burst locally although only
-  the server destroys blocks) and vanilla `largeexplode`/`smoke` particles.
-  - One sprite is left, `messtech:particle/voidstarSpark`, registered **into the item atlas** by the bow's own
-    `registerIcons`, and the particles use `getFXLayer() == 2`, which is the one atlas
-    `EffectRenderer#renderParticles` binds for a custom icon: layer 0 is the vanilla particle sheet, and
-    `EntityFX#setParticleIcon` throws for it. Layer 2 is bound to `TextureMap.locationItemsTexture`
+    `MTItemVoidstarBow#onPlayerStoppedUsing`): `player.heal(max - current)`, a real heal of the difference, so the heal path
+    runs (Forge heal event included) and the archer cannot pass their maximum. In the same `!world.isRemote` branch that
+    spawns the arrow, so a failed shot (draw too weak, no arrow) heals nothing.
+  - A player's shot posts `BlockEvent.BreakEvent` per block and leaves it standing if a protection mod cancels it; the
+    vanilla "block destroyed" effect (`World#playAuxSFX` id 2001, what `Explosion` sends per block) goes out only within 12
+    blocks of the impact - one packet per block over a long tunnel is what makes big explosions lag.
+  - A piece longer than `Config.VOIDSTAR_BOW_TUNNEL_LENGTH` (default **128** blocks) keeps its far end, drops the near one:
+    the wall the arrow is pressed against is what the player looks at. Per piece, so only a first-block shot that far is
+    affected.
+  - `Config.VOIDSTAR_BOW_BREAKS_BLOCKS` (default **true**, category `VoidstarBow`) turns block destruction off - the arrow
+    still flies straight and trails, it just stops at the wall. Per pass: `Config.VOIDSTAR_BOW_ANNIHILATES_LIVING` (default
+    **true**) turns the true kill off, so a server can have the tunnel without the living, or the kills without the damage.
+- **Particles** (`MTEntityFXVoidstar`, `MTVoidstarFx`): three sparks along the step just taken (at 3 blocks per tick one per
+  position would be a dotted line), a small burst at the face of every drilled block, the big one at the end - flash at the
+  wall, sparks through the whole tunnel (muzzle position in data watcher ids 20/21/22, so every client can draw the burst
+  although only the server destroys blocks) and vanilla `largeexplode`/`smoke`.
+  - `messtech:particle/voidstarSpark`, registered **into the item atlas** by the bow's own `registerIcons`; particles use
+    `getFXLayer() == 2`, the one atlas `EffectRenderer#renderParticles` binds for a custom icon (layer 0 is the vanilla
+    particle sheet, `EntityFX#setParticleIcon` throws for it). Layer 2 -> `TextureMap.locationItemsTexture`
     (`EffectRenderer.java` lines 127-144).
-  - They are full bright (`getBrightnessForRender` returns `0xF000F0`, the value vanilla's spell particles return),
-    so the trail glows in an unlit cave instead of turning into grey dots. `noClip` is on: sparks hang in the air in
-    a tunnel that is being dug and must not be stopped by the blocks around them.
-  - The drilled block's burst is deliberately cheap (7 sparks): a shot into a mountain triggers it every few ticks
-    for as long as the arrow digs.
-- **The name wears the `STARFIELD` tooltip animation** (`MTStarfieldText` + `MTStarfieldTextRenderer`, both new):
-  - `MTStarfieldText.frame` colours character `i` with
-    `PALETTE[(i + floor(millis / 75)) mod 12]`, i.e. neighbouring characters wear neighbouring colours (the
-    gradient the player reads as a flow) and the band advances one character every 75 ms. The palette is
-    pink - purple - blue - dark aqua - aqua - white and back through a red and a gold, so every pass has a white
-    core with a night sky on one side and an ember on the other. Only colour codes are emitted - never bold, which
-    would move the advance by a pixel per character and pump the tooltip box (see
-    `MTModuleProjectTextRenderer` for that trap).
-  - `MTStarfieldTextRenderer` **replaces** the line (`replacesText()`): it draws the frame itself with the font and
-    then, on the plane of the tooltip box (`zLevel` 300, through a `Gui` subclass),
-    - one or two **twinkling stars per glyph**: the position comes from an avalanche hash of the character index, so
-      a star never leaves its pixel, while its blink phase comes from the same hash and a 260 ms clock, so the
-      neighbours twinkle independently; the brightest step also gets a four pixel cross,
-    - and a **shooting star** crossing the whole line from the upper left every 3.6 s, visible for the first 35% of
-      that period, with a fading tail.
-  - Glyph geometry (where a character starts, how wide it is) always comes from the `FontRenderer`, never from a
-    hand sum, so a resource pack with different letter widths keeps the stars on their letters.
-- **`MTAnimatedTooltipHandler#addItemNameAnimation` is the new registration shape this needs.** A tooltip's first
-  line is the item's display name, drawn by vanilla before any handler sees the tooltip, so an animation cannot be
-  attached by adding a line. The handler recognises the line a renderer belongs to by its **visible text**
-  (`rendererFor`), so an entry whose supplier answers with the item's name is enough - it must simply not be
-  appended to the tooltip, which is what the new `Entry#drawn` flag is for (`addItemTooltip`/`addAnimatedText` entries
-  are drawn, name entries are not). `ClientProxy#preInit` registers `MTStarfieldText.INSTANCE` with the lang key as
-  the supplier, so a resource pack rename follows.
-  - **The registration has to use `OreDictionary.WILDCARD_VALUE` as the stack's damage, and that was a real bug.**
-    The first version registered `new ItemStack(MTItems.voidstarBow)`, i.e. damage 0. The damage of a damageable stack
-    *is* its durability damage, `ItemStackMap.actualDamage` is `stack.getItemDamage()` and the handler's map is keyed
-    by it - so the effect worked on a freshly spawned bow and stopped working the moment the bow had been fired once,
-    which is exactly what "the rainbow effect does not show up" looked like in game. With `WILDCARD_VALUE` on the
+  - Full bright (`getBrightnessForRender` -> `0xF000F0`, what vanilla's spell particles return) so the trail glows in an
+    unlit cave; `noClip` on, sparks hang in the tunnel being dug.
+  - Cheap on purpose (7 sparks): a shot into a mountain triggers it every few ticks.
+- **The name wears the `magnetar` text effect** (`docs/text-fx/`): the lang entry itself carries the inline marker -
+  `item.messtech.voidstarBow.name=§{mg}混沌终焉·虚无贯星弓§r` (`mg` is the short name, `§r` closes it), in both
+  `zh_CN.lang` and `en_US.lang`. Effect text is ordinary text, so no Java hook and no `AnimatedTooltipHandler` is
+  involved: whatever draws the name with the font - the tooltip's first line (`ItemStack#getTooltip` takes
+  `getDisplayName()`), the inventory label, a chat item link - gets the field-line shader.
+  - Markers are inline declarations (`§{name...}`) or the private-use scoped form, so
+    `EnumChatFormatting#getTextWithoutFormattingCodes` (patched by `MixinEnumChatFormatting_TextEffect`) strips them
+    wherever vanilla wants unformatted text: search, command parsing, NEI lookups. A renamed stack shows the NBT custom
+    name instead; put the same marker in the custom name to keep the effect.
+  - If the effect stops showing up: check `Config.TEXT_EFFECTS`, and that
+    `assets/messtech/shaders/text/magnetar.frag.glsl` is packed; the renderer falls back to plain text (first palette
+    colour) when the shader or the mask cannot be used.
+  - The old `STARFIELD` name animation is no longer registered on the bow. `MTStarfieldText` / `MTStarfieldTextRenderer`
+    and `MTAnimatedTooltipHandler#addItemNameAnimation` remain as the tooltip-animation API: `init()` still registers
+    their renderers, and the registration shape below is what any future name animation would use.
+- **`MTAnimatedTooltipHandler#addItemNameAnimation` is the registration shape a name animation needs.** The first tooltip line is the
+  display name, drawn by vanilla before any handler sees the tooltip, so it cannot be animated by adding a line. The handler
+  recognises a renderer's line by its **visible text** (`rendererFor`), so an entry answering with the item's name
+  suffices - it must not be appended, which is what the new `Entry#drawn` flag is for (`addItemTooltip`/`addAnimatedText`
+  entries are drawn, name entries are not). The bow used to register `MTStarfieldText.INSTANCE` with the lang key as
+  supplier this way; if a name animation comes back, the same supplier shape lets a resource pack rename follow.
+  - **A registration like that has to use `OreDictionary.WILDCARD_VALUE` as the stack's damage - a real bug.** The first version
+    registered `new ItemStack(MTItems.voidstarBow)`, damage 0; a damageable stack's damage *is* its durability damage,
+    `ItemStackMap.actualDamage` is `stack.getItemDamage()` and the handler's map is keyed by it, so the effect worked on a
+    fresh bow and stopped once fired - what "the rainbow effect does not show up" looked like. With `WILDCARD_VALUE` on the
     NBT-insensitive map (`ItemStackMap(boolean NBTSensitive)` with `false`, the constructor the handler uses)
-    `DetailMap#getKeyType` answers `WildcardAll` - `isWildcard(damage)` and then `!NBTSensitive` -> `withWildcardTag`
-    - which lands the entry in the map's single `wildcard` field, and `DetailMap#get` returns that field **before**
-    looking at damage or NBT at all. Every damage, every enchantment and a renamed bow are therefore covered, which
-    is the same wildcard `MTItemPiggy`'s own registration uses.
-  - The other half of the tooltip plumbing was checked while hunting that: NEI does post gtnhlib's
-    `RenderTooltipEvent` (`codechicken/nei/util/RenderTooltipEventHelper`, called from `GuiContainerManager` line 633)
-    and honours `alternativeRenderer` (line 648), and the marker NEI appends to the first line
-    (`GuiDraw.TOOLTIP_LINESPACE = "\u00a7h"`) is a section code, i.e. `MTTextAnimation.visibleText` strips it and the
-    name still matches. Neither was the problem.
-- **Limitation**: the magic circle reads the use state of the player on the client that draws it, so *other* players
-  do not see the circle of somebody else drawing the bow (1.7.10 does not sync item use to other clients - the vanilla
-  bow pose has the same hole). The arrow, its trail, its bursts and the tunnel are unaffected - those travel with the
-  entity and every client simulates them.
-- Verification: `gradlew compileJava`, as always; the texture generators self-check their own output
-  (`tmp/chaosbow/gen_voidstar_textures.py`, `tmp/chaosbow/gen_voidstar_ysm_circles.py`) and the shell loops are not
-  part of the build. The Yes Steve Model pack the circle's design was read from is not a dependency: the layout,
-  timing and spin rates above were read out of its JSON files, and `tmp/chaosbow/inspect_ysm*.py` are the throwaway
-  scripts that read them.
-
+    `DetailMap#getKeyType` answers `WildcardAll` (`isWildcard(damage)` and then `!NBTSensitive` -> `withWildcardTag`),
+    landing the entry in the map's single `wildcard` field, and `DetailMap#get` returns that field **before** damage or NBT:
+    every damage, every enchantment and a renamed bow covered - the same wildcard `MTItemPiggy`'s registration uses.
+  - Tooltip plumbing underneath: NEI does post gtnhlib's `RenderTooltipEvent`
+    (`codechicken/nei/util/RenderTooltipEventHelper`, from `GuiContainerManager` line 633) and honours `alternativeRenderer`
+    (line 648), and the marker NEI appends to the first line (`GuiDraw.TOOLTIP_LINESPACE = "\u00a7h"`) is a section code, so
+    `MTTextAnimation.visibleText` strips it and the name still matches.
+- **Limitation**: the magic circle reads the drawing client's own use state, so *other* players do not see somebody else's
+  circle (1.7.10 does not sync item use - the vanilla bow pose has the same hole). Arrow, trail, bursts and tunnel are
+  unaffected: they travel with the entity.
+- Verification: `gradlew compileJava`; the texture generators self-check their output
+  (`tmp/chaosbow/gen_voidstar_textures.py`, `tmp/chaosbow/gen_voidstar_ysm_circles.py`) and the shell loops are not part of
+  the build. The Yes Steve Model pack is not a dependency: its JSON files only supplied the layout, timing and spin rates
+  (read with the throwaway `tmp/chaosbow/inspect_ysm*.py`).

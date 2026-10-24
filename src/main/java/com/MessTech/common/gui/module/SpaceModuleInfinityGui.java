@@ -51,8 +51,8 @@ public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<SpaceModuleInfi
     protected Flow createLeftPanelGapRow(ModularPanel parent, PanelSyncManager syncManager) {
         Flow row = super.createLeftPanelGapRow(parent, syncManager);
 
-        // Modules with a fixed parallel/cross-recipe behaviour (e.g. the infinite assembler) hide
-        // this button completely instead of leaving an empty panel button behind.
+        // Modules with fixed parallel/cross-recipe behaviour (e.g. the infinite assembler) hide this button completely
+        // instead of leaving an empty panel button behind.
         if (shouldShowParallelField() || shouldShowCrossRecipeParallelField()) {
             IPanelHandler parallelPanel = syncManager.syncedPanel(
                 "parallelPanel",
@@ -157,7 +157,7 @@ public class SpaceModuleInfinityGui extends MTEMultiBlockBaseGui<SpaceModuleInfi
     /**
      * Adds a separate small panel with a single integer text field.
      *
-     * @return the created panel handler, in case the caller wants to keep a reference.
+     * @return the created panel handler, if the caller wants to keep a reference.
      */
     protected IPanelHandler addIntPanelButton(Flow row, PanelSyncManager syncManager, ModularPanel parent,
         String panelName, String langKey, IntSyncValue syncer, int min, int max, int defaultValue) {

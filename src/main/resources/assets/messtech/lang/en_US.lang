@@ -598,9 +598,9 @@ messtech.itemEffect.universium=Universium
 messtech.itemEffect.sixPhasedCopper=Six-Phased Copper
 
 # --- Voidstar Piercer (混沌终焉·虚无贯星弓) ---
-# The bow's name wears the STARFIELD tooltip animation (MTStarfieldText): the handler matches the animated line by
-# its visible text, so this key is also what the animation is registered against.
-item.messtech.voidstarBow.name=Chaos Finale: Voidstar Piercer
+# The name carries the inline magnetar text-effect marker: §{mg} is the short name, closed by §r.
+# See docs/text-fx/ and common/text/effect/TextEffectFormat; anything that draws the name with the font gets it.
+item.messtech.voidstarBow.name=§{mg}Chaos Finale: Voidstar Piercer§r
 messtech.voidstarBow.tooltip.charge=§7· §6Charging:§7 a full draw takes §b%1$s seconds§7, and a §dmagic circle§7 unfolds in the air in front of you as it charges, its four corners bursting open one after another
 messtech.voidstarBow.tooltip.flight=§7· §6Flight:§7 the arrow holds a §bdead straight§7 line with almost no drop, trailing §dchaos sparks
 messtech.voidstarBow.tooltip.pierce=§7· §6Impact:§7 it blasts a §ctunnel§7 through what it hits and §bdigs straight on§7, until it runs out of range or meets something it cannot open
@@ -735,3 +735,179 @@ messtech.gameConsole.key.weapon7=Weapon 7
 messtech.gameConsole.key.weapon8=Weapon 8
 messtech.gameConsole.key.weapon9=Weapon 9
 messtech.gameConsole.key.weapon0=Weapon 0
+
+# Text effects (docs/text-fx/), preview command /messtechfx
+command.messtechfx.usage=§cUsage: /messtechfx <datafall|eventhorizon|inkbloom|magnetar|resonance|beamcut|cipher|petalfall|all>
+messtech.text_effect.datafall=Datafall
+messtech.text_effect.datafall.sample=Data torrent - quantum storage matrix
+messtech.text_effect.eventhorizon=Event Horizon
+messtech.text_effect.eventhorizon.sample=Final singularity - gravitational collapse core
+messtech.text_effect.inkbloom=Inkbloom
+messtech.text_effect.inkbloom.sample=Ink of a thousand autumns - gilded years
+messtech.text_effect.magnetar=Magnetar
+messtech.text_effect.magnetar.sample=Magnetar pulse - dipole confinement ring
+messtech.text_effect.resonance=Resonance
+messtech.text_effect.resonance.sample=Resonant frequency - voiceprint analysis array
+messtech.text_effect.beamcut=Beam Cut
+messtech.text_effect.beamcut.sample=Phase blade - cutting protocol
+messtech.text_effect.cipher=Cipher
+messtech.text_effect.cipher.sample=Cipher protocol - quantum key rotation
+messtech.text_effect.petalfall=Petalfall
+messtech.text_effect.petalfall.sample=Petals falling - ten miles of spring wind
+
+# Large Processing Factory / Large Essentia Generator (GT++ and GoodGenerator ports)
+machine.lpf.name=Large Processing Factory
+machine.lpf.machinetype=Nine in One
+machine.lpf.mode.0=Metal
+machine.lpf.mode.1=Fluid
+machine.lpf.mode.2=Misc
+machine.lpf.tooltip.desc=§7Nine single-block machines in one frame: the machine mode and the circuit pick the recipe pool.
+machine.lpf.tooltip.flavour=§7The old factory never really closed.
+machine.lpf.tooltip.bonus.header=§6Bonuses:
+machine.lpf.tooltip.bonus.speed=§7· §e250% faster§7 than the single-block machines
+machine.lpf.tooltip.bonus.eu=§7· Uses §e80%§7 of the EU/t normally required
+machine.lpf.tooltip.bonus.parallel=§7· Processes §e2 items per energy hatch tier§7 in parallel
+machine.lpf.tooltip.bonus.module=§7· Speed/EU modules multiply these, a parallel module §eadds§7 its parallel
+machine.lpf.tooltip.modes.header=§6Machine modes (screwdriver or the GUI button):
+machine.lpf.tooltip.modes.metal=§7· §eMetal§7 (circuit 20/21/22): Compressor / Lathe / Electromagnetic Polarizer
+machine.lpf.tooltip.modes.fluid=§7· §eFluid§7 (circuit 20/21/22): Fermenter / Fluid Extractor / Extractor
+machine.lpf.tooltip.modes.misc=§7· §eMisc§7 (circuit 20/21/22): Precision Laser Engraver / Autoclave / Fluid Solidifier
+machine.lpf.tooltip.modes.circuit=§7· Put the circuit in the controller slot or an input bus
+machine.lpf.tooltip.structure.header=§6Structure:
+machine.lpf.tooltip.structure.casing=§7· §b3×3×3§7 shell of §eMulti-Use Casing§7, at least §b6§7 casings
+machine.lpf.tooltip.structure.hatches=§7· Every casing may hold an IO bus, an IO hatch, the energy hatch, the muffler or a §dModule Hatch§7
+machine.lpf.tooltip.details=§6Supports input separation and a GT++ Solidifier Hatch in Misc mode.
+machine.lpf.tooltip.details.hint=§7Modules are the speed / EU / parallel controller hatches.
+machine.lpf.tooltip.controller=§7Front center
+machine.lpf.tooltip.casing_name=Multi-Use Casing
+machine.lpf.tooltip.hatch_info=Any Casing
+machine.lpf.tooltip.module_hatch=Module Hatch
+
+machine.leg.name=Large Essentia Generator
+machine.leg.machinetype=Essentia Generator
+machine.leg.tooltip.desc=§7Turns stored essentia into §eEU§7. The dynamo hatch decides the output voltage and amperage.
+machine.leg.tooltip.flavour=§7Maybe some Thaumaturges are upset by it...
+machine.leg.tooltip.fuel.header=§6Fuel:
+machine.leg.tooltip.fuel.cells=§7· EU per essentia unit = §efuel value × stable points / 25§7; the cells only give stable points
+machine.leg.tooltip.fuel.upgrade=§7· Right-click the controller with an upgrade to unlock its aspect category (NORMAL is always on)
+machine.leg.tooltip.fuel.fluids=§7· Most categories also consume an auxiliary fluid (air, coolant, inert gas, ...) per unit
+machine.leg.tooltip.output.header=§6Output:
+machine.leg.tooltip.output.hatch=§7· Exactly §b1§7 dynamo hatch: normal, §eMulti-Amp§7 or §cLaser§7; voltage and amperage follow the hatch
+machine.leg.tooltip.output.overmax=§7· A multi-amp or laser hatch can push the output past the §cMAX§7 tier voltage
+machine.leg.tooltip.output.wireless=§7· Wireless output is §cdisabled§7 on this generator
+machine.leg.tooltip.structure.header=§6Structure:
+machine.leg.tooltip.structure.cells=§7· §b25§7 Essentia Diffusion Cells of §bone tier§7 (blueprint sub-channel §bessentia_cell§7): Novice/Adept/Master cap the hatch tier at EV/IV/LuV, §eGrandmaster§7 removes the cap
+machine.leg.tooltip.structure.blocks=§7· §b4§7 Amber Bricks, §b24§7 Arcane Stone Bricks, the rest is §eMagic Casing§7
+machine.leg.tooltip.structure.hatches=§7· Hatches: §b1+§7 Essentia Input Hatches, §b1§7 input hatch, §b1§7 dynamo hatch
+machine.leg.tooltip.details=§6The full rules are the "混乱科技" Thaumonomicon page.
+machine.leg.tooltip.details.hint=§7Hover a hatch to see the hint dot.
+machine.leg.tooltip.controller=§7Front bottom center
+machine.leg.tooltip.hatch_info=Magic Casing
+machine.leg.tooltip.essentia_hatch=Essentia Input Hatch
+machine.leg.tooltip.essentia_hatch_me=ME Essentia Input Hatch
+machine.leg.tooltip.cells_name=Essentia Diffusion Cell
+machine.leg.chat.upgrade=§aInstalled upgrade: %s
+machine.leg.structure.error.no_cell=§cAt least one Essentia Diffusion Cell is required
+machine.leg.structure.error.dynamo_count=§cExactly one dynamo hatch is required (normal, multi-amp or laser)
+machine.leg.structure.error.hatch_tier=§cHatch tier too high for the diffusion cells (Grandmaster cells allow any tier)
+machine.leg.structure.error.input_hatch=§cExactly one input hatch is required
+machine.leg.structure.error.no_essentia_hatch=§cAt least one Essentia Input Hatch is required
+
+tile.essentiaHatch.name=Essentia Input Hatch
+machine.essentiahatch.tooltip.0=§7Right-click with an essentia container to lock the filter
+machine.essentiahatch.tooltip.1=§7Right-click with an empty hand to clear it
+machine.essentiahatch.chat.locked=§aLocked to %s
+machine.essentiahatch.chat.clear=§eFilter cleared
+
+item.messtech.essentiaUpgrade.0.name=Essentia Generator: Empty
+item.messtech.essentiaUpgrade.1.name=§eEssentia Generator: Air§r
+item.messtech.essentiaUpgrade.2.name=§cEssentia Generator: Thermal§r
+item.messtech.essentiaUpgrade.3.name=§8Essentia Generator: Unstable§r
+item.messtech.essentiaUpgrade.4.name=§dEssentia Generator: Victus§r
+item.messtech.essentiaUpgrade.5.name=§5Essentia Generator: Tainted§r
+item.messtech.essentiaUpgrade.6.name=§bEssentia Generator: Mechanics§r
+item.messtech.essentiaUpgrade.7.name=§6Essentia Generator: Spirit§r
+item.messtech.essentiaUpgrade.8.name=§aEssentia Generator: Radiation§r
+item.messtech.essentiaUpgrade.9.name=§3Essentia Generator: Electric§r
+
+# Thaumonomicon: 混乱科技 / MessTech tab and its LEG research
+tc.research_category.messtech=MessTech
+tc.research_name.messtech.leg=Combustion Engine in Magic World
+tc.research_text.messtech.leg=Will it cause Flux pollution?
+tc.research_text.messtech.leg.0=You have found that Essentia contains much more power than you thought. Is there a way to generate electricity from these Essentia?<BR><BR>The LEG(Large Essentia Generator) will automatically adapt its output voltage according to its dynamo hatch. The Diffusion Cell determines the highest hatch tier that LEG can accept, and Grandmaster cells remove that limit.
+tc.research_text.messtech.leg.1=Currently, only these Aspects can be converted into power directly without upgrades:<BR><BR>Terra: 800EU<BR><BR>Aqua: 5000EU<BR><BR>Ordo: 12000EU<BR><BR>Lux: 13000EU<BR><BR>Tempestas: 61200EU<BR><BR>Gelum: 3900EU<BR><BR>Vitreus: 2000EU<BR><BR>Potentia: 25600EU<BR><BR>Permutatio: 6000EU<BR><BR>Metallum: 2600EU
+tc.research_text.messtech.leg.2=Tenebrae: 9000EU<BR><BR>Praecantatio: 36000EU<BR><BR>Herba: 2600EU<BR><BR>Arbor: 4500EU<BR><BR>Bestia: 1000EU<BR><BR>Messis: 9800EU<BR><BR>Perfodio: 1300EU<BR><BR>Instrumentum: 1200EU<BR><BR>Meto: 3600EU<BR><BR>Tutamen: 6200EU<BR><BR>Fabrico: 1100EU
+tc.research_text.messtech.leg.3=Pannus: 600EU<BR><BR>Vinculum: 500EU<BR><BR>Magneto: 108000EU<BR><BR>Vesania: 1EU<BR><BR>Primordium: 217000<BR><BR>Gula: 64000EU<BR><BR>Tempus: 142857EU<BR><BR>You need to install upgrades on the generator if you want to use other kinds of Essentia as fuel.
+
+tc.research_name.messtech.cells=Better Cells
+tc.research_text.messtech.cells=And higher efficiency.
+tc.research_text.messtech.cells.0=The Novice Cell has such low efficiency that you can't bear it. So you discovered a new way to make some better Cells<BR><BR>The Novice Cell only provides 1 StablePoint, the Adept one provides 2 StablePoint, the Master one provides 5 StablePoint, and the Grandmaster one provides 10 StablePoint!<BR><BR>With higher StablePoint, the generator can create more electricity from per Essentia.<BR><BR>They also allow you to use better hatches.
+
+tc.research_name.messtech.upgrade.blank=Upgrade your generator
+tc.research_text.messtech.upgrade.blank=Let's try some more dangerous essentia.
+tc.research_text.messtech.upgrade.blank.0=A blank upgrade! I bet it has infinity possibility.<BR><BR>Except few kinds of Essentia, most Essentia needs external fluid to help them diffuse in the cell or increase the efficiency. Without these special fluids, the Essentia will block up the crevice of cells, resulting in lower efficiency or even no output. You can install multiple upgrades in one LEG.<BR><BR>The formula to calculate the fluid consuming speed:<BR>Basic consuming speed * Essentia coefficient * consumed Essentia amount
+
+tc.research_name.messtech.upgrade.air=Essentia: AIR
+tc.research_text.messtech.upgrade.air=I can feel it on the wind.
+tc.research_text.messtech.upgrade.air.0=This kind of Essentia has a high affinity for air and requires air to assist it to diffuse.<BR><BR>We can use liquid air which is more concentrated to further increase the efficiency of Essentia.<BR><BR>The basic consuming speed is 160L/sec.
+tc.research_text.messtech.upgrade.air.1=Acceptable Aspects:<BR><BR>Aer: 10000EU Coefficient:x1.0<BR><BR>Motus: 20000EU Coefficient:x0.5<BR><BR>Volatus: 56000EU Coefficient:x2.0<BR><BR>Auram: 42000EU Coefficient:x2.7<BR><BR>Required Liquid:<BR><BR>Air: Efficiency:x1.0<BR><BR>Liquid Air: Efficiency:x1.5
+
+tc.research_name.messtech.upgrade.thermal=Essentia: THERMAL
+tc.research_text.messtech.upgrade.thermal=Melting down.
+tc.research_text.messtech.upgrade.thermal.0=The energy from this kind of Essentia cannot be fully converted into electricity, and some of it is converted into heat that heats up the diffusion cell.<BR><BR>Coolants are needed to keep the generator running steadily and better coolants allow Essentia to release more energy safely.<BR><BR>The basic consuming speed is 40L/sec.
+tc.research_text.messtech.upgrade.thermal.1=Acceptable Aspects:<BR><BR>Ignis: 16000EU Coefficient:x1.0<BR><BR>Aequalitas: 300000EU Coefficient:x7.0<BR><BR>Volatus: 56000EU Coefficient:x2.0<BR><BR>Infernus: 35700EU Coefficient:x3.0<BR><BR>Ira: 82600EU Coefficient:x5.0
+tc.research_text.messtech.upgrade.thermal.2=Required Liquid:<BR><BR>Water: Efficiency:x0.5<BR><BR>Distilled Water: Efficiency:x1.0<BR><BR>Crushed Ice: Efficiency:x1.2<BR><BR>IC2 Coolant: Efficiency:x1.5<BR><BR>Cryotheum: Efficiency:x5.0<BR><BR>Super Coolant: Efficiency:x9.0
+
+tc.research_name.messtech.upgrade.unstable=Essentia: UNSTABLE
+tc.research_text.messtech.upgrade.unstable=Heart of chaos.
+tc.research_text.messtech.upgrade.unstable.0=This kind of Essentia tends to damage the diffusion cell or reacts with air easily.<BR><BR>Inert gases are needed to protect the diffusion cell.<BR><BR>The more inert the gas, the more energy can be safely released from the Essentia.<BR><BR>The basic consuming speed is 80L/sec.
+tc.research_text.messtech.upgrade.unstable.1=Acceptable Aspects:<BR><BR>Perditio: 4500EU Coefficient:x1.0<BR><BR>Vacuos: 8200EU Coefficient:x1.5<BR><BR>Venenum: 17000EU Coefficient:x2.0<BR><BR>Telum: 14200EU Coefficient:x2.5<BR><BR>Terminus: 300000EU Coefficient:x10.0
+tc.research_text.messtech.upgrade.unstable.2=Required Liquid:<BR><BR>Nitrogen: Efficiency:x1.0<BR><BR>Helium: Efficiency:x2.0<BR><BR>Neon: Efficiency:x2.2<BR><BR>Argon: Efficiency:x2.5<BR><BR>Krypton: Efficiency:x3.0<BR><BR>Xenon: Efficiency:x4.0
+
+tc.research_name.messtech.upgrade.victus=Essentia: VICTUS
+tc.research_text.messtech.upgrade.victus=Will it bleed?
+tc.research_text.messtech.upgrade.victus.0=This kind of Essentia contains the essence of life.<BR><BR>Most of them can't be converted into much energy directly, but you can provide them with Life Essence, enhancing the power they generate greatly.<BR><BR>The basic consuming speed is 360L/sec.
+tc.research_text.messtech.upgrade.victus.1=Acceptable Aspects:<BR><BR>Victus: 20000EU Coefficient:x1.0<BR><BR>Spiritus: 37600EU Coefficient:x0.7<BR><BR>Sano: 24600EU Coefficient:x1.2<BR><BR>Corpus: 5200EU Coefficient:x0.9<BR><BR>Humanus: 16700EU Coefficient:x1.3<BR><BR>Fames: 17600EU Coefficient:x1.1<BR><BR>Gloria: 120000EU Coefficient:x0.6
+tc.research_text.messtech.upgrade.victus.2=Optional Liquid:<BR><BR>Liquid XP: Efficiency:x2.0<BR><BR>Life Essence: Efficiency:x6.0
+
+tc.research_name.messtech.upgrade.tainted=Essentia: TAINTED
+tc.research_text.messtech.upgrade.tainted=Dirty Deeds Done Dirt Cheap
+tc.research_text.messtech.upgrade.tainted.0=This kind of Essentia contains dark powers. It may cause flux pollution when running.<BR><BR>You can provide these Essentia with Purifying Fluid or Liquid Death...... resulting two different effects.<BR><BR>The Purifying Fluid can purify and greatly enhances the energy outputted by the Essentia, and also prevents the flux pollution.<BR><BR>The Water of Death does not dissolve Essentia, but adding it to diffused Essentia can have a wonderful effect. The lower the basic fuel value of the Essentia, the more the dark energy can be released.
+tc.research_text.messtech.upgrade.tainted.1=The basic consuming speed is 60L/sec.
+tc.research_text.messtech.upgrade.tainted.2=Acceptable Aspects:<BR><BR>Mortuus: 7200EU Coefficient:x1.0<BR><BR>Alienis: 9700EU Coefficient:x1.7<BR><BR>Vitium: 4700EU Coefficient:x10.0<BR><BR>Exanimis: 9000EU Coefficient:x1.2
+tc.research_text.messtech.upgrade.tainted.3=Optional Liquid:<BR><BR>Purifying Fluid: Efficiency:x60.0<BR><BR>Liquid Death: Efficiency:x (25000/Basic Fuel Value)^4
+
+tc.research_name.messtech.upgrade.mechanics=Essentia: MECHANICS
+tc.research_text.messtech.upgrade.mechanics=Driven by Ether.
+tc.research_text.messtech.upgrade.mechanics.0=This kind of Essentia must flow quickly in order to release energy.<BR><BR>Lubricants are needed to provide sufficient fluidity to the Essentia.<BR><BR>The basic consuming speed is 400L/sec.
+tc.research_text.messtech.upgrade.mechanics.1=Acceptable Aspects:<BR><BR>Iter: 16000EU<BR><BR>Machina: 61200EU<BR><BR>Limus: 11800EU<BR><BR>The Coefficient is always x1.0
+tc.research_text.messtech.upgrade.mechanics.2=Required Liquid:<BR><BR>Lubricant: Efficiency:x1.0
+
+tc.research_name.messtech.upgrade.sprite=Essentia: SPRITE
+tc.research_text.messtech.upgrade.sprite=Brain in a Machine.
+tc.research_text.messtech.upgrade.sprite.0=The power directly generated from spiritual Essentia is very low. It is only when activated with Flowing Spirit or Hollow Tears that these Essentia can show their true power.<BR><BR>When the stable point of Diffusion Cell is low, Hollow Tears can stimulate more energy from Essentia. But when the stable point of Diffusion Cell becomes higher, only using Flowing Spirit can awaken the true power of Essentia.<BR><BR>The basic consuming speed is 40L/sec.
+tc.research_text.messtech.upgrade.sprite.1=Acceptable Aspects:<BR><BR>Cognitio: 2200EU Coefficient:x1.2<BR><BR>Sensus: 1400EU Coefficient:x0.7<BR><BR>Lucrum: 6000EU Coefficient:x2.0<BR><BR>Strontio: 200EU Coefficient:x0.03<BR><BR>Nebrisum: 24300EU Coefficient:x2.0<BR><BR>Luxuria: 79200EU Coefficient:x3.7<BR><BR>Superbia: 10900EU Coefficient:x2.1<BR><BR>Invidia: 7700EU Coefficient:x1.0<BR><BR>Desidia: 600EU Coefficient:x0.1
+tc.research_text.messtech.upgrade.sprite.2=Optional Liquid:<BR><BR>Hollow Tears: Efficiency:x 15x(1+100/Stable Point)<BR><BR>Flowing Spirit Efficiency:x 10x(1+Stable Point/100)<BR><BR>This means Flowing Spirit is more efficient when stable point is over 150.
+
+tc.research_name.messtech.upgrade.radiation=Essentia: RADIATION
+tc.research_text.messtech.upgrade.radiation=Atomic Heart
+tc.research_text.messtech.upgrade.radiation.0=The use of this Essentia for power generation is similar to the use of nuclear fuel, except that the Essentia represents a purely "radioactive" property rather than a specific nuclear fuel.<BR><BR>However, the method of boosting nuclear fuel power still applies here, and it will directly result in more energy being released from Essentia.<BR><BR>The basic consuming speed is 120L/sec.
+tc.research_text.messtech.upgrade.radiation.1=Acceptable Aspects:<BR><BR>Radio: 238000EU Coefficient:x1.0<BR><BR>Astrum: 118000EU Coefficient:x0.5
+tc.research_text.messtech.upgrade.radiation.2=Optional Liquid:<BR><BR>Molten Caesium: Efficiency:x2.0<BR><BR>Molten Uranium-235: Efficiency:x3.0<BR><BR>Molten Naquadah: Efficiency:x4.0<BR><BR>Molten Atomic Separation Catalyst: Efficiency:x16.0
+
+tc.research_name.messtech.upgrade.electric=Essentia: ELECTRIC
+tc.research_text.messtech.upgrade.electric=Get electricity from... electricity?
+tc.research_text.messtech.upgrade.electric.0=The ELECTRUM Essentia itself represents electricity!<BR><BR>The higher the voltage of the generator dynamo hatch, the more ELECTRUM will be affected by potential difference and increase the amount of energy.
+tc.research_text.messtech.upgrade.electric.1=Acceptable Aspects: Electrum<BR><BR>The formula to calculate its power:<BR>8x(3.0^Dynamo Hatch Tier)EU
+tile.essentiaHatchME.name=ME Essentia Input Hatch
+machine.essentiahatch.me.tooltip.0=§7Right-click with an essentia container to mark that aspect
+machine.essentiahatch.me.tooltip.1=§7Right-click with an empty hand to open the GUI
+machine.essentiahatch.me.gui.aspect=§7Aspect: §b%s
+machine.essentiahatch.me.gui.stored=§7Stored: §b%s§7 / §b%s
+machine.essentiahatch.me.gui.online=§7AE network: §aonline
+machine.essentiahatch.me.gui.offline=§7AE network: §coffline
+machine.essentiahatch.me.gui.max=§7Max input per tick:
+machine.essentiahatch.me.gui.clear=§eClear aspect
+machine.essentiahatch.me.gui.no_aspect=none
+machine.essentiahatch.me.tooltip.capacity=§7Capacity: §b%s§7 essentia
+machine.essentiahatch.me.tooltip.max_input=§7Max input per tick: §b%s

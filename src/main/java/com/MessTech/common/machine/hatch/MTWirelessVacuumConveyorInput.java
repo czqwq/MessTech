@@ -27,9 +27,8 @@ import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponen
 /**
  * Wireless NAC Vacuum Conveyor Input.
  * <p>
- * Extends the normal GT5U input hatch so existing NAC module structure code still recognises it as a
- * VCI. Instead of using coloured pipes, it pairs with wireless output hatches that share the same
- * frequency and privacy scope, including across NACs/dimensions.
+ * Extends the GT5U input hatch so existing NAC module structure code still sees a VCI, but pairs with wireless output
+ * hatches of the same frequency and privacy scope instead of coloured pipes, across NACs and dimensions.
  */
 public class MTWirelessVacuumConveyorInput extends MTEHatchVacuumConveyorInput implements IWirelessVacuumConveyor {
 
@@ -148,12 +147,12 @@ public class MTWirelessVacuumConveyorInput extends MTEHatchVacuumConveyorInput i
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         if (aBaseMetaTileEntity.isServerSide()) {
-            // Re-register every tick so hatches that existed before the wireless registry was added
-            // still get picked up without needing to be broken and replaced.
+            // Re-register every tick so hatches that predate the wireless registry are picked up without being
+            // broken and replaced.
             WirelessVacuumConveyorUtil.register(this);
             if (aTick % 20 == VACUUM_MOVE_TICK) {
-                // Query the dedicated wireless registry directly. This avoids depending on whether the
-                // two isolated hatches successfully formed a VacuumFactoryGrid edge.
+                // Query the dedicated wireless registry directly instead of relying on the two isolated hatches
+                // having formed a VacuumFactoryGrid edge.
                 List<MTEHatchVacuumConveyorOutput> outputs = WirelessVacuumConveyorUtil.findMatchingOutputs(this);
                 // Keep the original 1:1 rule: one wireless output per colour/frequency channel.
                 if (outputs.size() == 1) {

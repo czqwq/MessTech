@@ -63,12 +63,10 @@ import tectech.thing.metaTileEntity.hatch.MTEHatchDataInput;
 import tectech.thing.metaTileEntity.multi.base.render.TTRenderedExtendedFacingTexture;
 
 /**
- * Infinite Space Mining module.
- * <p>
- * Uses the real GTNH Intergalactic space mining recipe pool, consumes drones/drills/rods and plasma,
- * draws computation from the parent Space Elevator and power from the GT wireless network. It is an
- * Orbital Tier V module: {@code TileEntitySpaceElevator} only mounts it while its motor tier is at
- * least {@code getNeededMotorTier()}, i.e. while it carries acceleration track MK-V.
+ * Infinite Space Mining module: GTNH Intergalactic's real space mining recipe pool, consuming drones/drills/rods and
+ * plasma, drawing computation from the parent Space Elevator and power from the GT wireless network. It is an Orbital
+ * Tier V module: {@code TileEntitySpaceElevator} only mounts it while its motor tier is at least
+ * {@code getNeededMotorTier()}, i.e. while it carries acceleration track MK-V.
  */
 public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModuleMinerInfinity> {
 
@@ -236,9 +234,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     }
 
     /**
-     * @return the module tier this module was constructed with, i.e. {@code tModuleTier}. The native mining
-     *         modules read the same field back through their own {@code getModuleTier()}, and the recipe pool
-     *         marks every asteroid with the {@code MODULE_TIER} it needs.
+     * @return {@code tModuleTier}, which the native mining modules read back through their own {@code getModuleTier()};
+     *         the recipe pool marks every asteroid with the {@code MODULE_TIER} it needs.
      */
     public int getModuleTier() {
         return tModuleTier;
@@ -269,9 +266,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         eInputData.clear();
         if (!checkPiece("main", 0, 1, 0, errors)) return;
         checkElevatorLinkage(errors, "V");
-        // Only look for computation while the elevator has the module mounted: a module that is not linked yet
-        // has no access to the shared computation either, and reporting a missing data hatch on top of the
-        // linkage error would just send the player after the wrong problem.
+        // Look for computation only once the elevator has the module mounted: otherwise a missing data hatch on top of
+        // the linkage error would send the player to the wrong problem.
         if (eInputData.isEmpty() && getConnectedElevator() != null && !getConnectedElevator().hasDataHatches()) {
             errors.add(StructureErrors.of("GT5U.gui.text.structure_error.missing_data_input_hatch"));
         }
@@ -325,12 +321,9 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     }
 
     /**
-     * The custom mining check already caps parallels using the data available at recipe-start time.
-     * TT's generic computation-timeout check can otherwise see a temporarily lower
-     * {@code eAvailableData} right after the module becomes active (elevator data is divided among
-     * active miners) and shut the machine down with a false "computation_loss" even though enough
-     * computation exists. Keep {@code eAvailableData} at least at the amount this recipe actually
-     * reserved.
+     * The mining check already capped parallels on the data available at recipe start; TT's generic
+     * computation-timeout check can otherwise see a temporarily lower {@code eAvailableData} (the elevator data is
+     * divided among active miners) and fire a false "computation_loss". Keep it at what this recipe reserved.
      */
     @Override
     public boolean onRunningTickCheck(ItemStack aStack) {
@@ -363,8 +356,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     }
 
     private CheckRecipeResult doMiningCheck() {
-        // Cap the per-recipe parallel to prevent Int.MAX from turning generateOutputs into a
-        // multi-billion iteration loop (the main spark hotspot).
+        // Cap the per-recipe parallel so Int.MAX cannot turn generateOutputs into a multi-billion iteration loop (the
+        // main spark hotspot).
         int parallel = Math.max(1, Math.min(getWirelessParallel(), MAX_MINING_PARALLEL));
         long eut = GTValues.V[14] + (long) (parallel - 1) * GTValues.V[13];
         int effectiveDistance = getEffectiveDistance();
@@ -397,9 +390,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
                 .voltage(Long.MAX_VALUE)
                 .findAll()
                 .filter(r -> {
-                    // Same two gates as the native miner: the asteroid has to be within this module's module
-                    // tier and within the selected distance. Without the first one the distance alone decided
-                    // the pool, so the module also pulled asteroids that a native module of its tier could not.
+                    // Same two gates as the native miner: module tier and selected distance. Without the first one the
+                    // distance alone decided the pool, so the module pulled asteroids a native module could not.
                     int recipeTier = r.getMetadataOrDefault(IGRecipeMaps.MODULE_TIER, 1);
                     if (recipeTier > getModuleTier()) return false;
                     SpaceMiningData data = r.getMetadata(IGRecipeMaps.SPACE_MINING_DATA);
@@ -440,8 +432,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
             return SimpleCheckRecipeResult.ofFailure("no_plasma");
         }
 
-        // Use the same ParallelHelper path as the original module: it caps by inputs and consumes
-        // the item/fluid inputs once parallels are known.
+        // Same ParallelHelper path as the original module: it caps by inputs and consumes the item/fluid inputs once
+        // the parallels are known.
         ParallelHelper helper = new ParallelHelper().setMaxParallel(maxParallels)
             .setRecipe(recipe)
             .setFluidInputs(fluidInputs)
@@ -476,12 +468,10 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         // Wireless power was already deducted in one lump; don't drain energy hatches too.
         lEUt = 0;
         eRequiredData = (int) Math.ceil(data.computation * maxParallels * compModifier);
-        // The custom check above already reserved only as much computation as was available. Keep TT's
-        // internal view consistent so its generic computation timeout does not fire a false loss right
-        // after this module becomes active and the elevator recalculates the per-module share.
+        // Keep TT's view consistent with the reservation above, so its timeout does not fire a false loss.
         eAvailableData = Math.max(eAvailableData, availableData);
         eComputationTimeout = 100;
-        // Duration is managed by the tick-batched main batch; do not overwrite it here.
+        // Duration belongs to the tick-batched main batch; do not overwrite it here.
         mEfficiencyIncrease = 10000;
         cycleDistance();
         return CheckRecipeResultRegistry.SUCCESSFUL;
@@ -581,8 +571,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
             parallels = Math.max(1, (int) (MAX_OUTPUT_ITERATIONS / Math.max(1, data.maxSize)));
         }
 
-        // Use a plain long[] indexed by recipe output slot. This avoids HashMap/ItemId hashing and
-        // merging entirely, which was the main server-thread hotspot in spark.
+        // A plain long[] indexed by recipe output slot: no HashMap/ItemId hashing or merging, which was the main
+        // server-thread hotspot in spark.
         long[] outputCounts = new long[recipe.mOutputs.length];
         String[] outputOreStrings = null;
         boolean hasFilter = configuredOres != null && !configuredOres.isEmpty();

@@ -13,13 +13,10 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Assembly Matrix Block - Tier 1.
- * <p>
- * One of the two structure blocks used by {@code MTAssFactory} (structure letter 'I').
- * The tier of this block ({@link #getLevelTier()}) is read
- * back by {@code StructureUtility#ofBlocksTiered} while the machine checks its structure, and is
- * written into the machine's {@code LevelTier} field (1 for this block, 2 for
- * {@link AdvAssMatrixBlock}).
+ * Assembly Matrix Block - Tier 1, one of the two structure blocks of {@code MTAssFactory} (structure letter 'I').
+ * {@link #getLevelTier()} is read back by {@code StructureUtility#ofBlocksTiered} while the machine checks its
+ * structure
+ * and written into the machine's {@code LevelTier} field (1 for this block, 2 for {@link AdvAssMatrixBlock}).
  */
 @SuppressWarnings("SpellCheckingInspection")
 public class AssMatrixBlock extends Block {

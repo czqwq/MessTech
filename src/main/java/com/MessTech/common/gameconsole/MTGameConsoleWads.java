@@ -21,27 +21,25 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * Where the game console's data lives, and how it gets there.
- * <p>
- * Doom needs an IWAD to run at all, and id's original ones are commercial - they cannot ship with
- * the mod. What this does instead, in order:
+ * Where the game console's data lives, and how it gets there. Doom needs an IWAD and id's own are commercial, so they
+ * cannot
+ * ship with the mod. In order:
  * <ol>
  * <li>a WAD named in the config wins;</li>
- * <li>otherwise any IWAD the player dropped into the console's folder is used (the list is Mocha
- * Doom's own {@code DoomVersion} list, so {@code doom.wad}, {@code doom2.wad}, {@code tnt.wad} and
- * the Freedoom ones all count);</li>
- * <li>otherwise, if downloading is enabled, Freedoom Phase 1 is fetched from its GitHub release
- * and unpacked. Freedoom is a free, BSD-licensed Doom whose data files are redistributable, so it
- * is the sensible default - nothing commercial is ever downloaded or shipped.</li>
+ * <li>otherwise any IWAD the player dropped into the console's folder (Mocha Doom's {@code DoomVersion} list, so
+ * {@code doom.wad}, {@code doom2.wad}, {@code tnt.wad} and the Freedoom ones all count);</li>
+ * <li>otherwise, with downloading enabled, Freedoom Phase 1 from its GitHub release, unpacked - free and BSD-licensed,
+ * so
+ * redistributable; nothing commercial is ever downloaded or shipped.</li>
  * </ol>
  */
 @SideOnly(Side.CLIENT)
 public final class MTGameConsoleWads {
 
     /**
-     * Every base name Mocha Doom's {@code defines.DoomVersion} recognises as an IWAD, in the order
-     * the engine itself probes them - so a folder holding several uses the same one the engine
-     * would have picked on its own.
+     * Every base name Mocha Doom's {@code defines.DoomVersion} recognises as an IWAD, in the engine's own probe order -
+     * so a
+     * folder holding several uses the one the engine would have picked.
      */
     private static final String[] IWAD_NAMES = { "doom2f.wad", "doom2.wad", "plutonia.wad", "tnt.wad", "xbla.wad",
         "doomu.wad", "udoom.wad", "doom.wad", "doom1.wad", "freedm.wad", "freedoom1.wad", "freedoom2.wad" };
@@ -135,9 +133,8 @@ public final class MTGameConsoleWads {
     }
 
     /**
-     * Fetches the Freedoom release archive and unpacks {@value #FREEDOOM_IWAD} out of it. The
-     * download goes to a {@code .part} file first, so an interrupted attempt cannot leave a
-     * half-written WAD that the engine would then fail to parse.
+     * Fetches the Freedoom release archive and unpacks {@value #FREEDOOM_IWAD} out of it. The download goes to a
+     * {@code .part} file first, so an interrupted attempt cannot leave a half-written WAD for the engine to choke on.
      */
     public static File downloadFreedoom(final File dir, final Progress progress) {
         final File target = new File(dir, FREEDOOM_IWAD);

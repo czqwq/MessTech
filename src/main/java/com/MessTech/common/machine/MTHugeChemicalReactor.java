@@ -40,21 +40,14 @@ import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.common.misc.GTStructureChannels;
 
 /**
- * Huge Chemical Reactor: the modular machine that runs the recipe pool of the Large Chemical Reactor.
+ * Huge Chemical Reactor: runs the recipe pool of the Large Chemical Reactor and has no bonus of its own -
+ * {@code getBaseSpeedBonus()}, {@code getBaseEuModifier()} and {@code getBaseMaxParallelRecipes()} stay at 1, so
+ * duration, EU/t and parallel are only what the {@link MTModuleMultiMachineBase modules} supply.
  * <p>
- * The machine folds the values of its {@link MTModuleMultiMachineBase modules} into the three knobs every MessTech
- * multiblock has, and it has no bonus of its own: {@code getBaseSpeedBonus()}, {@code getBaseEuModifier()} and
- * {@code getBaseMaxParallelRecipes()} all stay at 1, so the recipe duration, the EU/t and the parallel of the machine
- * are whatever its modules supply ({@code MTModuleMultiMachineBase.getSpeedBonus()},
- * {@code getEuModifier()} and {@code getMaxParallelRecipes()}).
- * <p>
- * Recipes: {@link RecipeMaps#chemicalReactorRecipes}, the pool of the Large Chemical Reactor, with
- * {@link #isEnablePerfectOverclock()} enabled - every overclock is EU/t x4 and duration /4, which leaves the total
- * energy of a craft untouched.
- * <p>
- * The coil band of the shell (element {@code A}) takes a heating coil of any tier. Its level is read from the
- * structure ({@link #getCoilLevel()}) and published as the {@link GTStructureChannels#HEATING_COIL} sub channel, so
- * the hologram preview and BlockRenderer6343 offer the coil slider.
+ * {@link RecipeMaps#chemicalReactorRecipes} with {@link #isEnablePerfectOverclock()}: EU/t x4 and duration /4 per
+ * overclock, so the total energy of a craft is untouched. Coil band (element {@code A}) takes any heating coil tier and
+ * {@link #getCoilLevel()} publishes {@link GTStructureChannels#HEATING_COIL}, so the hologram preview and
+ * BlockRenderer6343 offer the coil slider.
  */
 public class MTHugeChemicalReactor extends MTModuleMultiMachineBase<MTHugeChemicalReactor>
     implements ISurvivalConstructable, ICasingTextureProvider {
@@ -118,9 +111,8 @@ public class MTHugeChemicalReactor extends MTModuleMultiMachineBase<MTHugeChemic
     // region Coil
 
     /**
-     * Level of the heating coil band of the structure (element {@code A}). The structure element writes it, once per
-     * coil block it accepts; {@link HeatingCoilLevel#None} means the structure has no coil, and a band of mixed levels
-     * is refused by the coil element itself.
+     * Level of the coil band (element {@code A}), written once per coil block the element accepts.
+     * {@link HeatingCoilLevel#None} means no coil; a band of mixed levels is refused by the coil element itself.
      */
     private HeatingCoilLevel mCoilLevel = HeatingCoilLevel.None;
 
@@ -129,10 +121,7 @@ public class MTHugeChemicalReactor extends MTModuleMultiMachineBase<MTHugeChemic
         return mCoilLevel;
     }
 
-    /**
-     * Called by the structure element {@code A}, once per coil block of the band, see
-     * {@code GTStructureUtility#ofCoil}.
-     */
+    /** Called by the structure element {@code A}, once per coil block, see {@code GTStructureUtility#ofCoil}. */
     public void setCoilLevel(HeatingCoilLevel aCoilLevel) {
         mCoilLevel = aCoilLevel;
     }
@@ -145,9 +134,8 @@ public class MTHugeChemicalReactor extends MTModuleMultiMachineBase<MTHugeChemic
     }
 
     /**
-     * The module list of the base class is rebuilt by every structure check, so the coil level - the only other
-     * property that comes from the structure - is forgotten here as well: a check that fails half way cannot leave
-     * the coil of the previous structure behind.
+     * The module list is rebuilt by every structure check, so the coil level is reset here too: a check that fails
+     * half way cannot leave the coil of the previous structure behind.
      */
     @Override
     protected void checkMachineStructure(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack,
@@ -160,9 +148,7 @@ public class MTHugeChemicalReactor extends MTModuleMultiMachineBase<MTHugeChemic
         checkHasAnyEnergy(errors);
     }
 
-    /**
-     * @return The pool of the Large Chemical Reactor: this machine runs chemical reactor recipes.
-     */
+    /** @return The pool of the Large Chemical Reactor: this machine runs chemical reactor recipes. */
     @Override
     public RecipeMap<?> getRecipeMap() {
         return RecipeMaps.multiblockChemicalReactorRecipes;
@@ -199,9 +185,8 @@ public class MTHugeChemicalReactor extends MTModuleMultiMachineBase<MTHugeChemic
     }
 
     /**
-     * The tooltip follows the house style of {@code docs/knowledge.md}: one {@code addInfo(translate(key))} per line,
-     * so the layout and every colour code live in the language files, and the coil is offered as a structure sub
-     * channel so the hologram preview has the coil slider.
+     * House style ({@code docs/knowledge.md}): one {@code addInfo(translate(key))} per line, so layout and colour codes
+     * live in the language files.
      */
     @Override
     protected MultiblockTooltipBuilder createTooltip() {
@@ -232,9 +217,9 @@ public class MTHugeChemicalReactor extends MTModuleMultiMachineBase<MTHugeChemic
     }
 
     /**
-     * The shell of the structure is chemically inert machine casing, so the controller wears the face of the machine
-     * whose recipes it runs - the Large Chemical Reactor - on that casing, idle and running, each with its glow
-     * layer; GT composes it from {@link #getCasingTexture()}.
+     * The shell is chemically inert machine casing, so the controller wears the face of the machine whose recipes it
+     * runs (the Large Chemical Reactor), idle and running with glow layers, composed by GT from
+     * {@link #getCasingTexture()}.
      */
     @Override
     public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity, ForgeDirection side, ForgeDirection facing,
@@ -250,9 +235,7 @@ public class MTHugeChemicalReactor extends MTModuleMultiMachineBase<MTHugeChemic
             OVERLAY_FRONT_LARGE_CHEMICAL_REACTOR_ACTIVE_GLOW);
     }
 
-    /**
-     * @return The casing of the controller, i.e. what element {@code B} of the structure is built from.
-     */
+    /** @return The casing of the controller: what element {@code B} is built from. */
     @Override
     public ITexture getCasingTexture() {
         return Casings.ChemicallyInertMachineCasing.getCasingTexture();

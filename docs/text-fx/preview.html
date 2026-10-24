@@ -1,0 +1,1381 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MessTech 文字动态特效 · 预览</title>
+<!--
+  MessTech 文字动态特效 —— 单文件 WebGL 预览（无外部依赖，可直接双击 file:// 打开）
+
+  · 8 个原创 text-frag 效果，共用一套文本书写着色器契约：textMask + coverage() + palette + time，
+    每个效果的算法与观感均原创（对照表见同目录 design.md）。
+  · 一份 GL 画布渲染，再拷到各块 2D 画布；主预览 + 图鉴卡片都实时跑同一套着色器。
+  · 每个 EFFECTS[].shader 就是模组内对应的 .frag.glsl（COMMON 部分对应 common.glsl）。
+  · 预览用系统字体光栅出整行文字遮罩，和游戏内 FontRenderer 遮罩等价；效果本身与字体无关。
+  设计稿 / 落地说明：design.md
+-->
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d12;
+    --panel: #141821;
+    --panel2: #1a1f2a;
+    --panel3: #222836;
+    --line: #2a3140;
+    --text: #e6e9f0;
+    --muted: #8b94a7;
+    --accent: #52d6e8;
+    --accent2: #9a8cff;
+    --ok: #58d68a;
+    --bad: #ff6b6b;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { scrollbar-color: #394257 transparent; }
+  body {
+    margin: 0; background:
+      radial-gradient(1100px 520px at 78% -8%, rgba(82, 214, 232, .07), transparent 62%),
+      radial-gradient(900px 480px at 8% 108%, rgba(154, 140, 255, .06), transparent 60%),
+      var(--bg);
+    color: var(--text); font: 14px/1.55 var(--sans);
+  }
+  code { font-family: var(--mono); font-size: .92em; background: var(--panel3); padding: 0 5px; border-radius: 4px; }
+  button, select, input { font: inherit; color: inherit; }
+  button {
+    background: var(--panel3); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px;
+    cursor: pointer; transition: background .12s, border-color .12s;
+  }
+  button:hover { background: #2b3346; border-color: #3a4459; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #06232a; font-weight: 700; }
+  button.primary:hover { background: #7fe4f1; }
+  select, input[type=text] {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px;
+  }
+  select:focus, input:focus { outline: 2px solid rgba(82, 214, 232, .4); border-color: var(--accent); }
+  label.check { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; user-select: none; }
+
+  header.bar {
+    position: sticky; top: 0; z-index: 30; background: rgba(11, 13, 18, .92);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+  }
+  .bar-inner { max-width: 1280px; margin: 0 auto; padding: 10px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .brand h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: .03em; }
+  .brand h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .brand .sub { color: var(--muted); font-size: 12px; }
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-left: auto; }
+  .controls label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+  .controls input[type=range] { width: 110px; accent-color: var(--accent); }
+  .speed-val { font: 12px var(--mono); color: var(--text); min-width: 42px; }
+
+  main { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sec-head h2 { font-size: 15px; margin: 0; }
+  .hint { color: var(--muted); font-size: 12.5px; }
+  .spacer { flex: 1; }
+  .badge { font: 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .badge.ok { color: var(--ok); border-color: rgba(88, 214, 138, .4); }
+
+  .preview-wrap { border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #07080c; }
+  #mainCanvas { display: block; width: 100%; height: 226px; }
+
+  .fx-bar { display: grid; gap: 8px; margin-top: 12px; padding: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; }
+  .fx-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .fx-title b { font-size: 16px; }
+  .fx-title .id { font: 12.5px var(--mono); color: var(--accent); }
+  .fx-title .acts { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .fx-title .acts button { font-size: 12.5px; padding: 2px 9px; }
+  .desc { margin: 0; color: #c5ccda; font-size: 13px; }
+  .swatches { display: inline-flex; gap: 4px; align-items: center; }
+  .sw { width: 15px; height: 15px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .22); display: inline-block; }
+  .text-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .text-row .k { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  #textInput { width: min(430px, 100%); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .chips button { font-size: 12.5px; padding: 2px 10px; border-radius: 999px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); gap: 12px; }
+  .card {
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); overflow: hidden;
+    display: flex; flex-direction: column; cursor: pointer; transition: border-color .12s, box-shadow .12s;
+  }
+  .card:hover { border-color: #3b4760; }
+  .card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .card-head { display: flex; gap: 8px; align-items: baseline; padding: 9px 12px 7px; flex-wrap: wrap; }
+  .card-head .no { font: 11px var(--mono); color: var(--muted); }
+  .card-head code { background: none; padding: 0; color: var(--accent); font-size: 11.5px; }
+  .card-head b { font-size: 13.5px; }
+  .card-head .badge { margin-left: auto; }
+  .card canvas { display: block; width: 100%; height: 132px; background: #07080c; }
+  .card-desc { margin: 9px 12px 0; color: #b9c1d0; font-size: 12.5px; flex: 1; }
+  .card-foot { display: flex; gap: 8px; align-items: center; padding: 9px 12px 11px; flex-wrap: wrap; }
+  .card-foot .swatches { margin-right: auto; }
+  .card-foot button { font-size: 12px; padding: 2px 9px; }
+
+  .rules { margin: 0; padding-left: 20px; display: grid; gap: 5px; color: #c5ccda; font-size: 13px; }
+  .rules code { color: #d9e2f2; }
+
+  footer.foot { max-width: 1280px; margin: 0 auto; padding: 0 16px 28px; color: var(--muted); font-size: 12px; }
+  #errors { max-width: 1280px; margin: 12px auto 0; padding: 0 16px; }
+  #errors .err {
+    background: rgba(255, 107, 107, .1); border: 1px solid rgba(255, 107, 107, .4); color: #ffc9c9;
+    border-radius: 8px; padding: 8px 12px; white-space: pre-wrap; font: 12px var(--mono); margin-bottom: 6px;
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+    background: #2b3445; color: var(--text); border: 1px solid #3c475b; padding: 8px 16px; border-radius: 8px;
+    opacity: 0; transition: .18s; pointer-events: none; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+  @media (max-width: 760px) {
+    .grid { grid-template-columns: 1fr; }
+    .controls { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <div class="brand">
+      <h1>MessTech 文字动态特效 · <em>Text FX Lab</em></h1>
+      <div class="sub">8 个原创 frag 效果 · 真实的整行文字遮罩 · 实时 WebGL 预览</div>
+    </div>
+    <div class="controls">
+      <label>背景 <select id="bg"></select></label>
+      <label class="check"><input type="checkbox" id="shadow" checked> 文字阴影</label>
+      <label class="check"><input type="checkbox" id="autoCycle"> 自动轮播</label>
+      <label>速度 <input id="speed" type="range" min="25" max="200" value="100"><span class="speed-val" id="speedVal">1.00×</span></label>
+      <button id="pause">暂停动画</button>
+      <button id="resetTime">时间归零</button>
+    </div>
+  </div>
+</header>
+<div id="errors"></div>
+
+<main>
+  <section>
+    <div class="sec-head">
+      <h2>实时预览</h2>
+      <span class="hint">选中下方图鉴里的任一效果，用你喜欢的文字看它在物品名上的样子</span>
+      <span class="spacer"></span>
+      <span class="badge" id="mainBadge"></span>
+    </div>
+    <div class="preview-wrap"><canvas id="mainCanvas"></canvas></div>
+    <div class="fx-bar">
+      <div class="fx-title">
+        <b id="mainZh"></b><code id="mainId" class="id"></code>
+        <span class="swatches" id="mainSw"></span>
+        <span class="acts">
+          <button id="prevFx" title="上一个效果">◀</button>
+          <button id="nextFx" title="下一个效果">▶</button>
+          <button id="copyShader">复制着色器源码</button>
+        </span>
+      </div>
+      <p class="desc" id="mainDesc"></p>
+      <div class="text-row">
+        <span class="k">预览文字</span>
+        <input id="textInput" type="text" maxlength="42" spellcheck="false" value="混沌终焉 · 虚无贯星弓">
+        <div class="chips" id="examples"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>特效图鉴</h2>
+      <span class="hint">8 种效果全部在跑同一套着色器；点卡片切换主预览</span>
+      <span class="spacer"></span>
+      <span class="badge" id="galleryCount"></span>
+    </div>
+    <div class="grid" id="gallery"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>关于这套特效</h2><span class="hint">设计稿与落地说明见同目录 design.md</span></div>
+    <ul class="rules">
+      <li><b>一个效果 = 一个 fragment shader。</b>公共部分（<code>position()</code> / <code>coverage()</code> / <code>outline()</code> / <code>hash()</code> / <code>noise()</code> / <code>palette</code> / <code>time</code>）就是模组里的 <code>common.glsl</code>，每个效果各是一个 <code>&lt;id&gt;.frag.glsl</code>。</li>
+      <li><b>所有距离以字高 <code>h</code> 为单位</b>（<code>h = textSize.y</code>），所以同一效果在任何字号、任何 GUI 缩放下比例不变；换字体的字形遮罩只影响 <code>coverage()</code>，不影响动效。</li>
+      <li><b>八个效果互不重复：</b>解码头、视界、磁力线、光刃、密文解码、墨染、声纹、落花各是一套独立机制。</li>
+      <li><b>预览说明：</b>字形遮罩是整行文字光栅（系统字体），不是 Minecraft 像素字体；阴影、背景只是预览近似，游戏内由渲染管线统一绘制。</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="foot">
+  MessTech · 文字动态特效设计稿与预览（docs/text-fx/preview.html）· 效果着色器内联在本文件中，可直接抽取；
+  八个效果均为原创。
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   1. 公共着色器部分（对应模组里的 common.glsl）
+   ---------------------------------------------------------------------
+   uniform：
+     uCanvas  共享 GL 画布尺寸（拿绝对像素坐标用）
+     uTextPos 本行文字包围盒左上角（设备像素）
+     uTextSize 包围盒尺寸（设备像素，y 即字高 h）
+     uMaskRect 包围盒左上/右下在遮罩贴图里的 uv
+     textMask 整行文字 alpha 遮罩
+     time / opacity
+   坐标：position() 返回相对包围盒左上角的像素坐标，y 向下；
+        效果里一般除以字高 h 变成归一化坐标 p（1.0 = 一个字高）。
+   ===================================================================== */
+const COMMON = `
+precision highp float;
+
+uniform vec2 uCanvas;
+uniform vec2 uTextPos;
+uniform vec2 uTextSize;
+uniform vec4 uMaskRect;
+uniform sampler2D textMask;
+uniform float time;
+uniform float opacity;
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise(vec2 p) {
+    vec2 base = floor(p);
+    vec2 w = fract(p);
+    w = w * w * (3.0 - 2.0 * w);
+    return mix(mix(hash(base), hash(base + vec2(1.0, 0.0)), w.x),
+        mix(hash(base + vec2(0.0, 1.0)), hash(base + vec2(1.0, 1.0)), w.x), w.y);
+}
+
+vec2 position() {
+    vec2 frag = vec2(gl_FragCoord.x, uCanvas.y - gl_FragCoord.y);
+    return frag - uTextPos;
+}
+
+float coverage(vec2 point) {
+    if (point.x < 0.0 || point.y < 0.0 || point.x > uTextSize.x || point.y > uTextSize.y) return 0.0;
+    vec2 t = point / max(uTextSize, vec2(1.0));
+    vec2 uv = vec2(mix(uMaskRect.x, uMaskRect.z, t.x), mix(uMaskRect.y, uMaskRect.w, t.y));
+    return texture2D(textMask, uv).a;
+}
+
+float outline(vec2 point, float radius) {
+    float result = 0.0;
+    for (int i = 0; i < 12; i++) {
+        float angle = float(i) * 0.5235987756;
+        result = max(result, coverage(point + vec2(cos(angle), sin(angle)) * radius));
+    }
+    return result;
+}
+
+vec2 turn(vec2 point, float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat2(c, -s, s, c) * point;
+}
+
+float starLight(vec2 delta, vec2 radius) {
+    vec2 q = abs(delta) / max(radius, vec2(0.001));
+    return exp(-q.x * 14.0 - q.y * 2.0) + exp(-q.y * 14.0 - q.x * 2.0);
+}
+
+float textBloom(vec2 p) {
+    vec2 q = (p - vec2(uTextSize.x / uTextSize.y * 0.5, 0.45))
+        / vec2(uTextSize.x / uTextSize.y * 0.55 + 0.25, 0.62);
+    return exp(-dot(q, q) * 3.0);
+}
+
+void overRarity(inout vec4 layer, vec3 color, float alpha) {
+    alpha = clamp(alpha, 0.0, 1.0);
+    layer.rgb = color * alpha + layer.rgb * (1.0 - alpha);
+    layer.a = alpha + layer.a * (1.0 - alpha);
+}
+
+void outputRarity(vec4 layer) {
+    layer *= opacity;
+    if (max(layer.a, max(layer.r, max(layer.g, layer.b))) <= 0.001) discard;
+    gl_FragColor = layer;
+}
+`;
+
+const VERTEX = `
+attribute vec2 aPos;
+void main() {
+    gl_Position = vec4(aPos, 0.0, 1.0);
+}
+`;
+
+/* =====================================================================
+   2. 八个效果（效果主体，可直接抽成 <id>.frag.glsl）
+   ===================================================================== */
+
+/* 01 数据坠流：数据雨 + 块状乱码 + 解码扫描头。色板：深底 / 青 / 白青 / 蓝 */
+const FX_DATAFALL = `
+const vec3 DF0 = vec3(0.020, 0.055, 0.075);
+const vec3 DF1 = vec3(0.145, 0.930, 0.800);
+const vec3 DF2 = vec3(0.880, 1.000, 0.980);
+const vec3 DF3 = vec3(0.280, 0.520, 1.000);
+
+void main() {
+    float h = max(1.0, uTextSize.y);
+    float w = uTextSize.x / h;
+    vec2 p = position() / h;
+
+    // decode head: hold, then snap top -> bottom in ~0.12s (2-3 ticks)
+    float cycle = fract(time / 2.4);
+    float sweep = clamp(smoothstep(0.0, 0.05, cycle) - smoothstep(0.55, 0.60, cycle), 0.0, 1.0);
+    float head = sweep * 1.5 - 0.25;
+    float below = smoothstep(-0.03, 0.03, p.y - head);
+
+    // encrypted: block-wise horizontal jitter, keeps a readable silhouette
+    vec2 block = floor(vec2(p.x / 0.14, p.y / 0.12));
+    vec2 jitter = vec2(hash(block + 1.0) - 0.5, 0.0) * 0.26;
+    float inkEnc = coverage((p + jitter) * h);
+    float inkClean = coverage(p * h);
+    float ink = mix(inkClean, max(inkEnc, inkClean * 0.65), below);
+
+    // data rain: falling dashes across the glyph band
+    vec2 g = vec2(p.x / 0.05, (p.y - time * 1.25) / 0.16);
+    float bit = step(0.62, hash(floor(g)));
+    float dash = bit * (1.0 - fract(g.y) * 0.85);
+    float rain = dash
+        * smoothstep(-0.10, 0.02, p.x) * (1.0 - smoothstep(w - 0.02, w + 0.10, p.x))
+        * smoothstep(-0.10, 0.02, p.y) * (1.0 - smoothstep(0.98, 1.12, p.y));
+
+    vec3 color = mix(DF1, DF2, 0.20 + 0.55 * smoothstep(0.0, 1.0, p.y));
+    color = mix(color, DF3, below * 0.7);
+    color *= 0.55 + 0.45 * inkClean;
+    color = mix(color, DF2, clamp(rain * 1.4, 0.0, 1.0) * (0.35 + 0.65 * ink));
+
+    // scan line + encrypted flicker blocks, confined to the glyph band
+    float band = smoothstep(-0.06, 0.02, p.y) * (1.0 - smoothstep(0.98, 1.06, p.y));
+    float line = exp(-abs(p.y - head) * 45.0) * band;
+    float flick = step(0.93, hash(floor(vec2(p.x / 0.12, p.y / 0.12)) + floor(time * 24.0))) * below * band;
+    color = mix(color, DF2, clamp(line * 0.9 + flick * 0.7, 0.0, 1.0));
+
+    float alpha = clamp(max(ink, max(rain * 0.15, max(line * 0.55, flick * 0.4))), 0.0, 1.0);
+    outputRarity(vec4(color * alpha, alpha));
+}
+`;
+
+/* 02 事件视界：引力透镜 + 光子环 + 吸积盘。色板：黑紫 / 琥珀 / 白热 / 紫 */
+const FX_EVENTHORIZON = `
+const vec3 EH0 = vec3(0.055, 0.025, 0.125);
+const vec3 EH1 = vec3(1.000, 0.620, 0.180);
+const vec3 EH2 = vec3(1.000, 0.953, 0.816);
+const vec3 EH3 = vec3(0.541, 0.361, 1.000);
+
+void main() {
+    float h = max(1.0, uTextSize.y);
+    float w = uTextSize.x / h;
+    vec2 p = position() / h;
+    vec2 center = vec2(w * 0.5, 0.5);
+    vec2 rel = p - center;
+
+    // normalized ellipse: the accretion disk plane
+    vec2 q = rel / vec2(w * 0.5 + 0.35, 0.62);
+    float r = length(q);
+    float ang = atan(q.y, q.x);
+
+    // gravitational lensing pulls the glyphs toward the core
+    vec2 pull = -normalize(rel + vec2(0.001, 0.0)) * (0.07 / (1.0 + r * r * 5.0));
+    float ink = max(coverage(p * h), coverage((p + pull) * h) * 0.9);
+
+    // accretion disk: spiral streaks on a ring
+    float spiral = sin(ang * 3.0 - log(max(r, 0.05)) * 6.0 + time * 2.4);
+    float disk = exp(-abs(r - 1.02) * 6.0) * pow(0.5 + 0.5 * spiral, 3.0);
+    float edge = exp(-abs(r - 1.02) * 26.0) * 0.8;
+    float glow = exp(-abs(r - 1.02) * 2.2) * 0.18;
+
+    // photon ring: just outside the glyph edges
+    float ring = clamp(outline(p * h, 0.035 * h) - ink, 0.0, 1.0);
+    float halo = clamp(outline(p * h, 0.10 * h) - ink, 0.0, 1.0);
+    float abyss = 1.0 - smoothstep(0.35, 0.95, r);
+
+    // photons racing around the ring
+    float photons = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float a = time * 1.6 + float(i) * 2.094;
+        vec2 spot = center + vec2(cos(a) * (w * 0.5 + 0.30), sin(a) * 0.64);
+        photons += exp(-dot(p - spot, p - spot) * 34.0);
+    }
+
+    vec4 layer = vec4(0.0);
+    layer.rgb += EH1 * (disk * 1.1 + edge * 0.6) * (1.0 - 0.65 * ink);
+    layer.rgb += EH3 * glow * (1.0 - ink);
+    layer.rgb += EH2 * photons * 0.9;
+
+    vec3 inkColor = mix(EH3 * 0.75, EH0, 0.42 + 0.40 * abyss);
+    overRarity(layer, inkColor, ink * 0.94);
+    overRarity(layer, mix(EH2, EH1, 0.35), ring * 0.95);
+    overRarity(layer, EH1 * 0.55, halo * 0.35);
+    layer.rgb += EH2 * ring * 0.5;
+    outputRarity(layer);
+}
+`;
+
+/* 03 墨韵流金：水墨晕染 + 金箔 + 流金扫光。色板：墨 / 褐墨 / 流金 / 纸白 */
+const FX_INKBLOOM = `
+const vec3 IB0 = vec3(0.160, 0.120, 0.090);
+const vec3 IB1 = vec3(0.450, 0.330, 0.220);
+const vec3 IB2 = vec3(0.950, 0.740, 0.360);
+const vec3 IB3 = vec3(1.000, 0.970, 0.900);
+
+void main() {
+    float h = max(1.0, uTextSize.y);
+    vec2 p = position() / h;
+    float ink = coverage(p * h);
+
+    // ink wash inside the strokes
+    float wash = noise(p * 1.2 + vec2(time * 0.05, time * 0.08)) * 0.7
+               + noise(p * 3.3 - vec2(time * 0.04, time * 0.03)) * 0.3;
+
+    // coverage gradient = brush rim
+    float gx = coverage((p + vec2(0.025, 0.0)) * h) - coverage((p - vec2(0.025, 0.0)) * h);
+    float gy = coverage((p + vec2(0.0, 0.025)) * h) - coverage((p - vec2(0.0, 0.025)) * h);
+    float rim = clamp(length(vec2(gx, gy)) * 0.5, 0.0, 1.0);
+
+    float bleed = clamp(outline(p * h, 0.05 * h) - ink, 0.0, 1.0)
+        * (0.35 + 0.65 * noise(p * 3.6 + time * 0.1));
+    float halo = clamp(outline(p * h, 0.14 * h) - ink, 0.0, 1.0);
+
+    float topLight = 1.0 - smoothstep(0.05, 0.55, p.y);
+    vec3 inkColor = mix(IB0 * 1.25, IB1, 0.25 + 0.45 * wash);
+    inkColor = mix(inkColor, IB2, rim * 0.55);
+    inkColor = mix(inkColor, IB3, topLight * 0.06);
+    inkColor *= 0.90 + 0.25 * wash;
+
+    vec4 layer = vec4(0.0);
+    // dark halo first so the warm ink stands out from the purple tooltip
+    overRarity(layer, vec3(0.035, 0.024, 0.020), clamp(halo * 0.8, 0.0, 1.0));
+    layer.rgb += IB1 * bleed * 0.30;
+    layer.rgb += IB2 * halo * 0.10;
+    overRarity(layer, inkColor, ink);
+
+    // gold flakes drifting over the ink
+    vec2 g = p / 0.30 + vec2(time * 0.05, time * 0.035);
+    vec2 gid = floor(g);
+    vec2 gf = fract(g) - 0.5;
+    float pick = step(0.88, hash(gid));
+    vec2 flake = turn(gf, -hash(gid + 7.3) * 6.2831853);
+    float shape = 1.0 - smoothstep(0.14, 0.24, max(abs(flake.x), abs(flake.y) * 1.8));
+    float twinkle = 0.55 + 0.45 * sin(time * 3.2 + hash(gid) * 6.2831853);
+    float region = clamp(ink * 0.9 + bleed * 0.8, 0.0, 1.0);
+    layer.rgb += IB2 * pick * shape * twinkle * region * 1.25;
+    layer.rgb += IB3 * pick * shape * shape * region * 0.30;
+
+    // flowing gold sheen
+    float sweep = pow(0.5 + 0.5 * sin(p.x * 1.05 - time * 1.3), 20.0);
+    overRarity(layer, mix(IB2, IB3, 0.35), ink * sweep * 0.85);
+    layer.rgb += IB2 * textBloom(p) * 0.10;
+    outputRarity(layer);
+}
+`;
+
+/* 04 磁星场线：过两磁极的偶极场线 + 间歇电弧。色板：深钢 / 青 / 白 / 蓝 */
+const FX_MAGNETAR = `
+const vec3 MG0 = vec3(0.027, 0.075, 0.110);
+const vec3 MG1 = vec3(0.369, 0.949, 1.000);
+const vec3 MG2 = vec3(0.910, 1.000, 1.000);
+const vec3 MG3 = vec3(0.227, 0.419, 1.000);
+
+void main() {
+    float h = max(1.0, uTextSize.y);
+    float w = uTextSize.x / h;
+    vec2 p = position() / h;
+    float ink = coverage(p * h);
+    vec2 center = vec2(w * 0.5, 0.5);
+    float halfSpan = w * 0.5;
+
+    // dipole field lines: circles through the two poles
+    float field = 0.0;
+    float flow = 0.0;
+    for (int i = 0; i < 7; i++) {
+        float k = (float(i) - 3.0) * 0.34;
+        vec2 cc = center + vec2(0.0, k);
+        float radius = sqrt(halfSpan * halfSpan + k * k);
+        vec2 rel = p - cc;
+        float dist = abs(length(rel) - radius);
+        float band = exp(-dist * dist / 0.0045);
+        float ang = atan(rel.y, rel.x);
+        float pulse = pow(0.5 + 0.5 * sin(ang * 2.0 - time * 3.2 + float(i) * 1.7), 6.0);
+        field += band;
+        flow += band * pulse;
+    }
+    field = clamp(field, 0.0, 1.0);
+
+    // intermittent arc between the poles
+    float phase = fract(time / 2.6);
+    float burst = smoothstep(0.0, 0.04, phase) * (1.0 - smoothstep(0.22, 0.34, phase));
+    float jag = 0.26 * sin(p.x * 4.0 - time * 21.0)
+              + 0.15 * sin(p.x * 11.0 + time * 33.0)
+              + (hash(vec2(floor(p.x / 0.45), floor(time * 30.0))) - 0.5) * 0.24;
+    float arcLine = exp(-abs(p.y - 0.5 - jag) * 120.0) * burst;
+
+    // pole glows
+    float pole = exp(-length(p - (center + vec2(halfSpan * 0.98, 0.0))) * 2.4)
+               + exp(-length(p - (center - vec2(halfSpan * 0.98, 0.0))) * 2.4);
+
+    // keep the field inside a band around the text so it does not rule the panel
+    float region = smoothstep(-0.55, -0.10, p.y) * (1.0 - smoothstep(1.10, 1.55, p.y));
+
+    vec4 layer = vec4(0.0);
+    // charged glyphs: bright cyan core with plasma flowing through the strokes
+    vec3 inkColor = mix(vec3(0.100, 0.380, 0.520), MG1, 0.45 + 0.55 * clamp(flow, 0.0, 1.0));
+    inkColor = mix(inkColor, MG2, clamp(flow * 1.4 + arcLine * 0.9, 0.0, 1.0));
+    overRarity(layer, inkColor, ink);
+    overRarity(layer, MG2, ink * clamp(flow - 0.55, 0.0, 1.0) * 0.35);
+
+    layer.rgb += MG1 * field * (0.24 + 0.30 * ink) * region;
+    layer.rgb += MG1 * flow * 0.30 * region;
+    layer.rgb += MG2 * arcLine * 1.1;
+    layer.rgb += mix(MG1, MG2, 0.5) * pole * 0.30 * region;
+    layer.rgb += MG1 * textBloom(p) * 0.05;
+    outputRarity(layer);
+}
+`;
+
+/* 05 共振声纹：频谱柱 + 波形线 + 节拍环。色板：深蓝 / 青 / 品红 / 白 */
+const FX_RESONANCE = `
+const vec3 RS0 = vec3(0.027, 0.051, 0.086);
+const vec3 RS1 = vec3(0.169, 0.847, 1.000);
+const vec3 RS2 = vec3(1.000, 0.310, 0.784);
+const vec3 RS3 = vec3(0.949, 1.000, 1.000);
+
+void main() {
+    float h = max(1.0, uTextSize.y);
+    float w = uTextSize.x / h;
+    vec2 p = position() / h;
+    float ink = coverage(p * h);
+    float xr = clamp(p.x / max(0.001, w), 0.0, 1.0);
+    float yr = p.y;
+
+    // spectrum bars bouncing with the music
+    float idx = floor(xr * 30.0);
+    float level = 0.28 + 0.72 * noise(vec2(idx * 0.83, time * 2.4 - idx * 0.09));
+    float fill = smoothstep(1.0 - level - 0.015, 1.0 - level + 0.015, yr);
+    float cap = exp(-abs(yr - (1.0 - level)) * 34.0) * 0.9;
+
+    // waveform line
+    float wave = sin(p.x * 2.4 + time * 4.6 + sin(p.x * 0.66 + time * 1.6) * 2.4);
+    float line = exp(-abs(yr - 0.52 - wave * 0.22) * 70.0);
+
+    // beat rings spreading from the text center
+    float beat = pow(0.5 + 0.5 * sin(time * 7.8), 8.0);
+    vec2 q = (p - vec2(w * 0.5, 0.5)) / vec2(w * 0.62, 0.95);
+    float ringT = fract(time * 0.55);
+    float ring = exp(-abs(length(q) - ringT * 1.5) * 16.0) * (1.0 - ringT) * 0.5;
+
+    vec3 inkColor = mix(RS0, RS1, 0.35 + 0.55 * fill);
+    inkColor = mix(inkColor, RS2, pow(0.5 + 0.5 * sin(xr * 8.0 + time * 2.0), 6.0) * 0.6);
+    inkColor = mix(inkColor, RS3, clamp(cap + line * 0.8, 0.0, 1.0));
+
+    vec4 layer = vec4(0.0);
+    overRarity(layer, inkColor, ink);
+    layer.rgb += RS1 * textBloom(p) * (0.10 + beat * 0.28);
+    layer.rgb += RS2 * ring * (0.5 + beat * 0.5);
+    layer.rgb += RS3 * line * ink * 0.35;
+    outputRarity(layer);
+}
+`;
+
+/* 06 光刃斩击：字高尺度的短刃扫切 + 白热冷却 + 火花。色板：暗 / 冷蓝 / 白热 / 熔渣橙 */
+const FX_BEAMCUT = `
+const vec3 BC0 = vec3(0.039, 0.055, 0.086);
+const vec3 BC1 = vec3(0.310, 0.450, 0.640);
+const vec3 BC2 = vec3(1.000, 0.965, 0.847);
+const vec3 BC3 = vec3(1.000, 0.416, 0.102);
+
+void main() {
+    float h = max(1.0, uTextSize.y);
+    float w = uTextSize.x / h;
+    vec2 p = position() / h;
+    float ink = coverage(p * h);
+
+    // blade front sweeps left -> right across the glyphs
+    float head = fract(time / 2.0) * 1.4 - 0.2;
+    float vis = smoothstep(-0.15, 0.0, head) * (1.0 - smoothstep(1.0, 1.15, head));
+    float frontX = head * w;
+    float behind = frontX - p.x;
+    float cut = step(0.0, behind);
+    float cool = clamp(behind / 1.6, 0.0, 1.0);
+
+    vec3 uncut = mix(BC0, BC1, 0.50);
+    vec3 cutColor = mix(BC1, BC0, cool * 0.35);
+    cutColor = mix(cutColor, BC2, pow(1.0 - cool, 5.0));
+    cutColor = mix(cutColor, BC3, smoothstep(0.08, 0.40, cool) * (1.0 - smoothstep(0.60, 1.0, cool)) * 0.95);
+    vec3 color = mix(uncut, cutColor, cut);
+
+    // short blade light, about one glyph tall, centred on the cutting front
+    vec2 bladeDir = normalize(vec2(0.45, 1.0));
+    vec2 bladePerp = vec2(bladeDir.y, -bladeDir.x);
+    vec2 rel = p - vec2(frontX, 0.5);
+    float along = dot(rel, bladeDir);
+    float across = dot(rel, bladePerp);
+    float blade = exp(-(along * along) / 0.45 - (across * across) / 0.0022) * vis;
+    float core = exp(-(along * along) / 0.22 - (across * across) / 0.0005) * vis;
+
+    // sparks leaving the blade tips
+    float sparks = 0.0;
+    for (int i = 0; i < 8; i++) {
+        float fi = float(i);
+        float side = hash(vec2(fi, 1.3)) > 0.5 ? 1.0 : -1.0;
+        float t = fract(time * 2.2 + hash(vec2(fi, 4.1)));
+        vec2 start = vec2(frontX, 0.45) + bladeDir * side * 0.45;
+        vec2 dir = normalize(bladePerp * side + bladeDir * (hash(vec2(fi, 7.7)) - 0.5));
+        vec2 pos = start + dir * t * 0.8;
+        sparks += starLight(turn(pos - p, 0.9), vec2(0.015, 0.09)) * (1.0 - t) * vis;
+    }
+
+    // thin cut front, only across the glyph band
+    float band = smoothstep(-0.10, 0.0, p.y) * (1.0 - smoothstep(1.0, 1.10, p.y));
+    float front = exp(-abs(p.x - frontX) * 90.0) * band * vis * 0.5;
+
+    vec4 layer = vec4(0.0);
+    overRarity(layer, color, ink);
+    layer.rgb += mix(BC2, BC3, 0.4) * (blade * 1.1 + core * 1.6);
+    layer.rgb += BC3 * sparks * 0.9;
+    layer.rgb += BC2 * sparks * 0.5;
+    layer.rgb += BC2 * front;
+    outputRarity(layer);
+}
+`;
+
+/* 07 密文解码：加密乱码 + 解码头往返 + 终端绿。色板：深墨绿 / 荧光绿 / 白 / 琥珀 */
+const FX_CIPHER = `
+const vec3 CP0 = vec3(0.012, 0.071, 0.043);
+const vec3 CP1 = vec3(0.208, 0.878, 0.478);
+const vec3 CP2 = vec3(0.902, 1.000, 0.937);
+const vec3 CP3 = vec3(1.000, 0.690, 0.125);
+
+void main() {
+    float h = max(1.0, uTextSize.y);
+    float w = uTextSize.x / h;
+    vec2 p = position() / h;
+    float ink = coverage(p * h);
+    float xr = clamp(p.x / max(0.001, w), 0.0, 1.0);
+
+    // decode cycle: hold locked, sweep left -> right in ~0.22s (4-5 ticks), hold decoded, sweep back
+    float cycle = fract(time / 3.2);
+    float sweep = clamp(smoothstep(0.0, 0.07, cycle) - smoothstep(0.55, 0.62, cycle), 0.0, 1.0);
+    float head = sweep * 1.4 - 0.2;
+    float unlocked = 1.0 - smoothstep(head - 0.02, head + 0.02, xr);
+
+    // locked: block-scrambled glyph fragments
+    vec2 cell = floor(p / 0.12);
+    vec2 jitter = vec2(hash(cell + 3.0), hash(cell + 7.0)) - 0.5;
+    jitter *= 0.35;
+    float lockedInk = coverage((p + jitter) * h);
+    float noiseBar = step(0.55, hash(vec2(cell.x, floor(time * 9.0)))) * lockedInk;
+
+    vec3 lockedColor = mix(CP0, CP3, 0.60 + 0.40 * hash(cell));
+    vec3 color = mix(lockedColor, CP1, unlocked);
+    color = mix(color, CP2, unlocked * 0.30);
+    float flash = step(0.94, hash(vec2(floor(p.y / 0.10), floor(time * 18.0)))) * unlocked;
+    color = mix(color, CP2, flash * 0.7);
+
+    float band = smoothstep(-0.06, 0.02, p.y) * (1.0 - smoothstep(0.98, 1.06, p.y));
+    float headLine = exp(-abs(xr - head) * 160.0) * band;
+    float inkAll = max(ink * unlocked, lockedInk * (1.0 - unlocked) * 0.9);
+    inkAll = max(inkAll, noiseBar * 0.35);
+
+    vec4 layer = vec4(0.0);
+    overRarity(layer, color, inkAll);
+    layer.rgb += CP3 * noiseBar * (1.0 - unlocked) * 0.45;
+    layer.rgb += CP1 * headLine * 0.35;
+    layer.rgb += CP2 * headLine * headLine * 0.5;
+    outputRarity(layer);
+}
+`;
+
+/* 08 落英缤纷：花瓣飘落 + 冷暖呼吸渐变。色板：绛紫 / 桃 / 落英 / 紫 */
+const FX_PETALFALL = `
+const vec3 PF0 = vec3(0.290, 0.063, 0.188);
+const vec3 PF1 = vec3(1.000, 0.561, 0.639);
+const vec3 PF2 = vec3(1.000, 0.843, 0.690);
+const vec3 PF3 = vec3(0.690, 0.420, 1.000);
+
+void main() {
+    float h = max(1.0, uTextSize.y);
+    float w = uTextSize.x / h;
+    vec2 p = position() / h;
+    float ink = coverage(p * h);
+    float xr = clamp(p.x / max(0.001, w), 0.0, 1.0);
+    float yr = clamp(p.y, 0.0, 1.0);
+    float breath = 0.5 + 0.5 * sin(time * 1.1);
+
+    // dynamic pink: hue drifts between rose / hot pink / light pink, plus a moving sheen
+    float flowA = 0.5 + 0.5 * sin(time * 1.35 + p.x * 1.15 + p.y * 1.7);
+    float flowB = 0.5 + 0.5 * sin(time * 2.20 - p.x * 0.90 + p.y * 0.80);
+    vec3 base = mix(vec3(0.92, 0.24, 0.44), vec3(1.00, 0.56, 0.73), flowA);
+    base = mix(base, vec3(1.00, 0.80, 0.88), flowB * 0.35);
+    base = mix(base, PF3, 0.10 * flowB);
+    base *= 0.85 + 0.25 * flowB;
+    float sheen = pow(0.5 + 0.5 * sin(time * 1.6 - p.x * 1.35 + p.y * 0.9), 6.0);
+    base = mix(base, vec3(1.00, 0.93, 0.96), sheen * 0.35);
+    base = mix(base, PF2, breath * 0.10);
+
+    vec4 layer = vec4(0.0);
+    // petals behind the glyphs
+    for (int i = 0; i < 7; i++) {
+        float fi = float(i);
+        float ph = fract(time * (0.12 + 0.10 * hash(vec2(fi, 2.0))) + hash(vec2(fi, 3.0)));
+        vec2 c = vec2(hash(vec2(fi, 4.0)) * w + sin(time * 0.9 + fi * 2.1) * 0.18, -0.15 + ph * 1.5);
+        vec2 d = turn(p - c, -time * (0.6 + 0.8 * hash(vec2(fi, 5.0))));
+        float shape = 1.0 - smoothstep(0.85, 1.25, length(vec2(d.x / 0.16, d.y / 0.075)));
+        overRarity(layer, mix(PF1, PF3, 0.55), shape * (0.35 + 0.35 * ph) * 0.30);
+    }
+    overRarity(layer, base, ink);
+    // petals in front of the glyphs
+    for (int i = 0; i < 6; i++) {
+        float fi = float(i) + 7.0;
+        float ph = fract(time * (0.15 + 0.12 * hash(vec2(fi, 2.0))) + hash(vec2(fi, 3.0)));
+        vec2 c = vec2(hash(vec2(fi, 4.0)) * w + sin(time * 0.7 + fi * 1.7) * 0.22, -0.12 + ph * 1.5);
+        vec2 d = turn(p - c, -time * (0.8 + 0.9 * hash(vec2(fi, 5.0))));
+        float shape = 1.0 - smoothstep(0.85, 1.20, length(vec2(d.x / 0.19, d.y / 0.09)));
+        overRarity(layer, mix(PF2, PF1, hash(vec2(fi, 9.0)) * 0.8), shape * (0.45 + 0.4 * ph) * 0.85);
+    }
+    layer.rgb += PF1 * textBloom(p) * (0.06 + breath * 0.08);
+    outputRarity(layer);
+}
+`;
+
+/* 阴影近似：只画字形遮罩的黑色副本，游戏内由渲染管线统一处理 */
+const FX_SHADOW = `
+void main() {
+    float a = coverage(position()) * opacity * 0.62;
+    if (a <= 0.002) discard;
+    gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+}
+`;
+
+/* =====================================================================
+   3. 效果表
+   ===================================================================== */
+const EFFECTS = [
+  {
+    id: 'datafall', zh: '数据坠流', shader: FX_DATAFALL,
+    palette: ['#050e13', '#25edcc', '#e0fffa', '#4785ff'],
+    sample: '数据洪流 · 量子存储矩阵',
+    desc: '数据雨在字间落下；解码头每隔几秒自上而下瞬间扫过（约 2-3 tick），扫过的部分定格成冷青色可读文字，随后重新加密。',
+  },
+  {
+    id: 'eventhorizon', zh: '事件视界', shader: FX_EVENTHORIZON,
+    palette: ['#0e0620', '#ff9e2e', '#fff3d0', '#8a5cff'],
+    sample: '事件视界 · 终焉之核',
+    desc: '字形被引力透镜拉向中心，外缘点亮成一圈光子环；琥珀色吸积盘在字后缓慢旋转，字芯沉进黑色视界。',
+  },
+  {
+    id: 'inkbloom', zh: '墨韵流金', shader: FX_INKBLOOM,
+    palette: ['#291f17', '#735438', '#f2bd5c', '#fff7e6'],
+    sample: '墨染山河 · 流金长卷',
+    desc: '水墨在笔画里晕开，边缘积墨、外侧洇出淡墨；金箔碎屑慢慢游走，偶有一道流金扫过。',
+  },
+  {
+    id: 'magnetar', zh: '磁星场线', shader: FX_MAGNETAR,
+    palette: ['#07131c', '#5ef2ff', '#e8ffff', '#3a6bff'],
+    sample: '磁暴约束 · 极光力场',
+    desc: '穿过文字两端磁极的偶极场线缓慢呼吸，电流沿场线流动；每隔几秒劈出一条横贯文字的锯齿电弧。',
+  },
+  {
+    id: 'resonance', zh: '共振声纹', shader: FX_RESONANCE,
+    palette: ['#070d16', '#2bd8ff', '#ff4fc8', '#f2ffff'],
+    sample: '共振声纹 · 回响装置',
+    desc: '字内是随音乐跳动的频谱柱与一条波形亮线，节拍重音时从文字中心向外推出一圈圈声波环。',
+  },
+  {
+    id: 'beamcut', zh: '光刃斩击', shader: FX_BEAMCUT,
+    palette: ['#0a0e16', '#4f73a3', '#fff6d8', '#ff6a1a'],
+    sample: '斩星 · 相位光刃',
+    desc: '约一个字高的短光刃逐字扫过，切痕由白热冷却成熔渣橙再回到冷铁色，刃尖甩出短促的火花。',
+  },
+  {
+    id: 'cipher', zh: '密文解码', shader: FX_CIPHER,
+    palette: ['#03120b', '#35e07a', '#e6ffef', '#ffb020'],
+    sample: '密文 · 零点协议',
+    desc: '琥珀色块状乱码每隔几秒被扫描头从左到右瞬间解密（约 4-5 tick）成终端绿文字，停留片刻后再快速加密回去。',
+  },
+  {
+    id: 'petalfall', zh: '落英缤纷', shader: FX_PETALFALL,
+    palette: ['#4a1030', '#ff8fa3', '#ffd7b0', '#b06bff'],
+    sample: '落英 · 绯色序曲',
+    desc: '桃色花瓣绕字旋转飘落，一半在字后、一半掠过字前；字色是流动的粉，在玫红、桃粉与浅粉之间呼吸。',
+  },
+];
+
+/* =====================================================================
+   4. WebGL 初始化 / 程序编译
+   ===================================================================== */
+const glCanvas = document.createElement('canvas');
+const gl = glCanvas.getContext('webgl', {
+  alpha: true, premultipliedAlpha: true, antialias: true, depth: false, stencil: false,
+});
+const errors = [];
+function reportError(message) {
+  errors.push(String(message));
+  const box = document.getElementById('errors');
+  const div = document.createElement('div');
+  div.className = 'err';
+  div.textContent = String(message);
+  box.append(div);
+  console.error(message);
+}
+
+let vertexShader = null;
+const UNIFORMS = ['uCanvas', 'uTextPos', 'uTextSize', 'uMaskRect', 'textMask', 'time', 'opacity'];
+
+function compile(type, source, label) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    throw new Error(label + ' 编译失败：\n' + gl.getShaderInfoLog(shader));
+  }
+  return shader;
+}
+
+function createProgram(fragmentSource, label) {
+  if (!vertexShader) vertexShader = compile(gl.VERTEX_SHADER, VERTEX, 'vertex');
+  const fragment = compile(gl.FRAGMENT_SHADER, COMMON + fragmentSource, label);
+  const program = gl.createProgram();
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragment);
+  gl.bindAttribLocation(program, 0, 'aPos');
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    throw new Error(label + ' 链接失败：\n' + gl.getProgramInfoLog(program));
+  }
+  const uniforms = {};
+  for (const name of UNIFORMS) uniforms[name] = gl.getUniformLocation(program, name);
+  return { program, uniforms };
+}
+
+function initGl() {
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1, 1, -1, -1, 1,
+    -1, 1, 1, -1, 1, 1,
+  ]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.CULL_FACE);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+}
+
+/* =====================================================================
+   5. 文字遮罩（整行文字的 alpha 光栅，相当于游戏里的 FontRenderer 遮罩）
+   ===================================================================== */
+const FONT_STACK = '"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "Source Han Sans SC", sans-serif';
+let measureCtx = null;
+const maskCache = new Map();
+const MASK_LIMIT = 48;
+
+function fontOf(size) {
+  return '700 ' + size + 'px ' + FONT_STACK;
+}
+
+function measure(text, size) {
+  if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+  measureCtx.font = fontOf(size);
+  const m = measureCtx.measureText(text);
+  return {
+    width: m.width,
+    ascent: m.fontBoundingBoxAscent || size * 0.84,
+    descent: m.fontBoundingBoxDescent || size * 0.22,
+  };
+}
+
+function fitFont(text, maxWidth, maxHeight) {
+  const probe = 100;
+  const m = measure(text || ' ', probe);
+  const w = Math.max(1, m.width);
+  const h = Math.max(1, m.ascent + m.descent);
+  const size = Math.floor(probe * Math.min(maxWidth / w, maxHeight / h));
+  return Math.max(8, Math.min(size, 180));
+}
+
+function getMask(text, size) {
+  const key = size + '|' + text;
+  const cached = maskCache.get(key);
+  if (cached) return cached;
+
+  const m = measure(text, size);
+  const tw = Math.max(1, Math.ceil(m.width));
+  const ascent = Math.ceil(m.ascent);
+  const descent = Math.ceil(m.descent);
+  const th = Math.max(1, ascent + descent);
+  const pad = Math.ceil(size * 0.18) + 2;
+  const width = tw + pad * 2;
+  const height = th + pad * 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.font = fontOf(size);
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(text, pad, pad + ascent);
+
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const entry = {
+    texture, tw, th,
+    rect: [pad / width, 1 - pad / height, (pad + tw) / width, 1 - (pad + th) / height],
+  };
+  maskCache.set(key, entry);
+  if (maskCache.size > MASK_LIMIT) {
+    const oldest = maskCache.keys().next().value;
+    gl.deleteTexture(maskCache.get(oldest).texture);
+    maskCache.delete(oldest);
+  }
+  return entry;
+}
+
+/* =====================================================================
+   6. 背景（预览近似，不是游戏渲染的一部分）
+   ===================================================================== */
+const BACKGROUNDS = {
+  tooltip: '物品提示框',
+  dark: '深色界面',
+  black: '纯黑',
+  checker: '透明棋盘',
+};
+
+function drawBackground(ctx, w, h, kind) {
+  ctx.clearRect(0, 0, w, h);
+  if (kind === 'checker') {
+    const cell = Math.max(8, Math.round(10 * (window.devicePixelRatio || 1)));
+    for (let y = 0; y < h; y += cell) {
+      for (let x = 0; x < w; x += cell) {
+        ctx.fillStyle = ((x / cell + y / cell) & 1) ? '#191d24' : '#22262f';
+        ctx.fillRect(x, y, cell, cell);
+      }
+    }
+    return;
+  }
+  if (kind === 'black') {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    return;
+  }
+  const bar = Math.max(1, Math.round((window.devicePixelRatio || 1) * 1));
+  if (kind === 'dark') {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#10141b');
+    g.addColorStop(0.55, '#0a0d13');
+    g.addColorStop(1, '#080a0f');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(70, 86, 112, .55)';
+    ctx.lineWidth = bar;
+    ctx.strokeRect(bar * 0.5, bar * 0.5, w - bar, h - bar);
+    return;
+  }
+  // 物品提示框：MC 风格的深紫底 + 渐变 + 紫边
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#1d0b26');
+  g.addColorStop(0.5, '#110718');
+  g.addColorStop(1, '#1d0b26');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(120, 70, 190, .85)';
+  ctx.lineWidth = bar;
+  ctx.strokeRect(bar * 0.5, bar * 0.5, w - bar, h - bar);
+  ctx.strokeStyle = 'rgba(190, 140, 255, .16)';
+  ctx.strokeRect(bar * 1.5, bar * 1.5, w - bar * 3, h - bar * 3);
+}
+
+/* =====================================================================
+   7. 目标画布（主预览 + 图鉴卡片）
+   ===================================================================== */
+const targets = [];
+const visibility = new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    const target = entry.target.__target;
+    if (target) target.visible = entry.isIntersecting;
+  }
+}, { rootMargin: '140px' });
+
+function addTarget(canvas, options) {
+  const target = Object.assign({
+    canvas,
+    ctx: canvas.getContext('2d'),
+    visible: true,
+    kind: 'card',
+  }, options);
+  targets.push(target);
+  canvas.__target = target;
+  visibility.observe(canvas);
+  return target;
+}
+
+function renderTarget(target, clock) {
+  const canvas = target.canvas;
+  const ctx = target.ctx;
+  const cssW = canvas.clientWidth;
+  const cssH = canvas.clientHeight;
+  if (cssW < 8 || cssH < 8) return;
+
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const pxW = Math.max(24, Math.round(cssW * dpr));
+  const pxH = Math.max(24, Math.round(cssH * dpr));
+  if (canvas.width !== pxW || canvas.height !== pxH) {
+    canvas.width = pxW;
+    canvas.height = pxH;
+  }
+  if (glCanvas.width < pxW || glCanvas.height < pxH) {
+    glCanvas.width = Math.max(glCanvas.width, pxW);
+    glCanvas.height = Math.max(glCanvas.height, pxH);
+  }
+
+  const state = window.__fxState;
+  const effect = EFFECTS[target.effectIndex];
+  const text = (target.text() || ' ').slice(0, 42);
+  const fontPx = fitFont(text, pxW * 0.86, pxH * (target.kind === 'main' ? 0.36 : 0.34));
+  const mask = getMask(text, fontPx);
+  const originX = Math.round((pxW - mask.tw) / 2);
+  const originY = Math.round((pxH - mask.th) / 2);
+
+  drawBackground(ctx, pxW, pxH, state.bg);
+
+  const top = glCanvas.height - pxH;
+  gl.enable(gl.SCISSOR_TEST);
+  gl.scissor(0, top, pxW, pxH);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  // scissor/视口限制在文字左右各 0.75 个字高的范围内，避免特效糊到整块面板
+  const padX = Math.ceil(mask.th * 0.75);
+  const x0 = Math.max(0, originX - padX);
+  const x1 = Math.min(pxW, originX + mask.tw + padX);
+  const vw = Math.max(1, x1 - x0);
+  gl.viewport(x0, top, vw, pxH);
+  gl.scissor(x0, top, vw, pxH);
+
+  // 图鉴卡片错开相位（同屏看得到不同时刻），主预览直接用时钟，便于截图和对照
+  const timeSec = clock + (target.kind === 'card' ? target.effectIndex * 1.37 : 0);
+  const shadowOffset = Math.max(1, Math.round(dpr));
+  const info = {
+    mask, originX, originY, timeSec,
+    uCanvasX: glCanvas.width, uCanvasY: glCanvas.height,
+    uTextPosX: originX, uTextPosY: originY,
+  };
+
+  const bind = (entry, offsetX, offsetY, alpha) => {
+    const u = entry.uniforms;
+    gl.useProgram(entry.program);
+    gl.uniform2f(u.uCanvas, info.uCanvasX, info.uCanvasY);
+    gl.uniform2f(u.uTextPos, info.uTextPosX + offsetX, info.uTextPosY + offsetY);
+    gl.uniform2f(u.uTextSize, mask.tw, mask.th);
+    gl.uniform4f(u.uMaskRect, mask.rect[0], mask.rect[1], mask.rect[2], mask.rect[3]);
+    gl.uniform1f(u.time, Math.fround(timeSec));
+    gl.uniform1f(u.opacity, alpha);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, mask.texture);
+    gl.uniform1i(u.textMask, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  };
+
+  if (state.shadow) bind(shadowProgram, shadowOffset, shadowOffset, 0.65);
+  bind(effect.program, 0, 0, 1);
+
+  ctx.drawImage(glCanvas, 0, 0, pxW, pxH, 0, 0, pxW, pxH);
+}
+
+/* =====================================================================
+   8. 页面状态 / UI
+   ===================================================================== */
+const state = window.__fxState = {
+  clock: 0,
+  paused: false,
+  speed: 1,
+  bg: 'tooltip',
+  shadow: true,
+  autoCycle: false,
+  effect: 0,
+  text: '混沌终焉 · 虚无贯星弓',
+  cycleAt: 0,
+};
+
+const mainCanvas = document.getElementById('mainCanvas');
+const mainTarget = addTarget(mainCanvas, {
+  kind: 'main',
+  effectIndex: 0,
+  text: () => state.text,
+});
+
+function updateEffectInfo() {
+  const effect = EFFECTS[state.effect];
+  mainTarget.effectIndex = state.effect;
+  document.getElementById('mainZh').textContent = effect.zh;
+  document.getElementById('mainId').textContent = effect.id;
+  document.getElementById('mainDesc').textContent = effect.desc;
+  document.getElementById('mainBadge').textContent = 'frag ' + effect.shader.trim().split('\n').length + ' 行 · ' + effect.palette.length + ' 色板';
+  const sw = document.getElementById('mainSw');
+  sw.innerHTML = '';
+  for (const color of effect.palette) {
+    const dot = document.createElement('i');
+    dot.className = 'sw';
+    dot.style.background = color;
+    sw.append(dot);
+  }
+  for (const card of galleryCards) card.classList.toggle('on', Number(card.dataset.index) === state.effect);
+}
+
+const galleryCards = [];
+
+function buildGallery() {
+  const grid = document.getElementById('gallery');
+  EFFECTS.forEach((effect, index) => {
+    const canvas = document.createElement('canvas');
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.index = String(index);
+    card.innerHTML =
+      '<div class="card-head"><span class="no">#' + String(index + 1).padStart(2, '0') + '</span>' +
+      '<code>' + effect.id + '</code><b>' + effect.zh + '</b>' +
+      '<span class="badge">' + effect.shader.trim().split('\n').length + ' 行</span></div>';
+    card.append(canvas);
+    const desc = document.createElement('p');
+    desc.className = 'card-desc';
+    desc.textContent = effect.desc;
+    card.append(desc);
+    const foot = document.createElement('div');
+    foot.className = 'card-foot';
+    const sw = document.createElement('span');
+    sw.className = 'swatches';
+    for (const color of effect.palette) {
+      const dot = document.createElement('i');
+      dot.className = 'sw';
+      dot.style.background = color;
+      sw.append(dot);
+    }
+    const use = document.createElement('button');
+    use.textContent = '在主预览中查看';
+    use.onclick = event => {
+      event.stopPropagation();
+      selectEffect(index);
+      document.querySelector('.preview-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    const copy = document.createElement('button');
+    copy.textContent = '复制着色器';
+    copy.onclick = event => {
+      event.stopPropagation();
+      copyShaderFor(index);
+    };
+    foot.append(sw, copy, use);
+    card.append(foot);
+    card.onclick = () => selectEffect(index);
+    grid.append(card);
+    galleryCards.push(card);
+    addTarget(canvas, {
+      kind: 'card',
+      effectIndex: index,
+      text: () => effect.sample,
+    });
+  });
+  document.getElementById('galleryCount').textContent = '共 ' + EFFECTS.length + ' 种';
+}
+
+function selectEffect(index) {
+  state.effect = (index + EFFECTS.length) % EFFECTS.length;
+  state.cycleAt = state.clock;
+  updateEffectInfo();
+}
+
+function toast(message) {
+  const el = document.getElementById('toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => el.classList.remove('show'), 1600);
+}
+
+function copyText(text) {
+  const done = () => toast('已复制到剪贴板');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const area = document.createElement('textarea');
+  area.value = text;
+  document.body.append(area);
+  area.select();
+  try { document.execCommand('copy'); done(); } catch (ignored) { toast('复制失败，请手动选择'); }
+  area.remove();
+}
+
+function copyShaderFor(index) {
+  const effect = EFFECTS[index];
+  copyText('// ' + effect.id + ' — MessTech text effect (common.glsl contract)\n' + COMMON.trim() + '\n\n' + effect.shader.trim() + '\n');
+}
+
+function bindControls() {
+  const bg = document.getElementById('bg');
+  for (const [key, name] of Object.entries(BACKGROUNDS)) {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = name;
+    bg.append(option);
+  }
+  bg.value = state.bg;
+  bg.onchange = () => { state.bg = bg.value; };
+
+  const shadow = document.getElementById('shadow');
+  shadow.checked = state.shadow;
+  shadow.onchange = () => { state.shadow = shadow.checked; };
+
+  const auto = document.getElementById('autoCycle');
+  auto.onchange = () => { state.autoCycle = auto.checked; state.cycleAt = state.clock; };
+
+  const speed = document.getElementById('speed');
+  const speedVal = document.getElementById('speedVal');
+  const syncSpeed = () => {
+    state.speed = Number(speed.value) / 100;
+    speedVal.textContent = state.speed.toFixed(2) + '×';
+  };
+  speed.oninput = syncSpeed;
+  syncSpeed();
+
+  const pause = document.getElementById('pause');
+  pause.textContent = state.paused ? '继续动画' : '暂停动画';
+  pause.onclick = () => {
+    state.paused = !state.paused;
+    pause.textContent = state.paused ? '继续动画' : '暂停动画';
+  };
+  document.getElementById('resetTime').onclick = () => { state.clock = 0; };
+
+  const textInput = document.getElementById('textInput');
+  textInput.value = state.text;
+  textInput.oninput = () => { state.text = textInput.value || ' '; };
+
+  const EXAMPLES = [
+    '混沌终焉 · 虚无贯星弓',
+    '数据洪流 · 量子存储矩阵',
+    '墨染山河 · 流金长卷',
+    'LEGENDARY · 传说级',
+    'MT-01 · DATA STREAM',
+    '谢谢观看！',
+  ];
+  const examples = document.getElementById('examples');
+  for (const value of EXAMPLES) {
+    const button = document.createElement('button');
+    button.textContent = value;
+    button.onclick = () => { textInput.value = value; state.text = value; };
+    examples.append(button);
+  }
+
+  document.getElementById('prevFx').onclick = () => selectEffect(state.effect - 1);
+  document.getElementById('nextFx').onclick = () => selectEffect(state.effect + 1);
+  document.getElementById('copyShader').onclick = () => copyShaderFor(state.effect);
+
+  document.addEventListener('keydown', event => {
+    if (event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+    if (event.key === 'ArrowLeft') selectEffect(state.effect - 1);
+    else if (event.key === 'ArrowRight') selectEffect(state.effect + 1);
+    else if (event.key === ' ') { state.paused = !state.paused; pause.textContent = state.paused ? '继续动画' : '暂停动画'; event.preventDefault(); }
+  });
+}
+
+/* =====================================================================
+   9. 主循环
+   ===================================================================== */
+let shadowProgram = null;
+let lastNow = 0;
+let autoTimer = 0;
+
+function frame(now) {
+  const dt = Math.min(0.1, (now - lastNow) / 1000 || 0);
+  lastNow = now;
+  if (!state.paused) state.clock += dt * state.speed;
+
+  if (state.autoCycle && !state.paused) {
+    autoTimer += dt;
+    if (autoTimer > 4.5) {
+      autoTimer = 0;
+      selectEffect(state.effect + 1);
+    }
+  } else {
+    autoTimer = 0;
+  }
+
+  for (const target of targets) if (target.visible) renderTarget(target, state.clock);
+  requestAnimationFrame(frame);
+}
+
+function main() {
+  if (!gl) {
+    reportError('当前浏览器不支持 WebGL，无法运行着色器预览。请换用新版 Chrome / Edge / Firefox。');
+    return;
+  }
+  applyQuery();
+  try {
+    initGl();
+    shadowProgram = createProgram(FX_SHADOW, 'shadow');
+    for (const effect of EFFECTS) {
+      const built = createProgram(effect.shader, effect.id);
+      effect.program = built;
+    }
+  } catch (error) {
+    reportError(error.message);
+    return;
+  }
+  buildGallery();
+  bindControls();
+  updateEffectInfo();
+
+  // 先同步一轮，避免首帧画布空白；之后交给 rAF
+  renderTarget(mainTarget, 0);
+  requestAnimationFrame(now => {
+    lastNow = now;
+    frame(now);
+  });
+}
+
+/* 便于截图 / 分享固定画面：
+   ?fx=eventhorizon&text=...&t=1.8&paused=1&bg=tooltip&shadow=0 */
+function applyQuery() {
+  const query = new URLSearchParams(location.search);
+  if (query.has('fx')) {
+    const index = EFFECTS.findIndex(effect => effect.id === query.get('fx'));
+    if (index >= 0) state.effect = index;
+  }
+  if (query.has('text')) {
+    const text = query.get('text').slice(0, 42).trim();
+    if (text) state.text = text;
+  }
+  if (query.has('t')) {
+    const seconds = parseFloat(query.get('t'));
+    if (isFinite(seconds)) state.clock = Math.max(0, seconds);
+    state.paused = true;
+  }
+  if (query.get('paused') === '1') state.paused = true;
+  if (query.has('bg') && BACKGROUNDS[query.get('bg')]) state.bg = query.get('bg');
+  if (query.get('shadow') === '0') state.shadow = false;
+}
+
+main();
+})();
+</script>
+</body>
+</html>

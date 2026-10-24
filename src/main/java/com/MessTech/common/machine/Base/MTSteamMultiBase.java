@@ -169,14 +169,11 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
         super.onPostTick(aBaseMetaTileEntity, aTick);
     }
 
-    /**
-     * Called every tick the Machine runs
-     */
+    /** Called every tick the Machine runs */
     @Override
     public boolean onRunningTick(ItemStack aStack) {
         if (lEUt < 0) {
             long aSteamVal = ((-lEUt * 10000) / Math.max(1000, mEfficiency));
-            // Logger.INFO("Trying to drain "+aSteamVal+" steam per tick.");
             if (!tryConsumeSteam((int) aSteamVal)) {
                 stopMachine(ShutDownReasonRegistry.POWER_LOSS);
                 return false;
@@ -191,8 +188,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
         final IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
         if (aMetaTileEntity == null) return false;
 
-        // 蒸汽仓优先分发:GTPP 基类的 addToMachineList 不认识 MTEHatchCustomFluidBase,
-        // 会把蒸汽输入仓丢进虚空(之前 mSteamInputFluids 永远是空的致命 bug)
+        // 蒸汽仓优先分发:GTPP 基类的 addToMachineList 不认识 MTEHatchCustomFluidBase,会把蒸汽输入仓丢进虚空
         if (addSteamInputFluidHatch(aTileEntity, aBaseCasingIndex)) return true;
         if (addSteamBusInput(aTileEntity, aBaseCasingIndex)) return true;
         if (addSteamBusOutput(aTileEntity, aBaseCasingIndex)) return true;
@@ -201,9 +197,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
             || addExoticEnergyInputToMachineList(aTileEntity, aBaseCasingIndex);
     }
 
-    /**
-     * 通用仓添加:更新纹理/合成图标/配方表,并去重。
-     */
+    /** 通用仓添加:更新纹理/合成图标/配方表,并去重。 */
     public <E> boolean addToMachineListInternal(ArrayList<E> aList, final E aTileEntity, final int aBaseCasingIndex) {
         if (aTileEntity == null) return false;
 
@@ -221,9 +215,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
         return aList.add(aTileEntity);
     }
 
-    /**
-     * 蒸汽输入总线(MTEHatchSteamBusInput)。
-     */
+    /** 蒸汽输入总线(MTEHatchSteamBusInput)。 */
     public boolean addSteamBusInput(final IGregTechTileEntity aTileEntity, final int aBaseCasingIndex) {
         if (aTileEntity == null) return false;
         final IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
@@ -236,9 +228,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
         return false;
     }
 
-    /**
-     * 蒸汽输出总线(MTEHatchSteamBusOutput),兼容虚空输出仓(MTEHatchVoidBus)。
-     */
+    /** 蒸汽输出总线(MTEHatchSteamBusOutput),兼容虚空输出仓(MTEHatchVoidBus)。 */
     public boolean addSteamBusOutput(final IGregTechTileEntity aTileEntity, final int aBaseCasingIndex) {
         if (aTileEntity == null) return false;
         final IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
@@ -250,9 +240,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
         return false;
     }
 
-    /**
-     * 蒸汽输入仓(MTEHatchCustomFluidBase,锁定为蒸汽)。只接受一个。
-     */
+    /** 蒸汽输入仓(MTEHatchCustomFluidBase,锁定为蒸汽)。只接受一个。 */
     public boolean addSteamInputFluidHatch(final IGregTechTileEntity aTileEntity, final int aBaseCasingIndex) {
         if (aTileEntity == null) return false;
         final IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
@@ -328,7 +316,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
             IGregTechTileEntity tile = tHatch.getBaseMetaTileEntity();
             for (int i = tile.getSizeInventory() - 1; i >= 0; i--) {
                 ItemStack stored = tile.getStackInSlot(i);
-                // 修复:之前误用 getStackInSlot(0) 比较/扣除,会扣错槽位
+                // 按实际槽位 i 扣除,固定用第 0 格会扣错槽位
                 if (stored != null && GTUtility.areStacksEqual(aStack, stored)) {
                     if (stored.stackSize >= aStack.stackSize) {
                         tile.decrStackSize(i, aStack.stackSize);
@@ -390,7 +378,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
 
     @Override
     public List<IOutputBus> getOutputBusses() {
-        // 蒸汽输出仓现在进 mSteamOutputs 而非 mOutputBusses,必须在这里补上,否则产物会丢失
+        // 蒸汽输出仓进 mSteamOutputs 而非 mOutputBusses,这里必须补上,否则产物会丢失
         List<IOutputBus> output = new ArrayList<>(super.getOutputBusses());
         for (MTEHatchOutputBus outputBus : validMTEList(mSteamOutputs)) {
             if (outputBus.isValid()) output.add(outputBus);
@@ -581,62 +569,6 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
                 .setSize(18, 4));
     }
 
-    /*
-     * @Override
-     * public void getWailaBody(ItemStack itemStack, List<String> currentTip, IWailaDataAccessor accessor,
-     * IWailaConfigHandler config) {
-     * final NBTTagCompound tag = accessor.getNBTData();
-     * if (tag.getBoolean("incompleteStructure")) {
-     * currentTip
-     * .add(RED + StatCollector.translateToLocalFormatted("GT5U.waila.multiblock.status.incomplete") + RESET);
-     * }
-     * String efficiency = RESET + StatCollector
-     * .translateToLocalFormatted("GT5U.waila.multiblock.status.efficiency", tag.getFloat("efficiency"));
-     * if (tag.getBoolean("hasProblems")) {
-     * currentTip
-     * .add(RED + StatCollector.translateToLocal("GT5U.waila.multiblock.status.has_problem") + efficiency);
-     * } else if (!tag.getBoolean("incompleteStructure")) {
-     * currentTip
-     * .add(GREEN + StatCollector.translateToLocal("GT5U.waila.multiblock.status.running_fine") + efficiency);
-     * }
-     * boolean isActive = tag.getBoolean("isActive");
-     * if (isActive) {
-     * long actualEnergyUsage = tag.getLong("energyUsage");
-     * if (actualEnergyUsage > 0) {
-     * currentTip.add(
-     * StatCollector
-     * .translateToLocalFormatted("GTPP.waila.steam.use", formatNumbers(actualEnergyUsage * 20)));
-     * }
-     * }
-     * currentTip.add(
-     * GTWaila.getMachineProgressString(
-     * isActive,
-     * tag.getBoolean("isAllowedToWork"),
-     * tag.getInteger("maxProgress"),
-     * tag.getInteger("progress")));
-     * // Show ns on the tooltip
-     * if (GTMod.proxy.wailaAverageNS && tag.hasKey("averageNS")) {
-     * int tAverageTime = tag.getInteger("averageNS");
-     * currentTip.add(
-     * StatCollector
-     * .translateToLocalFormatted("GT5U.waila.multiblock.status.cpu_load", formatNumbers(tAverageTime)));
-     * }
-     * super.getMTEWailaBody(itemStack, currentTip, accessor, config);
-     * }
-     * protected static String getSteamTierTextForWaila(NBTTagCompound tag) {
-     * int tierMachine = tag.getInteger("tierMachine");
-     * String tierMachineText;
-     * if (tierMachine == 1) {
-     * tierMachineText = "Basic";
-     * } else if (tierMachine == 2) {
-     * tierMachineText = "High Pressure";
-     * } else {
-     * tierMachineText = String.valueOf(tierMachine);
-     * }
-     * return tierMachineText;
-     * }
-     */
-
     protected static <T extends MTSteamMultiBase<T>> HatchElementBuilder<T> buildSteamInput(Class<T> typeToken) {
         return buildHatchAdder(typeToken).adder(MTSteamMultiBase::addToMachineList)
             .hatchIds(31040)
@@ -721,7 +653,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
         return false;
     }
 
-    // ── 结构错误检查(移植自 GT5U 的 MTESteamMultiBlockBase)──
+    // 结构错误检查(移植自 GT5U 的 MTESteamMultiBlockBase)
 
     /** 蒸汽输入仓必须存在。 */
     protected final void checkHasSteamInput(List<StructureError> errors) {

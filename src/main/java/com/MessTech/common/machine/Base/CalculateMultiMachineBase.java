@@ -29,9 +29,7 @@ import tectech.thing.metaTileEntity.hatch.MTEHatchUncertainty;
 import tectech.thing.metaTileEntity.hatch.MTEHatchWirelessComputationOutput;
 
 /**
- * Base class for MessTech computation multiblocks.
- * <p>
- * Adds the TecTech-style computation hatch lists and structure elements
+ * Base class for MessTech computation multiblocks: TecTech-style computation hatch lists and structure elements
  * (Uncertainty, InputData, OutputData, Rack) on top of {@link MTMultiMachineBase}.
  */
 public abstract class CalculateMultiMachineBase<T extends CalculateMultiMachineBase<T>> extends MTMultiMachineBase<T> {

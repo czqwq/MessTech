@@ -5,5 +5,13 @@
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
   "package": "com.MessTech.common.mixin.early",
-  "mixins": []
+  "mixins": [],
+  "client": [
+    "MixinBatchingFontRenderer_TextEffect",
+    "MixinEnumChatFormatting_TextEffect",
+    "MixinFontRenderer_TextEffect",
+    "MixinGuiNewChat_TextEffect",
+    "MixinGuiTextField_TextEffect"
+  ],
+  "server": []
 }

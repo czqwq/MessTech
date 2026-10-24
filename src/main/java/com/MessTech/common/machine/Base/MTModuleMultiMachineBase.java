@@ -25,22 +25,15 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
- * Base class for multiblocks that take {@link IMTModule modules}.
+ * Base class for multiblocks that take {@link IMTModule modules}: module values fold into the machine's EU modifier,
+ * speed bonus and parallel. Subclasses supply their own values in {@link #getBaseEuModifier()},
+ * {@link #getBaseSpeedBonus()} and {@link #getBaseMaxParallelRecipes()}; the aggregating methods are final. EU and
+ * speed modules multiply the machine's value, a parallel control module replaces it
+ * ({@link #getMaxParallelRecipes()}).
  * <p>
- * The machine owns the module list and folds the module values into the three knobs it already has: EU modifier,
- * speed bonus and parallel. Subclasses put their own values in {@link #getBaseEuModifier()},
- * {@link #getBaseSpeedBonus()} and {@link #getBaseMaxParallelRecipes()}; the aggregating methods themselves are
- * final, so a module can never be skipped by accident. The EU and speed modules multiply the value of the machine, a
- * parallel control module replaces it (see {@link #getMaxParallelRecipes()}).
- * <p>
- * The module list is rebuilt on every structure check: {@link #checkMachine} drops the old modules first and
- * subclasses register the current ones in {@link #checkMachineStructure}, usually from
- * {@link #addModuleHatchToMachineList}. A machine that lost a module hatch therefore loses its bonus at the next
- * check.
- * <p>
- * {@link MTModuleType#CROSS_RECIPE_PARALLEL} and {@link MTModuleType#WIRELESS} are not part of the default set, a
- * machine has to opt in; this class only reports what the modules provide ({@link #getModuleCycleNum()},
- * {@link #hasWirelessModule()}), the processing loop that uses it stays in the machine.
+ * The list is rebuilt on every structure check ({@link #checkMachine} then {@link #checkMachineStructure}, usually via
+ * {@link #addModuleHatchToMachineList}), so losing a hatch loses the bonus. {@link MTModuleType#CROSS_RECIPE_PARALLEL}
+ * and {@link MTModuleType#WIRELESS} are not default (a machine opts in); this class only reports them.
  */
 public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBase<T>> extends MTMultiMachineBase<T> {
 
@@ -52,10 +45,7 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
         super(aName);
     }
 
-    /**
-     * The module-aware GUI of {@link MTModuleMultiMachineBaseGui}: it adds the parallel field of the linked parallel
-     * control module to the terminal.
-     */
+    /** Module-aware GUI: {@link MTModuleMultiMachineBaseGui} adds the parallel field of the parallel control module. */
     @Override
     protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
         return new MTModuleMultiMachineBaseGui(this);
@@ -65,31 +55,16 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
 
     protected final List<IMTModule> modules = new ArrayList<>();
 
-    /**
-     * The module types this machine takes. The default is the standard set
-     * ({@link MTModuleType#defaultSupported()}); a machine that can also use the cross recipe parallel or the
-     * wireless module opts in by overriding this.
-     *
-     * @return The module types this machine takes.
-     */
+    /** @return Module types this machine takes; default {@link MTModuleType#defaultSupported()}, override to opt in. */
     public Set<MTModuleType> getSupportedModuleTypes() {
         return MTModuleType.defaultSupported();
     }
 
-    /**
-     * @param type The module type to test.
-     * @return If true this machine takes that module type.
-     */
     public boolean supportsModuleType(MTModuleType type) {
         return getSupportedModuleTypes().contains(type);
     }
 
-    /**
-     * A module is only taken when the machine supports every type it provides and its tier is IV .. MAX.
-     *
-     * @param module The module to test.
-     * @return If true this machine takes that module.
-     */
+    /** @return If true the machine takes that module: it supports every provided type and the tier is IV .. MAX. */
     public boolean acceptsModule(IMTModule module) {
         if (module == null || !IMTModule.isValidTier(module.getModuleTier())) return false;
         Set<MTModuleType> provided = module.getModuleTypes();
@@ -101,14 +76,10 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
     }
 
     /**
-     * Link a module to this machine, normally called while the structure is checked.
-     * <p>
-     * Only one {@link MTModuleType#PARALLEL_CONTROL} module is taken, because such a module supplies the parallel of
-     * the machine instead of adding to it: a second parallel controller is a structure error, the way TST's
-     * {@code checkSingleModularHatch} rejects a second modular hatch.
+     * Link a module, normally while the structure is checked. Only one {@link MTModuleType#PARALLEL_CONTROL} module is
+     * taken (it supplies the parallel instead of adding to it), like TST's {@code checkSingleModularHatch}.
      *
-     * @param module The module to link.
-     * @return If true the module is linked now, false when it is not taken or was already linked.
+     * @return If true the module is linked now, false when it is not taken or already linked.
      */
     public boolean addModule(IMTModule module) {
         if (!acceptsModule(module) || modules.contains(module)) return false;
@@ -117,12 +88,8 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
     }
 
     /**
-     * Hatch adder for {@link MTModuleHatchElement}, i.e. the structure scan entry point that links a module hatch to
-     * this machine.
-     *
-     * @param aTileEntity      The hatch that was found.
-     * @param aBaseCasingIndex The casing texture index of the structure.
-     * @return If true the hatch is a module this machine takes and the structure stays valid.
+     * @return Hatch adder for {@link MTModuleHatchElement}: links a module hatch found by the structure scan, if the
+     *         machine takes it.
      */
     public boolean addModuleHatchToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex) {
         if (aTileEntity == null) return false;
@@ -132,17 +99,10 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
         return true;
     }
 
-    /**
-     * @return Every linked module, in the order they were added.
-     */
     public List<IMTModule> getModules() {
         return Collections.unmodifiableList(modules);
     }
 
-    /**
-     * @param type The module type to look for.
-     * @return Every linked module that provides that type.
-     */
     public List<IMTModule> getModules(MTModuleType type) {
         List<IMTModule> found = new ArrayList<>();
         for (IMTModule module : modules) {
@@ -151,10 +111,6 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
         return found;
     }
 
-    /**
-     * @param type The module type to look for.
-     * @return If true at least one linked module provides that type.
-     */
     public boolean hasModule(MTModuleType type) {
         for (IMTModule module : modules) {
             if (module.provides(type)) return true;
@@ -162,9 +118,7 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
         return false;
     }
 
-    /**
-     * Drop every linked module. Called at the start of every structure check.
-     */
+    /** Drop every linked module. Called at the start of every structure check. */
     public void clearModules() {
         modules.clear();
     }
@@ -173,18 +127,14 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
 
     // region Module contributions
 
-    /**
-     * @return The EU modifier of every linked module, multiplied.
-     */
+    /** @return The EU modifier of the linked modules, multiplied. */
     protected float getModuleEuModifier() {
         float modifier = 1.0F;
         for (IMTModule module : modules) modifier *= module.getEuModifier();
         return modifier;
     }
 
-    /**
-     * @return The speed bonus of every linked module, multiplied.
-     */
+    /** @return The speed bonus of the linked modules, multiplied. */
     protected float getModuleSpeedBonus() {
         float bonus = 1.0F;
         for (IMTModule module : modules) bonus *= module.getSpeedBonus();
@@ -192,12 +142,8 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
     }
 
     /**
-     * The parallel of every linked parallel control module, taking the highest one.
-     * <p>
-     * Such a module supplies the parallel of the machine rather than adding to it, so several of them would be
-     * ambiguous; {@link #addModule} only accepts the first one.
-     *
-     * @return The parallel the linked modules supply, 0 when there is none.
+     * @return The parallel of the linked parallel control module (the highest one), 0 when there is none; such a module
+     *         supplies the parallel rather than adding to it.
      */
     protected int getModuleParallel() {
         int parallel = 0;
@@ -208,9 +154,6 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
         return parallel;
     }
 
-    /**
-     * @return The highest cycle count of the linked modules, 1 when there is none.
-     */
     protected int getModuleCycleNum() {
         int cycles = 1;
         for (IMTModule module : modules) {
@@ -219,9 +162,6 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
         return cycles;
     }
 
-    /**
-     * @return If true at least one linked module provides wireless operation.
-     */
     protected boolean hasWirelessModule() {
         for (IMTModule module : modules) {
             if (module.providesWireless()) return true;
@@ -244,33 +184,30 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
     }
 
     /**
-     * A parallel control module replaces the parallel of the machine: the machine runs on
-     * {@link IMTModule#getParallel()} of that module and falls back to {@link #getBaseMaxParallelRecipes()} only when
-     * it has none.
+     * A parallel control module supplies the parallel ({@link IMTModule#getParallel()}), else
+     * {@link #getBaseMaxParallelRecipes()}; with {@link #isModuleParallelAdditive()} it is added on top instead.
      */
     @Override
     public final int getMaxParallelRecipes() {
         int supplied = getModuleParallel();
-        return supplied > 0 ? supplied : getBaseMaxParallelRecipes();
+        if (supplied <= 0) return getBaseMaxParallelRecipes();
+        if (!isModuleParallelAdditive()) return supplied;
+        return (int) Math.min(Integer.MAX_VALUE, (long) getBaseMaxParallelRecipes() + supplied);
     }
 
-    /**
-     * @return The EU modifier of the machine itself, without its modules. Defaults to 1.
-     */
+    /** @return If true a parallel control module adds to the base parallel instead of replacing it. */
+    protected boolean isModuleParallelAdditive() {
+        return false;
+    }
+
     protected float getBaseEuModifier() {
         return 1.0F;
     }
 
-    /**
-     * @return The speed bonus of the machine itself, without its modules. Defaults to 1.
-     */
     protected float getBaseSpeedBonus() {
         return 1.0F;
     }
 
-    /**
-     * @return The parallel of the machine itself, without its modules. Defaults to 1.
-     */
     protected int getBaseMaxParallelRecipes() {
         return 1;
     }
@@ -279,12 +216,7 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
 
     // region Module GUI
 
-    /**
-     * The linked parallel control module, {@code null} when the machine has none. {@link #addModule} takes only one,
-     * so this is the module that supplies the parallel of the machine.
-     *
-     * @return The module that supplies the parallel, {@code null} when there is none.
-     */
+    /** @return The linked parallel control module, {@code null} when none ({@link #addModule} takes only one). */
     private IMTModule parallelModule() {
         for (IMTModule module : modules) {
             if (module.provides(MTModuleType.PARALLEL_CONTROL)) return module;
@@ -293,32 +225,20 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
     }
 
     /**
-     * The parallel the machine GUI shows: the parallel of the linked parallel control module, which is the parallel
-     * the machine runs on ({@link #getMaxParallelRecipes()}). Client safe, so the GUI can ask for it on both sides;
-     * it reads 1 on a client that has not received the module values yet.
-     *
-     * @return The parallel of the parallel control module, 1 when the machine has none.
+     * @return The GUI's parallel, i.e. that of the parallel control module (= {@link #getMaxParallelRecipes()}), 1
+     *         without one. Client safe, so 1 until the client received the module values.
      */
     public int getParallelForGui() {
         IMTModule module = parallelModule();
         return module == null ? 1 : Math.max(1, module.getParallel());
     }
 
-    /**
-     * @return The ceiling of the parallel field in the machine GUI, 1 when the machine has no parallel control
-     *         module.
-     */
     public int getParallelCeilingForGui() {
         IMTModule module = parallelModule();
         return module == null ? 1 : Math.max(1, module.getMaxParallel());
     }
 
-    /**
-     * Sets the parallel of the linked parallel control module from the machine GUI, clamped by the module. Does
-     * nothing when the machine has no parallel control module.
-     *
-     * @param value The requested parallel.
-     */
+    /** Sets the GUI parallel of the linked parallel control module (clamped by it); no-op without one. */
     public void setParallelForGui(int value) {
         IMTModule module = parallelModule();
         if (module != null) module.setParallelFromGui(value);
@@ -328,10 +248,7 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
 
     // region Waila
 
-    /**
-     * Writes the module values into the Waila tag. The modules are linked by the structure scan, which only runs on
-     * the server, so the client can only read them out of the tag.
-     */
+    /** Writes the module values into the Waila tag: the structure scan that links modules only runs on the server. */
     @Override
     public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
         int z) {
@@ -345,13 +262,9 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
     }
 
     /**
-     * The module lines of the Waila body, below everything the bases above put there and in the order of the module
-     * tooltips: the recipe duration reduction, the EU discount and then the parallel. A line only appears while a
-     * module of that kind is linked.
-     * <p>
-     * The numbers are written the way the module tooltips write them ({@code MTModuleValues}: the duration reduction
-     * and the EU discount as the factor of the machine, the parallel as a grouped number), and the colour codes live
-     * in the language files like every other MessTech display.
+     * The module lines of the Waila body, in module tooltip order (duration reduction, EU discount, parallel), each
+     * only while such a module is linked. Numbers use the {@code MTModuleValues} tooltip format, colours live in the
+     * lang files.
      */
     @Override
     public void getWailaBody(ItemStack itemStack, List<String> currentTip, IWailaDataAccessor accessor,
@@ -383,11 +296,7 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
 
     // region Structure
 
-    /**
-     * Structure check entry. The modules of the previous check are dropped here and the structure scan of the
-     * subclass registers the current ones, so subclasses implement {@link #checkMachineStructure} instead of this
-     * method.
-     */
+    /** Structure check entry: drops the previous modules, then runs {@link #checkMachineStructure}. */
     @Override
     public final void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack,
         List<StructureError> errors) {
@@ -398,9 +307,7 @@ public abstract class MTModuleMultiMachineBase<T extends MTModuleMultiMachineBas
     /**
      * Check the structure and register the modules, see {@link #checkMachine}.
      *
-     * @param aBaseMetaTileEntity The base tile entity of this machine.
-     * @param aStack              The stack that triggered the check.
-     * @param errors              Collected structure errors.
+     * @param errors Collected structure errors.
      */
     protected abstract void checkMachineStructure(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack,
         List<StructureError> errors);

@@ -37,11 +37,9 @@ import gtnhintergalactic.tile.multi.elevator.TileEntitySpaceElevator;
 import tectech.thing.metaTileEntity.multi.base.render.TTRenderedExtendedFacingTexture;
 
 /**
- * Infinite Space Assembler module.
- * <p>
- * Uses GTNH Intergalactic's real space assembler recipe pool, draws power from the GT wireless
- * network and runs an unlimited number of independent recipe cycles per machine cycle (cross-recipe
- * parallelism with Integer.MAX_VALUE parallel per recipe).
+ * Infinite Space Assembler module: GTNH Intergalactic's real space assembler recipe pool, power from the GT wireless
+ * network and an unlimited number of independent recipe cycles per machine cycle (cross-recipe parallelism,
+ * Integer.MAX_VALUE parallel per recipe).
  */
 public class SpaceModuleAssemblerInfinity extends SpaceModuleInfinityBase<SpaceModuleAssemblerInfinity> {
 

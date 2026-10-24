@@ -32,17 +32,14 @@ import gregtech.common.tileentities.machines.MTEHatchInputBusME;
 /**
  * "Inventory Input Bus (ME)"
  * <p>
- * Like the GT5U stocking ME input bus, but instead of exposing at most 16 configured item types it
- * snapshots the whole AE item network during every recipe processing check, so a multiblock can see
- * every item type stored in ME in one recipe check.
+ * Like the GT5U stocking ME input bus, but it snapshots the whole AE item network on every recipe check instead of
+ * exposing at most 16 configured item types, so a multiblock sees every ME-stored type in one check.
  * <p>
- * It uses the advanced stocking ME hatch GUI (auto-pull toggle is available). When auto-pull is on,
- * the GUI still displays only the first 16 items from AE, while actual recipe processing uses the
- * complete snapshot from {@link #inventorySlots} (filtered by the configured minimum stock size).
- * The per-recipe-check snapshot is refreshed on every {@link #startRecipeProcessing()}, matching the
- * GT5U stocking hatch's automatic per-check pull notification.
- * When auto-pull is off, it behaves like the normal GT5U stocking bus: only the manually configured
- * 16 slots are exposed and no auto pull happens.
+ * Uses the advanced stocking ME hatch GUI (auto-pull toggle). Auto-pull on: the GUI shows only the first 16 AE items
+ * while
+ * processing uses the full snapshot from {@link #inventorySlots} (filtered by the configured minimum stock size),
+ * refreshed on every {@link #startRecipeProcessing()} like the GT5U hatch's per-check pull. Auto-pull off: behaves like
+ * the normal GT5U stocking bus, only the manually configured 16 slots, no auto pull.
  */
 public class MTInventoryInputBusME extends MTEHatchInputBusME {
 
@@ -69,15 +66,14 @@ public class MTInventoryInputBusME extends MTEHatchInputBusME {
     @Override
     public String[] getDescription() {
         return new String[] {
-            // EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.meinventory.inputbus.desc.0"),
             EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.meinventory.inputbus.desc.1"),
             EnumChatFormatting.GRAY + StatCollector.translateToLocal("machine.meinventory.inputbus.desc.2") };
     }
 
     @Override
     public boolean needsPeriodicChecks() {
-        // We do not install a watcher for every possible AE item type; force periodic recipe checks so
-        // new/removed ME contents are still noticed by attached multis.
+        // No watcher per AE item type: force periodic recipe checks so attached multis still notice added/removed
+        // ME contents.
         return true;
     }
 
@@ -113,10 +109,9 @@ public class MTInventoryInputBusME extends MTEHatchInputBusME {
         }
 
         if (autoPullItemList) {
-            // Auto-pull mode: the GUI only shows the first 16 items, but every recipe check pulls a
-            // fresh full snapshot from AE. This mirrors the original hatch behavior where the recipe
-            // check itself notifies the hatch to refresh its available contents, allowing continuous
-            // feeding even while autoPullRefreshTime governs the 16-slot GUI refresh.
+            // Auto-pull: every recipe check pulls a fresh full AE snapshot (the GUI still shows only the first 16
+            // items),
+            // so feeding is continuous although autoPullRefreshTime governs the GUI.
             try {
                 IMEMonitor<IAEItemStack> sg = getProxy().getStorage()
                     .getItemInventory();

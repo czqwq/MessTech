@@ -2,8 +2,7 @@
 
 > 机器：`MTIntegratedMachiningCenter` / 多功能集成加工中心
 > 结构名：**MT 集成加工车间（Integrated Machining Workshop）**
-> 本文只做**设计 + 溯源**，不改 `src/`。所有方块都来自工作区里已解包的 GT5U 源码，每条都给了
-> 「注册名 + meta + 中文名 + 英文名 + 源码出处」。
+> 只做**设计 + 溯源**，不改 `src/`；方块全部取自工作区已解包的 GT5U 源码，每条给「注册名 + meta + 中英文名 + 源码出处」。
 
 ## 0. 参考源码（全部在本地，未联网）
 
@@ -16,11 +15,10 @@
 | MessTech 自己的机器模板（`Casings` 枚举用法范例） | `src/main/java/com/MessTech/common/machine/template/MachineTemplate.java` |
 | 结构库 | `tmp/StructureLib-master/` |
 
-`Casings` 枚举是 GT5U 5.09.54.183 引入的方块+casing 纹理总表，定义在
-`tmp/GT5U-183-src/gregtech/api/casing/Casings.java`。MessTech 已有的
-[`MachineTemplate.java`](../../src/main/java/com/MessTech/common/machine/template/MachineTemplate.java)
-（第 21 行 `import gregtech.api.casing.Casings;`、第 78–93 行）已经在用它，
-所以新机器同样用 `Casings.X.getBlock()` / `getBlockMeta()` / `textureId` / `asElement()`。
+`Casings`（GT5U 5.09.54.183 引入的方块+casing 纹理总表）定义在 `tmp/GT5U-183-src/gregtech/api/casing/Casings.java`；
+MessTech 的 [`MachineTemplate.java`](../../src/main/java/com/MessTech/common/machine/template/MachineTemplate.java)
+（第 21 行 `import gregtech.api.casing.Casings;`、78–93 行）已在用，新机器同样用
+`Casings.X.getBlock()` / `getBlockMeta()` / `textureId` / `asElement()`。
 
 ## 1. 结构方块总表（结构字母 → 方块）
 
@@ -45,46 +43,37 @@
 | **R** | 强化玻璃 | `gt.blockglass1` | 10 | Reinforced Glass | 强化玻璃 ‡ | `Casings.java:647-648` |
 | **S** | 无菌水厂机壳 | `gt.blockcasings9` | 4 | Sterile Water Plant Casing | 无菌水厂机壳 ‡ | `Casings.java:279` |
 
-† `gt.blockconcretes.*.name` 在 `tmp/GT5U-183-src/assets/gregtech/lang/en_US.lang` 有英文条目
-（第 9512–9527 行，meta 0–7 = Dark 系列、8–15 = Light 系列），但**这个快照没有随附
-`zh_CN` 的 `.name` 键**（`tmp/GT5U-183-src/assets/gregtech/lang/zh_CN.lang` 与
-`tmp/Translation-GTNH/GregTech_zh_CN.lang` 都只收录了 `.32767` 通配条目）。因此这些中文名是**暂定译名**，
-落地成 Java 时必须用游戏内实际 lang 里的名字替换（见 §6）。
+† `gt.blockconcretes.*.name` 的英文条目在 `tmp/GT5U-183-src/assets/gregtech/lang/en_US.lang` 第 9512–9527 行
+（meta 0–7 = Dark 系列、8–15 = Light 系列），但**这个快照没有 `zh_CN` 的 `.name` 键**
+（`tmp/GT5U-183-src/assets/gregtech/lang/zh_CN.lang` 与 `tmp/Translation-GTNH/GregTech_zh_CN.lang` 都只有 `.32767`
+通配条目），所以这些中文名是**暂定译名**，落地成 Java 时必须换成游戏内实际名字（见 §6）。
 
-‡ 这些词在 `tmp/Translation-GTNH/GregTech_zh_CN.lang` 里能搜到同词素（`机械方块` / `框架` / `玻璃` /
-`机壳`），但没有直接搜到该方块整名，同样按暂定处理。
+‡ `tmp/Translation-GTNH/GregTech_zh_CN.lang` 只能搜到同词素（`机械方块` / `框架` / `玻璃` / `机壳`），没有该方块整名，同样按暂定处理。
 
-> 注册名全部按源码核对过：GT 方块取 `super(ItemCasings.class, "<name>", ...)` 的字面量
-> （`BlockCasings2/3/4/9.java`、`BlockGlass1.java`），GT++ 取 `ModBlocks` 的登记名，
-> BW / TT / GG 取各自的 `GameRegistry.registerBlock(..., "<name>")`。
-> 表里的 `GoodGenerator:` 前缀是大写 G —— 来自 `Mods.ModIDs.GOOD_GENERATOR = "GoodGenerator"`
-> （`Mods.java:446`），不要写成小写。
+> 注册名均按源码核对：GT 取 `super(ItemCasings.class, "<name>", ...)` 字面量（`BlockCasings2/3/4/9.java`、`BlockGlass1.java`），
+> GT++ 取 `ModBlocks` 登记名，BW / TT / GG 各取 `GameRegistry.registerBlock(..., "<name>")`。
+> `GoodGenerator:` 前缀是大写 G（`Mods.ModIDs.GOOD_GENERATOR = "GoodGenerator"`，`Mods.java:446`），别写小写。
 
 ### 1.1 为什么选这些方块
 
-- **混凝土（A/B/C/D）+ 玻璃（K/R）+ 钢框架（H）** 是「厂房 + 混凝土地基 + 现代化风格」的核心。
-  D 是 GT5U 里唯一名字里就写着 high-strength 的混凝土板，用来做**厂房地面垫层**；C 做**地坪边缘**压边；
-  B 做地坪；A 做外墙填充板。
-- **H 防辐射钢框架**在 GTNH 里承担「预制钢结构」的角色（核燃料精炼厂的结构说明里明确写
-  「§664 §f防辐射钢框架」），是这套设计里唯一真正的**钢结构柱 / 桁架**。
-- **I 格栅机械方块**做设备区的地沟盖板（CAL 用它当结构地板）。
-- **E 洁净不锈钢机壳**做**主加工区/加工平台**的外壳（工业挤出机 `MTEIndustrialExtruder`
-  用的就是它）。
-- **F 实心钢机械方块**做**天车大梁 / 立柱包边**这类承重钢构件。
-- **G 车床机壳（稳定钛机壳）**是这台机器的「品牌件」：车床 = 本机的切削主轴隐喻。
-- **M 爆炸危险警示方块 + L 黄色条纹方块**做安全标识（设备区四周、屋顶女儿墙前沿）。
-- **N 螺栓铱机壳**做钢柱柱脚（有螺栓锚固的观感）。
-- **O/P/Q** 是 TT 的电脑/分子线，做**工控柜、主轴箱、刀库**这类「高科技设备」。
-- **S 无菌水厂机壳**做**计量/校正区**的浅色设备外壳，给深色工业风里补一点亮。
+- **混凝土（A/B/C/D）+ 玻璃（K/R）+ 钢框架（H）** = 「厂房 + 混凝土地基 + 现代化风格」核心：D 是 GT5U 里唯一名字带
+  high-strength 的板，做**地面垫层**；C 做**地坪边缘**压边；B 做地坪；A 做外墙填充板。
+- **H 防辐射钢框架** = GTNH 的「预制钢结构」（核燃料精炼厂结构说明「§664 §f防辐射钢框架」），本设计唯一的**钢柱 / 桁架**。
+- **I 格栅机械方块** = 设备区地沟盖板（CAL 拿它当结构地板）。
+- **E 洁净不锈钢机壳** = **主加工区/加工平台**外壳（工业挤出机 `MTEIndustrialExtruder` 用的就是它）。
+- **F 实心钢机械方块** = **天车大梁 / 立柱包边**等承重钢构件。
+- **G 车床机壳（稳定钛）** = 「品牌件」：车床 = 本机切削主轴隐喻。
+- **M 爆炸危险警示方块 + L 黄色条纹方块** = 安全标识（设备区四周、屋顶女儿墙前沿）。
+- **N 螺栓铱机壳** = 钢柱柱脚（螺栓锚固观感）。
+- **O/P/Q** = TT 电脑/分子线，做**工控柜、主轴箱、刀库**。
+- **S 无菌水厂机壳**做**计量/校正区**的浅色设备外壳，给深色工业风补一点亮。
 
 ## 2. 结构总览
 
-- **包络尺寸（宽 × 高 × 深）= 19 × 12 × 21**（x 0–18，y 0–11，z 0–20）。
-- 控制器 `~` 位于 **(x=9, y=2, z=20)** —— 厂房正面（南面）大门中央。
-  因为 `structure_string` 要 `transpose()`，所以 `checkPiece` 偏移量是
+- **包络（宽 × 高 × 深）19 × 12 × 21**（x 0–18，y 0–11，z 0–20）。
+- 控制器 `~` 在 **(x=9, y=2, z=20)**，厂房正面（南面）大门中央；`structure_string` 要 `transpose()`，故 `checkPiece` 偏移
   `HORIZONTAL_OFFSET=9, VERTICAL_OFFSET=2, DEPTH_OFFSET=20`。
-- 结构是「**厂房外壳 + 混凝土地基**」：地基（y0）是一整块实心混凝土台，厂房（y1–y11）是
-  钢结构柱 + 混凝土填充墙 + 大面积玻璃幕墙的**中空**车间，车间里摆着加工设备。
+- 结构 = **厂房外壳 + 混凝土地基**：y0 实心混凝土台，y1–y11 是钢柱 + 混凝土填充墙 + 玻璃幕墙的**中空**车间，内摆加工设备。
 - 竖向分区：
 
 | 层 | 名称 | 内容 |
@@ -101,12 +90,9 @@
 | y10 | 屋面板 | 整块屋面板 + 中央天窗阵列（4×4）+ 吊装口 |
 | y11 | 女儿墙 | 周边女儿墙压顶 + 正面与两侧黄条纹警示 |
 
-建筑语言：**通高钢角柱（防辐射钢框架）夹住四面玻璃幕墙**，幕墙竖梃也是钢框架；
-基座与屋面用混凝土，设备层用不锈钢机壳。
-前半个车间做成**夹层**（首层通行、夹层办公/工控），后半个车间**通高 7 格**放主轴与天车 ——
-这是现代精密制造车间的典型剖面。
-
-详细坐标见 [`machine-spec.md`](machine-spec.md)（逐层逐格的权威定义，由生成器产出）。
+**通高钢角柱（防辐射钢框架）夹住四面玻璃幕墙**，幕墙竖梃同为钢框架；基座与屋面用混凝土，设备层用不锈钢机壳。
+前半个车间做**夹层**（首层通行、夹层办公/工控），后半个车间**通高 7 格**放主轴与天车。
+逐层逐格坐标（生成器产出的权威定义）见 [`machine-spec.md`](machine-spec.md)。
 
 ## 3. 结构元素（`addElement` 计划）
 
@@ -130,21 +116,18 @@ S -> Casings.SterileWaterPlantCasing.asElement()
 '~' -> 控制器（不需要 element）
 ```
 
-> 上面每个 `Casings.X` 都在 `tmp/GT5U-183-src/gregtech/api/casing/Casings.java` 里核对过是真实枚举常量
-> （不是猜的名字）。混凝土方块在 GT5U 里的字段是 `GregTechAPI.sBlockConcretes`
-> （`gregtech.common.blocks.BlockConcretes`，注册名 `gt.blockconcretes`，构造器第 17 行，
-> 由 `LoaderGTBlockFluid.java:754` 赋值）。`Casings` 枚举里没有混凝土，所以 A/B/C 走 `ofBlock` + meta。
+> 每个 `Casings.X` 都在 `tmp/GT5U-183-src/gregtech/api/casing/Casings.java` 核对过是真实枚举常量。
+> 混凝土字段是 `GregTechAPI.sBlockConcretes`（`gregtech.common.blocks.BlockConcretes`，注册名 `gt.blockconcretes`，
+> 构造器第 17 行，由 `LoaderGTBlockFluid.java:754` 赋值）；`Casings` 里没有混凝土，A/B/C 走 `ofBlock` + meta。
 
-仓室（hatch）挂点已经定死：**后墙 `z=0`、`y=2` 的那一整条**（`x=1..17`，全是实心钢机械方块，
-内侧 `z=1` 同 x 都是车间空气，生成器的自检 #7 会保证这一点）。这一条放
-`InputBus / InputHatch / OutputBus / OutputHatch / Energy.or(ExoticEnergy) / Maintenance / Muffler`；
-正面幕墙基座（`z=20`、`y=2` 的混凝土段）可以再挂一排总线，将来接装配线模式时留给 `DataAccess`。
+仓室挂点定死：**后墙 `z=0`、`y=2` 整条**（`x=1..17` 全是实心钢机械方块；内侧 `z=1` 同 x 是车间空气，生成器自检 #7 保证）。
+其上放 `InputBus / InputHatch / OutputBus / OutputHatch / Energy.or(ExoticEnergy) / Maintenance / Muffler`；
+正面幕墙基座（`z=20`、`y=2` 混凝土段）可再挂一排总线，将来接装配线模式时留给 `DataAccess`。
 
 ## 4. 多模式（功能集成）
 
-一台机器跑四套配方池，用**螺丝刀切模式**（`MTMultiMachineBase` 已经内置
-`totalMachineMode()` / `getMachineModeName(int)` / `nextMachineMode()` / 模式按钮，
-见 `MTMultiMachineBase.java:734-782`）：
+一台机器跑四套配方池，用**螺丝刀切模式**（`MTMultiMachineBase` 已内置 `totalMachineMode()` / `getMachineModeName(int)` /
+`nextMachineMode()` / 模式按钮，见 `MTMultiMachineBase.java:734-782`）：
 
 | 模式 | 名称 | 配方池（GT5U `RecipeMaps`） | 现实隐喻 |
 |---|---|---|---|
@@ -153,36 +136,29 @@ S -> Casings.SterileWaterPlantCasing.asElement()
 | 2 | 装配模式 | `assemblerRecipes` / `circuitAssemblerRecipes` / `laserEngraverRecipes` | 组装、电路贴装、激光刻蚀 |
 | 3 | 热处理模式 | `arcFurnaceRecipes` / `alloySmelterRecipes` / `chemicalBathRecipes` | 电弧炉、合金炉、化学浴 |
 
-（配方池名全部来自 `tmp/GT5U-183-src/gregtech/api/recipe/RecipeMaps.java`。
-模式数、每模式的池子、是否开完美超频由实施时定；这里只锁定**结构怎么支持多模式**。）
+（池名全部来自 `tmp/GT5U-183-src/gregtech/api/recipe/RecipeMaps.java`；模式数、池子构成、是否完美超频实施时定，
+这里只锁定**结构怎么支持多模式**。）
 
 ### 4.1 模式与结构的绑定
 
-不建议把模式做成「结构上多摆一个方块」——那样每换一次模式就要拆一次厂房。
-更好的做法是复用 MessTech 现有的两条约定：
+模式不做成「结构上多摆一个方块」（每换一次模式要拆一次厂房），复用 MessTech 两条约定：
 
-1. **模式开关**走螺丝刀（和 `MTAssFactory` 一样，`MTAssFactory.java:133-159`），
-   机器内部限制「正在运行 / 有余热时不能切」；
-2. **加工单元等级**走 `ofBlocksTiered`（和 `MTDTPF` 的线圈 / 外壳一样，
-   `MTDTPF.java:466-482`）：把「刀库」那一排（后墙内侧 `x=3..5`、`z=3..4`、`y=5`）换成
-   **可检测等级的加工单元块**，等级决定并行数与超频档位，和模式互相独立。
+1. **模式开关**走螺丝刀（同 `MTAssFactory`，`MTAssFactory.java:133-159`），运行中 / 有余热时不能切；
+2. **加工单元等级**走 `ofBlocksTiered`（同 `MTDTPF` 的线圈 / 外壳，`MTDTPF.java:466-482`）：把「刀库」那一排
+   （后墙内侧 `x=3..5`、`z=3..4`、`y=5`）换成**可检测等级的加工单元块**，等级决定并行数与超频档位，和模式互相独立。
 
-这样：厂房一次建成，模式用 GUI/螺丝刀切，加工能力用换刀库块来升级。
+厂房一次建成，模式用 GUI/螺丝刀切，加工能力换刀库块升级。
 
 ## 5. 预览
 
-交互式 3D 预览：[`preview.html`](preview.html)（自包含、无外部依赖，双击即可在浏览器打开；
-`file://` 下会自动回退到内联数据快照，所以打开就有图）。
-它读 [`machine-structure.json`](machine-structure.json)，后者与逐层坐标一起由
-[`generate_structure.py`](generate_structure.py) 生成、[`render_spec.py`](render_spec.py) 渲染成
-[`machine-spec.md`](machine-spec.md)。
+交互式 3D 预览 [`preview.html`](preview.html)：自包含、无外部依赖，双击即可打开（`file://` 下回退到内联数据快照，打开就有图）。
+它读 [`machine-structure.json`](machine-structure.json)：该文件与逐层坐标由 [`generate_structure.py`](generate_structure.py) 生成、
+[`render_spec.py`](render_spec.py) 渲染成 [`machine-spec.md`](machine-spec.md)。
 
 ## 6. 落地成 Java 时还要做的事（本次不做）
 
-1. 用游戏内实际 lang 覆盖 §1 表里标 †/‡ 的中文名（`gt.blockconcretes.15.name` 等），
-   中文名一律以运行时的 `zh_CN` 为准。
-2. `MTBlocks` 里新增「加工单元」方块（带 meta 分级）如果要做 §4.1 的等级系统。
-3. `MTMachineLoader` 注册 + `MTItemList` + 两个 lang 文件（`messtech` 自己的
-   `machine.integratedmachiningcenter.*` 键）。
+1. 用游戏内实际 lang 覆盖 §1 表里标 †/‡ 的中文名（`gt.blockconcretes.15.name` 等），一律以运行时 `zh_CN` 为准。
+2. 要做 §4.1 的等级系统，就在 `MTBlocks` 新增「加工单元」方块（带 meta 分级）。
+3. `MTMachineLoader` 注册 + `MTItemList` + 两个 lang 文件（`messtech` 自己的 `machine.integratedmachiningcenter.*` 键）。
 4. 结构错误本地化键：`structure.error.*`（见 `docs/GT5U-NOTES.md` §8）。
 5. 跑 `./gradlew spotlessApply compileJava`。

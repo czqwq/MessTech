@@ -54,7 +54,7 @@ public final class Utils {
 
     /**
      * Hands a stack back to the player, ported from GT-Not-Leisure's {@code Utils.placeItemBackInInventory}: try the
-     * inventory, drop whatever does not fit, then resync the inventory container so the client sees it at once.
+     * inventory, drop what does not fit, resync the inventory container so the client sees it at once.
      */
     public static void placeItemBackInInventory(EntityPlayer player, ItemStack stack) {
         if (stack == null || stack.stackSize == 0) return;
@@ -214,7 +214,6 @@ public final class Utils {
     public static ItemStack copyAmount(int aAmount, ItemStack aStack) {
         if (isStackInvalid(aStack)) return null;
         ItemStack rStack = aStack.copy();
-        // if (aAmount > 64) aAmount = 64;
         if (aAmount == -1) aAmount = 111;
         else if (aAmount < 0) aAmount = 0;
         rStack.stackSize = aAmount;
@@ -328,8 +327,8 @@ public final class Utils {
     }
 
     /**
-     * Recursively checks an Object array for null ItemStacks or nested null items.
-     * Used to validate recipe inputs before passing to TTRecipeAdder.
+     * Recursively checks an Object array for null ItemStacks or nested null items. Used to validate recipe inputs
+     * before passing them to TTRecipeAdder.
      */
     public static boolean hasNullItem(Object... items) {
         if (items == null) return true;

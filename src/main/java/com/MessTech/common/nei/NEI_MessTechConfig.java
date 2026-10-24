@@ -16,16 +16,17 @@ import cpw.mods.fml.common.Loader;
 import gregtech.api.recipe.RecipeCategory;
 
 /**
- * MessTech NEI configuration.
+ * MessTech NEI configuration: the infinite Space Pump becomes a catalyst for GTNH-Intergalactic's Space Pump handler,
+ * so its
+ * {@code SpacePumpingRecipes} show up in NEI, and NEI can transfer recipe pages into the Ultimate Pattern Terminal's
+ * grid. The
+ * terminal is deliberately <em>not</em> a recipe catalyst - it is a pattern terminal, not a machine that runs those
+ * recipes.
  * <p>
- * Registers the infinite Space Pump as a catalyst for the original GTNH-Intergalactic Space Pump recipe handler, so
- * its custom {@code SpacePumpingRecipes} show up in NEI, and lets NEI transfer recipe pages into the Ultimate Pattern
- * Terminal's grid. The terminal is deliberately <em>not</em> a recipe catalyst: it is a pattern terminal, not a machine
- * that runs those recipes, so it has no business being listed as one on the page.
- * <p>
- * Who does the transfer depends on the pack: with NotEnoughEnergistics - the GTNH transfer for AE's pattern terminals -
- * loaded, its {@link NEEPatternTerminalHandler} takes the terminal's pages, so that one mod owns the behaviour and its
- * options apply here too; without it, this mod's own {@link PatternImportOverlayHandler} takes every GT recipe page.
+ * Who transfers depends on the pack: NotEnoughEnergistics' {@link NEEPatternTerminalHandler} when that mod is loaded
+ * (it then
+ * owns the behaviour, and its options apply), otherwise this mod's {@link PatternImportOverlayHandler} for every GT
+ * page.
  */
 public class NEI_MessTechConfig implements IConfigureNEI {
 
@@ -40,9 +41,11 @@ public class NEI_MessTechConfig implements IConfigureNEI {
             MTItemList.SpaceModulePumpInfinity.get(1),
             "gtnhintergalactic.nei.SpacePumpModuleRecipeHandler");
 
-        // NotEnoughEnergistics registers itself for AE's own terminals only, and NEI looks a transfer up by the GUI's
-        // exact class, so this terminal has to ask for the very idents NEU serves if it wants NEU to do its transfer.
-        // Every NEU reference sits in its own method, so a pack that ships without NEU never has to link its classes.
+        // NotEnoughEnergistics registers itself for AE's own terminals only and NEI looks a transfer up by the GUI's
+        // exact
+        // class, so this terminal has to ask for the very idents NEU serves. Every NEU reference sits in its own
+        // method, so a
+        // pack without NEU never links its classes.
         final boolean useNEU = Loader.isModLoaded(NOT_ENOUGH_ENERGISTICS);
         final IOverlayHandler handler = useNEU ? neuTransferHandler() : new PatternImportOverlayHandler();
         for (String ident : useNEU ? neuTransferIdents() : gtTransferIdents()) {
@@ -61,15 +64,19 @@ public class NEI_MessTechConfig implements IConfigureNEI {
     }
 
     /**
-     * Everything NotEnoughEnergistics itself serves this kind of terminal: the GT pages below plus every page of the
-     * mods its processor list knows (the vanilla processing pages, IC2, Forestry, Thaumcraft, ...), which this mod's
-     * own handler cannot pack - it reads GT's {@code FixedPositionedStack} flags.
+     * Everything NEU itself serves this kind of terminal: the GT pages below plus every page of the mods its processor
+     * list
+     * knows (vanilla processing pages, IC2, Forestry, Thaumcraft, ...), which this mod's handler cannot pack - it reads
+     * GT's
+     * {@code FixedPositionedStack} flags.
      */
     private static Set<String> neuTransferIdents() {
         final Set<String> idents = gtTransferIdents();
-        // NEI may load this config before NEU's own one, and the processor list is a plain static fill with no side
-        // effects beyond its log lines, so it is built on demand here. NEU's own later call appends the same
-        // processors again, which its lookup tolerates: it breaks at the first processor that claims the page.
+        // NEI may load this config before NEU's own, and the processor list is a plain static fill with no side
+        // effects, so it
+        // is built on demand. NEU's later call appends the same processors again, which its lookup tolerates: it breaks
+        // at the
+        // first processor that claims the page.
         if (RecipeProcessor.recipeProcessors.isEmpty()) {
             RecipeProcessor.init();
         }
@@ -78,18 +85,21 @@ public class NEI_MessTechConfig implements IConfigureNEI {
         }
         // Pages whose handler defines no overlay id at all (NEU registers those too, under a null ident).
         idents.add(null);
-        // AE's extended pattern terminal cannot craft, and this terminal is built on it: a crafting page has no
-        // processing pattern to become. NEU skips exactly these two for that same terminal.
+        // AE's extended pattern terminal cannot craft and this terminal is built on it, so a crafting page has no
+        // processing
+        // pattern to become; NEU skips exactly these two for that terminal.
         idents.remove("crafting");
         idents.remove("crafting2x2");
         return idents;
     }
 
     /**
-     * Every GT machine recipe page, read from GT's own categories - the same source NotEnoughEnergistics builds its
-     * idents from - so a newly registered GT recipe map (the Nano-Scale Foundry "24" pool is one) becomes importable
-     * without touching this class, and a map that keeps itself out of NEI ({@code registerNEI} false) is skipped. The
-     * overlay id of such a page is the category's unlocalized name.
+     * Every GT machine recipe page, from GT's own categories - the source NEU also builds its idents from - so a newly
+     * registered GT recipe map (the Nano-Scale Foundry "24" pool, say) becomes importable without touching this class,
+     * and a
+     * map keeping itself out of NEI ({@code registerNEI} false) is skipped. A page's overlay id is its category's
+     * unlocalized
+     * name.
      */
     private static Set<String> gtTransferIdents() {
         final Set<String> idents = new LinkedHashSet<>();

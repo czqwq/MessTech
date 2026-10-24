@@ -24,10 +24,8 @@ import gregtech.api.modularui2.GTGuiTextures;
 import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 
 /**
- * DTPF (Plasma Forge) style GUI with a wireless-mode toggle button.
- * <p>
- * Left-click toggles wireless mode; right-click opens the wireless parallel selector.
- * The parallel selector is the same pattern as {@code MTETranscendentPlasmaMixerGui}.
+ * DTPF (Plasma Forge) style GUI with a wireless-mode toggle button: left-click toggles wireless mode, right-click
+ * opens the wireless parallel selector, the same pattern as {@code MTETranscendentPlasmaMixerGui}.
  */
 public class MTDTPFGui extends MTEMultiBlockBaseGui<MTDTPF> {
 

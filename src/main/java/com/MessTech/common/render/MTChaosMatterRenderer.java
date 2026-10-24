@@ -23,58 +23,53 @@ import gregtech.common.render.items.InfinityRenderer;
 import gregtech.common.render.items.UniversiumRenderer;
 
 /**
- * The Chaos Matter look: several of GregTech's animated material renderers playing <b>at the same time</b>, on a
- * <b>random</b> playback instead of a fixed rotation.
+ * The Chaos Matter look: several of GT's animated material renderers playing <b>at once</b> on a <b>random</b>
+ * playback, not a fixed rotation.
  * <p>
- * The four kinds of effect GT uses can only be combined in different ways, which is what this class works around:
+ * GT's four effect kinds only combine in fixed ways:
  * <ul>
- * <li><b>Geometry</b> - {@code TranscendentMetalRenderer} only rotates the matrix. {@link #applySpin} holds the same
- * oblique axis (0.3, 0.5, 0.2 at 3.5 degrees per client tick) plus a second, slower one; it is <b>currently
- * disabled</b>
- * (the call in {@link #renderItem} is commented out on request), so the icon is drawn straight.</li>
- * <li><b>Colour modulation</b> - {@code GaiaSpiritRenderer} and {@code RainbowOverlayRenderer} only set
- * {@code glColor}.
- * {@link #renderRegularItem} mixes both hues into one tint; both cycles get a random period and a random phase per
- * game session ({@link #gaiaPeriod}, {@link #rainbowPeriod}, {@link #gaiaPhase}, {@link #rainbowPhase}), so the colour
- * never repeats on a clock.</li>
- * <li><b>Extra translucent passes</b> - {@code InfinityRenderer}'s halo and pulse, {@code CosmicNeutroniumRenderer}'s
- * halo and {@code GlitchEffectRenderer}'s red/cyan ghost copies (all public static, all inventory space). The pulse
- * runs every frame, the second halo and the glitch burst are rolled per window in {@link #rollWindow}, i.e. genuinely
- * simultaneous with the icon and not on a fixed schedule.</li>
- * <li><b>Whole-icon replacements</b> - {@code UniversiumRenderer} (a shader over the whole sprite),
- * {@code CosmicNeutroniumRenderer} and {@code InfinityRenderer} draw the icon themselves, so two of them cannot be
- * stacked without one hiding the other. {@link #renderLayer} draws one of them over the base, blended additively or
- * normally; which one, for how long and which blend is rolled in {@link #rollWindow}, so the order is never the same
- * twice and the same layer never plays two windows in a row.</li>
+ * <li><b>Geometry</b> - {@code TranscendentMetalRenderer} only rotates the matrix. {@link #applySpin} (axis 0.3, 0.5,
+ * 0.2 at 3.5 deg/client tick + a slower second axis) is <b>disabled</b> (call in {@link #renderItem} commented out on
+ * request), so the icon draws straight.</li>
+ * <li><b>Colour modulation</b> - {@code GaiaSpiritRenderer} / {@code RainbowOverlayRenderer} only set {@code glColor};
+ * {@link #renderRegularItem} mixes both hues, each on a per-session random period + phase ({@link #gaiaPeriod},
+ * {@link #rainbowPeriod}, {@link #gaiaPhase}, {@link #rainbowPhase}): never a fixed clock.</li>
+ * <li><b>Extra translucent passes</b> - {@code InfinityRenderer} halo + pulse, {@code CosmicNeutroniumRenderer} halo,
+ * {@code GlitchEffectRenderer} red/cyan ghosts (public static, inventory only); pulse every frame, the rest rolled per
+ * window in {@link #rollWindow}.</li>
+ * <li><b>Whole-icon replacements</b> - {@code UniversiumRenderer} (whole-sprite shader),
+ * {@code CosmicNeutroniumRenderer}, {@code InfinityRenderer} draw the icon themselves, so two would hide each other;
+ * {@link #renderLayer} draws one over the base, additive or normal, {@link #rollWindow} picking it, its length and
+ * blend, and no layer twice in a row.</li>
  * </ul>
- * The icons themselves are painted grey with messy multi-colour speckles (see
- * {@code assets/messtech/textures/items/materialicons/chaos}) and are tinted by the material's light grey through
+ * The icons are grey with multi-colour speckles
+ * ({@code assets/messtech/textures/items/materialicons/chaos}), tinted by the material's light grey via
  * {@link #mixedTint}, so the colour never settles.
  */
 @SideOnly(Side.CLIENT)
 public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
 
-    /** The whole-icon effects that play; every one of them is GT's own renderer. */
+    /** The whole-icon layers. */
     private static final GeneratedMaterialRenderer[] LAYERS = { new UniversiumRenderer(),
         new CosmicNeutroniumRenderer(), new InfinityRenderer() };
 
-    /** Window length is rolled in this range: 10..39 client ticks. */
+    /** Window length range: 10..39 client ticks. */
     private static final int WINDOW_MIN_TICKS = 10;
     private static final int WINDOW_RANDOM_TICKS = 30;
 
-    /** Chances rolled for every window: additive burst, the second halo, a glitch burst. */
+    /** Per-window chances: additive burst, second halo, glitch burst. */
     private static final float BURST_CHANCE = 0.35F;
     private static final float SECOND_HALO_CHANCE = 0.5F;
     private static final float GLITCH_CHANCE = 0.6F;
 
-    /** A glitch burst lasts this many ticks and re-rolls its ghost offset every {@value #GLITCH_JITTER_TICKS}. */
+    /** Burst length in ticks; the ghost offset re-rolls every {@value #GLITCH_JITTER_TICKS}. */
     private static final int GLITCH_LENGTH_TICKS = 8;
     private static final int GLITCH_JITTER_TICKS = 2;
 
-    /** How much the mixed hue is brightened: two multiplied hues would come out too dark. */
+    /** Tint gain: two multiplied hues would come out too dark. */
     private static final float TINT_GAIN = 1.35F;
 
-    /** Per-session randomness: the playback rolls and the random hue periods/phases come from here. */
+    /** Per-session randomness for the playback rolls and the hue cycles. */
     private final Random playback = new Random();
 
     private final int gaiaPeriod = 140 + playback.nextInt(120);
@@ -84,14 +79,14 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
 
     // region Current window, rolled by rollWindow()
 
-    /** Animation tick the current window ends at, or -1 while nothing has been rolled yet. */
+    /** Window end tick, or -1 before the first roll. */
     private int windowEndTick = -1;
     private int windowLayerIndex;
     private int previousLayerIndex = -1;
     private boolean windowBurst;
     private boolean windowSecondHalo;
 
-    /** Tick the glitch burst of the current window starts at, or {@link Integer#MIN_VALUE} for none. */
+    /** Glitch burst start tick, or {@link Integer#MIN_VALUE} for none. */
     private int glitchStartTick = Integer.MIN_VALUE;
 
     private double offsetRed;
@@ -109,21 +104,19 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
         GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GL11.glPushMatrix();
 
-        // Disabled on request: the permanent Transcendent Metal tumble. The method below is kept unchanged, so
-        // switching it back on is uncommenting this single call; without it the icon is drawn straight and only the
-        // effects underneath it (halos, pulse, glitch, the whole-icon layers) animate.
+        // Disabled on request: the permanent Transcendent Metal tumble; re-enable by uncommenting this call.
         // applySpin(type);
 
-        // Halos belong behind the icon, which is the order GT's own renderers draw them in.
+        // Halos behind the icon (GT's order).
         renderHalos(type);
 
-        // The base icon, tinted by the mixed Gaia/Rainbow hue.
+        // The tinted base icon.
         super.renderItem(type, stack, data);
 
-        // Pulse and the red/cyan glitch ghosts sit on top of the icon.
+        // Pulse + glitch ghosts on top.
         renderSimultaneous(type, stack, tick);
 
-        // The whole-icon layer of this window, blended over what is already there.
+        // The window's whole-icon layer above everything.
         renderLayer(type, stack, data);
 
         GL11.glPopMatrix();
@@ -139,18 +132,13 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
         ItemRenderUtil.renderItem(type, icon);
     }
 
-    /**
-     * Rolls the next window once the current one has run out: a random layer (never the one that just played), a random
-     * length, and the burst / second halo / glitch burst coin flips. Everything the look does between two rolls is
-     * decided here, so the playback has no fixed order to it.
-     */
+    /** Rolls the next window: layer (never the one that just played), length, and the burst / halo / glitch flips. */
     private void rollWindow(int tick) {
         if (tick < windowEndTick) return;
 
         int index = playback.nextInt(LAYERS.length);
         if (LAYERS.length > 1 && index == previousLayerIndex) {
-            // Step past the layer that just played, then pick one of the remaining ones, so the same effect never
-            // repeats back to back.
+            // Skip the layer that just played: no effect twice in a row.
             index = (index + 1 + playback.nextInt(LAYERS.length - 1)) % LAYERS.length;
         }
         previousLayerIndex = index;
@@ -166,10 +154,7 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
             : Integer.MIN_VALUE;
     }
 
-    /**
-     * The tumble GT's {@code TranscendentMetalRenderer} applies, plus a second slower axis. Currently unused (see
-     * {@link #renderItem}); kept so the always-on animation can be switched back on with one uncommented line.
-     */
+    /** GT's {@code TranscendentMetalRenderer} tumble + a slower second axis; unused, see {@link #renderItem}. */
     private static void applySpin(ItemRenderType type) {
         float ticks = GTMod.clientProxy()
             .getAnimationRenderTicks();
@@ -197,8 +182,8 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
     }
 
     /**
-     * The halos. The Infinity halo is always there (it is the one GT draws for Infinity itself), the
-     * CosmicNeutronium halo only in the windows whose coin flip turned it on.
+     * Halos: Infinity's always (as GT draws for Infinity itself), CosmicNeutronium's only in the windows whose coin
+     * flip turned it on.
      */
     private void renderHalos(ItemRenderType type) {
         if (type != IItemRenderer.ItemRenderType.INVENTORY) return;
@@ -214,8 +199,7 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
     }
 
     /**
-     * The pulse and the glitch ghosts. The pulse runs every frame (like Infinity's own items); the ghosts only during
-     * the glitch burst {@link #rollWindow} rolled for this window, with a fresh random offset every
+     * Pulse every frame (like Infinity's own items); glitch ghosts only in the rolled burst, offset refreshed every
      * {@value #GLITCH_JITTER_TICKS} ticks.
      */
     private void renderSimultaneous(ItemRenderType type, ItemStack stack, int tick) {
@@ -240,8 +224,8 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
     }
 
     /**
-     * The whole-icon layer of this window: one of GT's shader/icon replacement renderers, drawn over the base so it
-     * merges with the chaos icon instead of replacing it. The additive windows are the "everything at once" bursts.
+     * The window's whole-icon layer over the base, so it merges with the chaos icon instead of replacing it; additive
+     * windows are the "everything at once" bursts.
      */
     private void renderLayer(ItemRenderType type, ItemStack stack, Object... data) {
         GeneratedMaterialRenderer layer = LAYERS[windowLayerIndex];
@@ -255,10 +239,7 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
         GL11.glPopAttrib();
     }
 
-    /**
-     * The material's own light grey, modulated by the mixed Gaia and Rainbow hues. Both hues run on their own random
-     * period and start at their own random phase, so the tint drifts instead of cycling on a fixed clock.
-     */
+    /** The material's light grey × the mixed Gaia/Rainbow hues, each on its own random period and phase. */
     private float[] mixedTint(short[] rgba) {
         float ticks = GTMod.clientProxy()
             .getAnimationRenderTicks();
@@ -305,7 +286,7 @@ public class MTChaosMatterRenderer extends GeneratedMaterialRenderer {
             && tick - glitchStartTick < GLITCH_LENGTH_TICKS;
     }
 
-    /** The same jitter GT's own glitch renderer uses: a new random ghost offset every few ticks. */
+    /** GT's own jitter: a new random ghost offset every few ticks. */
     private void jitterOffsets(int tick) {
         if (lastJitterTick != Integer.MIN_VALUE && tick - lastJitterTick < GLITCH_JITTER_TICKS) return;
         lastJitterTick = tick;

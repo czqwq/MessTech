@@ -13,9 +13,9 @@ import com.MessTech.common.items.MessFoodHelper;
 import squeek.spiceoflife.foodtracker.FoodEaten;
 
 /**
- * Mess foods store their ordered ingredient list in NBT. Spice of Life's original
- * {@link FoodEaten#equals} only compares item and metadata, which would merge every mess food into
- * one journal entry, so the NBT is added to the identity here (for mess foods only).
+ * Mess foods carry their ordered ingredient list in NBT; Spice of Life's {@link FoodEaten#equals} compares only item
+ * and
+ * metadata, so without this every mess food merges into one journal entry (mess foods only).
  */
 @Mixin(value = FoodEaten.class, remap = false)
 public abstract class MixinFoodEaten {

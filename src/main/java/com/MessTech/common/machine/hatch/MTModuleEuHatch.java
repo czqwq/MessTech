@@ -16,14 +16,14 @@ import gregtech.api.metatileentity.MetaTileEntity;
 /**
  * EU discount module: multiplies the EU/t of the machine it is built into.
  * <p>
- * The values are TST's {@code PowerConsumptionMultiplierOfPowerConsumptionController}: 0.95 at IV (5% saved) down to
- * 0.0625 at MAX (93.75% saved), see {@link MTModuleValues#euModifier(int)}.
+ * TST's {@code PowerConsumptionMultiplierOfPowerConsumptionController} values: 0.95 at IV (5% saved) down to 0.0625 at
+ * MAX (93.75% saved), see {@link MTModuleValues#euModifier(int)}.
  */
 public class MTModuleEuHatch extends MTModuleHatchBase {
 
     private static final Set<MTModuleType> TYPES = Collections.unmodifiableSet(EnumSet.of(MTModuleType.EU_DISCOUNT));
 
-    /** Decal of this module, {@code assets/messtech/textures/blocks/ModuleHatch/OVERLAY_PowerController.png}. */
+    /** Decal: {@code assets/messtech/textures/blocks/ModuleHatch/OVERLAY_PowerController.png}. */
     private static final String OVERLAY_PATH = "ModuleHatch/OVERLAY_PowerController";
 
     public MTModuleEuHatch(int aID, String aName, String aNameRegional, int aTier) {
@@ -49,9 +49,6 @@ public class MTModuleEuHatch extends MTModuleHatchBase {
         return OVERLAY_PATH;
     }
 
-    /**
-     * @return The EU/t multiplier of this module, 0.95 at IV down to 0.0625 at MAX.
-     */
     public float getEuMultiplier() {
         return MTModuleValues.euModifier(mTier);
     }

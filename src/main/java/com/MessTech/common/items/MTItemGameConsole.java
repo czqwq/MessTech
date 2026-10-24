@@ -17,18 +17,15 @@ import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.api.GregTechAPI;
 
 /**
- * The game console (游戏机): a handheld that runs a whole copy of DOOM.
+ * The game console (游戏机): a handheld running a whole copy of DOOM. Right clicking opens a window about half the
+ * screen across with the game inside; {@code Esc} closes it.
  * <p>
- * Right clicking opens a window about half the screen across with the game inside it; {@code Esc}
- * closes it again. Nothing about the console is server state - the engine runs on the client's own
- * machine, next to Minecraft's - so the item deliberately does nothing at all server-side. That is
- * also why both right-click paths have to be covered here:
+ * Nothing about the console is server state - the engine runs on the client's own machine, next to Minecraft's - so
+ * the item does nothing server-side. Hence both right-click paths:
  * <ul>
- * <li>{@link #onItemRightClick} is the "pointing at nothing" case, and it only runs on the
- * client;</li>
- * <li>{@link #onItemUseFirst} is the "pointing at a block" case. Minecraft calls it on the client
- * <em>and</em> the server, so it opens the window on the client and returns true everywhere, which
- * keeps the click from also reaching whatever block is under the crosshair.</li>
+ * <li>{@link #onItemRightClick} ("pointing at nothing"): client only;</li>
+ * <li>{@link #onItemUseFirst} ("pointing at a block"): Minecraft calls it on the client <em>and</em> the server, so it
+ * opens the window on the client and returns true everywhere, keeping the click off the block under the crosshair.</li>
  * </ul>
  */
 public class MTItemGameConsole extends Item {
@@ -39,9 +36,8 @@ public class MTItemGameConsole extends Item {
     private IIcon icon;
 
     public MTItemGameConsole() {
-        // "messtech." prefix like every other item here, which makes the key
-        // item.messtech.gameConsole.name. Without the prefix the key was item.gameConsole.name,
-        // which no language file defines, so the item showed the raw key instead of its name.
+        // "messtech." prefix like every other item here: the key is item.messtech.gameConsole.name. Without it the
+        // key was item.gameConsole.name, undefined in the lang files, so the raw key showed instead of the name.
         this.setUnlocalizedName("messtech.gameConsole");
         this.setCreativeTab(GregTechAPI.TAB_GREGTECH);
         this.setMaxStackSize(1);
@@ -56,7 +52,7 @@ public class MTItemGameConsole extends Item {
         return stack;
     }
 
-    /** Right click on a block: the console wins over the block's own activation. */
+    /** Right click on a block: the console wins over the block's activation. */
     @Override
     public boolean onItemUseFirst(final ItemStack stack, final EntityPlayer player, final World world, final int x,
         final int y, final int z, final int side, final float hitX, final float hitY, final float hitZ) {
@@ -67,8 +63,7 @@ public class MTItemGameConsole extends Item {
     }
 
     /**
-     * The tooltip follows the house style of {@code docs/knowledge.md}: the colours live in the
-     * lang files and every line here is one translated key.
+     * House style ({@code docs/knowledge.md}): colours live in the lang files, every line here is one translated key.
      */
     @Override
     @SideOnly(Side.CLIENT)

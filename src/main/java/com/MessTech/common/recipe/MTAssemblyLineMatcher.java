@@ -22,28 +22,24 @@ import gregtech.api.util.GTUtility;
 /**
  * Order-independent ("unordered") input matching for GT Assembly Line definitions.
  * <p>
- * A definition carries, per input slot, the ingredient and - when that slot accepts several items - every accepted
- * alternative ({@code RecipeAssemblyLine#mOreDictAlt}). GT's own Assembly Line is ordered: it compares the first slot
- * of
- * an input bus with the first input slot, so an alternative only ever matters in the bus slot it was put in. This
- * matcher instead reads all buses as one pool, which is what lets the ingredients sit in any bus in any order.
+ * A definition carries, per input slot, the ingredient and - when the slot accepts several items - every accepted
+ * alternative ({@code RecipeAssemblyLine#mOreDictAlt}). GT's own Assembly Line is ordered (first slot of an input bus
+ * against the first input slot), so an alternative only matters in the bus slot it was put in; this matcher reads all
+ * buses as one pool, which lets the ingredients sit in any bus in any order.
  * <p>
- * The pool still has to be resolved against the per-slot alternatives somewhere. Registering one recipe per
- * alternative combination is the obvious way, but the count is the product of every slot's alternative count (one
- * Wetware Mainframe definition reaches six digits on its own), so that table cannot be built at world load.
- * <p>
- * Instead one definition is resolved against the current pool on demand: every slot picks the alternative that leaves
- * the most parallels for the whole definition, and the result is a single concrete ingredient list. The caller hands
- * that list to the ordinary GT recipe pipeline (parallels, overclock, void protection, ME buses, input consumption),
- * which matches and consumes it against the same pool, in the same order-independent way.
+ * Registering one recipe per alternative combination is impossible at world load (the count is the product of every
+ * slot's alternative count - one Wetware Mainframe definition reaches six digits alone), so a definition is resolved
+ * against the current pool on demand: every slot picks the alternative leaving the most parallels for the whole
+ * definition, and that concrete ingredient list goes to the ordinary GT recipe pipeline (parallels, overclock, void
+ * protection, ME buses, input consumption), which matches and consumes it against the same pool.
  */
 public final class MTAssemblyLineMatcher {
 
     private MTAssemblyLineMatcher() {}
 
     /**
-     * Every definition the pool can satisfy, cheapest EU/t first so the caller's recipe search takes the same one a
-     * player would expect. Definitions whose slots cannot all be filled are left out.
+     * Every definition the pool can satisfy, cheapest EU/t first so the caller's recipe search takes the one a player
+     * would expect; definitions whose slots cannot all be filled are left out.
      */
     public static Stream<GTRecipe> matches(Collection<GTRecipe.RecipeAssemblyLine> definitions, ItemStack[] pool) {
         if (definitions == null || definitions.isEmpty()) return Stream.empty();
@@ -56,8 +52,8 @@ public final class MTAssemblyLineMatcher {
 
     /**
      * Every input stack as one pool of {@code item -> amount}. Each stack is also filed under its wildcard-damage
-     * alias, because a definition slot may ask for any damage value of an item. NBT is left out of the keys, matching
-     * how the recipe pipeline itself compares an ingredient with the stored stacks.
+     * alias, because a definition slot may ask for any damage value of an item; NBT stays out of the keys, matching how
+     * the recipe pipeline compares an ingredient with the stored stacks.
      */
     private static Map<GTUtility.ItemId, Long> poolOf(@Nullable ItemStack[] pool) {
         Map<GTUtility.ItemId, Long> availability = new HashMap<>();
@@ -95,14 +91,11 @@ public final class MTAssemblyLineMatcher {
 
     /**
      * The fluid inputs of a definition without the null slots, for {@code GTRecipeBuilder#fluidInputs(FluidStack...)}.
-     * <p>
-     * A definition may have no fluids at all or leave a fluid slot empty, and the registry is filled by every addon,
-     * not only by GT - {@code GTRecipeConstants#addAssemblingLineRecipe} skips null entries itself when it hashes what
-     * it registers. The builder does not tolerate either: with {@code gt.recipebuilder.panic.null} set (GTNH ships it
-     * set) a null array or a null entry throws {@code IllegalArgumentException("null in argument")}, which is what
-     * stopped {@code CommonProxy#serverStarted} from finishing. The nulls are dropped here instead, which is what the
-     * builder does to whatever it is handed ({@code ArrayExt#removeNullFluids}) - a definition with an empty fluid slot
-     * keeps its page and its recipe.
+     * Addons may register a definition with no fluids or an empty fluid slot, which GT only logs
+     * ({@code GTRecipeConstants#addAssemblingLineRecipe}); the builder throws
+     * {@code IllegalArgumentException("null in argument")} on it - {@code gt.recipebuilder.panic.null} is set in GTNH -
+     * and {@code CommonProxy#serverStarted} never finishes. Dropping the nulls is what the builder's own
+     * {@code ArrayExt#removeNullFluids} does; a definition with an empty fluid slot keeps its page.
      */
     static FluidStack[] nonNullFluids(@Nullable FluidStack[] fluids) {
         if (fluids == null || fluids.length == 0) return GTValues.emptyFluidStackArray;
@@ -121,8 +114,8 @@ public final class MTAssemblyLineMatcher {
     }
 
     /**
-     * The ingredient to use for every slot, or null when one of them cannot be filled. Slots are resolved in order and
-     * every choice is charged to the pool immediately, so a slot cannot pick an item another slot already needs.
+     * The ingredient to use for every slot, or null when one cannot be filled. Slots are resolved in order and every
+     * choice is charged to the pool immediately, so no slot can pick an item another slot already needs.
      */
     @Nullable
     private static List<ItemStack> chooseIngredients(GTRecipe.RecipeAssemblyLine definition,
@@ -153,7 +146,7 @@ public final class MTAssemblyLineMatcher {
     }
 
     /**
-     * The ingredient or alternative that leaves the most parallels for the whole definition. A tie keeps the earlier
+     * The ingredient or alternative that leaves the most parallels for the whole definition; a tie keeps the earlier
      * candidate, i.e. the ingredient itself before its alternatives.
      */
     @Nullable

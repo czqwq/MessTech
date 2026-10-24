@@ -32,31 +32,20 @@ public class MTChemicalTwisterRecipes {
         RecipeMap<RecipeMapBackend> MT = MTRecipeMaps.MTChemicalTwisterRecipes;
         /**
          * The one-step platinum-group-metal recipe of the Chemical Twister: the whole GT5U platinum line (bartworks
-         * {@code PlatinumSludgeRecipes}) collapsed into a single reaction.
+         * {@code PlatinumSludgeRecipes}) collapsed into one reaction. Derived and cross-checked in
+         * `tmp/platinum/derive_platinum_recipe.py` / `verify_platinum_recipe.py`: every recipe of the line becomes a
+         * stoichiometric vector, all cyclic intermediates (Aqua Regia, ammonium chloride, formic acid, sodium
+         * sulfate/sodium, the refined-salt and leach-residue loops) are forced to balance exactly, and what the line
+         * produces but never eats again (NO2, steam, salt, potassium, ethylene, calcium chloride, zinc sulfate, both
+         * PGS
+         * residues, surplus chlorine/water/ammonia) is dropped.
          * <p>
-         * Derivation (`tmp/platinum/derive_platinum_recipe.py`, cross-checked in
-         * `tmp/platinum/verify_platinum_recipe.py`):
-         * every recipe of the line is written as a stoichiometric vector, all cyclic intermediates (Aqua Regia,
-         * ammonium
-         * chloride, formic acid, sodium sulfate/sodium, the refined-salt and leach-residue loops, ...) are forced to
-         * balance exactly, and everything the line produces but never eats again (NO2, steam, salt, potassium,
-         * ethylene,
-         * calcium chloride, zinc sulfate, both PGS residues, surplus chlorine/water/ammonia, ...) is simply dropped.
-         * What
-         * is left is the net consumption per 6.8226 Platinum Metallic Powder: 4.8733 Pt, 3.1328 Pd, 1.5152 Ir, 3.6364
-         * Ru,
-         * 1 Rh and 0.1515 Os, scaled here by 33/5 so that osmium, iridium, ruthenium and the feed are integers.
-         * <p>
-         * The only metal feed is Platinum Metallic Powder: the line's own "palladium enriched ammonia" byproduct
-         * carries
-         * the palladium, so no Palladium Metallic Powder (i.e. no palladium ore) is needed. Ammonia is not inflated
-         * beyond
-         * what closes that palladium loop, which is why it stays an input instead of turning the loop into a palladium
-         * printer.
-         * <p>
-         * 2701 K is the Kanthal coil, the heat the recipe asks for (IV energy adds 300 K on top, the same formula as
-         * the
-         * EBF); the machine refuses the recipe with {@code insufficientHeat} below that.
+         * Net per 6.8226 Platinum Metallic Powder: 4.8733 Pt, 3.1328 Pd, 1.5152 Ir, 3.6364 Ru, 1 Rh, 0.1515 Os, scaled
+         * by 33/5 so osmium, iridium, ruthenium and the feed are integers. That powder is the only metal feed - the
+         * "palladium enriched ammonia" byproduct carries the palladium, so no palladium ore is needed - and ammonia is
+         * not inflated beyond what closes that loop, or it would become a palladium printer. 2701 K is the Kanthal
+         * coil,
+         * the heat asked for (IV energy adds 300 K, the EBF formula); {@code insufficientHeat} refuses it below that.
          */
         GTValues.RA.stdBuilder()
             .itemInputsUnsafe(
@@ -123,7 +112,7 @@ public class MTChemicalTwisterRecipes {
             .duration(60 * 2500 * SECONDS)
             .addTo(MT);
 
-        // Next part is copy from Twist Space Technology
+        // The rest is copied from Twist Space Technology
 
         GTValues.RA.stdBuilder()
             .itemInputsUnsafe(

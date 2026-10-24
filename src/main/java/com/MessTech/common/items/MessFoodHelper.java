@@ -14,10 +14,8 @@ import squeek.applecore.api.AppleCoreAPI;
 import squeek.applecore.api.food.FoodValues;
 
 /**
- * Shared helpers for {@link ItemMessFood}.
- * <p>
- * The helpers are also used by the Spice of Life mixins, which need a food identity that takes the
- * stored ingredient list (and therefore its order) into account.
+ * Shared helpers for {@link ItemMessFood}, also used by the Spice of Life mixins: they need a food identity that takes
+ * the stored ingredient list (and therefore its order) into account.
  */
 public final class MessFoodHelper {
 
@@ -27,9 +25,7 @@ public final class MessFoodHelper {
         return stack != null && stack.getItem() instanceof ItemMessFood;
     }
 
-    /**
-     * Reads the ordered ingredient list from the item's NBT.
-     */
+    /** @return the ordered ingredient list stored in NBT, empty for anything that is not a mess food. */
     public static List<ItemStack> getIngredients(ItemStack stack) {
         if (!isMessFood(stack) || stack.getTagCompound() == null) return Collections.emptyList();
 
@@ -46,7 +42,7 @@ public final class MessFoodHelper {
     }
 
     /**
-     * @return the display names of the stored ingredients, joined in their crafting order.
+     * @return the stored ingredient names, joined in crafting order.
      */
     public static String getIngredientNames(ItemStack stack) {
         StringBuilder builder = new StringBuilder();
@@ -58,9 +54,8 @@ public final class MessFoodHelper {
     }
 
     /**
-     * Writes the given ingredient list into a new mess food stack. The order of the passed stacks is
-     * preserved, so it defines the identity of the resulting food. Duplicate ingredients are not
-     * allowed, so e.g. apple+apple can never become a mess food.
+     * New mess food stack from the given ingredients: the passed order defines the food's identity, duplicates are
+     * rejected (apple+apple is never a mess food).
      */
     public static ItemStack createStack(ItemStack... ingredients) {
         if (ItemMessFood.INSTANCE == null) return null;
@@ -86,8 +81,7 @@ public final class MessFoodHelper {
     }
 
     /**
-     * Whether the given stack may be used as a mess food ingredient. Mess Food itself is excluded,
-     * so it can never be used to craft another mess food.
+     * Whether the stack may be a mess food ingredient; Mess Food itself is excluded, so it can never craft another.
      */
     public static boolean isFoodIngredient(ItemStack stack) {
         if (stack == null || stack.getItem() == null) return false;
@@ -96,8 +90,7 @@ public final class MessFoodHelper {
     }
 
     /**
-     * Two stacks are the same ingredient when item, damage and NBT all match, i.e. when they are
-     * exactly the same item. Stack size is irrelevant.
+     * Same ingredient = same item, damage and NBT; stack size is irrelevant.
      */
     public static boolean sameIngredient(ItemStack first, ItemStack second) {
         if (first == null || second == null) return false;
@@ -119,9 +112,6 @@ public final class MessFoodHelper {
         return false;
     }
 
-    /**
-     * @return true when the candidate is already present in the given ingredient list.
-     */
     public static boolean containsIngredient(List<ItemStack> ingredients, ItemStack candidate) {
         if (ingredients == null || candidate == null) return false;
         for (ItemStack ingredient : ingredients) {
@@ -145,8 +135,7 @@ public final class MessFoodHelper {
     }
 
     /**
-     * @return the summed saturation that the ingredients would restore, before the player's food
-     *         level clamps it.
+     * @return the summed saturation the ingredients restore, before the player's food level clamps it.
      */
     public static float getTotalSaturationIncrement(List<ItemStack> ingredients) {
         float total = 0F;
@@ -158,11 +147,9 @@ public final class MessFoodHelper {
     }
 
     /**
-     * The food identity used by Spice of Life.
-     * <p>
-     * For mess foods the whole NBT tag (the ordered ingredient list) is part of the identity, so
-     * every ingredient order counts as a distinct food. For every other item the behaviour of
-     * Spice of Life's {@code FoodEaten#equals} is reproduced: registry name, item and damage.
+     * The food identity used by Spice of Life. For mess foods the whole NBT tag (the ordered ingredient list) is part
+     * of the identity, so each ingredient order is a distinct food; every other item reproduces Spice of Life's
+     * {@code FoodEaten#equals}: registry name, item and damage.
      */
     public static boolean sameFoodIdentity(ItemStack first, ItemStack second) {
         if (first == null || second == null) return false;
@@ -180,8 +167,8 @@ public final class MessFoodHelper {
     }
 
     /**
-     * Hash code matching {@link #sameFoodIdentity}. Only mess foods mix the NBT into the hash, every
-     * other item keeps Spice of Life's original hash code.
+     * Hash code matching {@link #sameFoodIdentity}: only mess foods mix the NBT in, every other item keeps Spice of
+     * Life's original hash.
      */
     public static int identityHash(ItemStack stack) {
         if (stack == null || stack.getItem() == null) return 0;

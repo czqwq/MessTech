@@ -9,10 +9,8 @@ import cpw.mods.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import cpw.mods.fml.relauncher.Side;
 
 /**
- * MessTech's one network channel, modelled on GT-Not-Leisure's {@code NetWorkHandler}.
- * <p>
- * Packets are numbered in registration order, so a new packet must be appended (never inserted) once a world has
- * been played with the previous build.
+ * MessTech's one network channel, modelled on GT-Not-Leisure's {@code NetWorkHandler}. Packets are numbered in
+ * registration order, so a new one must be appended (never inserted) once a world has been played with the old build.
  */
 public final class MTNetwork {
 

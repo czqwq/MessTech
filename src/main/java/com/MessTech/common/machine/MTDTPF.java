@@ -83,8 +83,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
     }
 
     /**
-     * 控制器槽位是否放入星阵
-     * 控制器槽是同步的库存槽,客户端永远最新,GUI 按钮以此作为门槛
+     * 控制器槽位是否放入星阵;控制器槽是同步的库存槽,客户端永远最新,GUI 按钮以此作为门槛
      */
     public void detecttier() {
         this.EnableWirelessFunc = hasAAF() && isTierAtLeast(5);
@@ -98,23 +97,15 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         return aGuiStack != null && GTUtility.areStacksEqual(aGuiStack, CustomItemList.astralArrayFabricator.get(1));
     }
 
-    // region Structure piece offsets (structure_string is transposed; controller '~' ends up at x=16, y=29, z=16)
+    // structure_string is transposed, so the controller '~' lands at x=16, y=29, z=16.
     private static final int HORIZONTAL_OFFSET = 16;
     private static final int VERTICAL_OFFSET = 29;
     private static final int DEPTH_OFFSET = 16;
 
-    // endregion
-
-    // region LevelTier
     /**
-     * Reactor tiers of this machine.
-     * <p>
-     * Every tier pairs a reactor coil block (A) with a fusion machine casing block (B); the machine is only
-     * considered formed when the tier derived from A exactly matches the tier derived from B. The blocks marked in
-     * the structure comment are {@link #TIER1}. Anything unrecognised is {@link #INVALID} (tier -1).
-     * <p>
-     * voltageTier is the matching GregTech voltage tier used for the recipe restriction
-     * (6 = LuV / Mk-I, 7 = ZPM / Mk-II, 8 = UV / Mk-III, 9 = UHV / Mk-IV, 10 = UEV / Mk-V).
+     * Reactor tiers: each pairs a reactor coil block (A) with a fusion machine casing block (B); the machine forms only
+     * when both derive the same tier. Unrecognised -> {@link #INVALID} (tier -1). voltageTier = GT voltage tier for the
+     * recipe restriction (6 = LuV / Mk-I .. 10 = UEV / Mk-V); the structure comment lists {@link #TIER1}'s blocks.
      */
     public enum LevelTier {
 
@@ -125,12 +116,12 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         TIER5(5, 10, Loaders.compactFusionCoil, 4, ModBlocks.blockCasings6Misc, 0),
         INVALID(-1, -1, null, -1, null, -1);
 
-        /** Sentinel meaning "no / unmatched / unrecognised tier". */
+        /** Sentinel: "no / unmatched / unrecognised tier". */
         public static final int INVALID_TIER = -1;
 
         /** 1..5, or -1 for {@link #INVALID}. */
         public final int tier;
-        /** GregTech voltage tier index (6=LuV, 7=ZPM, 8=UV, 9=UHV, 10=UEV), or -1 for {@link #INVALID}. */
+        /** GT voltage tier index (6=LuV .. 10=UEV), or -1 for {@link #INVALID}. */
         public final int voltageTier;
         /** A: reactor coil block of this tier. */
         public final Block coilBlock;
@@ -168,14 +159,12 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
             return isValid() ? VN[voltageTier] : "INVALID";
         }
 
-        /**
-         * Is this tier greater than or equal to {@code other}? {@link #INVALID} is never "at least" a real tier.
-         */
+        /** {@code tier >= other}; {@link #INVALID} is never "at least" a real tier. */
         public boolean isAtLeast(LevelTier other) {
             return isValid() && other != null && other.isValid() && tier >= other.tier;
         }
 
-        /** Is this tier greater than or equal to the given tier number (1..5)? {@link #INVALID} is never. */
+        /** {@code tier >= minTier} (1..5); {@link #INVALID} is never. */
         public boolean isAtLeast(int minTier) {
             return isValid() && tier >= minTier;
         }
@@ -201,22 +190,13 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
             return INVALID;
         }
 
-        /**
-         * Tier fetcher for StructureLib's {@code StructureUtility#ofBlocksTiered} used by structure element 'A'.
-         *
-         * @return the reactor coil tier of the given block, or {@code null} if it is not a recognised reactor coil.
-         */
+        /** {@code ofBlocksTiered} fetcher for element 'A'; {@code null} if unrecognised. */
         public static Integer getCoilBlockTier(Block block, int meta) {
             LevelTier level = getFromCoilBlock(block, meta);
             return level.isValid() ? level.tier : null;
         }
 
-        /**
-         * Tier fetcher for StructureLib's {@code StructureUtility#ofBlocksTiered} used by structure element 'B'.
-         *
-         * @return the fusion machine casing tier of the given block, or {@code null} if it is not a recognised
-         *         fusion machine casing.
-         */
+        /** {@code ofBlocksTiered} fetcher for element 'B'; {@code null} if unrecognised. */
         public static Integer getMachineBlockTier(Block block, int meta) {
             LevelTier level = getFromMachineBlock(block, meta);
             return level.isValid() ? level.tier : null;
@@ -240,9 +220,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
                 Pair.of(TIER5.machineBlock, TIER5.machineMeta));
         }
     }
-    // endregion
 
-    // region Reactor coil (A) & fusion machine casing (B) tiers (independent int fields)
     @Getter
     @Setter
     private int fusionCoilTier = LevelTier.INVALID_TIER;
@@ -251,35 +229,24 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
     private int fusionMachineTier = LevelTier.INVALID_TIER;
     @Getter
     private LevelTier levelTier = LevelTier.INVALID;
-    /** Client-synced tier used for the controller's side texture; INVALID is rendered as MKI (1). */
+    /** Client-synced tier for the controller's side texture; INVALID renders as MKI (1). */
     private int renderTier = 1;
 
-    /** Structure tier as a plain int (1..5), or -1 ({@link LevelTier#INVALID_TIER}) if not formed / mismatched. */
+    /** 1..5, or -1 ({@link LevelTier#INVALID_TIER}) if not formed / mismatched. */
     public int getStructureTier() {
         return levelTier.tier;
     }
 
-    /**
-     * Whether the current structure tier is at least the given tier.
-     * <p>
-     * Example: {@code if (isTierAtLeast(LevelTier.TIER3)) ...} returns {@code true} for TIER3/4/5 and
-     * {@code false} when the machine is not formed (INVALID).
-     */
+    /** Structure tier >= {@code required}; {@code false} when not formed (INVALID). */
     public boolean isTierAtLeast(LevelTier required) {
         return levelTier.isAtLeast(required);
     }
 
-    /**
-     * Whether the current structure tier is at least the given tier number (1..5).
-     * <p>
-     * Example: {@code if (isTierAtLeast(3)) ...} returns {@code true} for tiers 3..5 and {@code false}
-     * for tiers 1..2 or when the machine is not formed (INVALID).
-     */
+    /** Structure tier >= the given tier number (1..5); {@code false} when not formed (INVALID). */
     public boolean isTierAtLeast(int required) {
         return levelTier.isAtLeast(required);
     }
 
-    /** A: reactor coil block of the current matched tier. */
     public Block getFusionCoilBlock() {
         return levelTier.coilBlock;
     }
@@ -288,7 +255,6 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         return levelTier.coilMeta;
     }
 
-    /** B: fusion machine casing block of the current matched tier. */
     public Block getFusionMachineBlock() {
         return levelTier.machineBlock;
     }
@@ -296,9 +262,8 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
     public int getFusionMachineMeta() {
         return levelTier.machineMeta;
     }
-    // endregion
 
-    // region DTPF-style GUI state (ported from MTEPlasmaForge, no machine effect implemented yet)
+    // DTPF-style GUI state, ported from MTEPlasmaForge (no machine effect yet).
     private boolean convergence = false;
     @Getter
     @Setter
@@ -342,12 +307,11 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         super.loadNBTData(aNBT);
     }
 
-    // DTPF (Plasma Forge) style GUI with the convergence / catalyst buttons.
+    // DTPF (Plasma Forge) style GUI: convergence / catalyst buttons.
     @Override
     protected @NotNull MTDTPFGui getGui() {
         return new MTDTPFGui(this);
     }
-    // endregion
 
     @Override
     protected boolean isEnablePerfectOverclock() {
@@ -356,27 +320,25 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
 
     @Override
     protected float getEuModifier() {
-        // Wireless mode: fixed 0.75 EU discount, independent of the 3600s runtime ramp.
+        // Wireless: fixed 0.75 EU discount, independent of the 3600s runtime ramp.
         if (isEnableWireless()) return 0.75F;
-        // Wired mode: EU/t bonus only kicks in after 3600s: 1.0 (no reduction) until then, 0.5 at/after full runtime.
+        // Wired: 1.0 until 3600s of runtime, then 0.5.
         return getRuntimeProgress() >= 1.0 ? 0.5F : 1.0F;
     }
 
     @Override
     protected float getSpeedBonus() {
-        // Wireless mode: fixed 0.75 duration modifier, independent of the 3600s runtime ramp.
+        // Wireless: fixed 0.75 duration modifier, independent of the 3600s runtime ramp.
         if (isEnableWireless()) return 0.75F;
-        // Wired mode: durationModifier: 1.0 = normal time; only at 3600s does it become 0.5 (half recipe time).
+        // Wired: 1.0 = normal time; 0.5 (half recipe time) only at 3600s.
         return getRuntimeProgress() >= 1.0 ? 0.5F : 1.0F;
     }
 
     @Override
     public int getMaxParallelRecipes() {
-        // Wireless mode uses the player-selected parallel cap (like the Transcendent Plasma Mixer).
+        // Wireless: player-selected parallel cap (like the Transcendent Plasma Mixer).
         if (isEnableWireless()) return Math.max(1, wirelessParallel);
-        // Upper-bound fallback for the GUI / before a recipe is selected.
-        // The actual parallel is set per recipe in validateRecipe:
-        // maxParallel = (1 + machineTier - recipeTier) * 64, min 1.
+        // GUI/before-recipe fallback; validateRecipe sets (1 + machineTier - recipeTier) * 64, min 1 per recipe.
         return Math.max(1, (1 + Math.max(1, getStructureTier())) * 64);
     }
 
@@ -450,17 +412,13 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
 
     protected static final String STRUCTURE_PIECE_MAIN = "main";
     /*
-     * Blocks:
-     * A -> ofBlock...(compactFusionCoil, 0, ...);
-     * B -> ofBlock...(gt.blockcasings, 6, ...);
-     * C -> ofBlock...(gt.blockcasings.cyclotron_coils, 5, ...);
-     * D -> ofBlock...(gt.blockcasings8, 7, ...);
+     * A -> compactFusionCoil:0; B -> gt.blockcasings:6; C -> gt.blockcasings.cyclotron_coils:5;
+     * D -> gt.blockcasings8:7.
      */
 
     private static final IStructureDefinition<MTDTPF> STRUCTURE_DEFINITION = StructureDefinition.<MTDTPF>builder()
         .addShape(STRUCTURE_PIECE_MAIN, transpose(structure_string))
-        // A: reactor coil block, tier is auto-detected & recorded into the fusionCoilTier int field.
-        // All coil blocks must share the same tier, otherwise the piece check itself fails.
+        // A: reactor coil; tier auto-detected into fusionCoilTier, and all coils must match.
         .addElement(
             'A',
             ofBlocksTiered(
@@ -470,7 +428,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
                 MTDTPF::setFusionCoilTier,
                 MTDTPF::getFusionCoilTier,
                 Collections.singletonList("misc.structure_tooltip.reactor_coil")))
-        // B: fusion machine casing block, same auto-detect scheme into the fusionMachineTier int field.
+        // B: fusion machine casing; auto-detected into fusionMachineTier.
         .addElement(
             'B',
             ofBlocksTiered(
@@ -480,10 +438,9 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
                 MTDTPF::setFusionMachineTier,
                 MTDTPF::getFusionMachineTier,
                 Collections.singletonList("misc.structure_tooltip.fusion_machine_casing")))
-        // C: static fixed-id block (gt.blockcasings.cyclotron_coils : 5 = ZPM Solenoid Superconductor Coil).
+        // C: fixed block gt.blockcasings.cyclotron_coils:5 (ZPM Solenoid Superconductor Coil).
         .addElement('C', ofBlock(GregTechAPI.sSolenoidCoilCasings, 5))
-        // D: functional block - compartments for input/output bus/hatch and energy hatch.
-        // The fill casing is gt.blockcasings8 : 7.
+        // D: I/O bus/hatch + energy hatch compartments; fill casing gt.blockcasings8:7.
         .addElement(
             'D',
             HatchElementBuilder.<MTDTPF>builder()
@@ -501,7 +458,6 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
 
     @Override
     public RecipeMap<?> getRecipeMap() {
-        // Use the Large Fusion recipe pool.
         return RecipeMaps.fusionRecipes;
     }
 
@@ -533,7 +489,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         IWailaConfigHandler config) {
         super.getWailaBody(itemStack, currentTip, accessor, config);
         final NBTTagCompound tag = accessor.getNBTData();
-        // Only add the lines when the server actually wrote the keys (same "hasKey" gate as MTEPlasmaForge).
+        // hasKey gate, same as MTEPlasmaForge.
         if (tag.hasKey("runningTime")) {
             currentTip.add(
                 translateToLocal("machine.dtpf.runtime") + ": "
@@ -617,9 +573,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
                 setEuModifier(getEuModifier());
                 setSpeedBonus(getSpeedBonus());
                 setOverclock(isTierAtLeast(4) ? 4 : 2, getLevelTier() == LevelTier.TIER5 ? 2 : 4);
-                // 等级5 → speed=4, power=2
-                // 等级4 → speed=4, power=4
-                // 等级1-3 → speed=2, power=2
+                // 等级5: speed=4, power=2;等级4: speed=4, power=4;等级1-3: speed=2, power=2
                 return super.process();
             }
 
@@ -628,8 +582,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
             protected ParallelHelper createParallelHelper(@NotNull GTRecipe recipe) {
                 ParallelHelper helper = super.createParallelHelper(recipe);
                 if (isEnableWireless()) {
-                    // Wireless power is consumed directly from the network in onRecipeStart,
-                    // so do not let ParallelHelper consume inputs before that check.
+                    // Wireless power is drawn in onRecipeStart, so ParallelHelper must not consume inputs first.
                     helper.setConsumption(false);
                 }
                 return helper;
@@ -638,8 +591,8 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
             @NotNull
             @Override
             protected OverclockCalculator createOverclockCalculator(@NotNull GTRecipe recipe) {
-                // Wireless mode follows MTETranscendentPlasmaMixer's no-overclock behaviour, but keeps
-                // MTDTPF's runtime efficiency modifiers so the wireless cost matches what is actually paid.
+                // Wireless: no overclock (like MTETranscendentPlasmaMixer), but keep the runtime modifiers so
+                // the wireless cost matches what is paid.
                 if (isEnableWireless()) {
                     return OverclockCalculator.ofNoOverclock(recipe)
                         .setEUtDiscount(getEuModifier())
@@ -657,23 +610,22 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
                 }
 
                 if (isEnableWireless()) {
-                    // Wireless mode uses the player-selected parallel cap (like the Transcendent Plasma Mixer).
+                    // Wireless: player-selected parallel cap (like the Transcendent Plasma Mixer).
                     maxParallel = Math.max(1, wirelessParallel);
                 } else {
-                    // Parallel = (1 + machine tier - recipe tier) * 64, min 1.
-                    // Recipe tier is the GT voltage tier mapped to MKI..MKV scale (LuV=1, ZPM=2, ... UEV=5).
+                    // Parallel = (1 + machine tier - recipe tier) * 64, min 1; recipe tier is the GT voltage
+                    // tier on the MKI..MKV scale (LuV=1, ZPM=2, ... UEV=5).
                     int recipeTier = Math.max(1, GTUtility.getTier(recipe.mEUt) - 5);
                     maxParallel = Math.max(1, (1 + current.tier - recipeTier) * 64);
                 }
 
-                // Same restriction as the Fusion Computer, but without the startup-energy system:
-                // a tier can only do recipes of its own voltage tier and below.
+                // Like the Fusion Computer, no startup energy: own voltage tier and below only.
                 if (recipe.mEUt > GTValues.V[current.voltageTier]) {
                     return CheckRecipeResultRegistry.insufficientPower(recipe.mEUt);
                 }
 
-                // Wireless mode: mimic MTETranscendentPlasmaMixer and cap the parallel to what the
-                // global wireless balance can actually pay for. This check happens before any input is consumed.
+                // Wireless: cap the parallel to what the global balance can pay (like MTETranscendentPlasmaMixer),
+                // before consuming any input.
                 long wirelessEUt = recipe.mEUt;
                 int wirelessDuration = recipe.mDuration;
                 if (isEnableWireless()) {
@@ -689,7 +641,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
                         .intValue();
                 }
 
-                // Wireless mode: final shared safety check before input consumption.
+                // Wireless: final shared safety check before input consumption.
                 CheckRecipeResult wirelessResult = validateWirelessPowerForRecipe(
                     wirelessEUt,
                     wirelessDuration,
@@ -714,7 +666,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
                     if (!wirelessResult.wasSuccessful()) {
                         return wirelessResult;
                     }
-                    // Power was already deducted from the wireless network in one lump; don't also drain hatches.
+                    // Power was already deducted from the network in one lump; don't also drain hatches.
                     overwriteCalculatedEut(0);
                 }
                 return super.onRecipeStart(recipe);
@@ -725,8 +677,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
     @Override
     protected void setProcessingLogicPower(ProcessingLogic logic) {
         if (isEnableWireless()) {
-            // Wireless mode pulls directly from the global wireless network, so the machine has no
-            // energy-hatch voltage limit to respect (same idea as MTETranscendentPlasmaMixer).
+            // Wireless: no energy-hatch voltage limit (global network, like MTETranscendentPlasmaMixer).
             logic.setAvailableVoltage(Long.MAX_VALUE);
             logic.setAvailableAmperage(1);
             logic.setAmperageOC(false);
@@ -811,7 +762,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
 
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
-        // Reset per-check state; the structure elements write the tier ints while walking the structure.
+        // Reset per-check state: the structure elements write the tier ints while walking.
         setFusionCoilTier(LevelTier.INVALID_TIER);
         setFusionMachineTier(LevelTier.INVALID_TIER);
         levelTier = LevelTier.INVALID;
@@ -838,9 +789,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         detecttier();
         aBaseMetaTileEntity.sendBlockEvent(GregTechTileClientEvents.CHANGE_CUSTOM_DATA, getUpdateData());
 
-        // D compartments: input/output bus & hatch, and energy hatch requirements.
-        // In wireless mode the machine draws directly from the global wireless network, so normal
-        // energy hatches are forbidden (and are not used).
+        // D: I/O bus & hatch + energy hatches; wireless forbids normal energy hatches.
         checkHasAnyInput(errors);
         checkHasAnyOutput(errors);
         if (EnableWireless) {
@@ -872,10 +821,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         return tLiquid.amount == 0;
     }
 
-    /**
-     * Route the normal recipe-completion fluid output through {@link #addOutput(FluidStack)} (DTPF-style partial
-     * ejection). This avoids the generic path being the only one used and matches how DTPF handles fluid output.
-     */
+    /** Route recipe fluid output through {@link #addOutput(FluidStack)} (DTPF-style partial ejection). */
     @Override
     protected boolean addFluidOutputs(FluidStack[] outputFluids) {
         boolean succeed = true;
@@ -891,7 +837,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
 
     @Override
     public byte getUpdateData() {
-        // Send the render tier (1..5) to the client; INVALID is sent as 1 (MKI).
+        // Render tier (1..5) to the client; INVALID goes out as 1 (MKI).
         return (byte) renderTier;
     }
 
@@ -904,23 +850,21 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
     }
 
     /**
-     * Front face (side == facing) uses the Large Fusion Computer Mk-V style; other faces use the
-     * fusion machine casing texture matching the current machine tier (INVALID falls back to MKI),
-     * similar to how MTEPreciseAssembler varies its side texture by casing tier.
+     * Front face (side == facing) is Large Fusion Computer Mk-V style; other faces use the casing of the current
+     * tier (INVALID -> MKI), like MTEPreciseAssembler.
      */
     @Override
     public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity, ForgeDirection side, ForgeDirection facing,
         int colorIndex, boolean aActive, boolean aRedstone) {
         if (side == facing) {
-            // Front face: Large Fusion Computer Mk-V (fusion glass + MK-V screen overlay).
+            // Front face: fusion glass + MK-V screen overlay.
             return new ITexture[] { TextureFactory.builder()
                 .addIcon(Textures.BlockIcons.MACHINE_CASING_FUSION_GLASS)
                 .extFacing()
                 .build(), getTextureOverlay() };
         }
-        // Other faces: tier-dependent fusion machine casing (INVALID -> MKI).
-        // Use TextureFactory.of(block, meta) directly so the side uses the actual block icon;
-        // this avoids missing casing-texture entries for GT++/higher-tier casings.
+        // Other faces: tier casing (INVALID -> MKI). TextureFactory.of(block, meta) uses the real icon, so
+        // GT++/higher-tier casings need no casing-texture entry.
         LevelTier textureTier = LevelTier.fromTier(renderTier);
         if (!textureTier.isValid()) {
             textureTier = LevelTier.TIER1;
@@ -973,10 +917,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
         super.onTextureUpdate();
     }
 
-    /**
-     * Front face overlay, exactly like MTELargeFusionComputer5#getTextureOverlay:
-     * rainbow screen while active, random screen while idle.
-     */
+    /** Front overlay, like MTELargeFusionComputer5#getTextureOverlay: rainbow screen active, random screen idle. */
     private ITexture getTextureOverlay() {
         return TextureFactory.of(
             TextureFactory.builder()
@@ -990,7 +931,7 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
 
     @Override
     public ITexture getCasingTexture() {
-        // Same casing as MTEPlasmaForge: casingTexturePages[0][DIM_BRIDGE_CASING] (DIM_BRIDGE_CASING == 14).
+        // Same casing as MTEPlasmaForge: casingTexturePages[0][14] (DIM_BRIDGE_CASING).
         return Textures.BlockIcons.casingTexturePages[0][14];
     }
 

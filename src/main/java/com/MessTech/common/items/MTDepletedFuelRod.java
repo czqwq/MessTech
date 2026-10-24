@@ -8,11 +8,9 @@ import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.common.items.ItemDepletedCell;
 
 /**
- * Depleted MessTech fuel rod (Transcendent Metal single/dual/quad).
- * <p>
- * Extends GT's {@link ItemDepletedCell}, whose reactor behaviour is fully disabled (no heat, no output, no
- * pulse transfer), so it only works as an inert reactor filler / recycling input, exactly like GT's depleted
- * rods.
+ * Depleted MessTech fuel rod (Transcendent Metal single/dual/quad). Extends GT's {@link ItemDepletedCell}, whose
+ * reactor behaviour is fully disabled (no heat, no output, no pulse transfer), so it is only an inert reactor
+ * filler / recycling input, like GT's depleted rods.
  */
 public class MTDepletedFuelRod extends ItemDepletedCell {
 

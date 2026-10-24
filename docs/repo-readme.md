@@ -1,79 +1,78 @@
 # MessTech Repo Notes
 
-This file records knowledge about **MessTech's own code** (architecture, conventions, and past fixes).
-GT5U-internal knowledge is kept in `GT5U-NOTES.md`.
+Own-code notes (architecture, conventions, past fixes); GT5U internals: `GT5U-NOTES.md`.
 
 ## Machine base hierarchy
 
 ```
 MTMultiMachineBase<T>
-├── MTWirelessMultiMachineBase<T>          (wireless network support)
-│   └── ParallelismAcrossMultiMachineBase<T> (cross-recipe parallelism)
-└── CalculateMultiMachineBase<T>           (computation multiblock base)
+├── MTWirelessMultiMachineBase<T>            wireless
+│   └── ParallelismAcrossMultiMachineBase<T> cross-recipe parallelism
+└── CalculateMultiMachineBase<T>             computation multiblock
     └── MTComputingCenter
 ```
 
 ### `MTMultiMachineBase`
-- Generic MessTech multi-block base extending GT's `MTEExtendedPowerMultiBlockBase`.
-- Provides the standard `ProcessingLogic` setup, machine-mode switching, Waila mode NBT/body, and shared helpers.
-- It intentionally does **not** contain wireless code anymore; wireless machines use `MTWirelessMultiMachineBase`.
+`MTEExtendedPowerMultiBlockBase` + `ProcessingLogic` setup, mode switching, Waila mode NBT/body, shared
+helpers; wireless in `MTWirelessMultiMachineBase`.
 
 ### `MTWirelessMultiMachineBase`
-Extracted from the old `MTMultiMachineBase` wireless region + `MTDTPF`'s wireless mechanism.
-- State: `ownerUUID`, `EnableWirelessFunc`, `EnableWireless`, `wirelessParallel`.
-- Lifecycle: `startRecipeProcessing()` / `endRecipeProcessing()` / `isRecipeProcessing`.
-- Wireless cost: `costingEU` / `costingEUText`, Waila NBT/body for `无线模式` / `耗电`.
-- Safe hooks:
-  - `checkWirelessPower(eut, duration, maxParallel)` — simulate before consuming.
-  - `validateWirelessPowerForRecipe(...)` — shared recipe validation (check balance first).
-  - `startWirelessRecipe(...)` — deduct power first, then consume inputs.
-- Generic wireless processing loop: `checkProcessingWirelessLoop()` + `wirelessModeProcessOnce()`.
-- Hooks: `prepareProcessing()`, `getExtraEUCostMultiplier()`, `getWirelessModeProcessingTime()`, `getDefaultWirelessMode()`, `setupWirelessProcessingPowerLogic()`.
+= old `MTMultiMachineBase` wireless region + `MTDTPF` mechanism.
+- `ownerUUID`, `EnableWirelessFunc`, `EnableWireless`, `wirelessParallel`; `startRecipeProcessing()` /
+  `endRecipeProcessing()` / `isRecipeProcessing`; `costingEU` / `costingEUText`.
+- Waila NBT/body `无线模式` / `耗电`.
+- Safe hooks: `checkWirelessPower(eut, duration, maxParallel)` simulates first;
+  `validateWirelessPowerForRecipe(...)` balance first; `startWirelessRecipe(...)` power, then inputs.
+- Loop `checkProcessingWirelessLoop()` + `wirelessModeProcessOnce()`; `prepareProcessing()`,
+  `getExtraEUCostMultiplier()`, `getWirelessModeProcessingTime()`, `getDefaultWirelessMode()`,
+  `setupWirelessProcessingPowerLogic()`.
 
 ### `ParallelismAcrossMultiMachineBase`
-Cross-recipe parallelism design (inspired by external mod reference).
-- In wireless mode `checkProcessing()` runs `checkProcessingWirelessLoop()`.
-- Each wireless cycle may pick a **different recipe** from the recipe map; outputs are accumulated.
-- Subclasses configure `cycleNum` via `setWirelessCycleNum(int)` and override `getMaxParallelRecipes()` / `getWirelessModeProcessingTime()`.
+Cross-recipe parallelism, external-mod inspired.
+- `checkProcessing()` runs `checkProcessingWirelessLoop()`; each cycle may pick a **different recipe**, outputs
+  accumulate.
+- `cycleNum` via `setWirelessCycleNum(int)`; override `getMaxParallelRecipes()` /
+  `getWirelessModeProcessingTime()`.
 
 ## Machines
 
 ### MTDTPF
-- Extends `MTWirelessMultiMachineBase`.
-- Wireless availability: `detecttier()` requires AAF + tier >= 5.
-- Wireless mode: no-overclock, fixed 0.75 EU/duration modifier, player-selected wireless parallel.
-- Recipe validation order (kept from original design):
-  1. validate machine tier and recipe voltage;
-  2. cap wireless parallel by wireless balance;
-  3. `validateWirelessPowerForRecipe(...)` — if insufficient, return insufficient power;
-  4. `onRecipeStart` → `startWirelessRecipe(...)` — deduct power + consume inputs → start.
-- Runtime ramp: `running_time` 3600s to full efficiency, decay when idle.
+`MTWirelessMultiMachineBase`; `detecttier()` needs AAF + tier >= 5 for wireless.
+- No overclock, fixed 0.75 EU/duration modifier, player-selected wireless parallel.
+- Order: machine tier + recipe voltage; wireless balance caps parallel;
+  `validateWirelessPowerForRecipe(...)`; `onRecipeStart` → `startWirelessRecipe(...)` deduct power, then
+  inputs.
+- `running_time` 3600s ramp to full efficiency, decay when idle.
 
 ### MTComputingCenter
-- Modes:
-  - 0 = Nano Computing
-  - 1 = Research Station
-  - 2 = Scanner (same research-style computation/packet-loss logic)
-- Research/Scanner use holder hatch + controller special slot, `computationRemaining`/`packetLoss` logic.
-- Heat/overclock: `machineHeat`, cryotheum active cooling, passive cooling when stopped, overheat melts racks.
-- Waila values are reset whenever machine is not active (manual shutdown included).
-- Waila mode uses string mode tag (`setString("mode", getMachineModeName(...))`) because upstream GT reads a string.
+- Modes: 0 = Nano Computing, 1 = Research Station, 2 = Scanner (research-style computation/packet-loss logic).
+- Research/Scanner: holder hatch + controller special slot, `computationRemaining`/`packetLoss`.
+- `machineHeat`, cryotheum active cooling, passive cooling when stopped, overheat melts racks.
+- Waila values reset when not active (manual shutdown too); mode tag is the string
+  `setString("mode", getMachineModeName(...))`.
 
 ### MTAssFactory
-- Modes:
-  - 0 = Component Assembly Line (generic `ProcessingLogic` recipe map lookup, energy hatch tier limits recipe casing tier)
-  - 1 = Assembly Line (data-stick / Data Access, LevelTier 2 required, unordered input matching by `MTAssemblyLineMatcher`, no single-recipe locking)
+- Mode 0 = Component Assembly Line: generic `ProcessingLogic` recipe map lookup; energy hatch tier caps
+  recipe casing tier.
+- Mode 1 = Assembly Line: data-stick / Data Access, LevelTier 2, unordered input matching by
+  `MTAssemblyLineMatcher`, no single-recipe locking.
 - Structure `F` accepts Data Access hatch.
-- Independent Assembly Line recipe map (`MTRecipeMaps.assFactoryAssemblyLineRecipes`): fake display recipe per definition for NEI only. Runnable recipes are resolved per check by `MTAssemblyLineMatcher` against the input buses; see `docs/GT5U-NOTES.md` § 11.6.
+- `MTRecipeMaps.assFactoryAssemblyLineRecipes`: fake display recipe per definition, NEI only; runnable form
+  resolved per check by `MTAssemblyLineMatcher` against input buses (`docs/GT5U-NOTES.md` § 11.6).
 
 ## Own-code conventions / lessons
 
-1. **Always reuse existing GT methods first.**
-   - Input consumption: `depleteInput(ItemStack)` / `depleteInput(FluidStack)`.
-   - Recipe finding: `ProcessingLogic` / `findRecipeQuery` / `getStoredInputs`.
-   - Do **not** directly mutate `ItemStack.stackSize` / `FluidStack.amount` or call `setInventorySlotContents` on bus slots from custom processing code.
-2. **Waila mode display**: upstream GT `MTEMultiBlockBase#getWailaBody` reads `tag.getString("mode")`, so write the localized mode name as a string, not an integer.
-3. **Fake recipes are invisible to `findRecipeQuery`.** If a machine needs to process from a custom recipe pool, register real recipes (`addRecipe(..., false, false, false)`), not `addFakeRecipe`. Exception: a recipe whose runnable form cannot be written down ahead of time (the AssFactory Assembly Line mode, whose per-slot alternatives would have to be expanded into their cartesian product) should keep only fake NEI pages and override `ProcessingLogic#findRecipeMatches` to resolve the recipe per check.
-4. **NEI category lookup** reads `getRecipesByCategory(defaultCategory)`. When copying recipes into another map, call `recipe.setRecipeCategory(targetDefaultCategory)`.
-5. **Block helpers**: `AssMatrixBlock` / `AdvAssMatrixBlock` expose `getBlock()`, `getItem()`, `getItemStack()`, `getItemStack(int)`; also registered in `MTItemList`.
-6. **Registration** stays in one path: `postInit -> MTMachineLoader.loadMachines()`.
+1. **Reuse GT methods first.** Inputs `depleteInput(ItemStack)` / `depleteInput(FluidStack)`; recipes
+   `ProcessingLogic` / `findRecipeQuery` / `getStoredInputs`. Never mutate `ItemStack.stackSize` /
+   `FluidStack.amount` or `setInventorySlotContents` on bus slots from custom processing code.
+2. **Waila mode display**: `MTEMultiBlockBase#getWailaBody` reads `tag.getString("mode")` — localized mode name
+   as a string, not an integer.
+3. **Fake recipes are invisible to `findRecipeQuery`**: custom pool → real recipes
+   (`addRecipe(..., false, false, false)`), not `addFakeRecipe`. Exception: form unknowable upfront
+   (AssFactory Assembly Line: per-slot alternatives = cartesian product) → fake NEI pages only, override
+   `ProcessingLogic#findRecipeMatches` per check.
+4. **NEI category lookup** = `getRecipesByCategory(defaultCategory)`; copying needs
+   `recipe.setRecipeCategory(targetDefaultCategory)`.
+5. **Block helpers**: `AssMatrixBlock` / `AdvAssMatrixBlock` give `getBlock()`, `getItem()`, `getItemStack()`,
+   `getItemStack(int)`; also in `MTItemList`.
+6. **Registration** single path: `postInit -> MTMachineLoader.loadMachines()`.

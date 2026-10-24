@@ -16,14 +16,13 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * Draws the thrown piggy as the item icon it was thrown with: always facing the camera and slowly spinning around
- * the view axis. Animated effects (the ones with a {@code .mcmeta} strip) animate on their own, the atlas does that
- * for every sprite.
+ * The thrown piggy as its item icon: billboarded, spinning about the view axis; {@code .mcmeta} effects animate
+ * on their own (the atlas's job).
  */
 @SideOnly(Side.CLIENT)
 public class MTRenderPiggy extends Render {
 
-    /** Spin of the sprite around the view axis, in degrees per tick. */
+    /** Spin speed, in deg/tick. */
     private static final float SPIN_SPEED = 24.0F;
 
     public MTRenderPiggy() {
@@ -43,8 +42,7 @@ public class MTRenderPiggy extends Render {
         GL11.glScalef(0.6F, 0.6F, 0.6F);
         bindEntityTexture(piggy);
 
-        // Billboard first (the same two rotations the vanilla thrown item renderers use), then spin the sprite
-        // around the view axis, which is what makes the throw look alive.
+        // Billboard (as vanilla thrown-item renderers), then spin about the view axis.
         GL11.glRotatef(180.0F - this.renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
         GL11.glRotatef(-this.renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
         GL11.glRotatef((piggy.ticksExisted + partialTicks) * SPIN_SPEED, 0.0F, 0.0F, 1.0F);
@@ -65,7 +63,7 @@ public class MTRenderPiggy extends Render {
 
     @Override
     protected ResourceLocation getEntityTexture(Entity entity) {
-        // The icon lives in the item atlas, which is exactly what the quad is textured with.
+        // The icon is in the item atlas, which textures the quad.
         return TextureMap.locationItemsTexture;
     }
 }

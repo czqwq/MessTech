@@ -45,15 +45,12 @@ import ic2.core.item.reactor.ItemReactorHeatStorage;
 import ic2.core.item.reactor.ItemReactorUranium;
 
 /**
- * Tiered reactor access hatch holding the IC2 reactor component inventory for {@code MTReactor}.
+ * Tiered reactor access hatch: {@code MTReactor}'s IC2 component inventory in independent 9x6 pages (one IC2 reactor
+ * grid
+ * each), 1 page at EV up to 8 at UIV.
  * <p>
- * The inventory is split into independent pages of 9x6 slots (exactly one IC2 reactor grid each). The tier
- * determines the page count: Tier EV has 1 page, every tier above adds one more, up to 8 pages at Tier UIV.
- * <p>
- * The base texture is always the machine casing of the hatch's own tier; the reactor access decal from
- * {@code assets/messtech/textures/blocks/hatch/Hatch_Reactor_Access.png} is layered on the front face. Because
- * of that, {@code updateTexture} is intentionally never called for this hatch, so multiblock casing updating
- * cannot overwrite the tier base.
+ * Base texture = own-tier casing + decal {@code assets/messtech/textures/blocks/hatch/Hatch_Reactor_Access.png} on the
+ * front face, so {@code updateTexture} is never called (casing updates must not overwrite the tier base).
  */
 public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTReactorHeatSystem.PageOwner {
 
@@ -108,9 +105,7 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
         this.mSlotMemory = new ItemStack[mInventory.length];
     }
 
-    /**
-     * Pages per tier: EV = 1, IV = 2, ... UIV = 8.
-     */
+    /** Pages per tier: EV = 1, IV = 2, ... UIV = 8. */
     public static int getPageCountForTier(int aTier) {
         return Math.max(1, Math.min(aTier - MIN_TIER + 1, MAX_TIER - MIN_TIER + 1));
     }
@@ -149,10 +144,9 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Left click with a data stick in hand saves this hatch's lock configuration, the GT way (see
-     * {@code MTEHatchOutputBus#onLeftclick}). This cannot break the block: {@code BlockMachines} builds on GT's
-     * {@code MaterialMachines} ({@code setRequiresTool()}) and reports a wrench as its harvest tool, so left clicking
-     * with a data stick deals no block damage.
+     * Left click with a data stick saves the lock configuration, the GT way ({@code MTEHatchOutputBus#onLeftclick}); no
+     * block damage, as {@code BlockMachines} extends GT's {@code MaterialMachines} ({@code setRequiresTool()}) with a
+     * wrench harvest tool.
      */
     @Override
     public void onLeftclick(IGregTechTileEntity aBaseMetaTileEntity, EntityPlayer aPlayer) {
@@ -165,10 +159,9 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Only horizontal facings are allowed. The base tile entity defaults to {@link ForgeDirection#DOWN}, and
-     * {@code setFrontFacing} refuses to change the facing if it is invalid, which previously left the front decal
-     * pointing down. Restricting to horizontal sides also prevents the decal from ever ending up on the top or
-     * bottom face, so it is always visible from the side.
+     * Horizontal facings only: the base tile entity defaults to {@link ForgeDirection#DOWN} and {@code setFrontFacing}
+     * refuses an invalid facing (the decal used to point down); this also keeps the decal off top/bottom, in view from
+     * the side.
      */
     @Override
     public boolean isFacingValid(ForgeDirection facing) {
@@ -176,9 +169,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Placement can still fail to pick a horizontal facing (for example when a player places the hatch while
-     * looking straight down, or when structure auto-placement only offers a vertical side). In that case the base
-     * tile entity keeps its default {@code DOWN} facing, so force a horizontal fallback once on the first tick.
+     * Placement can still pick no horizontal facing (looking straight down, auto-placement offering a vertical side),
+     * leaving {@code DOWN}: force a horizontal fallback on the first tick.
      */
     @Override
     public void onFirstTick(IGregTechTileEntity aBaseMetaTileEntity) {
@@ -210,13 +202,10 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     // region Heat system page ownership (MTReactorHeatSystem.PageOwner)
 
     /**
-     * Stable identity of this hatch for the reactor's heat store: its block coordinates. The heat store is keyed by
-     * this instead of by the index of the hatch in a coordinate-sorted hatch list, so adding, removing or moving
-     * another access hatch cannot quietly renumber this hatch's pages and hand its heat to a different hatch.
-     * <p>
-     * The hatch itself stores no heat - {@code MTReactor} owns it, through {@code MTReactorHeatSystem}. Coordinates
-     * are only meaningful once the hatch is placed in the world; before that this returns {@code null}, which the heat
-     * system reads as "not a page owner".
+     * Stable identity for the reactor heat store: block coordinates, not the hatch's index in a coordinate-sorted hatch
+     * list, so adding, removing or moving another access hatch cannot renumber this hatch's pages and hand its heat
+     * elsewhere. The hatch stores no heat ({@code MTReactor} owns it via {@code MTReactorHeatSystem}); before placement
+     * this is {@code null} = "not a page owner".
      */
     @Override
     public ChunkCoordinates mtReactorKey() {
@@ -225,7 +214,7 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
         return new ChunkCoordinates(base.getXCoord(), base.getYCoord(), base.getZCoord());
     }
 
-    /** Number of 9x6 pages this hatch exposes, i.e. one IC2 reactor grid per page. */
+    /** 9x6 pages, one IC2 reactor grid each. */
     @Override
     public int mtReactorPageCount() {
         return pageCount;
@@ -233,10 +222,7 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
 
     // endregion
 
-    /**
-     * Reads a slot from a 9x6 page. Components on one page can never see items of another page, because the
-     * coordinates are always clamped to that single page.
-     */
+    /** Reads a slot of a 9x6 page; coordinates are clamped to that one page, so pages never see each other. */
     public ItemStack getReactorItem(int page, int x, int y) {
         if (!isInPage(page, x, y)) return null;
         return mInventory[toIndex(page, x, y)];
@@ -283,8 +269,7 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Every reactor slot is a real inventory slot. {@code MTEBasicTank} treats slot 2 as a fluid display slot,
-     * which would hide the third reactor slot from pipes/OpenComputers, so it is re-enabled here.
+     * Every reactor slot is a real inventory slot: {@code MTEBasicTank}'s slot 2 fluid display slot would hide the 3rd.
      */
     @Override
     public boolean isValidSlot(int aIndex) {
@@ -303,8 +288,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * IC2 style: insertion is validated per slot, extraction is allowed from every slot, so logistics mods
-     * (GT pipes, AE, OpenComputers, ...) can address individual reactor slots.
+     * IC2 style: per-slot validated insertion, extraction from every slot, so logistics mods (GT pipes, AE,
+     * OpenComputers) reach single reactor slots.
      */
     @Override
     public boolean allowPutStack(IGregTechTileEntity aBaseMetaTileEntity, int aIndex, ForgeDirection side,
@@ -319,8 +304,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Direct IInventory writes (for example OpenComputers' {@code inventory.setItem}) must not bypass the slot
-     * validation/lock rules. Internal reactor writes use {@link #setSlotStack(int, ItemStack)} instead.
+     * Direct IInventory writes (e.g. OpenComputers' {@code inventory.setItem}) must not bypass slot validation and
+     * locks; internal writes use {@link #setSlotStack(int, ItemStack)}.
      */
     @Override
     public void setInventorySlotContents(int aIndex, ItemStack aStack) {
@@ -335,8 +320,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Mirrors IC2's {@code isUsefulItem}: reactor components plus the inert items IC2 also lets you keep in the
-     * reactor inventory (depleted fuel cells and tritium cells).
+     * Mirrors IC2's {@code isUsefulItem}: reactor components plus the inert items IC2 also keeps (depleted fuel cells,
+     * tritium cells).
      */
     public static boolean isUsefulReactorItem(ItemStack stack) {
         if (stack == null || stack.getItem() == null) return false;
@@ -377,7 +362,7 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
         return index >= 0 && index < mSlotState.length && mSlotState[index] >= 0;
     }
 
-    /** @return the locked auto-output percentage, or -1 when the slot is not locked. */
+    /** Locked auto-output percentage, or -1 when the slot is not locked. */
     public int getSlotThreshold(int index) {
         if (!isSlotLocked(index)) return -1;
         return mSlotState[index];
@@ -388,20 +373,19 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
         return mSlotMemory[index];
     }
 
-    /** The raw memory array used by the MUI2 sync handler; MUI2 copies it for its cache. */
+    /** The raw array used by the MUI2 sync handler (which copies it). */
     public ItemStack[] getSlotMemoryArray() {
         return mSlotMemory;
     }
 
-    /** The raw array used by the MUI2 sync handler; MUI2 copies it for its cache. */
+    /** The raw array used by the MUI2 sync handler (which copies it). */
     public byte[] getSlotStateArray() {
         return mSlotState;
     }
 
     /**
-     * Locks the clicked slot and every slot of this hatch holding the same item type (all pages, durability/heat
-     * and NBT ignored). If this item type already has a locked threshold somewhere in the hatch, that threshold is
-     * kept instead of being reset to the item default.
+     * Locks the clicked slot and every slot of this hatch with the same item type (all pages, durability/heat and NBT
+     * ignored); an existing locked threshold for that type is kept, not reset to the item default.
      */
     public void lockSlotGroup(int index) {
         if (index < 0 || index >= mInventory.length) return;
@@ -432,8 +416,9 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Global unlock (Alt + Shift + right click): removes the lock from every locked slot of this hatch holding
-     * the same item type as the clicked slot, all pages included.
+     * Global unlock (Alt + Shift + right click): removes the lock from every locked slot holding the clicked slot's
+     * item
+     * type, all pages included.
      */
     public void unlockSlotGroup(int index) {
         if (index < 0 || index >= mInventory.length) return;
@@ -452,8 +437,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * The auto-output percentage is a property of the item type inside one hatch: setting it on any locked slot
-     * updates every locked slot of this hatch holding the same item type (all pages included).
+     * The auto-output percentage belongs to the item type inside one hatch: setting it on any locked slot updates every
+     * locked slot with that type (all pages).
      */
     public void setSlotThreshold(int index, int percent) {
         if (!isSlotLocked(index)) return;
@@ -482,41 +467,29 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Item type comparison for slot memory: which stacks a locked slot accepts, and which stacks the group operations
+     * Item type comparison for slot memory: what a locked slot accepts and what the group operations
      * ({@link #lockSlotGroup}, {@link #unlockSlotGroup}, {@link #setSlotThreshold},
-     * {@link #hasMissingLockedComponents})
-     * treat as one type.
+     * {@link #hasMissingLockedComponents}) treat as one type.
      * <p>
-     * <b>The rule, exactly.</b> Two stacks are the same type when both
-     * <ol>
-     * <li>hold the same {@link Item} instance, and</li>
-     * <li>either the item has a damage bar ({@code getMaxDamage() > 0}) - then the item damage is the wear bar and is
-     * ignored, so a half-burnt rod still matches a fresh rod of the same grade - or the item has no damage bar, then
-     * the item damage is a metadata variant and has to be equal.</li>
-     * </ol>
-     * <b>Why item damage is not part of the type for damageable items.</b> Reactor components keep their real state in
-     * NBT ({@code advDmg} for GT's {@code ItemRadioactiveCell}, {@code ItemRadioactiveCellIC} and IC2's
-     * {@code ItemGradualInt}, {@code heat} for {@code ItemCoolantCell}/{@code ItemCoolantCellIC}) and only paint
-     * vanilla's 0..99 bar by writing that state into the item damage. Keying on the damage would make every partly
-     * burnt rod a different type from a fresh one.
+     * Same {@link Item} plus: damageable ({@code getMaxDamage() > 0}) -> damage is the wear bar, ignored (half-burnt
+     * rod
+     * == fresh rod); else damage is a metadata variant and must match.
      * <p>
-     * <b>Why the Item instance is the identity.</b> Every grade of a rod or coolant cell is its own Item instance, in
-     * IC2 ({@code ic2.core.init.BlocksItems}, one {@code ItemReactorUranium} per uranium/MOX single/dual/quad and one
-     * {@code ItemReactorHeatStorage} per cell size) and in GT ({@code LoaderGTBlockFluid}, one
-     * {@code ItemRadioactiveCellIC} / {@code ItemCoolantCellIC} per grade, and the same for MessTech's own
-     * {@code MTFuelRod}s). Single, dual and quad are therefore separated by {@code getItem()} alone.
+     * Damage is ignored when damageable because the state lives in NBT ({@code advDmg} for GT's
+     * {@code ItemRadioactiveCell}/{@code ItemRadioactiveCellIC} and IC2's {@code ItemGradualInt}; {@code heat} for
+     * {@code ItemCoolantCell}/{@code ItemCoolantCellIC}) and only paints vanilla's 0..99 bar.
      * <p>
-     * <b>Rejected comparisons</b> - do not switch to either of these:
-     * <ul>
-     * <li>{@code ItemStack#getUnlocalizedName()}: it is stack-aware ({@code ItemStack} line 432 calls
-     * {@code item.getUnlocalizedName(stack)}, and {@code GTGenericItem} appends {@code "." + getDamage(stack)}
-     * whenever the item has subtypes), so for a rod it would embed the fuel state and break the "half-burnt rod equals
-     * fresh rod" requirement above. A comparison of the state-independent no-argument
-     * {@code Item#getUnlocalizedName()} adds nothing on top of the Item check: with both stacks holding the same Item
-     * instance it can never differ.</li>
-     * <li>{@code ItemStack#isItemEqual} (Forge/Vanilla, {@code ItemStack} line 427): same Item <em>and</em> same item
-     * damage, i.e. it is wear-sensitive and has exactly the problem described above.</li>
-     * </ul>
+     * Item identity works because each grade is its own Item: IC2 {@code ic2.core.init.BlocksItems}
+     * ({@code ItemReactorUranium} per uranium/MOX size, {@code ItemReactorHeatStorage} per cell size), GT
+     * {@code LoaderGTBlockFluid} ({@code ItemRadioactiveCellIC}/{@code ItemCoolantCellIC} per grade), MessTech
+     * {@code MTFuelRod}.
+     * <p>
+     * Not {@code ItemStack#getUnlocalizedName()}: stack-aware ({@code ItemStack} 432 calls
+     * {@code item.getUnlocalizedName(stack)}; {@code GTGenericItem} appends {@code "." + getDamage(stack)} for
+     * subtypes),
+     * so it embeds the fuel state, and {@code Item#getUnlocalizedName()} adds nothing. Not
+     * {@code ItemStack#isItemEqual}
+     * ({@code ItemStack} 427): compares damage as well, i.e. wear-sensitive.
      */
     public static boolean isSameItemType(ItemStack a, ItemStack b) {
         if (a == null || b == null) return false;
@@ -526,8 +499,9 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * True for rods that still burn fuel: IC2/GT burnable fuel rods (including MessTech's transcendent rods) but not
-     * depleted cells. Used by the slot sub-panel to decide whether the fuel durability line is shown.
+     * True for rods that still burn fuel: IC2/GT burnable rods (including MessTech's transcendent ones) but not
+     * depleted
+     * cells; the slot sub-panel shows the fuel durability line only for these.
      */
     public static boolean isFuelRod(ItemStack stack) {
         if (stack == null || stack.getItem() == null) return false;
@@ -546,8 +520,9 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Exact remaining durability in percent (fractional). Used for the auto-output/input threshold comparison so a
-     * fuel rod that still has a tiny bit left is not rounded down to 0% and output early.
+     * Exact remaining durability in percent (fractional) for the auto-output/input threshold: a rod with a tiny bit
+     * left
+     * must not round down to 0% and output early.
      */
     public static double getDurabilityFraction(ItemStack stack) {
         if (stack == null) return 0.0D;
@@ -630,9 +605,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Data stick payload: how many 9x6 pages the configuration covers and, per slot, which component type is locked
-     * with which auto-output threshold. The components themselves are deliberately not part of the payload - the
-     * paste only ever applies settings to what the target hatch already holds.
+     * Data stick payload: page count plus, per slot, locked component type and auto-output threshold. Components are
+     * absent on purpose - a paste only applies settings to what the target holds.
      */
     @Override
     public NBTTagCompound getCopiedData(EntityPlayer player) {
@@ -641,7 +615,7 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
         tag.setInteger("ver", DATA_STICK_VERSION);
         tag.setInteger("page", pageCount);
 
-        // Sparse archive of the locked component types: only the slots that are locked.
+        // Sparse archive of the locked component types: locked slots only.
         NBTTagList lockList = new NBTTagList();
         for (int i = 0; i < mSlotState.length; i++) {
             if (mSlotState[i] < 0 || mSlotMemory[i] == null) continue;
@@ -656,23 +630,18 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     }
 
     /**
-     * Replays a copied lock configuration into this hatch: the lock percentage and the component type a slot was locked
-     * to are taken straight from the stick. Which component sits in a slot is the player's business - the inventory is
-     * only ever <b>read</b> (to find the slot a lock's component already sits in) and never written.
+     * Replays a copied lock configuration: percentage and locked type come from the stick. The inventory is only
+     * <b>read</b> (to find the slot a lock's component already sits in), never written.
      * <p>
-     * Pages map one to one (page 0 to page 0, then upwards). When the source hatch has more pages than this one, only
-     * the pages this hatch really has are replayed and the player is told how many were dropped, which is what makes
-     * copying from an advanced hatch onto a lower tier one work.
+     * Pages map one to one; with more source pages than here, only those here are replayed and the chat reports the
+     * dropped ones. An unlocked slot stays unlocked, an empty locked slot is reported (the lock acts once the component
+     * arrives), and the chat reports locks replayed and pages covered.
      * <p>
-     * A slot the configuration leaves unlocked is unlocked here as well, and a page this hatch does not have keeps no
-     * lock. A locked slot that happens to be empty is reported: the lock is still in place and takes effect as soon as
-     * the matching component is put in. The chat always reports how many locks were replayed and over how many pages.
-     * <p>
-     * <b>The component type decides the slot, not the slot number.</b> A stick written on one layout and pasted onto
-     * another can hold the same component in different slots, so a pure slot-number replay locked the wrong slots.
-     * Every entry first goes to a slot of this hatch that already holds its component type, then to its original slot
-     * number when that slot is free, and last to another free slot on the same page. A lock this hatch has no room for
-     * is dropped and reported - it is never written over another lock.
+     * <b>The component type decides the slot, not the slot number</b> (same component, other layout): first a slot
+     * already
+     * holding its type, then its original number when free, last another free slot of the same page; a lock with no
+     * room is
+     * dropped and reported, never written over another lock.
      */
     @Override
     public boolean pasteCopiedData(EntityPlayer player, NBTTagCompound nbt) {
@@ -699,9 +668,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
 
         int appliedPages = Math.min(pageCount, sourcePages);
         int appliedSlots = appliedPages * SLOTS_PER_PAGE;
-        // Locks the stick carries for the pages this hatch has, counted before the remap. The difference to what
-        // actually landed is the number of locks that found no room; it cannot be counted per slot afterwards, because
-        // a lock is allowed to land on a slot other than its own.
+        // Locks the stick carries for the pages this hatch has, counted before the remap; the difference to what landed
+        // is the number that found no room (not countable afterwards, a lock may land on another slot).
         int entriesValid = 0;
         for (int i = 0; i < appliedSlots; i++) {
             if (lockedType[i] != null) entriesValid++;
@@ -711,8 +679,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
         int applied = 0;
         int emptyLocked = 0;
 
-        // The lock configuration is copied straight from the stick; only the slot it lands on is decided by the remap
-        // above. The inventory is never written: which component sits in a slot (if any) is the player's business.
+        // Lock settings come straight from the stick; only the slot they land on is decided by the remap above. The
+        // inventory is never written: which component sits in a slot (if any) is the player's business.
         for (int i = 0; i < mSlotState.length; i++) {
             int source = i < remapped.length ? remapped[i] : -1;
             if (source < 0) {
@@ -752,23 +720,20 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
             player.addChatComponentMessage(
                 new ChatComponentTranslation("machine.mtreactor.accesshatch.copy.empty_slots", emptyLocked));
         }
-        // How many locks the paste actually applied: without it a paste that silently replayed a handful of entries
-        // looked exactly like a full one. The count is the locks written, the second number the pages they cover.
+        // How many locks were actually applied (else a partial paste looks like a full one): locks written, pages
+        // covered.
         player.addChatComponentMessage(
             new ChatComponentTranslation("machine.mtreactor.accesshatch.copy.remapped", applied, appliedPages));
         return true;
     }
 
     /**
-     * Decides which of this hatch's slots each lock of the stick lands on, following the component type first and the
-     * original slot number only as a fallback.
+     * Which of this hatch's slots each lock lands on: component type first, original slot number as fallback.
      * <p>
-     * Two different booleans are needed because two different questions are asked here: {@code targetTaken} says "a
-     * lock already occupies this <b>slot</b>" (indexed by slot), while {@code placed} says "this <b>lock</b> already
-     * has
-     * a home" (indexed by source slot). Testing the slot array for the source index - as an earlier revision did -
-     * compared the wrong two things: a lock that pass 1 placed on another slot could then be placed a second time on
-     * its own source slot, and the paste wrote the same lock into two slots.
+     * Two booleans for two questions: {@code targetTaken} = "a lock already occupies this <b>slot</b>" (by slot),
+     * {@code placed} = "this <b>lock</b> already has a home" (by source slot) - using the source index on the slot
+     * array
+     * would place a lock twice.
      *
      * @param lockedType   component type per source slot; null marks an unlocked one
      * @param appliedSlots how many of this hatch's slots the stick's pages cover
@@ -782,8 +747,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
         // A lock already has a home, so it must not be placed again.
         boolean[] placed = new boolean[appliedSlots];
 
-        // Pass 1: a slot that already holds the component the stick locked is where that lock belongs, whatever its
-        // number was on the source hatch. This is what makes a paste follow the parts instead of the grid.
+        // Pass 1: a slot already holding the component the stick locked is where that lock belongs, whatever its number
+        // on the source hatch - this makes a paste follow the parts instead of the grid.
         for (int source = 0; source < appliedSlots; source++) {
             ItemStack wanted = lockedType[source];
             if (wanted == null) continue;
@@ -797,8 +762,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
             }
         }
 
-        // Pass 2: no slot held the part, so keep the original slot number when that slot is free. An occupied slot must
-        // not be overwritten with a different lock: the occupant was put there by the player.
+        // Pass 2: no slot held the part, so keep the original slot number when it is free. An occupied slot must not be
+        // overwritten with a different lock: the occupant was put there by the player.
         for (int source = 0; source < appliedSlots; source++) {
             if (lockedType[source] == null || placed[source]) continue;
             if (targetTaken[source]) continue;

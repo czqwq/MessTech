@@ -14,8 +14,9 @@ import cpw.mods.fml.common.gameevent.TickEvent;
 /**
  * 1:1 port of Draconic Evolution's
  * {@code com.brandon3055.draconicevolution.common.utils.handlers.ProcessHandler} (see
- * {@code tmp/Draconic-Evolution-master}). Processes are similar to tile entities except that they are not bound to
- * anything and they are not persistent (they are dropped when the world closes).
+ * {@code tmp/Draconic-Evolution-master}). Processes are like tile entities, but bound to nothing and not persistent -
+ * they
+ * are dropped when the world closes.
  */
 public class MTProcessHandler {
 

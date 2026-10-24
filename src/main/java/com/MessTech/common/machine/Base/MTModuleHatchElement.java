@@ -11,9 +11,7 @@ import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.util.IGTHatchAdder;
 
 /**
- * Structure element for the module hatches of a {@link MTModuleMultiMachineBase}.
- * <p>
- * A machine opts into modules with one line in its structure definition:
+ * Structure element for the module hatches of a {@link MTModuleMultiMachineBase}:
  *
  * <pre>
  * buildHatchAdder(MyMachine.class).casingIndex(casing)
@@ -22,8 +20,8 @@ import gregtech.api.util.IGTHatchAdder;
  *     .build()
  * </pre>
  *
- * The adder is {@link MTModuleMultiMachineBase#addModuleHatchToMachineList}, so the scan links the hatch and refuses
- * it when the machine does not take that module type (or already has a parallel module).
+ * The adder is {@link MTModuleMultiMachineBase#addModuleHatchToMachineList}: the scan refuses a hatch whose module type
+ * the machine does not take (or a second parallel module).
  */
 public enum MTModuleHatchElement implements IHatchElement<MTModuleMultiMachineBase<?>> {
 

@@ -20,67 +20,56 @@ import cpw.mods.fml.relauncher.SideOnly;
  * Draws the fireball of every live {@link MTEntityDEBlast}: the visible half of a
  * {@link com.MessTech.common.explosion.MTExplosionDE}, i.e. of Draconic Evolution's reactor explosion.
  * <p>
- * <b>What it is a port of.</b> DE draws that blast with {@code Particles.ReactorExplosionParticle}
- * ({@code client/render/particle/Particles.java:788-915}): one effect that grows one block per tick, and per frame
- * renders <em>eleven</em> nested copies of the reactor's UV sphere, each of them five shells deep, in colours that go
- * from deep orange ({@code 1, 0.4, 0}) on the outside to a pale yellow ({@code 1, 0.8, 0.55}) in the middle, plus
- * two extra shapes - a flattened one ({@code glScaled(2, 0.2, 2)}, the ground disk) and a stretched one
- * ({@code glScaled(5, 10, 5)}, the leading edge). Everything there is a plain white texture with
- * {@code GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA}, i.e. a coloured sphere and no lighting.
+ * Port of DE's {@code Particles.ReactorExplosionParticle} ({@code client/render/particle/Particles.java:788-915})
+ * without the model file: the sphere is a lat/long quad mesh ({@link #addSphere}) that a matrix scale flattens into
+ * the disk or stretches into the edge. Shallower layering than DE's (see {@link #SPHERE_LAYERS}); the shell scales
+ * and colours are DE's own numbers. No UVs are sent - a fireball needs none.
  * <p>
- * This is the same construction without DE's model file: the sphere is built here as a lat/long mesh of quads
- * ({@link #addSphere}), which a matrix scale can flatten into the disk or stretch into the leading edge. The layering
- * is shallower than DE's (see {@link #SPHERE_LAYERS}); the five shells per layer, their scales and their colours are
- * DE's own numbers. The one thing that is not DE's is the texture coordinates: a fireball needs none, so none are
- * sent.
- * <p>
- * Like DE, the blast is drawn with the depth test on and the depth mask off (a fireball behind a wall stays behind
- * it, and the fireball does not hide itself), with culling off and with a lightmap forced to full brightness, so the
- * blast lights up the night instead of being a dark blob.
+ * Like DE: depth test on, depth mask off (a fireball behind a wall stays behind it and never hides itself), culling
+ * off, full-bright lightmap so the blast lights up the night instead of being a dark blob.
  */
 @SideOnly(Side.CLIENT)
 public final class MTDEBlastRenderer {
 
-    /** The plain white texture DE binds ({@code textures/models/white.png}); 8x8 so no filtering surprises. */
+    /** DE's plain white texture ({@code textures/models/white.png}); 8x8, so no filtering surprises. */
     private static final ResourceLocation WHITE = new ResourceLocation("messtech", "textures/misc/white.png");
 
-    /** A lightmap coordinate that is brighter than daylight, the value DE forces for the same effect. */
+    /** Brighter than daylight; DE's value. */
     private static final int FULL_BRIGHT = 0xF000F0;
 
-    /** Segments of the sphere mesh: 10 around, 6 up and down is smooth enough for a fireball. */
+    /** 10 around, 6 up/down: smooth enough for a fireball. */
     private static final int SPHERE_SEGMENTS = 10, SPHERE_RINGS = 6;
 
     /**
-     * DE's layering, each layer 5% smaller than the one outside it. DE draws <em>eleven</em> of them; four are used
-     * here, because a layer here is a mesh of quads rather than a model and the outer layers of a fireball this
-     * translucent are indistinguishable. The cost is what sets the number: four layers of five shells of 60 quads is
-     * 1,200 quads per blast per frame, where DE draws 55 sphere models.
+     * Each layer 5% smaller than the one outside it; DE's eleven cut to four (a quad mesh is not a model, and the
+     * outer layers are indistinguishable at this alpha). 4 x 5 x 60 quads = 1,200 quads per blast per frame, vs DE's
+     * 55 sphere models.
      */
     private static final int SPHERE_LAYERS = 4;
     private static final double LAYER_SCALE = 0.95D;
 
     /**
-     * DE's five shells per layer: scale and colour from the outside in, all of them the same alpha. The colours are
-     * DE's own literals ({@code glColor4f(1F, 0.4F, 0F, a)} through {@code glColor4f(1F, 0.8F, 0.55F, a)}).
+     * DE's five shells per layer: scale and colour outside in, same alpha. Literals are DE's
+     * ({@code glColor4f(1F, 0.4F, 0F, a)} .. {@code glColor4f(1F, 0.8F, 0.55F, a)}).
      */
     private static final double[] SHELL_SCALE = { 0.80D, 0.64D, 0.45D, 0.27D, 0.13D };
     private static final float[][] SHELL_COLOUR = { { 1.00F, 0.40F, 0.00F }, { 1.00F, 0.50F, 0.10F },
         { 1.00F, 0.60F, 0.25F }, { 1.00F, 0.70F, 0.40F }, { 1.00F, 0.80F, 0.55F } };
 
-    /** The flattened shape DE scales with {@code (2, 0.2, 2)} and the stretched one with {@code (5, 10, 5)}. */
+    /** DE's disk {@code (2, 0.2, 2)} and leading edge {@code (5, 10, 5)}. */
     private static final double DISK_FLATTEN = 0.10D, DISK_WIDTH = 2.0D;
     private static final double EDGE_WIDTH = 5.0D, EDGE_HEIGHT = 10.0D;
 
-    /** Opacity of the leading edge and of the disk/outer shell at the start of the blast, straight out of DE. */
+    /** Leading edge and disk/outer shell opacity at blast start; DE's values. */
     private static final float EDGE_ALPHA = 0.30F;
     private static final float BODY_ALPHA = 0.50F;
 
-    /** The alpha DE applies to its shells, i.e. {@code (1 - 0.5 * size / maxSize)} becomes {@code 1 - this} halved. */
+    /** DE's shell alpha: {@code (1 - 0.5 * size / maxSize)} becomes {@code 1 - this} halved. */
     private static final double ALPHA_FADE = 0.5D;
 
     private MTDEBlastRenderer() {}
 
-    /** Registers the world render hook. Called by the client proxy. */
+    /** Registers the world render hook; called by the client proxy. */
     public static void init() {
         MinecraftForge.EVENT_BUS.register(new MTDEBlastRenderer());
     }
@@ -93,8 +82,8 @@ public final class MTDEBlastRenderer {
         float partial = event.partialTicks;
         double viewX = RenderManager.renderPosX, viewY = RenderManager.renderPosY, viewZ = RenderManager.renderPosZ;
 
-        // The blasts are found the same way vanilla finds entities to render: everything loaded near the player.
-        // They are rare (one per explosion), so the scan costs nothing outside the moment of a nuke.
+        // Found as vanilla finds entities to render: everything loaded near the player. Rare (one per explosion), so
+        // the scan is free outside a nuke.
         for (Object candidate : minecraft.theWorld.loadedEntityList) {
             if (!(candidate instanceof MTEntityDEBlast)) continue;
             MTEntityDEBlast blast = (MTEntityDEBlast) candidate;
@@ -110,14 +99,14 @@ public final class MTDEBlastRenderer {
     /**
      * Draws one fireball at the given camera relative position.
      *
-     * @param size how far it has grown in blocks, one block per tick (DE's {@code size})
+     * @param size growth in blocks, one block per tick (DE's {@code size})
      */
     private void draw(MTEntityDEBlast blast, double x, double y, double z, double size) {
         double maxSize = Math.max(1.0D, blast.getMaxSize());
         double grown = size / maxSize;
 
-        // DE fades its shells out as the fireball grows: the leading edge is gone at a third of the way and the
-        // body at the end, which is what turns the flash into smoke.
+        // DE fades the shells as it grows: edge gone a third of the way, body at the end - that turns the flash into
+        // smoke.
         float edgeAlpha = (float) Math.max(0.0D, EDGE_ALPHA - grown);
         float bodyAlpha = (float) Math.max(0.0D, BODY_ALPHA - grown * ALPHA_FADE);
         if (edgeAlpha <= 0.0F && bodyAlpha <= 0.0F) return;
@@ -130,7 +119,7 @@ public final class MTDEBlastRenderer {
         GL11.glDisable(GL11.GL_CULL_FACE);
         GL11.glDisable(GL11.GL_ALPHA_TEST);
         GL11.glEnable(GL11.GL_BLEND);
-        // DE's own blend for this effect: plain alpha, not additive - the shells are meant to hide each other.
+        // DE's own blend: plain alpha, not additive - the shells hide each other.
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         GL11.glDepthMask(false);
         Minecraft.getMinecraft()
@@ -142,7 +131,7 @@ public final class MTDEBlastRenderer {
         tessellator.setBrightness(FULL_BRIGHT);
         tessellator.setColorRGBA_F(1.0F, 1.0F, 1.0F, 1.0F);
 
-        // 1) The body: DE's nested layers, outermost first, each one five shells deep.
+        // 1) Body: DE's nested layers, outermost first, five shells each.
         for (int layer = 0; layer < SPHERE_LAYERS; layer++) {
             double layerScale = size * Math.pow(LAYER_SCALE, layer);
             for (int shell = 0; shell < SHELL_SCALE.length; shell++) {
@@ -154,13 +143,13 @@ public final class MTDEBlastRenderer {
             }
         }
 
-        // 2) The ground disk: the same sphere squashed flat (DE: glScaled(2, 0.2, 2)), centred on the blast.
+        // 2) Ground disk: same sphere squashed flat (DE: glScaled(2, 0.2, 2)).
         if (bodyAlpha > 0.0F) {
             tessellator.setColorRGBA_F(1.0F, 0.4F, 0.0F, bodyAlpha);
             addSphere(tessellator, x, y, z, size * DISK_WIDTH, size * DISK_WIDTH * DISK_FLATTEN, size * DISK_WIDTH);
         }
 
-        // 3) The leading edge: the same sphere stretched upwards (DE: glScaled(5, 10, 5)).
+        // 3) Leading edge: same sphere stretched up (DE: glScaled(5, 10, 5)).
         if (edgeAlpha > 0.0F) {
             tessellator.setColorRGBA_F(1.0F, 0.4F, 0.0F, edgeAlpha);
             addSphere(tessellator, x, y, z, size * EDGE_WIDTH, size * EDGE_HEIGHT, size * EDGE_WIDTH);
@@ -172,15 +161,14 @@ public final class MTDEBlastRenderer {
         GL11.glPopAttrib();
     }
 
-    /** Adds the sphere DE renders, centred on the given offset, of radius {@code 1} scaled by the given factors. */
+    /** The same sphere, one radius for all three axes. */
     private static void addSphere(Tessellator tessellator, double x, double y, double z, double radius) {
         addSphere(tessellator, x, y, z, radius, radius, radius);
     }
 
     /**
-     * Adds a lat/long sphere at the given offset, with one radius per axis so the same mesh serves the round body,
-     * the flattened disk and the stretched leading edge. Bands and columns share their vertices, so the shells have
-     * no visible seams; a fireball needs no UVs and no normals, so none are sent.
+     * Lat/long sphere, one radius per axis, so one mesh serves body, disk and edge. Bands and columns share vertices
+     * (no seams); no UVs and no normals - a fireball needs neither.
      */
     private static void addSphere(Tessellator tessellator, double x, double y, double z, double radiusX, double radiusY,
         double radiusZ) {

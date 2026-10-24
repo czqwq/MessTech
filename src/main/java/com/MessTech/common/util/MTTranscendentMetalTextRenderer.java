@@ -9,19 +9,18 @@ import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.GTMod;
 
 /**
- * Draws the moving half of {@link MTTranscendentMetalText}: the line itself, turned about its own centre with the
- * exact transform GT5U gives its Transcendent Metal item - the same oblique axis (0.3, 0.5, 0.2), the same 3.5
- * degrees per client tick and the same {@code getAnimationRenderTicks()} clock, one way round without stopping or
- * jumping back - so the word turns in step with an item lying next to it.
+ * Draws the moving half of {@link MTTranscendentMetalText}: the line turned about its own centre with the exact
+ * transform GT5U gives its Transcendent Metal item - oblique axis (0.3, 0.5, 0.2), 3.5 degrees per client tick, the
+ * {@code getAnimationRenderTicks()} clock, one way round - so the word turns in step with an item lying next to it.
  * <p>
- * The renderer <b>replaces</b> the text ({@link #replacesText()}): the turning copy is the only copy. A second,
- * still copy underneath it would be the thing the player actually reads while the metal turns across it.
+ * It <b>replaces</b> the text ({@link #replacesText()}): the turning copy is the only copy, since a still one
+ * underneath would be what the player reads while the metal turns across it.
  * <p>
- * The one addition a flat run of text needs is the back face: an item quad has two sides, so GT5U can turn it
- * through a whole circle and the sprite still reads from behind. Letters would not - past the edge-on pose they
- * come out mirrored. {@link MTTranscendentMetalText#showsBack} says when the plate faces away, and the glyphs are
- * mirrored back for that half, so they read the same way round on both sides. The switch happens exactly where the
- * plate is edge-on and has no visible area, so it is never seen: the turn itself stays the item's.
+ * A flat run of text needs one addition, the back face: an item quad has two sides, so GT5U can turn it through a
+ * whole circle, while letters past the edge-on pose come out mirrored.
+ * {@link MTTranscendentMetalText#showsBack} says when the plate faces away and the glyphs are mirrored back for that
+ * half, so they read the same way round on both sides - the switch is exactly where the plate is edge-on and has no
+ * visible area, so it is never seen.
  */
 @SideOnly(Side.CLIENT)
 public final class MTTranscendentMetalTextRenderer implements MTTextRenderer {
@@ -60,7 +59,7 @@ public final class MTTranscendentMetalTextRenderer implements MTTextRenderer {
 
         GL11.glTranslatef(pivotX, pivotY, 0.0F);
         // GT5U's own transform, verbatim: the item renderer passes the same three axis numbers and the same angle
-        // to glRotatef, which is what makes the text turn exactly like the item.
+        // to glRotatef, which makes the text turn exactly like the item.
         GL11.glRotatef(
             angle,
             MTTranscendentMetalText.ROTATION_AXIS_X,

@@ -21,24 +21,18 @@ import net.minecraft.util.StatCollector;
 import gregtech.api.enums.GTAuthors;
 
 /**
- * Dynamic animated author "czqwq" for MessTech machine tooltips.
+ * Dynamic animated author "czqwq" for MessTech machine tooltips, on gtnhlib's {@code AnimatedTooltipHandler}:
+ * rainbow cycling and a colour "wave" over the letters, as {@code GTAuthors.AuthorThree} /
+ * {@code GTAuthors.AuthorSerenibyss} do, plus a ping-pong offset so the band slides back and forth instead of
+ * scrolling one way.
  * <p>
- * Built on top of gtnhlib's {@code AnimatedTooltipHandler}, combining several of the animation
- * styles found in {@link GTAuthors}:
- * <ul>
- * <li>rainbow colour cycling (like {@code GTAuthors.AuthorThree}),</li>
- * <li>a colour "wave" sweeping across the letters (like {@code GTAuthors.AuthorSerenibyss}),</li>
- * <li>extended with a ping-pong (left-right wobble) offset so the rainbow band slides back and
- * forth instead of only scrolling one way.</li>
- * </ul>
- * Use {@link #author_czqwq()} anywhere a {@code Supplier<String>} author is expected, and
- * {@link #registerOn(ItemStack)} to append it at the end of a machine's tooltip.
+ * {@link #author_czqwq()} gives the author for {@link #registerOn(ItemStack)};
+ * {@link #register(MTTextAnimation, Supplier, ItemStack)} is the general form, animating the name with a caller
+ * {@link MTTextAnimation} that may add a {@link MTTextRenderer} drawn over the finished line. Built-ins:
+ * {@link #TRANSCENDENT_METAL}, {@link #MODULE_PROJECT}.
  * <p>
- * {@link #register(MTTextAnimation, Supplier, ItemStack)} is the general form: instead of the built-in rainbow it
- * animates the author name with a caller supplied {@link MTTextAnimation}, which may also bring a
- * {@link MTTextRenderer} - a renderer drawn over the finished line, not just colour codes inside it.
- * {@link #TRANSCENDENT_METAL} is the built-in one: GT5U's Transcendent Metal animation worn by the whole line, see
- * {@link MTTranscendentMetalText} and {@link MTTranscendentMetalTextRenderer}.
+ * The animations register through {@link MTAnimatedTooltipHandler} because a renderer must draw over the font and
+ * gtnhlib's {@code AnimatedTooltipHandler} can only add strings.
  */
 public final class AuthorDynamic {
 
@@ -46,20 +40,16 @@ public final class AuthorDynamic {
     public static final String AUTHOR_CZQWQ = "czqwq";
 
     /**
-     * GT5U's Transcendent Metal look, worn by a whole line of text: the metal band of
-     * {@link MTTranscendentMetalText} plus the tumbler {@link MTTranscendentMetalTextRenderer} draws over the
-     * finished font. Hand it to {@link #register(MTTextAnimation, Supplier, ItemStack)}.
-     * <p>
-     * The animations are registered through {@link MTAnimatedTooltipHandler}, which owns the registry and the
-     * client side renderer, because a rendering animation has to draw over the font and gtnhlib's
-     * {@code AnimatedTooltipHandler} can only add strings.
+     * GT5U's Transcendent Metal for a whole line: the band of {@link MTTranscendentMetalText} plus the tumbler
+     * {@link MTTranscendentMetalTextRenderer} draws over the finished font, for
+     * {@link #register(MTTextAnimation, Supplier, ItemStack)}.
      */
     public static final MTTextAnimation TRANSCENDENT_METAL = MTTranscendentMetalText.INSTANCE;
 
     /**
-     * The modular machine look of the {@code ModularProject} brand line: the rack of {@link MTModuleProjectText},
-     * powered up module by module, with the chip row of {@link MTModuleProjectTextRenderer} under the letters. Hand
-     * it to {@link #registerAddon(MTTextAnimation, Supplier, ItemStack)}.
+     * The {@code ModularProject} brand look: the rack of {@link MTModuleProjectText}, powered up module by module,
+     * with the chip row of {@link MTModuleProjectTextRenderer} under the letters; for
+     * {@link #registerAddon(MTTextAnimation, Supplier, ItemStack)}.
      */
     public static final MTTextAnimation MODULE_PROJECT = MTModuleProjectText.INSTANCE;
 
@@ -74,20 +64,16 @@ public final class AuthorDynamic {
     private AuthorDynamic() {}
 
     /**
-     * @return the animated author name as a {@link Supplier}{@code <String>}.
-     *         The whole name is rendered as one wobbling rainbow band (posstep = 1 -> colours glide
-     *         neighbour to neighbour, giving the left-right wave).
+     * @return the animated author name as a {@link Supplier}{@code <String>}: one wobbling rainbow band (posstep =
+     *         1 -> colours glide neighbour to neighbour, giving the left-right wave).
      */
     public static Supplier<String> author_czqwq() {
         return wobbleAnimatedText(AUTHOR_CZQWQ, 1, 140, RAINBOW_BOLD);
     }
 
     /**
-     * Register the author line at the end of the given machine item's tooltip.
-     * <p>
-     * Same pattern as {@code LoaderMetaTileEntities}: {@code AnimatedTooltipHandler.addItemTooltip(...)}.
-     *
-     * @param machineStack the machine's {@link ItemStack}
+     * Register the author line at the end of a machine item's tooltip, the way {@code LoaderMetaTileEntities} does:
+     * {@code AnimatedTooltipHandler.addItemTooltip(...)}.
      */
     public static void registerOn(ItemStack machineStack) {
         registerOn(author_czqwq(), machineStack);
@@ -96,28 +82,23 @@ public final class AuthorDynamic {
     /**
      * Register the author line + animated MessTech add-on line.
      *
-     * @param author       author tooltip supplier (e.g. {@link #author_czqwq()} or a GTAuthors supplier)
-     * @param machineStack the machine's {@link ItemStack}
+     * @param author author tooltip supplier, e.g. {@link #author_czqwq()} or a GTAuthors supplier
      */
     public static void registerOn(Supplier<String> author, ItemStack machineStack) {
         addAuthorLine(author, machineStack, null);
     }
 
     /**
-     * Register the author line + animated MessTech add-on line, with the author name animated by the given
-     * animation instead of the built-in rainbow.
-     * <p>
-     * The visible text of {@code author} is what gets animated: a supplier that brings its own colour codes
-     * (such as {@link #author_czqwq()}) is fine, its codes are dropped and the animation's own ones are used
-     * instead. The same call shape the built-in look uses, with one extra argument - the animation to wear:
+     * Register the author line + animated MessTech add-on line, the author name animated by the given animation
+     * instead of the built-in rainbow. The visible text of {@code author} is animated: a supplier with its own colour
+     * codes (such as {@link #author_czqwq()}) is fine, its codes are dropped in favour of the animation's.
      *
      * <pre>
      * AuthorDynamic.register(AuthorDynamic.TRANSCENDENT_METAL, AuthorDynamic.author_czqwq(), machineStack);
      * </pre>
      *
-     * @param animation    the look the author name wears, e.g. {@link #TRANSCENDENT_METAL}
-     * @param author       the author text to animate, see {@link MTTextAnimation#visibleText}
-     * @param machineStack the machine's {@link ItemStack}
+     * @param animation the look the author name wears, e.g. {@link #TRANSCENDENT_METAL}
+     * @param author    the author text to animate, see {@link MTTextAnimation#visibleText}
      */
     public static void register(MTTextAnimation animation, Supplier<String> author, ItemStack machineStack) {
         if (animation == null) return;
@@ -132,28 +113,25 @@ public final class AuthorDynamic {
     /**
      * {@link #register(MTTextAnimation, Supplier, ItemStack)} for the default author name, {@link #AUTHOR_CZQWQ}.
      *
-     * @param animation    the look the author name wears, e.g. {@link #TRANSCENDENT_METAL}
-     * @param machineStack the machine's {@link ItemStack}
+     * @param animation the look the author name wears, e.g. {@link #TRANSCENDENT_METAL}
      */
     public static void register(MTTextAnimation animation, ItemStack machineStack) {
         register(animation, text(AUTHOR_CZQWQ), machineStack);
     }
 
     /**
-     * Register only the animated brand line of a machine, {@code Add by: <word>}, with no author line.
-     * <p>
-     * The line has the shape the fuel rods already use: {@code AuthorDynamic} puts the static prefix
-     * ({@code messTech.addBy}) and one space in front, and the word after it wears the animation. A machine that
-     * should not name an author - or whose tooltip is already long - can carry an animated brand word this way:
+     * Register only the animated brand line of a machine, {@code Add by: <word>}, with no author line - the line
+     * shape the fuel rods use: {@code AuthorDynamic} puts the static {@code messTech.addBy} prefix and one space in
+     * front, the word after it wears the animation. For a machine that should not name an author, or whose tooltip
+     * is already long:
      *
      * <pre>
      * AuthorDynamic
      *     .registerAddon(AuthorDynamic.MODULE_PROJECT, () -&gt; translateToLocal("messtech.moduleProject"), machineStack);
      * </pre>
      *
-     * @param animation    the look the word wears, e.g. {@link #MODULE_PROJECT}
-     * @param word         the word to animate, normally a {@code Supplier} of a language key
-     * @param machineStack the machine's {@link ItemStack}
+     * @param animation the look the word wears, e.g. {@link #MODULE_PROJECT}
+     * @param word      the word to animate, normally a {@code Supplier} of a language key
      */
     public static void registerAddon(MTTextAnimation animation, Supplier<String> word, ItemStack machineStack) {
         if (animation == null || word == null || machineStack == null) return;
@@ -165,9 +143,8 @@ public final class AuthorDynamic {
     /**
      * Adds the author line - and the animated MessTech line that follows it - to a stack.
      *
-     * @param author       the author text, already the way it should be drawn
-     * @param machineStack the stack to decorate
-     * @param animation    the animation the author line wears, {@code null} for a plain line
+     * @param author    the author text, already the way it should be drawn
+     * @param animation the animation the author line wears, {@code null} for a plain line
      */
     private static void addAuthorLine(Supplier<String> author, ItemStack machineStack, MTTextAnimation animation) {
         if (author == null || machineStack == null) return;
@@ -186,8 +163,8 @@ public final class AuthorDynamic {
     }
 
     /**
-     * gtnhlib's {@code animatedText} but with a ping-pong (triangle wave) offset, so the colour
-     * band sweeps left-right instead of looping in one direction.
+     * gtnhlib's {@code animatedText} with a ping-pong (triangle wave) offset, so the colour band sweeps left-right
+     * instead of looping one way.
      */
     private static Supplier<String> wobbleAnimatedText(String text, int posstep, int delay, String... colors) {
         if (text == null || text.isEmpty() || colors == null || colors.length == 0) return () -> "";

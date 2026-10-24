@@ -1,0 +1,33 @@
+package com.MessTech.common.mixin.early;
+
+import net.minecraft.client.gui.GuiNewChat;
+
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+
+import com.MessTech.client.text.EffectTextLayout;
+import com.MessTech.common.text.effect.EffectTextParser;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+
+/** Keeps a split chat line's effect declarations open across the wrap boundary. */
+@Mixin(GuiNewChat.class)
+public abstract class MixinGuiNewChat_TextEffect {
+
+    @WrapOperation(
+        method = "func_146237_a",
+        at = @At(value = "INVOKE", target = "Ljava/lang/String;substring(I)Ljava/lang/String;", remap = false))
+    private String mt$continueEffect(String text, int start, Operation<String> original) {
+        String suffix = original.call(text, start);
+        if (suffix.isEmpty() || !EffectTextParser.containsMarkers(text)) return suffix;
+        return EffectTextLayout.continuation(text.substring(0, start)) + suffix;
+    }
+
+    @WrapOperation(
+        method = "func_146237_a",
+        at = @At(value = "INVOKE", target = "Ljava/lang/String;lastIndexOf(Ljava/lang/String;)I", remap = false))
+    private int mt$visibleWordBoundary(String text, String delimiter, Operation<Integer> original) {
+        return delimiter.equals(" ") && EffectTextParser.containsMarkers(text) ? EffectTextLayout.lastSpace(text)
+            : original.call(text, delimiter);
+    }
+}

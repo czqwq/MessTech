@@ -73,8 +73,7 @@ import gtnhintergalactic.recipe.SpaceMiningData;
 import gtnhintergalactic.recipe.SpaceMiningRecipes;
 
 /**
- * Full port of the original GT5U Space Miner GUI, adapted to the wireless
- * {@link SpaceModuleMinerInfinity} module.
+ * Full port of the original GT5U Space Miner GUI, adapted to the wireless {@link SpaceModuleMinerInfinity} module.
  */
 public class SpaceModuleMinerInfinityGui extends SpaceModuleInfinityGui {
 

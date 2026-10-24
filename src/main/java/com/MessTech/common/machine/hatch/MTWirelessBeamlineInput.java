@@ -12,13 +12,12 @@ import gtnhlanth.common.hatch.MTEHatchInputBeamline;
 /**
  * Wireless particle beam input hatch.
  * <p>
- * It is a normal {@link MTEHatchInputBeamline} as far as the beam machines are concerned (they only check
- * {@code instanceof MTEHatchInputBeamline} when building the structure), but it is never fed by beamline pipes:
- * the matching {@link MTWirelessBeamlineOutput} / {@link MTWirelessBeamlineAdvancedOutput} of the same dye colour
- * pushes its beam straight in, from anywhere in the world.
+ * A normal {@link MTEHatchInputBeamline} to the beam machines (their structure check only tests
+ * {@code instanceof MTEHatchInputBeamline}), but fed only by the matching {@link MTWirelessBeamlineOutput} /
+ * {@link MTWirelessBeamlineAdvancedOutput} of the same dye colour, from anywhere in the world.
  * <p>
- * The inherited expiry logic is kept on purpose - the input drops the beam again when no output refreshes it, so a
- * broken or repainted channel stops feeding the machine instead of caching a stale particle stream.
+ * The inherited expiry logic is kept on purpose: the input drops the beam when no output refreshes it, so a broken or
+ * repainted channel stops feeding the machine instead of caching a stale stream.
  */
 @IMetaTileEntity.SkipGenerateDescription
 public class MTWirelessBeamlineInput extends MTEHatchInputBeamline {
@@ -47,8 +46,8 @@ public class MTWirelessBeamlineInput extends MTEHatchInputBeamline {
 
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        // Re-register every tick: hatches that were placed before this feature existed (or whose chunk was
-        // reloaded) must be picked up without breaking and replacing them.
+        // Re-register every tick: hatches placed before this feature existed (or whose chunk reloaded) are picked up
+        // without breaking and replacing them.
         if (aBaseMetaTileEntity.isServerSide()) WirelessBeamlineUtil.register(this);
         super.onPostTick(aBaseMetaTileEntity, aTick);
     }
@@ -65,19 +64,19 @@ public class MTWirelessBeamlineInput extends MTEHatchInputBeamline {
         super.onRemoval();
     }
 
-    /** No beamline pipes: the input is fed wirelessly only (the colour channel decides the partner). */
+    /** No pipes: the input is fed wirelessly only (the colour channel decides the partner). */
     @Override
     public boolean canConnect(ForgeDirection side) {
         return false;
     }
 
     /**
-     * Accepts the beam of the paired wireless output only.
-     * <p>
-     * {@code canConnect} does not protect the input: the wired output hatch walks its line of sight and calls
-     * {@code setContents} on any {@code MTEHatchInputBeamline} it meets without asking. Rejecting everything that
-     * did not come through {@link WirelessBeamlineUtil#moveBeam} keeps the "one output + one input per colour"
-     * rule absolute, and {@code null} (the inherited expiry call) still passes through.
+     * Accepts the paired wireless output's beam only: {@code canConnect} does not protect the input, as the wired
+     * output
+     * hatch walks its line of sight and calls {@code setContents} on any {@code MTEHatchInputBeamline} it meets.
+     * Rejecting
+     * anything not coming through {@link WirelessBeamlineUtil#moveBeam} keeps "one output + one input per colour"
+     * absolute; {@code null} (the inherited expiry call) still passes.
      */
     @Override
     public void setContents(BeamLinePacket in) {

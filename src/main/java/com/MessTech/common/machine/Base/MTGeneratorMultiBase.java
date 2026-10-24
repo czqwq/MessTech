@@ -26,18 +26,12 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
- * Base class for MessTech generator multiblocks.
+ * Base class for MessTech generator multiblocks: unlike {@link MTMultiMachineBase} (which consumes EU from energy
+ * hatches) these <b>produce</b> EU. Output is wired through dynamo / exotic-dynamo hatches by default, optionally
+ * straight into the wireless network; the generator-oriented processing-logic energy handling ({@code lEUt} stays
+ * positive), dynamo registration and shared wireless-owner/Waila support live here.
  * <p>
- * Unlike the normal {@link MTMultiMachineBase} (which consumes EU from energy hatches), this base is
- * intended for machines that <b>produce</b> EU. It provides:
- * <ul>
- * <li>wired output through dynamo / exotic-dynamo hatches (the default);</li>
- * <li>optional direct wireless-network output (default off);</li>
- * <li>generator-oriented processing-logic energy handling ({@code lEUt} is kept positive);</li>
- * <li>dynamo hatch registration and shared wireless-owner/Waila support.</li>
- * </ul>
- * The wireless output feature is considered available by default; subclasses that need an external
- * unlock (for example a special controller item or a structure tier) should call
+ * Wireless output counts as available by default; subclasses needing an unlock call
  * {@link #setEnableWirelessFunc(boolean)} during {@code checkMachine}.
  */
 public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> extends MTMultiMachineBase<T> {
@@ -47,10 +41,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     protected boolean EnableWirelessFunc = true;
     protected boolean EnableWireless = getDefaultWirelessMode();
     protected boolean isRecipeProcessing = false;
-    /**
-     * Wireless-only single-tick generation. Used when the output cannot fit in a signed {@code long}
-     * without overflowing; the GT wireless network stores BigInteger, so this value is sent directly.
-     */
+    /** Wireless-only single-tick generation for output that would overflow a {@code long}; sent as BigInteger. */
     protected BigInteger wirelessGenerationPerTick = BigInteger.ZERO;
     /** MAX tier voltage (V[14] / Integer.MAX_VALUE - 7), used for compact total-generation display. */
     private static final BigInteger TOTAL_DISPLAY_CHUNK = BigInteger.valueOf(Integer.MAX_VALUE - 7);
@@ -67,12 +58,10 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     // endregion
 
     // region Wireless output mode
-    /** Whether the wireless output feature is currently available. */
     public boolean isWirelessModeAvailable() {
         return EnableWirelessFunc;
     }
 
-    /** Whether wireless output is currently enabled. */
     public boolean isWirelessModeEnabled() {
         return EnableWireless;
     }
@@ -93,7 +82,6 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
         }
     }
 
-    /** Default wireless mode for new instances. */
     public boolean getDefaultWirelessMode() {
         return false;
     }
@@ -119,8 +107,8 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     }
 
     /**
-     * @return the expected total EU for the whole current process, including current bonuses:
-     *         {@code per-tick generation * full process duration}. This does not grow with progress.
+     * @return The expected total EU of the current process, bonuses included: per-tick generation * full duration
+     *         (does not grow with progress).
      */
     public BigInteger getCurrentProcessTotalEU() {
         if (mMaxProgresstime <= 0) {
@@ -156,12 +144,8 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
 
     // region Parallelism
     /**
-     * Structural/upper parallel cap for generator machines.
-     * <p>
-     * Defaults to {@link Integer#MAX_VALUE} so subclasses that use fuel/input based auto-parallel
-     * helpers are only limited by the actual available fuel/inputs and by the GT power-panel
-     * parallel override. Subclasses may lower this cap by overriding {@link #getMaxParallelRecipes()}
-     * or calling {@link #setGeneratorMaxParallel(int)}.
+     * Structural/upper parallel cap for generator machines, {@link Integer#MAX_VALUE} by default, so fuel/input based
+     * auto-parallel is limited only by the fuel/inputs and the GT power-panel limit.
      */
     protected int generatorMaxParallel = Integer.MAX_VALUE;
 
@@ -179,11 +163,8 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     }
 
     /**
-     * Calculates how many parallel batches can be started from an available input/fuel amount.
-     * <p>
-     * Uses {@link #getTrueParallel()} so the GT power-panel parallel limit is respected, then caps
-     * the result by {@code availableAmount / requiredAmount}. Returns at least 1 when the caller
-     * already knows at least one batch is available.
+     * @return The parallel batches startable from an available input/fuel amount: {@link #getTrueParallel()} (GT
+     *         power-panel limit) capped by {@code availableAmount / requiredAmount}.
      */
     public int getParallelForAvailable(long availableAmount, long requiredAmount) {
         if (requiredAmount <= 0) {
@@ -213,9 +194,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     // endregion
 
     // region Generator EU handling
-    /**
-     * @return the EU/t that is currently being generated, after efficiency is applied.
-     */
+    /** @return The EU/t currently generated, after efficiency is applied. */
     public long getCurrentGenerationEUt() {
         if (lEUt <= 0) {
             return 0;
@@ -223,10 +202,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
         return (lEUt * Math.max(mEfficiency, 0)) / 10000;
     }
 
-    /**
-     * Helper for custom generator {@code checkProcessing()} implementations. It starts a generating
-     * recipe with the given positive EU/t output and optional item/fluid byproducts.
-     */
+    /** Starts a generating recipe with the given positive EU/t output and optional item/fluid byproducts. */
     protected CheckRecipeResult startGenerating(long outputEUt, int duration, ItemStack[] itemOutputs,
         FluidStack[] fluidOutputs) {
         if (outputEUt < 0) {
@@ -245,10 +221,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
         return CheckRecipeResultRegistry.GENERATING;
     }
 
-    /**
-     * Generator processing logic must keep {@link #lEUt} positive. The normal consumer base converts
-     * a positive ProcessingLogic result into a negative value; here we do the opposite.
-     */
+    /** Generator logic keeps {@link #lEUt} positive; the consumer base would negate the ProcessingLogic result. */
     @Override
     protected void setEnergyUsage(ProcessingLogic processingLogic) {
         long calculatedEut = processingLogic.getCalculatedEut();
@@ -257,11 +230,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
         wirelessGenerationPerTick = BigInteger.ZERO;
     }
 
-    /**
-     * Generic recipe path for machines that use a recipe map whose calculated EU/t is the generated
-     * output. After a successful ProcessingLogic run this reports {@code GENERATING} instead of plain
-     * success.
-     */
+    /** Generic recipe path whose map's EU/t is the output: reports {@code GENERATING} after a successful run. */
     @Override
     public CheckRecipeResult checkProcessing() {
         CheckRecipeResult result = super.checkProcessing();
@@ -271,10 +240,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
         return result;
     }
 
-    /**
-     * Every tick while a generator is running, either feed the dynamo hatches (wired mode) or push the
-     * EU directly into the owner's wireless network (wireless mode).
-     */
+    /** Every running tick: feed the dynamo hatches (wired) or push the EU into the owner's wireless network. */
     @Override
     public boolean onRunningTick(ItemStack aStack) {
         IGregTechTileEntity tileEntity = getBaseMetaTileEntity();
@@ -318,7 +284,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
             }
             tag.setString("generatedEUText", generation.toString());
             tag.setString("totalGeneratedEUText", getCurrentProcessTotalEU().toString());
-            // Wired-mode energy lines should not be shown for wireless output.
+            // No wired-mode energy lines for wireless output.
             tag.removeTag("energyUsage");
         }
     }
@@ -350,8 +316,8 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     }
 
     /**
-     * Formats a wireless EU value with thousands separators and a compact scientific-notation suffix,
-     * e.g. {@code 1,000,000 (1.00e6)}. Kept identical to {@link MTWirelessMultiMachineBase}.
+     * @return The value with thousands separators and a compact scientific suffix, e.g. {@code 1,000,000 (1.00e6)};
+     *         identical to the one in {@link MTWirelessMultiMachineBase}.
      */
     protected String formatWirelessEU(String raw) {
         try {
@@ -368,9 +334,8 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     }
 
     /**
-     * Formats the current-process total output. The main value uses the same wireless format
-     * (commas + scientific). Values above 2,147,483,640 get a compact {@code (n MAX)} suffix where
-     * {@code n = floor(total / 2147483640)}.
+     * @return The current-process total in the wireless format, plus a compact {@code (n MAX)} suffix above
+     *         2,147,483,640 where {@code n = floor(total / 2147483640)}.
      */
     protected String formatTotalWirelessEU(String raw) {
         try {
@@ -421,11 +386,7 @@ public abstract class MTGeneratorMultiBase<T extends MTGeneratorMultiBase<T>> ex
     // endregion
 
     // region Hatch identification
-    /**
-     * Generator multiblocks may use ordinary dynamo hatches, exotic dynamo hatches (multi-Amp / laser
-     * output) and, when their structure uses the generic hatch adder, the normal input/output hatches
-     * accepted by {@link MTMultiMachineBase}.
-     */
+    /** Accepts ordinary/exotic dynamo hatches plus the input/output hatches of {@link MTMultiMachineBase}. */
     @Override
     public boolean addToMachineList(IGregTechTileEntity aTileEntity, int aBaseCasingIndex) {
         return super.addToMachineList(aTileEntity, aBaseCasingIndex)

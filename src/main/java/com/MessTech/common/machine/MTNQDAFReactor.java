@@ -62,16 +62,12 @@ import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
- * Large NQD Annihilation Field Reactor.
- * <p>
- * A Naquadah-reactor derivative that runs on liquid nuclear / naquadah fuels, uses the Large
- * Naquadah Reactor coolant and excited-liquid mechanics, scales output with reactor coil tier,
- * gains work efficiency while running, and can freeze its idle efficiency decay with molten
- * spacetime. When no dynamo hatch is installed it automatically switches to wireless output.
+ * Large NQD Annihilation Field Reactor: a Naquadah-reactor derivative running liquid nuclear / naquadah fuels with the
+ * Large Naquadah Reactor coolant and excited-liquid mechanics, output scaling with reactor coil tier, work efficiency
+ * that grows while running and can be frozen against idle decay by molten spacetime. No dynamo hatch -> wireless out.
  */
 public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
     implements ISurvivalConstructable, ICasingTextureProvider {
-    // MTNQDAFReactor full name called Large NQD Annihilation Field Reactor
 
     // region Structure piece offsets
     // '~' (controller) is at char index 1 (X), outer array index 1 (Y), inner string index 2 (Z).
@@ -118,9 +114,7 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
             };
         }
 
-        /**
-         * Is this tier greater than or equal to {@code other}? {@link #INVALID} is never "at least" a real tier.
-         */
+        /** Is this tier greater than or equal to {@code other}? {@link #INVALID} is never "at least" a real tier. */
         public boolean isAtLeast(LevelTier other) {
             return isValid() && other != null && other.isValid() && tier >= other.tier;
         }
@@ -152,9 +146,9 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
         }
 
         /**
-         * Tier fetcher for StructureLib's {@code StructureUtility#ofBlocksTiered} used by structure element 'A'.
+         * Tier fetcher for StructureLib's {@code StructureUtility#ofBlocksTiered}, structure element 'A'.
          *
-         * @return the reactor coil tier of the given block, or {@code null} if it is not a recognised reactor coil.
+         * @return the coil tier, or {@code null} if the block is not a recognised reactor coil.
          */
         public static Integer getCoilBlockTier(Block block, int meta) {
             LevelTier level = getFromCoilBlock(block, meta);
@@ -249,16 +243,10 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
     };
     //spotless:on
     /*
-     * Blocks:
-     * A-> addElement('A', Casings.NaquadahFuelRefineryCasing.asElement()
-     * B -> ofBlock(FRF_Coil_1, 0);
-     * C-> addElement('C', Casings.FieldRestrictionCasing.asElement()
-     * D-> addElement('D', Casings.FieldRestrictionGlass.asElement()
-     * E-> addElement('E', Casings.NaquadahReactorCasing.asElement()
-     * F-> addElement('F', Casings.RadiationProofMachineCasing.asElement()
-     * G-> addElement('G', Casings.EuropiumReinforcedRadiationProofMachineCasing.asElement()
-     * Offsets:
-     * 16, 6, 0
+     * Blocks: A -> Casings.NaquadahFuelRefineryCasing, B -> ofBlock(FRF_Coil_1, 0), C ->
+     * Casings.FieldRestrictionCasing,
+     * D -> Casings.FieldRestrictionGlass, E -> Casings.NaquadahReactorCasing, F -> Casings.RadiationProofMachineCasing,
+     * G -> Casings.EuropiumReinforcedRadiationProofMachineCasing. Offsets: 16, 6, 0.
      */
 
     private static final IStructureDefinition<MTNQDAFReactor> STRUCTURE_DEFINITION = StructureDefinition
@@ -284,7 +272,6 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
                 Collections.singletonList("misc.structure_tooltip.coil")))
         .addElement('C', Casings.FieldRestrictionCasing.asElement())
         .addElement('D', Casings.FieldRestrictionGlass.asElement())
-        // .addElement('', Casings.ContainmentCasing.asElement())
         .addElement('F', Casings.RadiationProofMachineCasing.asElement())
         .addElement('G', Casings.EuropiumReinforcedRadiationProofMachineCasing.asElement())
         .addElement(
@@ -393,8 +380,9 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
     }
 
     /**
-     * Consumes one spacetime dose and starts a 30 second decay freeze. The dose cost doubles after
-     * every successful dose, capped at the Black Hole Compressor style 1,073,741,824 limit.
+     * Consumes one spacetime dose and starts a 30 second decay freeze; the dose cost doubles per successful dose,
+     * capped
+     * at the Black Hole Compressor style 1,073,741,824 limit.
      */
     private boolean tryConsumeSpacetime() {
         if (spacetimeCostPerSecond <= 0) {
@@ -510,8 +498,8 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
         currentBasicOutput = recipe.mSpecialValue;
         currentFuelMultiplier = excitedMultiplier;
 
-        // Wired dynamos cannot accept more than a signed long, so cap parallel in wired mode.
-        // In wireless mode the BigInteger path is used and this cap is intentionally skipped.
+        // Wired dynamos cannot accept more than a signed long, so cap parallel in wired mode; wireless uses the
+        // BigInteger path and intentionally skips this cap.
         if (!isWirelessModeActive()) {
             long unitOutput = (long) currentBasicOutput * getCoilTierForOutput() * 500 * currentFuelMultiplier / 100;
             if (unitOutput > 0) {
@@ -576,8 +564,7 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
             return;
         }
 
-        // The freeze is a real-time 30s effect. It only suppresses decay while the machine is idle;
-        // it never suppresses efficiency growth while running.
+        // The freeze is a real-time 30s effect: it only suppresses decay while the machine is idle, never growth.
         if (decayFreezeTicks > 0) {
             decayFreezeTicks--;
         }
@@ -621,9 +608,7 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
         applyOutput(computeOutputEUt(coolantEfficiency, multiplier, currentParallel));
     }
 
-    /**
-     * Computes EU/t with BigInteger so huge parallel values cannot overflow to a negative long.
-     */
+    /** EU/t via BigInteger, so huge parallel values cannot overflow to a negative long. */
     private BigInteger computeOutputEUt(int coolantEfficiency, int multiplier, int parallel) {
         return BigInteger.valueOf(currentBasicOutput)
             .multiply(BigInteger.valueOf(getCoilTierForOutput()))
@@ -791,8 +776,8 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
         int colorIndex, boolean aActive, boolean aRedstone) {
         ITexture baseCasing = Casings.NaquadahFuelRefineryCasing.getCasingTexture();
         if (side == facing) {
-            // Same front overlay as GT5U's "Shielded Lagrangian Annihilation Matrix" (AntimatterGenerator),
-            // but with Naquadah Fuel Refinery Casing as the base texture.
+            // GT5U "Shielded Lagrangian Annihilation Matrix" (AntimatterGenerator) front overlay, Naquadah Fuel
+            // Refinery Casing base.
             return new ITexture[] { baseCasing, TextureFactory.builder()
                 .addIcon(OVERLAY_FUSION1)
                 .extFacing()
@@ -803,7 +788,7 @@ public class MTNQDAFReactor extends MTGeneratorMultiBase<MTNQDAFReactor>
                     .glow()
                     .build() };
         }
-        // Other faces use the same Naquadah Fuel Refinery Casing base.
+        // Other faces: same casing base.
         return new ITexture[] { baseCasing };
     }
 

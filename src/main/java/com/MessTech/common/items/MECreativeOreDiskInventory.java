@@ -18,12 +18,9 @@ import appeng.util.item.AEItemStack;
 import appeng.util.item.AEItemStackType;
 
 /**
- * Creative AE cell inventory for the ME Creative Ore Disk.
- * <p>
- * It exposes every item registered under an ore dictionary name starting with {@code ore}, each with
- * the configured ME quantity from the disk's NBT. Extraction behaves like a creative cell (matching
- * requests always succeed), while the quantity controls how much of each ore type is shown/available
- * in the ME network.
+ * Creative AE cell inventory for the ME Creative Ore Disk: every item registered under an ore dictionary name
+ * starting with {@code ore}, each with the disk's configured NBT quantity. Extraction behaves like a creative cell
+ * (matching requests always succeed); the quantity bounds how much of each ore is shown/available.
  */
 public class MECreativeOreDiskInventory implements IMEInventoryHandler<IAEItemStack> {
 
@@ -73,10 +70,9 @@ public class MECreativeOreDiskInventory implements IMEInventoryHandler<IAEItemSt
         if (request == null) return null;
         IAEItemStack local = listCache.findPrecise(request);
         if (local == null) return null;
-        // This disk is bounded by the configured quantity. AE's stocking bus asks for Integer.MAX_VALUE
-        // to learn the full available amount, so we must cap the returned stack to the configured
-        // quantity instead of echoing the unbounded request (which made the first auto-pull GUI refresh
-        // show 2.14G / Integer.MAX_VALUE).
+        // Bounded by the configured quantity: AE's stocking bus asks for Integer.MAX_VALUE to learn the full available
+        // amount, so cap the result instead of echoing the unbounded request (the first auto-pull GUI refresh then
+        // showed 2.14G / Integer.MAX_VALUE).
         IAEItemStack result = request.copy();
         result.setStackSize(Math.min(request.getStackSize(), local.getStackSize()));
         return result;

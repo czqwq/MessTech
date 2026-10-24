@@ -16,10 +16,10 @@ import com.MessTech.common.items.MessFoodHelper;
 /**
  * Shapeless "throw any 2-9 foods into a crafting grid" recipe that produces a {@link ItemMessFood}.
  * <p>
- * The recipe is order sensitive: the ingredients are read in crafting slot order (top-left to
- * bottom-right), so placing the same foods in different slots produces a different mess food. Every
- * ingredient must also be distinct, so duplicates such as apple+apple are rejected, and Mess Food
- * itself cannot be used as an ingredient.
+ * Order sensitive: ingredients are read in crafting slot order (top-left to bottom-right), so the same foods in
+ * different slots make a different mess food. They must also be distinct (apple+apple is rejected), and Mess Food
+ * itself
+ * cannot be an ingredient.
  */
 public class RecipeMessFood implements IRecipe {
 
@@ -59,8 +59,8 @@ public class RecipeMessFood implements IRecipe {
     }
 
     /**
-     * Appends the recipe to the crafting manager. It is appended instead of inserted so every
-     * pre-existing recipe keeps priority over this catch-all recipe.
+     * Appends the recipe to the crafting manager: appended instead of inserted, so every pre-existing recipe keeps
+     * priority over this catch-all.
      */
     @SuppressWarnings("unchecked")
     public static void register() {

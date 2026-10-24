@@ -4,9 +4,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
 /**
- * Advanced Assembly Matrix Block - Tier 2.
- * <p>
- * The upgraded variant of {@link AssMatrixBlock}; its {@link #getLevelTier()} is 2, so an
+ * Advanced Assembly Matrix Block - Tier 2: the upgraded {@link AssMatrixBlock}, with {@link #getLevelTier()} 2, so an
  * {@code MTAssFactory} built entirely with this block records {@code LevelTier = 2}.
  */
 @SuppressWarnings("SpellCheckingInspection")

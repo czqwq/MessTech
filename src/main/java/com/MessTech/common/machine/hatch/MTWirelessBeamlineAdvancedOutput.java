@@ -10,9 +10,10 @@ import gregtech.common.tileentities.machines.multi.beamcrafting.MTEHatchAdvanced
 /**
  * Wireless filtered particle beam output hatch.
  * <p>
- * Same as {@link MTWirelessBeamlineOutput} (dye colour channel, strict 1:1, no pipes), but keeps everything the
- * GT5U filtered hatch brings along: the LHC/beam splitter fill in their accepted particle list, and the inherited
- * ModularUI lets the player edit that blacklist. Only the transport changed.
+ * Like {@link MTWirelessBeamlineOutput} (dye colour channel, strict 1:1, no pipes) but keeps the GT5U filtered hatch's
+ * accepted-particle blacklist, which the LHC/beam splitter fill in and the inherited ModularUI lets the player edit.
+ * Only
+ * the transport changed.
  */
 @IMetaTileEntity.SkipGenerateDescription
 public class MTWirelessBeamlineAdvancedOutput extends MTEHatchAdvancedOutputBeamline {
@@ -41,8 +42,8 @@ public class MTWirelessBeamlineAdvancedOutput extends MTEHatchAdvancedOutputBeam
 
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        // Re-register every tick: hatches that were placed before this feature existed (or whose chunk was
-        // reloaded) must be picked up without breaking and replacing them.
+        // Re-register every tick: hatches placed before this feature existed (or whose chunk reloaded) are picked up
+        // without breaking them.
         if (aBaseMetaTileEntity.isServerSide()) WirelessBeamlineUtil.register(this);
         super.onPostTick(aBaseMetaTileEntity, aTick);
     }
@@ -59,13 +60,13 @@ public class MTWirelessBeamlineAdvancedOutput extends MTEHatchAdvancedOutputBeam
         super.onRemoval();
     }
 
-    /** Replaces the pipe walk of the wired hatch: the beam only ever travels over the colour channel. */
+    /** Replaces the wired hatch's pipe walk: the beam only travels over the colour channel. */
     @Override
     public void moveAround(IGregTechTileEntity aBaseMetaTileEntity) {
         WirelessBeamlineUtil.moveBeam(this);
     }
 
-    /** No beamline pipes: the output is wireless only (the colour channel decides the partner). */
+    /** No pipes: the output is wireless only (the colour channel decides the partner). */
     @Override
     public boolean canConnect(ForgeDirection side) {
         return false;
@@ -73,7 +74,7 @@ public class MTWirelessBeamlineAdvancedOutput extends MTEHatchAdvancedOutputBeam
 
     @Override
     public String[] getDescription() {
-        // super returns the GT5U blacklist description, the wireless rules are appended to it
+        // super returns the GT5U blacklist description; the wireless rules are appended
         return WirelessBeamlineUtil.decorateDescription(super.getDescription(), "advanced");
     }
 

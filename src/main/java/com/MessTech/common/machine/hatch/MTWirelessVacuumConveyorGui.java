@@ -22,10 +22,8 @@ import gregtech.common.gui.modularui.hatch.MTEHatchVacuumConveyorGui;
 import gregtech.common.tileentities.machines.multi.nanochip.hatches.MTEHatchVacuumConveyor;
 
 /**
- * Same GUI as the normal NAC Vacuum Conveyor hatch, plus wireless channel controls.
- * <p>
- * One wireless config button: left-click toggles public/private, right-click opens the frequency
- * text-field panel.
+ * NAC Vacuum Conveyor hatch GUI plus wireless channel controls: one config button (left click toggles public/private,
+ * right click opens the frequency text-field panel).
  */
 public class MTWirelessVacuumConveyorGui extends MTEHatchVacuumConveyorGui {
 

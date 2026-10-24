@@ -26,12 +26,11 @@ import tectech.util.TTUtility;
 /**
  * MessTech computer rack hatch, reusing GT5U's {@link MTEHatchRack} behaviour.
  * <p>
- * Differences from the base GT5U rack:
+ * Differences from the stock rack:
  * <ul>
  * <li>No "TecTech: Elemental Matter" line in the tooltip.</li>
- * <li>Slightly softer overclock penalty: the {@code (overclock - overvoltage)^2} term in
- * the computation formula is scaled down by {@link #PENALTY_FACTOR}, so overclocking
- * gives a bit more computation than the stock rack.</li>
+ * <li>Softer overclock penalty: the {@code (overclock - overvoltage)^2} term is scaled by {@link #PENALTY_FACTOR}, so
+ * overclocking yields a bit more computation.</li>
  * </ul>
  */
 public class MTHatchRack extends MTEHatchRack {
@@ -41,14 +40,12 @@ public class MTHatchRack extends MTEHatchRack {
     private static final Map<String, QuantumComputerRecipeData> COMPONENT_DATA_CACHE = new HashMap<>();
 
     public MTHatchRack(int aID, String aName, String aNameRegional, int aTier) {
-        // The base ID constructor injects "TecTech: Elemental Matter"; we keep it internally only
-        // and hide it by overriding getDescription() below so the item tooltip stays clean.
+        // The base ID constructor injects "TecTech: Elemental Matter"; getDescription() hides it.
         super(aID, aName, aNameRegional, aTier);
     }
 
     @Override
     public String[] getDescription() {
-        // "TecTech: Elemental Matter" removed on purpose.
         return new String[] {
             EnumChatFormatting.AQUA + StatCollector.translateToLocal("gt.blockmachines.hatch.rack.desc.0"),
             EnumChatFormatting.AQUA + StatCollector.translateToLocal("gt.blockmachines.hatch.rack.desc.1") };

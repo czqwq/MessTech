@@ -1,19 +1,15 @@
 package com.MessTech.common.util;
 
 /**
- * One animated look for a stretch of tooltip text.
+ * One animated look for a stretch of tooltip text: per frame it answers "what does the line look like now", the
+ * contract of the {@code GTAuthors} names and the "PigTech" line, so an animation can go to any tooltip text
+ * consumer.
  * <p>
- * An animation is a plain object that answers one question per frame: <i>what does the line look like right
- * now</i>. That is the same contract the animated author names in {@code GTAuthors} and the "PigTech" line use,
- * so an animation can be handed to any tooltip text consumer.
- * <p>
- * The <b>renderer</b> that is drawn over the finished line - the part that needs a {@code FontRenderer} and
- * OpenGL, and therefore cannot live in common code - is registered client-side for the animation instance, see
- * {@link MTAnimatedTooltipHandler#registerRenderer}. An animation without a renderer is a pure formatting
- * animation (colour codes and spacing), which is what {@link MTPigTechText} is.
- * <p>
- * {@link MTTranscendentMetalText} is the built-in {@code TRANSCENDENT_METAL} look: GT5U's Transcendent Metal
- * animation, a renderer that tumbles a metallic copy of the line over the font.
+ * The <b>renderer</b> drawn over the finished line - needs a {@code FontRenderer} and OpenGL, so it cannot live in
+ * common code - is registered client-side per animation instance, see
+ * {@link MTAnimatedTooltipHandler#registerRenderer}. Without one the animation is pure formatting (colour codes and
+ * spacing), as {@link MTPigTechText} is. {@link MTTranscendentMetalText} is the built-in {@code TRANSCENDENT_METAL}
+ * look.
  */
 public interface MTTextAnimation {
 
@@ -29,10 +25,9 @@ public interface MTTextAnimation {
     String frame(String source, long millis);
 
     /**
-     * The visible characters of a string, i.e. the text without its formatting codes.
-     * <p>
-     * Used to hand an animation the text a supplier produces (a supplier such as {@code author_czqwq()} returns
-     * its own colour codes) and to recognise an animated line again while it is being drawn.
+     * The visible characters of a string, i.e. the text without its formatting codes. Used to hand an animation the
+     * text a supplier produces (such as {@code author_czqwq()}, which brings its own colour codes) and to recognise
+     * an animated line again while it is being drawn.
      *
      * @param line a line that may contain formatting codes, {@code null} is treated as empty
      * @return the same line without any formatting code pair

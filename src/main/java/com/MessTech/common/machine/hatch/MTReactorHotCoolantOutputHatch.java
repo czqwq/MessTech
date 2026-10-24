@@ -20,33 +20,31 @@ import gregtech.api.metatileentity.implementations.MTEHatchOutput;
 import gregtech.api.render.TextureFactory;
 
 /**
- * Hot-coolant port of {@code MTReactor}'s fluid ("wet") mode: it takes back exactly the hot coolant that
- * {@link MTReactorCoolantInputHatch} fed in as cold coolant, so the loop is 1 mB cold coolant in and 1 mB hot coolant
- * out per 1 HU of buffered component heat. Both the amount and the 1:1 conversion are MessTech's own, not IC2's x2.
+ * Hot-coolant port of {@code MTReactor}'s fluid ("wet") mode: takes back exactly the hot coolant
+ * {@link MTReactorCoolantInputHatch} fed in cold - 1 mB cold in / 1 mB hot out per 1 HU of buffered component heat
+ * (MessTech's own amounts, not IC2's x2).
  * <p>
- * Nothing else may enter: {@link #isFluidInputAllowed} and {@link #canStoreFluid} both reject every fluid but IC2's hot
- * coolant, so neither a pipe nor GT's output routing can park an unrelated fluid in the loop.
+ * Nothing else may enter: {@link #isFluidInputAllowed} and {@link #canStoreFluid} reject every other fluid, so neither
+ * a
+ * pipe nor GT's output routing can park something unrelated in the loop.
  * <p>
- * <b>Tier.</b> Deliberately a single variant at EV: it is plumbing, not a tier gate, and the inherited
- * {@code MTEHatchOutput#getCapacity()} of {@code 8000 * 2^4 = 128,000 mB} already holds twice the 64,000 mB one full
- * cycle can ask for. Nothing in the reactor structure compares this hatch's tier, so the same hatch fits a UIV
- * controller.
+ * <b>Tier:</b> one EV variant on purpose (plumbing, not a tier gate); inherited {@code MTEHatchOutput#getCapacity()} of
+ * {@code 8000 * 2^4 = 128,000 mB} holds twice the 64,000 mB one cycle asks for, and no structure check compares this
+ * tier,
+ * so it fits a UIV controller. Inherited {@code fill(FluidStack, boolean)} takes at most
+ * {@code getCapacity() - getFluidAmount()} and returns the mB really taken, letting the reactor abort a cycle instead
+ * of
+ * voiding coolant.
  * <p>
- * {@code fill(FluidStack, boolean)} is inherited unchanged, and it reports honestly: it never accepts more than
- * {@code getCapacity() - getFluidAmount()} and returns the mB it really took, which is what lets the reactor abort a
- * cycle instead of voiding coolant.
- * <p>
- * <b>Texture.</b> Base texture = multiblock casing, with GT's own fluid output pipe overlay kept so the port is
- * recognisable as a fluid output from the outside. The dedicated MessTech hot coolant decal is still pending, so the
- * existing {@code hatch/Hatch_Reactor_Temp_Control} panel stands in for it - replace {@link #OVERLAY_PATH} once the
- * hot coolant art exists.
+ * <b>Texture:</b> multiblock casing + GT's fluid output pipe overlay; the hot coolant decal is pending, so
+ * {@code hatch/Hatch_Reactor_Temp_Control} stands in (replace {@link #OVERLAY_PATH} later).
  */
 public class MTReactorHotCoolantOutputHatch extends MTEHatchOutput {
 
-    /** Fixed tier of this hatch (EV). See the class comment for why it is not a tier family. */
+    /** Fixed tier (EV); the class comment says why it is not a tier family. */
     public static final int TIER = 4;
 
-    /** Registry name of IC2's hot coolant, see {@code ic2.core.init.BlocksItems#registerIC2fluid}. */
+    /** Registry name of IC2's hot coolant ({@code ic2.core.init.BlocksItems#registerIC2fluid}). */
     public static final String HOT_COOLANT_FLUID_NAME = "ic2hotcoolant";
 
     private static final String OVERLAY_DOMAIN = "messtech";
@@ -69,21 +67,22 @@ public class MTReactorHotCoolantOutputHatch extends MTEHatchOutput {
     }
 
     /**
-     * The IC2 hot coolant, or {@code null} while no fluid is registered under that name (a pack without IC2 fluids).
-     * Every look-up goes through the registry and is null checked, so such a pack gets a hatch that accepts nothing
-     * instead of a crash while the class loads.
+     * The IC2 hot coolant, or {@code null} while nothing is registered under that name (a pack without IC2 fluids).
+     * Every
+     * look-up goes through the registry and is null checked, so such a pack gets a hatch that accepts nothing instead
+     * of
+     * crashing at class load.
      */
     public static Fluid getHotCoolantFluid() {
         return FluidRegistry.getFluid(HOT_COOLANT_FLUID_NAME);
     }
 
-    /** True when the given fluid is IC2's hot coolant. */
     public static boolean isHotCoolant(Fluid fluid) {
         Fluid hotCoolant = getHotCoolantFluid();
         return hotCoolant != null && fluid == hotCoolant;
     }
 
-    /** The tank of this port only ever holds hot coolant, so anything else is refused on the pipe/container path. */
+    /** The tank only ever holds hot coolant, so anything else is refused on the pipe/container path. */
     @Override
     public boolean isFluidInputAllowed(FluidStack aFluid) {
         return aFluid != null && isHotCoolant(aFluid.getFluid());
@@ -124,9 +123,10 @@ public class MTReactorHotCoolantOutputHatch extends MTEHatchOutput {
     }
 
     /**
-     * Keeps GT's fluid pipe overlay (the base array) and layers the reactor decal on top of it. Unlike the access
-     * hatch this hatch does not restrict {@code isFacingValid}: a coolant port legitimately sits on any casing face
-     * including the top and bottom, fluids leave from every side anyway, and only the decal's direction would suffer.
+     * Keeps GT's fluid pipe overlay (the base array) and layers the reactor decal on top. {@code isFacingValid} is not
+     * restricted (unlike the access hatch): a coolant port sits on any casing face incl. top and bottom, fluids leave
+     * from
+     * every side and only the decal's direction would suffer.
      */
     private ITexture[] withDecal(ITexture[] aBaseTextures) {
         if (sHotCoolantOverlay == null) return aBaseTextures;

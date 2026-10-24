@@ -9,12 +9,11 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * The engine's I_Quit / I_Error / I_GetHeapSize implementation for the embedded console.
- * <p>
- * Mocha Doom's own {@code i.DoomSystem} answers all of these with {@code System.exit}, and its
- * {@code GenerateAlert} opens an AWT message box. Neither is acceptable inside Minecraft, so the
- * quit path only asks the host to stop and every error becomes a {@link DoomFatalError}, which the
- * host catches and shows in the console's window instead of taking the game down.
+ * The engine's I_Quit / I_Error / I_GetHeapSize implementation for the embedded console. Mocha Doom's own
+ * {@code i.DoomSystem} answers these with {@code System.exit} and opens an AWT box from {@code GenerateAlert}, neither
+ * acceptable inside Minecraft: the quit path only asks the host to stop, and every error becomes a
+ * {@link DoomFatalError}
+ * the host shows in the console's window.
  */
 @SideOnly(Side.CLIENT)
 final class MTGameConsoleSystem implements IDoomSystem {
@@ -52,8 +51,9 @@ final class MTGameConsoleSystem implements IDoomSystem {
     }
 
     /**
-     * I_Quit - reached from Doom's own QUIT GAME entry. In the console that means "close the
-     * window", not "end the process": the host stops the loop and the GUI tears itself down.
+     * I_Quit - Doom's own QUIT GAME. In the console that means "close the window", not "end the process": the host
+     * stops
+     * the loop and the GUI tears itself down.
      */
     @Override
     public void Quit() {
@@ -103,9 +103,8 @@ final class MTGameConsoleSystem implements IDoomSystem {
     }
 
     /**
-     * Reached when a PWAD was supplied and the game wants to warn about it. The console never adds
-     * one, so this is only here so that the "declined" branch of the engine - which ends in
-     * {@code System.exit(-2)} - can never be taken. Saying yes is the honest answer.
+     * A PWAD was supplied and the game wants to warn about it. The console never adds one, so this is only here so the
+     * engine's "declined" branch - which ends in {@code System.exit(-2)} - can never be taken. Saying yes is honest.
      */
     @Override
     public boolean GenerateAlert(final String title, final String cause) {

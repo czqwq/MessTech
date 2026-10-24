@@ -20,23 +20,17 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
 /**
- * The game console's window: a centred panel roughly half the screen across, running DOOM inside
- * it, with the console's own key settings one click away.
+ * The game console's window: a centred panel about half the screen across running DOOM, with the console's own key
+ * settings one click away.
  * <p>
- * The engine renders 320x200 into a plain ARGB array (see {@code v.renderers.HeadlessRaster}) and
- * this class is the other end of that: it uploads each finished frame into a texture and draws it
- * with nearest-neighbour filtering, so the pixels stay square instead of turning into mush.
+ * The engine renders 320x200 into a plain ARGB array (see {@code v.renderers.HeadlessRaster}); this class uploads
+ * each finished frame into a texture and draws it with nearest-neighbour filtering, so the pixels stay square.
  * <p>
- * Controls - {@code Esc} closes the window (the console's own rule; DOOM's menu is on {@code F1}
- * instead), and everything else reaches the engine by polling LWJGL's key state, which is also the
- * only way to learn about key releases inside a {@code GuiScreen}. The defaults are WASD or the
- * arrow keys to move and turn, {@code E} to use, {@code Ctrl} to fire, {@code Shift} to run,
- * {@code Alt} to strafe, {@code 1}..{@code 0} for weapons and {@code Tab} for the automap; the key
- * screen changes any of them.
- * <p>
- * The key screen is a <em>mode</em> of this window rather than a second {@code GuiScreen}: swapping
- * screens would close this one, and closing this one stops the engine, so the player would lose
- * their game every time they looked at their keys.
+ * {@code Esc} closes the window (DOOM's menu is on {@code F1}); everything else reaches the engine by polling
+ * LWJGL's key state, the only way to learn about key releases inside a {@code GuiScreen}. The defaults and the
+ * rebinding behind {@link MTGameConsoleBindings} are on the key screen, which is a <em>mode</em> of this window and
+ * not a second {@code GuiScreen}: swapping screens would close this one, and closing this one stops the engine, so
+ * the player would lose their game.
  */
 @SideOnly(Side.CLIENT)
 public class GuiGameConsole extends GuiScreen {
@@ -45,7 +39,7 @@ public class GuiGameConsole extends GuiScreen {
     private static final int FRAME_HEIGHT = MTGameConsoleHost.HEIGHT;
     private static final int PIXEL_COUNT = FRAME_WIDTH * FRAME_HEIGHT;
 
-    /** DOOM's own 320x200 shape, which the panel keeps. */
+    /** DOOM's 320x200 shape, kept by the panel. */
     private static final double ASPECT = (double) FRAME_WIDTH / FRAME_HEIGHT;
 
     private static final int COLOUR_BEZEL = 0xFF1B1D22;
@@ -88,7 +82,7 @@ public class GuiGameConsole extends GuiScreen {
     private int panelWidth;
     private int panelHeight;
 
-    /** Frames uploaded in the last second, for the little readout above the panel. */
+    /** Frames uploaded in the last second, for the readout above the panel. */
     private int framesThisSecond;
     private long secondStarted = -1L;
     private int framesPerSecond;
@@ -111,8 +105,6 @@ public class GuiGameConsole extends GuiScreen {
         this.host = MTGameConsoleHost.start();
     }
 
-    // ------------------------------------------------------------------ layout
-
     @Override
     public void initGui() {
         int width = Math.max(160, (int) (this.width * Config.GAME_CONSOLE_SCREEN_FRACTION));
@@ -131,16 +123,13 @@ public class GuiGameConsole extends GuiScreen {
     }
 
     /**
-     * The console is a toy, not a container: the world has to keep running behind it, or a player
-     * would be frozen in place for as long as they were playing. A server that would rather freeze
-     * the world can say so in the config.
+     * The console is a toy, not a container: the world keeps running behind it, or a player would be frozen in place
+     * while playing. The config can freeze it instead.
      */
     @Override
     public boolean doesGuiPauseGame() {
         return Config.GAME_CONSOLE_PAUSES_WORLD;
     }
-
-    // ------------------------------------------------------------------ input
 
     @Override
     protected void keyTyped(final char typedChar, final int keyCode) {
@@ -171,8 +160,7 @@ public class GuiGameConsole extends GuiScreen {
             this.mc.displayGuiScreen(null);
             return;
         }
-        // Everything else is swallowed: Minecraft must not act on keys DOOM is using, and there is
-        // no text field in here that would want them either.
+        // Everything else is swallowed: Minecraft must not act on keys DOOM is using.
     }
 
     @Override
@@ -242,13 +230,11 @@ public class GuiGameConsole extends GuiScreen {
         return mouseX >= x && mouseX < x + this.fontRendererObj.getStringWidth(label) && mouseY >= y && mouseY < y + 9;
     }
 
-    // ------------------------------------------------------------------ rendering
-
     @Override
     public void drawScreen(final int mouseX, final int mouseY, final float partialTicks) {
         this.drawDefaultBackground();
 
-        // A bezel around the screen, the way the item's own little console looks.
+        // A bezel around the screen, like the item's own little console.
         drawRect(panelX - 3, panelY - 3, panelX + panelWidth + 3, panelY + panelHeight + 3, COLOUR_BEZEL_EDGE);
         drawRect(panelX - 2, panelY - 2, panelX + panelWidth + 2, panelY + panelHeight + 2, COLOUR_BEZEL);
         drawRect(panelX, panelY, panelX + panelWidth, panelY + panelHeight, COLOUR_SCREEN_OFF);
@@ -273,7 +259,7 @@ public class GuiGameConsole extends GuiScreen {
             0xFFFFFF);
     }
 
-    /** Uploads the newest finished frame when there is one, then draws whatever is in the texture. */
+    /** Uploads the newest finished frame when there is one, then draws the texture. */
     private void drawFrame() {
         if (this.textureId == -1) {
             createTexture();
@@ -367,7 +353,7 @@ public class GuiGameConsole extends GuiScreen {
             this.upload);
     }
 
-    /** Everything that is not a running game: preparing, loading, failed or stopped. */
+    /** Everything that is not a running game: preparing, loading, failed, stopped. */
     private void drawStatus(final MTGameConsoleHost.State state) {
         final int centreX = panelX + panelWidth / 2;
         int y = panelY + panelHeight / 2 - 14;
@@ -424,8 +410,6 @@ public class GuiGameConsole extends GuiScreen {
             }
         }
     }
-
-    // ------------------------------------------------------------------ the key screen
 
     /** The clickable "按键设置" label in the bezel's corner: the way into the key screen. */
     private void drawKeyScreenEntry(final int mouseX, final int mouseY) {
@@ -513,14 +497,13 @@ public class GuiGameConsole extends GuiScreen {
         this.keyScreen = true;
         this.keyPage = 0;
         this.capturing = null;
-        // Nothing the player was holding should stay held while they are in here.
+        // Nothing the player was holding should stay held in here.
         host.releaseKeys();
     }
 
     /**
-     * Leaves the key screen, storing what changed. The engine that is already running keeps the
-     * bindings it was started with - the note on the screen says so - so this is where the file is
-     * written for the next time the console opens.
+     * Leaves the key screen, storing what changed. The running engine keeps the bindings it was started with - the
+     * note on the screen says so - so this only writes the file for the next time the console opens.
      */
     private void closeKeyScreen() {
         this.capturing = null;
