@@ -985,3 +985,7 @@ messtech.config.gameconsole.game_console_threads=Render Threads
 messtech.config.gameconsole.game_console_sound=Sound Effects
 messtech.config.gameconsole.game_console_music=Music
 messtech.config.gameconsole.game_console_pauses_world=Pause the World While Open
+
+# --- LEG fake recipe pool (Large Essentia Generator: upgrades and essentia) ---
+mt.recipe.leg=Large Essentia Generator: Upgrades & Essentia
+mt.recipe.leg.aspect_power=§7Base power: §b%s§7 EU/essentia

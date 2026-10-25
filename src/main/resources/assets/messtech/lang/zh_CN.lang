@@ -984,3 +984,7 @@ messtech.config.gameconsole.game_console_threads=渲染线程数
 messtech.config.gameconsole.game_console_sound=音效
 messtech.config.gameconsole.game_console_music=音乐
 messtech.config.gameconsole.game_console_pauses_world=打开窗口时暂停世界
+
+# --- LEG 假配方池（大型源质发电机：升级与要素） ---
+mt.recipe.leg=大型源质发电机：升级与要素
+mt.recipe.leg.aspect_power=§7基础发电: §b%s§7 EU/源质

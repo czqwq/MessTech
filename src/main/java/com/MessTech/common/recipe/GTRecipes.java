@@ -544,6 +544,7 @@ public class GTRecipes {
         addUltimatePatternTerminalRecipe();
         addLegacyMachineRecipes();
         addSmallEssentiaSmelteryRecipes();
+        MTLegFakeRecipes.populate();
     }
 
     /**

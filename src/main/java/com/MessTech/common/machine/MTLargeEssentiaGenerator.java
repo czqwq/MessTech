@@ -9,6 +9,8 @@ import static gregtech.api.util.GTStructureUtility.buildHatchAdder;
 import static net.minecraft.util.StatCollector.translateToLocal;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import net.minecraft.entity.player.EntityPlayer;
@@ -24,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 
 import com.MessTech.common.block.MTBlocks;
 import com.MessTech.common.machine.Base.MTGeneratorMultiBase;
+import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.thaumcraft.MTEssentiaEnergyData;
 import com.MessTech.common.thaumcraft.MTEssentiaHatchMETileEntity;
 import com.MessTech.common.thaumcraft.MTEssentiaHatchTileEntity;
@@ -46,10 +49,12 @@ import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.ICasingTextureProvider;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
+import gregtech.api.interfaces.tileentity.RecipeMapWorkable;
 import gregtech.api.metatileentity.implementations.MTEHatch;
 import gregtech.api.metatileentity.implementations.MTEHatchDynamo;
 import gregtech.api.metatileentity.implementations.MTEHatchInput;
 import gregtech.api.objects.XSTR;
+import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.render.TextureFactory;
@@ -74,7 +79,7 @@ import thaumcraft.common.config.ConfigBlocks;
  * converts stored essentia directly, keeping the leftover EU in {@link #mLeftEnergy} for the next tick.
  */
 public class MTLargeEssentiaGenerator extends MTGeneratorMultiBase<MTLargeEssentiaGenerator>
-    implements ISurvivalConstructable, ICasingTextureProvider {
+    implements ISurvivalConstructable, ICasingTextureProvider, RecipeMapWorkable {
 
     // region Structure
     private static final String STRUCTURE_PIECE_MAIN = "main";
@@ -306,6 +311,16 @@ public class MTLargeEssentiaGenerator extends MTGeneratorMultiBase<MTLargeEssent
         mMaxProgresstime = 1;
         convertEssentia(getVoltageLimit(), getAmpLimit());
         return CheckRecipeResultRegistry.GENERATING;
+    }
+
+    /**
+     * The generator has no recipe map of its own; this fake pool only shows the NEI pages (upgrade items with their
+     * auxiliary fluids and the burnable aspects' base EU values). Returning it here is what makes GT register the LEG
+     * as the NEI catalyst of those pages.
+     */
+    @Override
+    public Collection<RecipeMap<?>> getAvailableRecipeMaps() {
+        return Collections.singletonList(MTRecipeMaps.legFakeRecipes);
     }
 
     /** @return Total output voltage of the single dynamo hatch (multi-amp and laser included). */

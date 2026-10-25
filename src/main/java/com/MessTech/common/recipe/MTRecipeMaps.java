@@ -141,6 +141,19 @@ public final class MTRecipeMaps {
         }
     }
 
+    /**
+     * Fake NEI pool of the Large Essentia Generator: one page per upgrade item + auxiliary fluid pair (the upgrade
+     * items
+     * are installed by right-clicking the controller and are not consumed) and one page per burnable aspect with its
+     * base EU value. Populated by {@link MTLegFakeRecipes}.
+     */
+    public static final RecipeMap<RecipeMapBackend> legFakeRecipes = RecipeMapBuilder.of("mt.recipe.leg")
+        .maxIO(1, 0, 1, 0)
+        .minInputs(0, 0)
+        .dontUseProgressBar()
+        .neiHandlerInfo(builder -> builder.setHeight(110))
+        .build();
+
     /** Independent Assembly Line recipe pool for {@code MTAssFactory} (Mode 2, requires LevelTier 2). */
     public static final RecipeMap<RecipeMapBackend> assFactoryAssemblyLineRecipes = RecipeMapBuilder
         .of("mt.recipe.assfactory.assemblyline")

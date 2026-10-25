@@ -21,6 +21,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 
 import com.MessTech.common.block.MTBlocks;
+import com.MessTech.common.gui.MTSmallEssentiaSmelteryGui;
 import com.MessTech.common.machine.Base.MTMultiMachineBase;
 import com.MessTech.common.thaumcraft.MTEssentiaOutputHatchMETileEntity;
 import com.google.common.collect.ImmutableList;
@@ -49,6 +50,7 @@ import gregtech.api.structure.error.StructureError;
 import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.api.util.OverclockCalculator;
+import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 import gregtech.common.misc.GTStructureChannels;
 import thaumcraft.api.aspects.Aspect;
 import thaumcraft.api.aspects.AspectList;
@@ -87,6 +89,11 @@ public class MTSmallEssentiaSmeltery extends MTMultiMachineBase<MTSmallEssentiaS
     private static final int BASE_TICKS_PER_ESSENTIA = 32;
     /** GoodGenerator's Large Essentia Smeltery base EU/t. */
     private static final long BASE_RECIPE_EUT = 480;
+    /**
+     * GT batch mode fill target: one run is stretched to at most this many ticks instead of being clamped at 1 tick
+     * (the same constant as {@code MTParallelHelper#MAX_BATCH_MODE_TICK_TIME}).
+     */
+    private static final int MAX_BATCH_MODE_TICK_TIME = 128;
 
     // spotless:off
     private static final String[][] structure_string = new String[][]{
@@ -289,19 +296,60 @@ public class MTSmallEssentiaSmeltery extends MTMultiMachineBase<MTSmallEssentiaS
     /**
      * GoodGenerator's Large Essentia Smeltery conversion, one parallel unit per item (or per 1000 L of fluid): the
      * item's Thaumcraft object tags plus bonus tags become the output essentia, an item without tags yields 1 Entropy.
+     * <p>
+     * With GT's batch mode enabled the run is stretched towards {@link #MAX_BATCH_MODE_TICK_TIME} ticks by melting more
+     * units in the same run (GT batch semantics: EU/t stays that of a single batch, the longer duration pays for the
+     * extra units), so overclocking cannot leave the machine stuck on the 1-tick wall.
      */
     @NotNull
     @Override
     public CheckRecipeResult checkProcessing() {
         if (!mMachine) return CheckRecipeResultRegistry.NO_RECIPE;
 
-        ArrayList<ItemStack> items = getStoredInputs();
-        ArrayList<FluidStack> fluids = getStoredFluids();
-        if (items.isEmpty() && fluids.isEmpty()) return CheckRecipeResultRegistry.NO_RECIPE;
-
         AspectList output = new AspectList();
-        int remaining = getParallel();
+        int consumed = consumeInputs(getParallel(), output);
+        if (consumed <= 0) return CheckRecipeResultRegistry.NO_RECIPE;
 
+        OverclockCalculator calculator = buildOverclockCalculator(output.visSize());
+        if (isBatchModeEnabled() && calculator.getDuration() < MAX_BATCH_MODE_TICK_TIME) {
+            double batchMultiplierMax = MAX_BATCH_MODE_TICK_TIME / (double) calculator.getDuration();
+            int maxExtraUnits = (int) Math
+                .floor(consumed * Math.min(batchMultiplierMax - 1.0D, getMaxBatchSize() - 1.0D));
+            if (maxExtraUnits > 0 && consumeInputs(maxExtraUnits, output) > 0) {
+                calculator = buildOverclockCalculator(output.visSize());
+            }
+        }
+
+        mOutputAspects = output;
+        mEfficiency = 10000;
+        mEfficiencyIncrease = 10000;
+        lEUt = -Math.max(1L, calculator.getConsumption());
+        mMaxProgresstime = Math.max(1, calculator.getDuration());
+        mProgresstime = 0;
+        updateSlots();
+        return CheckRecipeResultRegistry.SUCCESSFUL;
+    }
+
+    /** @return An overclocked calculator for one run that yields {@code essentiaPoints} points of essentia. */
+    private OverclockCalculator buildOverclockCalculator(int essentiaPoints) {
+        int baseDuration = Math.max(1, (int) Math.ceil(essentiaPoints * (double) BASE_TICKS_PER_ESSENTIA));
+        int duration = Math.max(1, (int) Math.ceil(baseDuration * getDurationMultiplier()));
+        OverclockCalculator calculator = new OverclockCalculator().setRecipeEUt(BASE_RECIPE_EUT)
+            .setEUt(getMaxInputEu())
+            .setDuration(duration);
+        if (hasPerfectOverclock()) calculator.enablePerfectOC();
+        return calculator.calculate();
+    }
+
+    /**
+     * Melts up to {@code maxUnits} parallel units (1 item or 1000 L of fluid each) into {@code output}. Inputs that
+     * cannot be depleted (e.g. a controller circuit) are skipped.
+     *
+     * @return How many units were actually consumed.
+     */
+    private int consumeInputs(int maxUnits, AspectList output) {
+        int remaining = maxUnits;
+        ArrayList<ItemStack> items = getStoredInputs();
         for (int i = items.size() - 1; i >= 0 && remaining > 0; i--) {
             ItemStack stack = items.get(i);
             if (stack == null || stack.stackSize <= 0) continue;
@@ -313,6 +361,7 @@ public class MTSmallEssentiaSmeltery extends MTMultiMachineBase<MTSmallEssentiaS
             remaining -= take;
         }
 
+        ArrayList<FluidStack> fluids = getStoredFluids();
         for (int i = fluids.size() - 1; i >= 0 && remaining > 0; i--) {
             FluidStack fluid = fluids.get(i);
             if (fluid == null || fluid.amount < 1000) continue;
@@ -325,26 +374,7 @@ public class MTSmallEssentiaSmeltery extends MTMultiMachineBase<MTSmallEssentiaS
             addAspects(output, aspects);
             remaining -= buckets;
         }
-
-        if (remaining >= getParallel()) return CheckRecipeResultRegistry.NO_RECIPE;
-
-        int baseDuration = Math.max(1, (int) Math.ceil(output.visSize() * (double) BASE_TICKS_PER_ESSENTIA));
-        int duration = Math.max(1, (int) Math.ceil(baseDuration * getDurationMultiplier()));
-
-        OverclockCalculator calculator = new OverclockCalculator().setRecipeEUt(BASE_RECIPE_EUT)
-            .setEUt(getMaxInputEu())
-            .setDuration(duration);
-        if (hasPerfectOverclock()) calculator.enablePerfectOC();
-        calculator.calculate();
-
-        mOutputAspects = output;
-        mEfficiency = 10000;
-        mEfficiencyIncrease = 10000;
-        lEUt = -Math.max(1L, calculator.getConsumption());
-        mMaxProgresstime = Math.max(1, calculator.getDuration());
-        mProgresstime = 0;
-        updateSlots();
-        return CheckRecipeResultRegistry.SUCCESSFUL;
+        return maxUnits - remaining;
     }
 
     /** Adds {@code amount} items' worth of the item's essentia tags to {@code output}. */
@@ -441,6 +471,33 @@ public class MTSmallEssentiaSmeltery extends MTMultiMachineBase<MTSmallEssentiaS
     @Override
     public IMetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
         return new MTSmallEssentiaSmeltery(mName);
+    }
+
+    /**
+     * The essentia the running recipe will flush into the output hatches, as {@code tag|amount;tag|amount} rows sorted
+     * by amount (see {@code MTSmallEssentiaSmelteryGui}). Empty when no recipe is running.
+     */
+    public String getPendingOutputAspectsText() {
+        AspectList output = mOutputAspects;
+        if (output == null || output.size() == 0) return "";
+        Aspect[] sorted = output.getAspectsSortedAmount();
+        if (sorted == null) return "";
+        StringBuilder text = new StringBuilder();
+        for (Aspect aspect : sorted) {
+            if (aspect == null) continue;
+            int amount = output.getAmount(aspect);
+            if (amount <= 0) continue;
+            if (text.length() > 0) text.append(';');
+            text.append(aspect.getTag())
+                .append('|')
+                .append(amount);
+        }
+        return text.toString();
+    }
+
+    @Override
+    protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
+        return new MTSmallEssentiaSmelteryGui(this);
     }
 
     @Override
