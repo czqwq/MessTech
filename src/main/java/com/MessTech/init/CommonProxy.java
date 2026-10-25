@@ -15,6 +15,7 @@ import com.MessTech.common.entity.MTEntityPiggy;
 import com.MessTech.common.entity.MTEntityVoidstarArrow;
 import com.MessTech.common.galacticraft.MTGalacticraftSpaceHandler;
 import com.MessTech.common.items.MTItems;
+import com.MessTech.common.machine.MTMiningPlantRegistry;
 import com.MessTech.common.machine.loaders.MTMachineLoader;
 import com.MessTech.common.network.MTNetwork;
 import com.MessTech.common.parts.PartUltimatePatternTerminal;
@@ -37,6 +38,7 @@ import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
+import cpw.mods.fml.common.event.FMLServerStoppedEvent;
 import cpw.mods.fml.common.network.IGuiHandler;
 import cpw.mods.fml.common.network.NetworkRegistry;
 import gregtech.api.enums.Mods;
@@ -190,5 +192,11 @@ public class CommonProxy implements IGuiHandler {
         if (Mods.VendingMachine.isModLoaded()) {
             MTVendingMachineRecipes.register();
         }
+    }
+
+    public void serverStopped(FMLServerStoppedEvent event) {
+        // The mining plant list behind /messtech infiore is static state keyed by dimension and coordinates: it belongs
+        // to the world that is shutting down and must not leak into the next one loaded by this JVM.
+        MTMiningPlantRegistry.clear();
     }
 }

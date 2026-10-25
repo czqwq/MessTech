@@ -537,6 +537,86 @@ MTMultiMachineBase<T>
   `AuthorDynamic.registerAddon(AuthorDynamic.MODULE_PROJECT, () -> translateToLocal("messtech.moduleProject"), ...)`
   prints `添加模组: ModularProject` with the word wearing the modular animation, see `MTModuleProjectText`.
 
+### MTComprehensiveMiningPlant (综合采掘工厂)
+
+- Ported from Elinar's standalone verification mod (`tmp/ElinarInfMiner/`), then given the **real structure** that mod
+  shipped with 1×1×1 placeholder: 11 wide × 10 high × 10 deep, controller at `5, 7, 4` (front face, 8th layer up,
+  centred). Shape string is the in-game Structure Writer's **transposed scan** (`[y][z]` layers of rows, chars along x),
+  so `addShape(MAIN, transpose(structure_string))` and `checkPiece/buildPiece(MAIN, 5, 7, 4, ...)`; `construct` /
+  `survivalConstruct` use the same offsets (`survivalBuildPiece(..., skipPlaceHints = false, skipSolidBlocks = true)`).
+  Elements: A = `Casings.SteelGearBoxCasing`, B = `ofFrame(Materials.Steel)`, C = `ofFrame(Materials.Tritanium)`, D =
+  `ofBlock(GregTechAPI.sBlockMetal3, 8)` (HSLA Steel Block), E = `ofBlock(GregTechAPI.sBlockMetal6, 13)` (Steel Block),
+  G = `Casings.ReboltedNaquadahCasing` (the scan's "special tile" `BWTileEntityMetaGeneratedBlocksCasingAdvanced` - the
+  scanner prints every tile entity as a class, so the scan could not say the meta; the chosen casing is the fixed one),
+  F = `HatchElementBuilder.atLeast(OutputBus, OutputHatch).casingIndex(Casings.HighPowerCasing.getTextureId())
+  .hint(1).buildAndChain(Casings.HighPowerCasing.asElement())` - the hatch region. `atLeast` is only the preview filter,
+  so `checkMachine` enforces the real requirement itself: `mOutputBusses` and `mOutputHatches` must both be non-empty
+  (`StructureErrors.of("machine.comprehensiveminingplant.structure.error.no_output_(bus|hatch)")`, shown by
+  `createStructureErrorWidget` in the GUI terminal). No energy/maintenance hatch: `getDefaultHasMaintenanceChecks()` /
+  `shouldCheckMaintenance()` are `false` and `checkMaintenance()` is a no-op - but `doRandomMaintenanceDamage()` **must
+  return `true`** (the source mod returned `false`, and GT's `runMachine` guard
+  `mMaxProgresstime > 0 && doRandomMaintenanceDamage()` then skipped the whole recipe tick, freezing the cycle; same rule
+  as `MTMultiMachineBase`).
+- **Hatch casing index must stay below 16384**: the controller's `getCasingTexture()` and F's `casingIndex` both use
+  `Casings.HighPowerCasing` (TecTech `gt.blockcasingsTT:0`, casing texture page 8 → id 1024, zh name 高能机械方块).
+  A BartWorks advanced casing id such as `Casings.ReboltedNaquadahCasing.getTextureId()` = 32090 **crashes the hatch
+  renderer**: `MTEHatch#updateTexture` splits the id as `texturePage = id >> 7` without masking and `MTEHatch#getCasingTexture`
+  then indexes `casingTexturePages[250]` while the table only has 128 pages (`ArrayIndexOutOfBoundsException: Index 250 out
+  of bounds for length 128`, hit from the NEI multiblock preview through Angelica's ISBRH pass). G is therefore only a
+  structure block, never a hatch background. The casing page math: `Textures.BlockIcons.casingTexturePages[128][128]`,
+  valid ids `0..16383`, `getCasingTextureForId` masks but `MTEHatch` does not.
+- The tooltip intentionally has **no hand-written structure description** (the "结构：" block was removed); the standard
+  `beginStructureBlock / addController / addCasing / addOutputBus / addOutputHatch` section is kept for the NEI
+  structure info and hint dots.
+- Real work is in the GT recipe cycle (`checkProcessing`, one cycle = one second), the rest in `onPostTick`:
+  - ores: `VoidMinerUtility.dropMapsByDimName` (+ `extraDropsByDimName`, merged via `isDistributionCached`) of the
+    dimension, `ORE_PER_SECOND_PER_PARALLEL = 64` ores/s per ore parallel. The roll is skipped while the map's
+    `getTotalWeight() <= 0`: `DropMap#nextOre` dereferences an `ores` array that is only built by
+    `isDistributionCached`, so the source mod's unconditional roll could NPE on a void-mineable dimension without
+    entries;
+  - fluids: `GTMod.proxy.mUndergroundOil.GetDimension(dim)` underground oil field, rate =
+    `GTUOFluid#getRandomAmount(Random(name.hashCode())) * fluidParallel / UndergroundOil.DIVIDER` (5000) mB/s;
+  - power: no energy hatch - `WirelessNetworkManager.addEUToGlobalEnergyMap(owner, -n)` in bulk, `EU_PER_PARALLEL =
+    32768` EU/t per parallel, buffer = 2 minutes of the current draw refilled every `REFILL_INTERVAL = 1200` ticks; a
+    failed refill disables working;
+  - output: **standard GT output** - `checkProcessing` rolls the second into `mOutputItems` / `mOutputFluids` and GT
+    ejects them into the F-region output buses and output hatches. The AE proxy, the `poweredInsert` buffers and the
+    channel requirement of the source mod are gone (an ME output bus does that job now);
+  - chunk: implements GT's `IChunkLoader` (`getActiveChunk`) and forces it through `GTChunkManager`.
+- `checkProcessing` starts with `if (!wasWorking) prepareWorkData()`: the first recipe check can arrive in `onPostTick`
+  before `onWorkStart` ran, so parallels/maps would otherwise be stale for the first second. `prepareWorkData` applies
+  `configuredOre` / `configuredFluid` and re-reads the dimension data; `onWorkStart` additionally fills the EU buffer and
+  loads the chunk.
+- Parallel settings are GUI-only and take effect on the next start (`configuredOre` / `configuredFluid`); the GUI is
+  `MTComprehensiveMiningPlantGui` (extends `MTMultiMachineBaseGui`, so the MT logo stays) whose terminal text is
+  replaced - and ends with `createStructureErrorWidget`, so a missing output bus/hatch is visible - and whose button
+  column has the power switch, the structure update button (the tower supports construct/survival build) and the
+  screwdriver button opening the parallel sub panel. `shouldDisplayVoidExcess/InputSeparation/BatchMode/RecipeLock` are
+  `false` (no recipe map).
+- **Localization rule for this machine** (it has no recipe map, so all its text is its own): the sync values, WAILA NBT
+  and `MTMiningPlantRegistry` only carry raw numbers and fluid registry names; every visible string is formatted client
+  side from `machine.comprehensiveminingplant.*` keys in both lang files. `getInfoData()` is the exception (GT calls it
+  server side, like every other machine here). The structure part names in the tooltip come from
+  `Casings#getLocalizedName` / GT item display names, so they follow the pack's own localisation.
+- Registered as `MTItemList.MTComprehensiveMiningPlant` by `MTMachineLoader` under `MT_ID + 79`, lang key
+  `machine.comprehensiveminingplant.name`. Author line is **hardcoded**:
+  `AuthorDynamic.registerElinarAuthor(...)` prints `messTech.addByAuthor` (`添加者:` / `Added by:`) + one space +
+  `AuthorDynamic.Author_Elinar = "§[pf]乳胶芷若喵§r"` (the `§[pf]` marker is the petalfall text effect, closed by `§r`)
+  and adds **no** `添加模组: MessTech` line. `messTech.addByAuthor` lives next to `messTech.addBy` in both lang files.
+- Assembler recipe in `GTRecipes#addComprehensiveMiningPlantRecipe`, following the structure: LuV hull, 8 Steel Gearbox
+  Casings (A), 4 Steel frames (B), 19 Tritanium frames (C), 7 HSLA Steel Blocks (D), 4 Steel Blocks (E), 8 Rebolted
+  Naquadah Casings (G), 16 High Power Casings (F, 16 of 19 because the hatches take the rest), 8 `ItemList.OilDrill4`
+  and `bartworks.common.loaders.ItemRegistry.voidminer[0]` (Void Miner I) as the functional core; 2304 L molten PTFE,
+  circuit 6, `eut(RECIPE_LuV)`, 2 minutes. Casing stacks are built with the local `casingStack(Casing, amount)` helper:
+  GT's `ICasing#toStack(int)` **ignores its amount argument** in 5.09.54.205 (always returns a stack of one), so
+  `.toStack(8)` would silently make the recipe need a single casing - note that several older recipes in
+  `GTRecipes` still use `.toStack(N)` and therefore under-count the same way. The source mod scanned
+  `GregTechAPI.METATILEENTITIES` for the Void Miner class name; the BartWorks list is the direct reference.
+- `/messtech infiore` lists the loaded machines: `MTMiningPlantRegistry` is a static, save-local `LinkedHashMap` keyed
+  `dimension:x:y:z`, filled on `onFirstTick`, dropped on `onRemoval` and **cleared on server stop**
+  (`CommonProxy#serverStopped`, wired in `MessTech#serverStopped`; the source mod leaked entries across worlds). The
+  command sends a `ChatComponentTranslation` (`command.messtech.infiore.entry`), so the output is localized client side.
+
 ### MTComputingCenter
 - 3 modes, screwdriver switches, blocked while active or heat present.
 - Mode 0: racks produce computation; energy = 1A UEV + 1A UEV per 1,000,000 computation (ceil).
@@ -833,6 +913,30 @@ MTMultiMachineBase<T>
 - `AssMatrixBlock` (Tier 1) / `AdvAssMatrixBlock` (Tier 2).
 - Static helpers: `getBlock()`, `getItem()`, `getItemStack()`, `getItemStack(int)`.
 - Added to `MTItemList` as `AssMatrixBlock`, `AdvAssMatrixBlock`.
+
+## NEI collapsible item groups (物品折叠：模块仓与 NAC 部件)
+
+NEI has no API for the collapsible item groups, so the groups are installed the way Twist Space Technology does it:
+`NEI_MessTechConfig#loadConfig()` (an `IConfigureNEI`) calls `MTNEICollapsibleItems#load()`, which rewrites
+`config/NEI/collapsibleitems.cfg` with a marker block (`# BEGIN/END MESSTECH COLLAPSIBLE ITEMS`). NEI's plugin loader
+runs every `loadConfig()` and only then `CollapsibleItems.load()`, which parses that file - so the groups are live in the
+same startup. `MTNEICollapsibleConfig` is the pure text part: it replaces/append the block and leaves the GTNH groups,
+other mods' blocks and player edits alone.
+
+- The block format is NEI's: before each filter line an optional `; {"unlocalizedName": "..."}` line names the group
+  (resolved against the client language, hence the `messtech.nei.collapsible.*` keys in both lang files), then one
+  `ItemStackFilterParser` expression per group. NEI strips `#` comments before parsing, so the markers are invisible to
+  it. If the file does not exist yet the NEI jar's `/assets/nei/cfg/collapsibleitems.cfg` is the base (NEI would copy it
+  later anyway); writes go through a temp file + atomic move, and a file whose content is unchanged is left untouched.
+- Groups: speed module hatches, EU discount module hatches and parallel control module hatches, each folded over its ten
+  IV..MAX tiers with exact `<gregtech:gt.blockmachines:meta>` selectors computed from `MTItemList.SPEED_MODULES` /
+  `EU_MODULES` / `PARALLEL_MODULES` (so moving `MT_ID` cannot leave stale ids); NAC components fold all 105
+  `CircuitComponent` metadata values of `MTNACComponentItem` with one item-wide `r/^<registry name>$/` filter. Groups are
+  collapsed by default (`expanded` defaults to false in NEI).
+- Only the item panel is affected - recipe pages, catalysts and every real stack keep working. The rewrite is idempotent:
+  the same groups produce the same file, so nothing is written after the first launch. Parallel NEI plugins
+  (`loadPluginsInParallel`) could in theory race another mod writing the same file; their blocks are regenerated on the
+  next launch, the marker design is the same one TST uses.
 
 ## GT5U API knowledge
 

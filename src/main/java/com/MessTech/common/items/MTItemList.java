@@ -57,6 +57,8 @@ public enum MTItemList {
     MTReactorHotCoolantOutputHatch,
     MTChemicalTwister,
     MTHugeChemicalReactor,
+    /** Comprehensive Mining Plant (综合采掘工厂), ported from Elinar's verification mod. */
+    MTComprehensiveMiningPlant,
     MTModuleSpeed_IV,
     MTModuleSpeed_LuV,
     MTModuleSpeed_ZPM,

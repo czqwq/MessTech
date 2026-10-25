@@ -27,6 +27,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - Machine tooltips (house style)
   - MTChemicalTwister
   - MTHugeChemicalReactor (巨型化学反应釜)
+  - MTComprehensiveMiningPlant (综合采掘工厂, ported from Elinar's standalone mod; 11x10x10 tower, F = output hatch region)
   - MTComputingCenter
   - MTAssFactory
   - MTInventoryInputBusME / MTInventoryInputHatchME
@@ -40,6 +41,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - Thaumcraft research tab (混乱科技 / MessTech): `MTThaumcraftResearch`, essentia hatch, LEG upgrade items
   - Blocks
 - GT5U API knowledge
+- NEI collapsible item groups (物品折叠：速度/节能/并行模块仓与 NAC 部件, via `config/NEI/collapsibleitems.cfg`)
 - Own-code conventions
 - Chaos Matter (混乱物质): GT material registration and the stacked-renderer look
 - 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`): magic-circle charge FX, straight penetrating

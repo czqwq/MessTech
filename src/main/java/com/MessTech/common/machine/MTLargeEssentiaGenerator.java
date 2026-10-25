@@ -91,6 +91,7 @@ public class MTLargeEssentiaGenerator extends MTGeneratorMultiBase<MTLargeEssent
 
     private IStructureDefinition<MTLargeEssentiaGenerator> structureDefinition;
 
+    // spotless:off
     private static final String[][] STRUCTURE_STRING = {
         { "A       A", "         ", "         ", "         ", "    ~    ", "         ", "         ", "         ",
             "A       A" },
@@ -99,6 +100,8 @@ public class MTLargeEssentiaGenerator extends MTGeneratorMultiBase<MTLargeEssent
         { "T  TXT  T", "  TCXCT  ", " TCCXCCT ", "TCCCXCCCT", "XXXXXXXXX", "TCCCXCCCT", " TCCXCCT ", "  TCXCT  ",
             "T  TXT  T" } };
     // endregion
+
+    //spotless:on
 
     /**
      * Uniform tier of the 25 diffusion cells (0..3, -1 = no cell): decides the stable points (1/2/5/10) and the highest
@@ -607,6 +610,7 @@ public class MTLargeEssentiaGenerator extends MTGeneratorMultiBase<MTLargeEssent
             .addSeparator()
             .addInfo(translateToLocal("machine.leg.tooltip.structure.header"))
             .addInfo(translateToLocal("machine.leg.tooltip.structure.cells"))
+            .addInfo(translateToLocal("machine.leg.tooltip.structure.cells.limit"))
             .addInfo(translateToLocal("machine.leg.tooltip.structure.blocks"))
             .addInfo(translateToLocal("machine.leg.tooltip.structure.hatches"))
             .addSeparator()

@@ -12,11 +12,11 @@ import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.YELLOW;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.animatedText;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.chain;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.text;
+import static net.minecraft.util.StatCollector.translateToLocal;
 
 import java.util.function.Supplier;
 
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.StatCollector;
 
 import gregtech.api.enums.GTAuthors;
 
@@ -38,6 +38,13 @@ public final class AuthorDynamic {
 
     /** The author field. */
     public static final String AUTHOR_CZQWQ = "czqwq";
+
+    /**
+     * The author field of Elinar, whose Comprehensive Mining Plant was ported into this mod: {@code §[pf]乳胶芷若喵§r}.
+     * The {@code §[pf]} inline marker is the petalfall text effect and the trailing {@code §r} ends its scope; the font
+     * pipeline draws it, so this line is plain text and needs no {@link MTTextAnimation}.
+     */
+    public static final String Author_Elinar = "§[pf]乳胶芷若喵§r";
 
     /**
      * GT5U's Transcendent Metal for a whole line: the band of {@link MTTranscendentMetalText} plus the tumbler
@@ -137,7 +144,21 @@ public final class AuthorDynamic {
         if (animation == null || word == null || machineStack == null) return;
 
         MTAnimatedTooltipHandler
-            .addAnimatedText(machineStack, () -> StatCollector.translateToLocal("messTech.addBy"), word, animation);
+            .addAnimatedText(machineStack, () -> translateToLocal("messTech.addBy"), word, animation);
+    }
+
+    /**
+     * Registers the hardcoded author line {@code messTech.addByAuthor + " " + Author_Elinar} on a machine stack, and
+     * nothing else: no animated "Add by: MessTech" line follows it, unlike {@link #registerOn(Supplier, ItemStack)}.
+     * The prefix is re-read from the language files every frame (the supplier runs per tooltip), so a resource pack
+     * reload keeps the line in the player's language, and the petalfall marker in {@link #Author_Elinar} is the only
+     * animation it carries.
+     */
+    public static void registerElinarAuthor(ItemStack machineStack) {
+        if (machineStack == null) return;
+
+        MTAnimatedTooltipHandler
+            .addItemTooltip(machineStack, () -> translateToLocal("messTech.addByAuthor") + " " + Author_Elinar);
     }
 
     /**
@@ -151,9 +172,8 @@ public final class AuthorDynamic {
 
         MTAnimatedTooltipHandler
             .addItemTooltip(machineStack, GTAuthors.buildAuthorsWithFormatSupplier(author), animation);
-        MTAnimatedTooltipHandler.addItemTooltip(
-            machineStack,
-            chain(text(StatCollector.translateToLocal("messTech.addBy") + " "), messTechAnimated()));
+        MTAnimatedTooltipHandler
+            .addItemTooltip(machineStack, chain(text(translateToLocal("messTech.addBy") + " "), messTechAnimated()));
     }
 
     /** Animated "MessTech" with a flowing purple gradient. */

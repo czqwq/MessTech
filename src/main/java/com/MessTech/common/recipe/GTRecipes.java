@@ -49,8 +49,10 @@ import com.MessTech.common.machine.Base.IMTModule;
 import com.MessTech.common.machine.hatch.MTReactorAccessHatch;
 import com.MessTech.common.machine.hatch.MTReactorCoolantInputHatch;
 import com.MessTech.common.thaumcraft.MTEssentiaHatchMETileEntity;
+import com.MessTech.init.MessTech;
 
 import appeng.api.AEApi;
+import bartworks.common.loaders.ItemRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
 import goodgenerator.items.GGMaterial;
 import goodgenerator.loader.Loaders;
@@ -543,6 +545,7 @@ public class GTRecipes {
         addSpaceApiaryRecipes();
         addUltimatePatternTerminalRecipe();
         addLegacyMachineRecipes();
+        addComprehensiveMiningPlantRecipe();
         addSmallEssentiaSmelteryRecipes();
         MTLegFakeRecipes.populate();
     }
@@ -636,6 +639,53 @@ public class GTRecipes {
                     .addTo(assemblerRecipes);
             }
         }
+    }
+
+    /**
+     * The Comprehensive Mining Plant, built from the structure it is made of plus the two GT machines whose behaviour
+     * it combines: the tower's casing, frames, metal blocks, advanced casing and High Power Casing, a ring of eight IV
+     * fluid drilling rigs and one LuV Void Miner I. The Void Miner I is read from BartWorks' own registry list
+     * ({@code ItemRegistry.voidminer[0]}); the source mod instead scanned {@code GregTechAPI.METATILEENTITIES} for the
+     * {@code MTEVoidMiners$VMLUV} class name, which the registry makes unnecessary.
+     * <p>
+     * The counts follow the structure: 8 A (Steel Gearbox Casing), 4 B (Steel Frame), 19 C (Tritanium Frame), 7 D (HSLA
+     * Steel Block), 4 E (Steel Block), 8 G (Rebolted Naquadah Casing). F (High Power Casing, 19 positions) is taken as
+     * 16 because the hatches use part of it.
+     */
+    private static void addComprehensiveMiningPlantRecipe() {
+        // BartWorks fills its lists in GT's preInit, long before this mod's recipe load, but a missing entry must not
+        // turn into a recipe with a null input.
+        final ItemStack voidMiner = ItemRegistry.voidminer[0];
+        if (voidMiner == null) {
+            MessTech.MT_LOG.warn("Comprehensive Mining Plant recipe not registered: the Void Miner I item is missing");
+            return;
+        }
+
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.Hull_LuV.get(1),
+                GTOreDictUnificator.get(OrePrefixes.frameGt, Materials.Steel, 64),
+                GTOreDictUnificator.get(OrePrefixes.frameGt, Materials.Tritanium, 32),
+                GTOreDictUnificator.get(OrePrefixes.block, Materials.Steel, 4),
+                casingStack(Casings.ReboltedNaquadahCasing, 8),
+                casingStack(Casings.HighPowerCasing, 16),
+                ItemList.OilDrill4.get(8),
+                voidMiner,
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UV, 16))
+            .fluidInputs(Materials.Polytetrafluoroethylene.getMolten(INGOTS * 16))
+            .circuit(6)
+            .itemOutputs(MTItemList.MTComprehensiveMiningPlant.get(1))
+            .eut(TierEU.RECIPE_ZPM)
+            .duration(SECONDS * 325)
+            .addTo(assemblerRecipes);
+    }
+
+    /**
+     * {@code ICasing#toStack(int)} ignores its amount argument in GT 5.09.54.205 (it always returns a stack of one), so
+     * recipes that need more than one casing have to build the stack by hand.
+     */
+    private static ItemStack casingStack(Casings casing, int amount) {
+        return new ItemStack(casing.getBlock(), amount, casing.getBlockMeta());
     }
 
     /**

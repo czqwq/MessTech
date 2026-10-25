@@ -27,6 +27,9 @@ import gregtech.api.recipe.RecipeCategory;
  * (it then
  * owns the behaviour, and its options apply), otherwise this mod's {@link PatternImportOverlayHandler} for every GT
  * page.
+ * <p>
+ * It also installs the collapsible item groups ({@link MTNEICollapsibleItems}): NEI has no API for those and only reads
+ * its {@code collapsibleitems.cfg} after all NEI plugins ran, so this plugin writes that file here.
  */
 public class NEI_MessTechConfig implements IConfigureNEI {
 
@@ -37,6 +40,8 @@ public class NEI_MessTechConfig implements IConfigureNEI {
 
     @Override
     public void loadConfig() {
+        MTNEICollapsibleItems.load();
+
         API.addRecipeCatalyst(
             MTItemList.SpaceModulePumpInfinity.get(1),
             "gtnhintergalactic.nei.SpacePumpModuleRecipeHandler");

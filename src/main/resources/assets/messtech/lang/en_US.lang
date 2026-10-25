@@ -6,6 +6,7 @@ machine.generatorbase.mode=Wireless Mode
 machine.generatorbase.generation=Wireless Generation
 machine.generatorbase.total=Total Generated
 messTech.addBy=Add by:
+messTech.addByAuthor=Added by:
 GT5U.gui.text.shutdown_reason.datastick=Removed or otherwise extracted the datastick before the research was completed.
 GT5U.gui.text.shutdown_reason.overheating=Machine OverHeating!
 
@@ -678,6 +679,51 @@ machine.hugechemicalreactor.tooltip.structure.hatches=§7· The shell needs at l
 machine.hugechemicalreactor.tooltip.details=§dDetails:§7 the modules apply while the structure check passes, so pulling the module hatch invalidates them at the next check
 machine.hugechemicalreactor.tooltip.details.hint=§7· Without a parallel control module the machine runs on its own parallel of §b1§7
 
+# --- Comprehensive Mining Plant (MTComprehensiveMiningPlant) ---
+machine.comprehensiveminingplant.name=Comprehensive Mining Plant
+machine.comprehensiveminingplant.machinetype=Void Miner | Void Pump
+machine.comprehensiveminingplant.tooltip.desc=§7An infinite resource harvester: it rolls this dimension's §bore pool§7 and pumps its §boil field§7
+machine.comprehensiveminingplant.tooltip.flavour=§7One machine, one whole vein
+machine.comprehensiveminingplant.tooltip.work.header=§6Extraction:
+machine.comprehensiveminingplant.tooltip.work.ore=§7· Ore: each ore parallel takes §b64§7 ores per second from this dimension's §bore pool§7
+machine.comprehensiveminingplant.tooltip.work.fluid=§7· Fluid: each fluid parallel takes vein weight ÷ §b5000§7 of fluid per second
+machine.comprehensiveminingplant.tooltip.work.parallel=§7· Both parallels are §b1..1024§7 (fluid may be §b0§7), set in the GUI and §eapplied on the next start§7
+machine.comprehensiveminingplant.tooltip.power.header=§6Power and output:
+machine.comprehensiveminingplant.tooltip.power.wireless=§7· No energy hatch: each parallel draws §b32768 EU/t§7 from the §bpersonal wireless EU network§7, with a §b2§7 minute buffer
+machine.comprehensiveminingplant.tooltip.power.buffer=§7· The buffer is refilled from the network once every §b60§7 seconds; the machine shuts down while the network cannot pay
+machine.comprehensiveminingplant.tooltip.details=§dDetails:§7 The machine keeps its own chunk loaded; fluid rates can be high, so use a large output hatch or an §bME output hatch
+machine.comprehensiveminingplant.tooltip.details.hint=§7· Without an ore pool the ore parallel idles, without an oil field the fluid parallel idles
+machine.comprehensiveminingplant.structure.controller=Front face, 8th layer up, centred
+machine.comprehensiveminingplant.structure.output_bus=F region (High Power Casing)
+machine.comprehensiveminingplant.structure.output_hatch=F region (High Power Casing)
+machine.comprehensiveminingplant.structure.error.no_output_bus=§cAt least 1 output bus is required (F region)
+machine.comprehensiveminingplant.structure.error.no_output_hatch=§cAt least 1 output hatch is required (F region)
+machine.comprehensiveminingplant.status.running=Running
+machine.comprehensiveminingplant.status.idle=Stopped
+machine.comprehensiveminingplant.gui.status=§7Status: §f%1$s
+machine.comprehensiveminingplant.gui.power=§7Current draw:
+machine.comprehensiveminingplant.gui.eut=§f%1$s EU/t
+machine.comprehensiveminingplant.gui.eutSecond=§f%1$s EU/s (%2$s%% buffered)
+machine.comprehensiveminingplant.gui.fluidHeader=§7Fluid extraction rates:
+machine.comprehensiveminingplant.gui.fluidLine=§b%1$s§7 §f%2$s L/s
+machine.comprehensiveminingplant.gui.oreSpeed=§7Ore extraction rate: §f%1$s §7ores/s
+machine.comprehensiveminingplant.gui.empty=§cThis dimension has neither an ore pool nor an oil field
+machine.comprehensiveminingplant.gui.parallel.title=Parallel Settings (applied on next start)
+machine.comprehensiveminingplant.gui.parallel.ore=Ore Parallel
+machine.comprehensiveminingplant.gui.parallel.fluid=Fluid Parallel
+machine.comprehensiveminingplant.gui.parallel.hint=Applied on the machine's next start
+machine.comprehensiveminingplant.waila.status=§7Status: §b%1$s
+machine.comprehensiveminingplant.waila.power=§7Draw: §b%1$s§7 EU/t (§b%2$s§7 EU/s)
+machine.comprehensiveminingplant.waila.buffer=§7Buffered: §b%1$s§7%%
+machine.comprehensiveminingplant.waila.runtime=§7Runtime: §b%1$s§7s
+machine.comprehensiveminingplant.waila.types=§7Ore types: §b%1$s§7 / fluid types: §b%2$s
+machine.comprehensiveminingplant.waila.fluids=§7Fluids: §b%1$s
+machine.comprehensiveminingplant.info.status=Status: %1$s
+machine.comprehensiveminingplant.info.power=Draw: %1$s EU/t (%2$s EU/s)
+machine.comprehensiveminingplant.info.buffer=Buffered: %1$s%%
+machine.comprehensiveminingplant.info.runtime=Runtime: %1$s s
+machine.comprehensiveminingplant.info.types=Ore types: %1$s / fluid types: %2$s
+
 # --- Modular machine modules (MTModuleMultiMachineBase) ---
 machine.module.desc.install=§7Usable in a §bmodular machine
 machine.module.speed.name=Speed Module
@@ -701,7 +747,9 @@ Material.rainbowwrench=Rainbow
 # --- /messtech command (MTCommand / MTGoUpFlight). The placeholders are the speed, the duration in seconds and the
 # configured ceiling, in that order; the third line only shows up when MOVED_TOO_QUICKLY_THRESHOLD is below the square
 # of the speed, because that check compares squared per-axis distances and would pull the player back down.
-command.messtech.usage=§cUsage: /messtech GoUp [seconds]
+command.messtech.usage=§cUsage: /messtech <GoUp [seconds]|infiore>
+command.messtech.infiore.empty=§7Comprehensive Mining Plants: none
+command.messtech.infiore.entry=§7Comprehensive Mining Plant, dimension §b%1$s§7 at §b%2$s %3$s %4$s§7
 command.messtech.goup.start=§7Launched at §b%s §7blocks/s for §b%s §7seconds
 command.messtech.goup.threshold.low=§cWarning: MOVED_TOO_QUICKLY_THRESHOLD=§b%s§c is below this speed squared (§b%s§c), so the vanilla moved too quickly check will pull the player back
 
@@ -801,7 +849,8 @@ machine.leg.tooltip.output.hatch=§7· Exactly §b1§7 dynamo hatch: normal, §e
 machine.leg.tooltip.output.overmax=§7· A multi-amp or laser hatch can push the output past the §cMAX§7 tier voltage
 machine.leg.tooltip.output.wireless=§7· Wireless output is §cdisabled§7 on this generator
 machine.leg.tooltip.structure.header=§6Structure:
-machine.leg.tooltip.structure.cells=§7· §b25§7 Essentia Diffusion Cells of §bone tier§7 (blueprint sub-channel §bessentia_cell§7): Novice/Adept/Master cap the hatch tier at EV/IV/LuV, §eGrandmaster§7 removes the cap
+machine.leg.tooltip.structure.cells=§7· §b25§7 Essentia Diffusion Cells of §bone tier§7 (sub-channel §bessentia_cell§7)
+machine.leg.tooltip.structure.cells.limit=Novice/Adept/Master cap the hatch tier at EV/IV/LuV, §eGrandmaster§7 removes the cap
 machine.leg.tooltip.structure.blocks=§7· §b4§7 Amber Bricks, §b24§7 Arcane Stone Bricks, the rest is §eMagic Casing§7
 machine.leg.tooltip.structure.hatches=§7· Hatches: §b1+§7 Essentia Input Hatches, §b1§7 input hatch, §b1§7 dynamo hatch
 machine.leg.tooltip.details=§6The full rules are the "混乱科技" Thaumonomicon page.
@@ -989,3 +1038,15 @@ messtech.config.gameconsole.game_console_pauses_world=Pause the World While Open
 # --- LEG fake recipe pool (Large Essentia Generator: upgrades and essentia) ---
 mt.recipe.leg=Large Essentia Generator: Upgrades & Essentia
 mt.recipe.leg.aspect_power=§7Base power: §b%s§7 EU/essentia
+mt.recipe.leg.multiplier=§7Fluid multiplier: §b%s
+mt.recipe.leg.formula=§7EU per essentia = §bBase power × fluid multiplier × stable points / 25
+mt.recipe.leg.multiplier.tainted_death=(25000 / %s)^4
+mt.recipe.leg.multiplier.spirit_spirit=10 × (1 + stable points / 100)
+mt.recipe.leg.multiplier.spirit_tears=15 × (1 + 100 / stable points)
+mt.recipe.leg.multiplier.electric=3^dynamo hatch tier
+
+# --- NEI collapsible item groups (config/NEI/collapsibleitems.cfg, see MTNEICollapsibleItems) ---
+messtech.nei.collapsible.speed=Speed Modules
+messtech.nei.collapsible.eu=EU Discount Modules
+messtech.nei.collapsible.parallel=Parallel Control Modules
+messtech.nei.collapsible.nac=NAC Components

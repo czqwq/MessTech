@@ -13,6 +13,7 @@ import com.MessTech.common.machine.Base.IMTModule;
 import com.MessTech.common.machine.BosesCraftingArray;
 import com.MessTech.common.machine.MTAssFactory;
 import com.MessTech.common.machine.MTChemicalTwister;
+import com.MessTech.common.machine.MTComprehensiveMiningPlant;
 import com.MessTech.common.machine.MTComputingCenter;
 import com.MessTech.common.machine.MTDBBFurnace;
 import com.MessTech.common.machine.MTDTPF;
@@ -281,6 +282,18 @@ public class MTMachineLoader {
                 translateToLocal("machine.hugechemicalreactor.name")).getStackForm(1L));
         // Its brand line is the modular look instead of an author name, see MTModuleProjectText.
         brandAsModuleProject(MTItemList.MTHugeChemicalReactor);
+
+        // The Comprehensive Mining Plant, ported from Elinar's standalone verification mod: an 11x10x10 mining tower
+        // (front-face controller at 5,7,4) that is a wireless-powered void miner + oil extractor, output through the
+        // output buses/hatches of its F region. ID + 79 because the block after + 78 (Small Essentia Smeltery) is the
+        // first one free again; see the loader's other IDs.
+        MTItemList.MTComprehensiveMiningPlant.set(
+            new MTComprehensiveMiningPlant(
+                MT_ID + 79,
+                "MTComprehensiveMiningPlant",
+                translateToLocal("machine.comprehensiveminingplant.name")).getStackForm(1L));
+        // Hardcoded author line: "添加者: " + Elinar's petalfall-styled name, and no "Add by: MessTech" line.
+        AuthorDynamic.registerElinarAuthor(MTItemList.MTComprehensiveMiningPlant.get(1));
 
         // Module hatches: speed, EU discount and parallel control, one variant per tier IV..MAX. IDs go out per family
         // so a tier can be added without shifting the others; no author name - the brand line is the modular look.

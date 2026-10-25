@@ -6,6 +6,7 @@ machine.generatorbase.mode=无线模式
 machine.generatorbase.generation=无线发电
 machine.generatorbase.total=总发电量
 messTech.addBy=添加模组:
+messTech.addByAuthor=添加者:
 GT5U.gui.text.shutdown_reason.datastick=在研究完成前取出或特定方式移除了闪存
 GT5U.gui.text.shutdown_reason.overheating=机器过热!
 
@@ -679,6 +680,51 @@ machine.hugechemicalreactor.tooltip.structure.hatches=§7· 外壳上要求至�
 machine.hugechemicalreactor.tooltip.details=§d细节：§7模块只在结构检查通过时生效，拆掉模块仓会在下一次结构检查时失效
 machine.hugechemicalreactor.tooltip.details.hint=§7· 没有并行控制模块时，机器按自身的 §b1§7 并行运行
 
+# --- 综合采掘工厂 (MTComprehensiveMiningPlant) ---
+machine.comprehensiveminingplant.name=综合采掘工厂
+machine.comprehensiveminingplant.machinetype=虚空采矿场 | 虚空流体钻机
+machine.comprehensiveminingplant.tooltip.desc=§7一台资源采集机：按维度从§b星辰中§7抽出矿物，并从§b银河中§7抽取流体
+machine.comprehensiveminingplant.tooltip.flavour=§7一台机器，整条矿脉
+machine.comprehensiveminingplant.tooltip.work.header=§6采集：
+machine.comprehensiveminingplant.tooltip.work.ore=§7· 矿石：每个矿石并行每秒从本维度的§b矿石池§7中抽取 §b64§7 个矿石
+machine.comprehensiveminingplant.tooltip.work.fluid=§7· 流体：每个流体并行每秒抽取 油田权重 ÷ §b5000§7 的流体
+machine.comprehensiveminingplant.tooltip.work.parallel=§7· 两种并行各 §b1..1024§7（流体可为 §b0§7），在 GUI 中设置，§e下一次启动生效§7
+machine.comprehensiveminingplant.tooltip.power.header=§6供电与输出：
+machine.comprehensiveminingplant.tooltip.power.wireless=§7· 不使用能源仓：每个并行额外增加§b32768 EU功率消耗§7
+machine.comprehensiveminingplant.tooltip.power.buffer=§7· 缓冲每 §b60§7 秒从无线电网平衡一次；电网电量不足时机器自动停机
+machine.comprehensiveminingplant.tooltip.details=§d细节：§7机器会自行加载所在区块；
+machine.comprehensiveminingplant.tooltip.details.hint=§7· 维度没有矿石池时矿石并行空转，没有油田时流体并行空转
+machine.comprehensiveminingplant.structure.controller=正面、自下往上第 8 层居中
+machine.comprehensiveminingplant.structure.output_bus=超能机械方块(或任意输入总线)
+machine.comprehensiveminingplant.structure.output_hatch=超能机械方块(或任意输入仓)
+machine.comprehensiveminingplant.structure.error.no_output_bus=§c至少需要 1 个输出总线（超能机械方块）
+machine.comprehensiveminingplant.structure.error.no_output_hatch=§c至少需要 1 个输出仓（超能机械方块）
+machine.comprehensiveminingplant.status.running=运行中
+machine.comprehensiveminingplant.status.idle=已停止
+machine.comprehensiveminingplant.gui.status=§7状态：§f%1$s
+machine.comprehensiveminingplant.gui.power=§7当前耗电量：
+machine.comprehensiveminingplant.gui.eut=§f%1$s EU/t
+machine.comprehensiveminingplant.gui.eutSecond=§f%1$s EU/s（剩余 %2$s%%）
+machine.comprehensiveminingplant.gui.fluidHeader=§7流体采掘速度：
+machine.comprehensiveminingplant.gui.fluidLine=§b%1$s§7 §f%2$s L/秒
+machine.comprehensiveminingplant.gui.oreSpeed=§7矿石采掘速度：§f%1$s§7/秒
+machine.comprehensiveminingplant.gui.empty=§c该维度没有矿石池或油田
+machine.comprehensiveminingplant.gui.parallel.title=并行设置（下次启动生效）
+machine.comprehensiveminingplant.gui.parallel.ore=矿石并行
+machine.comprehensiveminingplant.gui.parallel.fluid=流体并行
+machine.comprehensiveminingplant.gui.parallel.hint=修改后在这台机器下一次启动时生效
+machine.comprehensiveminingplant.waila.status=§7状态: §b%1$s
+machine.comprehensiveminingplant.waila.power=§7耗电: §b%1$s§7 EU/t (§b%2$s§7 EU/s)
+machine.comprehensiveminingplant.waila.buffer=§7剩余电量: §b%1$s§7%%
+machine.comprehensiveminingplant.waila.runtime=§7运行: §b%1$s§7s
+machine.comprehensiveminingplant.waila.types=§7矿种: §b%1$s§7 种 / 流体: §b%2$s§7 种
+machine.comprehensiveminingplant.waila.fluids=§7流体: §b%1$s
+machine.comprehensiveminingplant.info.status=状态: %1$s
+machine.comprehensiveminingplant.info.power=耗电: %1$s EU/t (%2$s EU/s)
+machine.comprehensiveminingplant.info.buffer=剩余电量: %1$s%%
+machine.comprehensiveminingplant.info.runtime=运行: %1$s s
+machine.comprehensiveminingplant.info.types=矿种: %1$s 种 / 流体: %2$s 种
+
 # --- 模块化机器模块 (MTModuleMultiMachineBase) ---
 machine.module.desc.install=§7可用于§b模块化机器
 machine.module.speed.name=速度模块
@@ -701,7 +747,9 @@ Material.rainbowwrench=彩虹
 # --- /messtech 指令 (MTCommand / MTGoUpFlight)。占位符依次是速度、持续秒数、配置阈值：
 # 第三条只在 MOVED_TOO_QUICKLY_THRESHOLD 低于本次速度的平方时出现，因为原版 moved too quickly 检查
 # 比较的就是逐轴平方距离，阈值不够时服务端会把玩家拉回去。
-command.messtech.usage=§c用法: /messtech GoUp [秒数]
+command.messtech.usage=§c用法: /messtech <GoUp [秒数]|infiore>
+command.messtech.infiore.empty=§7综合采掘工厂：无
+command.messtech.infiore.entry=§7综合采掘工厂 维度 §b%1$s§7（§b%2$s %3$s %4$s§7）
 command.messtech.goup.start=§7已抛向空中: §b%s §7格/s, 持续 §b%s §7秒
 command.messtech.goup.threshold.low=§c警告: 配置 MOVED_TOO_QUICKLY_THRESHOLD=§b%s§c 低于本次速度的平方 §b%s§c, 原版 moved too quickly 检查会把玩家拉回来
 
@@ -801,7 +849,8 @@ machine.leg.tooltip.output.hatch=§7· 恰好 §b1§7 个动力仓：普通、§
 machine.leg.tooltip.output.overmax=§7· 多安/激光动力仓可让输出超过 §cMAX§7 电压
 machine.leg.tooltip.output.wireless=§7· 本发电机§c不启用§7无线输出
 machine.leg.tooltip.structure.header=§6结构:
-machine.leg.tooltip.structure.cells=§7· §b25§7 个源质扩散单元，必须§b同一等级§7（蓝图子频道 §bessentia_cell§7）：新手/学徒/大师级限制动力仓等级在 EV/IV/LuV，§e宗师级§7不限制等级
+machine.leg.tooltip.structure.cells=§7· §b25§7 个源质扩散单元，必须§b同一等级§7（子频道 §bessentia_cell§7）
+machine.leg.tooltip.structure.cells.limit=新手/学徒/大师级限制动力仓等级在 EV/IV/LuV，§e宗师级§7不限制等级
 machine.leg.tooltip.structure.blocks=§7· §b4§7 琥珀砖块、§b24§7 奥术石砖，其余为 §e魔法机械方块§7
 machine.leg.tooltip.structure.hatches=§7· 仓室：§b1+§7 个源质输入仓、§b1§7 个输入仓、§b1§7 个动力仓
 machine.leg.tooltip.details=§6完整规则见“混乱科技”神秘时代研究页。
@@ -988,3 +1037,15 @@ messtech.config.gameconsole.game_console_pauses_world=打开窗口时暂停世�
 # --- LEG 假配方池（大型源质发电机：升级与要素） ---
 mt.recipe.leg=大型源质发电机：升级与要素
 mt.recipe.leg.aspect_power=§7基础发电: §b%s§7 EU/源质
+mt.recipe.leg.multiplier=§7流体倍率: §b%s
+mt.recipe.leg.formula=§7每单位源质 EU = §b基础发电 × 流体倍率 × 稳定点 / 25
+mt.recipe.leg.multiplier.tainted_death=(25000 / %s)^4
+mt.recipe.leg.multiplier.spirit_spirit=10 × (1 + 稳定点 / 100)
+mt.recipe.leg.multiplier.spirit_tears=15 × (1 + 100 / 稳定点)
+mt.recipe.leg.multiplier.electric=3^动力仓等级
+
+# --- NEI 物品折叠组（config/NEI/collapsibleitems.cfg，见 MTNEICollapsibleItems） ---
+messtech.nei.collapsible.speed=速度模块
+messtech.nei.collapsible.eu=耗电减免模块
+messtech.nei.collapsible.parallel=并行控制模块
+messtech.nei.collapsible.nac=NAC 部件

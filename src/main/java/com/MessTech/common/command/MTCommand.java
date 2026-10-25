@@ -9,21 +9,32 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.StatCollector;
 
+import com.MessTech.common.machine.MTMiningPlantRegistry;
 import com.MessTech.init.Config;
 
 /**
  * MessTech's one command root: {@code /messtech <subcommand>}.
  * <p>
- * Only {@code GoUp [seconds]} exists - it hands the sender to {@link MTGoUpFlight}, which pins them to a fixed climb
- * speed for that many seconds (30 by default). The subcommand name is written as it is meant to be typed; only the root
- * name is matched case-insensitively by vanilla.
+ * Subcommands:
+ * <ul>
+ * <li>{@code GoUp [seconds]} - hands the sender to {@link MTGoUpFlight}, which pins them to a fixed climb speed for
+ * that many seconds (30 by default);</li>
+ * <li>{@code infiore} - prints dimension and coordinates of every loaded Comprehensive Mining Plant, from
+ * {@link MTMiningPlantRegistry}. The registry only holds raw numbers and the line is a
+ * {@link ChatComponentTranslation}, so the output is in the player's language.</li>
+ * </ul>
+ * The subcommand name is written as it is meant to be typed; only the root name is matched case-insensitively by
+ * vanilla.
  * <p>
  * Permission level 2 (operator): throwing a player through the world is not something a random player should do to
- * themselves on a server. The sender has to be a player - no target argument, so the console has nothing to launch.
+ * themselves on a server. {@code GoUp} needs a player sender - no target argument, so the console has nothing to
+ * launch; {@code infiore} also works from the console.
  */
 public class MTCommand extends CommandBase {
 
     private static final String USAGE_KEY = "command.messtech.usage";
+    private static final String SUBCOMMAND_GO_UP = "GoUp";
+    private static final String SUBCOMMAND_INFIORE = "infiore";
 
     @Override
     public String getCommandName() {
@@ -44,7 +55,7 @@ public class MTCommand extends CommandBase {
     public void processCommand(ICommandSender sender, String[] args) {
         if (args.length < 1) throw new WrongUsageException(USAGE_KEY);
 
-        if ("GoUp".equalsIgnoreCase(args[0])) {
+        if (SUBCOMMAND_GO_UP.equalsIgnoreCase(args[0])) {
             final EntityPlayerMP player = getCommandSenderAsPlayer(sender);
             final double seconds = args.length >= 2
                 ? Math.min(parseDoubleWithMin(sender, args[1], 0.05D), MTGoUpFlight.MAX_SECONDS)
@@ -72,11 +83,29 @@ public class MTCommand extends CommandBase {
             return;
         }
 
+        if (SUBCOMMAND_INFIORE.equalsIgnoreCase(args[0])) {
+            final List<MTMiningPlantRegistry.Entry> plants = MTMiningPlantRegistry.snapshot();
+            if (plants.isEmpty()) {
+                sender.addChatMessage(new ChatComponentTranslation("command.messtech.infiore.empty"));
+                return;
+            }
+            for (MTMiningPlantRegistry.Entry plant : plants) {
+                sender.addChatMessage(
+                    new ChatComponentTranslation(
+                        "command.messtech.infiore.entry",
+                        plant.getDimension(),
+                        plant.getX(),
+                        plant.getY(),
+                        plant.getZ()));
+            }
+            return;
+        }
+
         throw new WrongUsageException(USAGE_KEY);
     }
 
     @Override
     public List<String> addTabCompletionOptions(ICommandSender sender, String[] args) {
-        return args.length == 1 ? getListOfStringsMatchingLastWord(args, "GoUp") : null;
+        return args.length == 1 ? getListOfStringsMatchingLastWord(args, SUBCOMMAND_GO_UP, SUBCOMMAND_INFIORE) : null;
     }
 }

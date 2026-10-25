@@ -24,14 +24,17 @@ import gregtech.api.util.GTRecipeBuilder;
 import thaumcraft.api.aspects.Aspect;
 
 /**
- * Fills the Large Essentia Generator's fake NEI pool ({@link MTRecipeMaps#legFakeRecipes}) with two page kinds:
+ * Fills the Large Essentia Generator's fake NEI pool ({@link MTRecipeMaps#legFakeRecipes}) with one page per burnable
+ * aspect and auxiliary fluid option. A page shows, in this order:
  *
  * <ul>
- * <li>one page per upgrade item and auxiliary fluid of its aspect category - the upgrade item is installed by
- * right-clicking the controller and is not consumed, and the fluids are the ones {@code MTLargeEssentiaGenerator}
- * tries in order (see {@code airEssentia()} and the other per-category methods);</li>
- * <li>one page per burnable aspect with its base EU value from {@code MTEssentiaEnergyData} (only the base value: the
- * actual output also depends on the auxiliary fluid and the diffusion cell stable points).</li>
+ * <li>the aspect icon (an Aspect Recipe Index item carrying that aspect);</li>
+ * <li>the upgrade item its category needs - or nothing for the NORMAL aspects that burn without an upgrade;</li>
+ * <li>one auxiliary fluid of that category, exactly the list {@code MTLargeEssentiaGenerator} tries in order (see
+ * {@code airEssentia()} and the other per-category methods) - categories without auxiliary fluids show none;</li>
+ * <li>three NEI text lines: the aspect's base EU value, the auxiliary fluid's multiplier (a fixed value, or the
+ * formula the generator uses when it depends on other values) and the EU-per-essentia formula. No pre-computed
+ * result: the actual output also depends on the player's diffusion cell stable points.</li>
  * </ul>
  *
  * Fake recipes only: they are NEI display pages and can never be found by a machine.
@@ -49,68 +52,6 @@ public final class MTLegFakeRecipes {
     private MTLegFakeRecipes() {}
 
     public static void populate() {
-        addUpgradePages();
-        addAspectPages();
-    }
-
-    private static void addUpgradePages() {
-        // The order is the order the generator tries the fluids in: the first one is the best boost.
-        addUpgrade(
-            MTEssentiaEnergyData.TYPE_AIR,
-            Materials.LiquidAir.getFluid(FLUID_DISPLAY_AMOUNT),
-            Materials.Air.getGas(FLUID_DISPLAY_AMOUNT));
-        addUpgrade(
-            MTEssentiaEnergyData.TYPE_THERMAL,
-            Materials.SuperCoolant.getFluid(FLUID_DISPLAY_AMOUNT),
-            FluidRegistry.getFluidStack("cryotheum", FLUID_DISPLAY_AMOUNT),
-            FluidRegistry.getFluidStack("ic2coolant", FLUID_DISPLAY_AMOUNT),
-            FluidRegistry.getFluidStack("ice", FLUID_DISPLAY_AMOUNT),
-            FluidRegistry.getFluidStack("ic2distilledwater", FLUID_DISPLAY_AMOUNT),
-            Materials.Water.getFluid(FLUID_DISPLAY_AMOUNT));
-        addUpgrade(
-            MTEssentiaEnergyData.TYPE_UNSTABLE,
-            WerkstoffLoader.Xenon.getFluidOrGas(FLUID_DISPLAY_AMOUNT),
-            WerkstoffLoader.Krypton.getFluidOrGas(FLUID_DISPLAY_AMOUNT),
-            Materials.Argon.getFluid(FLUID_DISPLAY_AMOUNT),
-            WerkstoffLoader.Neon.getFluidOrGas(FLUID_DISPLAY_AMOUNT),
-            Materials.Helium.getFluid(FLUID_DISPLAY_AMOUNT),
-            Materials.Nitrogen.getFluid(FLUID_DISPLAY_AMOUNT));
-        addUpgrade(
-            MTEssentiaEnergyData.TYPE_VICTUS,
-            FluidRegistry.getFluidStack("xpjuice", FLUID_DISPLAY_AMOUNT),
-            FluidRegistry.getFluidStack("lifeessence", FLUID_DISPLAY_AMOUNT));
-        addUpgrade(
-            MTEssentiaEnergyData.TYPE_TAINTED,
-            FluidRegistry.getFluidStack("fluidpure", FLUID_DISPLAY_AMOUNT),
-            FluidRegistry.getFluidStack("fluiddeath", FLUID_DISPLAY_AMOUNT));
-        addUpgrade(MTEssentiaEnergyData.TYPE_MECHANIC, Materials.Lubricant.getFluid(FLUID_DISPLAY_AMOUNT));
-        addUpgrade(
-            MTEssentiaEnergyData.TYPE_SPRITE,
-            FluidRegistry.getFluidStack("witchery:fluidspirit", FLUID_DISPLAY_AMOUNT),
-            FluidRegistry.getFluidStack("witchery:hollowtears", FLUID_DISPLAY_AMOUNT));
-        addUpgrade(
-            MTEssentiaEnergyData.TYPE_RADIATION,
-            Materials.Caesium.getMolten(FLUID_DISPLAY_AMOUNT),
-            Materials.Uranium235.getMolten(FLUID_DISPLAY_AMOUNT),
-            Materials.Naquadah.getMolten(FLUID_DISPLAY_AMOUNT),
-            GGMaterial.atomicSeparationCatalyst.getMolten(FLUID_DISPLAY_AMOUNT));
-        // ELECTRIC needs no fluid.
-        addUpgrade(MTEssentiaEnergyData.TYPE_ELECTRIC);
-    }
-
-    private static void addUpgrade(int upgradeType, FluidStack... fluids) {
-        ItemStack upgrade = MTEssentiaUpgradeItem.getStack(upgradeType);
-        if (fluids.length == 0) {
-            addFakePage(upgrade, null, null);
-            return;
-        }
-        for (FluidStack fluid : fluids) {
-            if (fluid == null) continue;
-            addFakePage(upgrade, fluid, null);
-        }
-    }
-
-    private static void addAspectPages() {
         if (!Loader.isModLoaded("aspectrecipeindex")) {
             MessTech.MT_LOG.info("AspectRecipeIndex is missing, skipping the LEG aspect NEI pages");
             return;
@@ -122,12 +63,84 @@ public final class MTLegFakeRecipes {
             Comparator.comparingInt(MTEssentiaEnergyData::getAspectTypeIndex)
                 .thenComparing(Aspect::getTag));
         for (Aspect aspect : aspects) {
-            long basePower = MTEssentiaEnergyData.getAspectFuelValue(aspect);
-            addFakePage(
-                aspectItem(aspect),
-                null,
-                StatCollector.translateToLocalFormatted("mt.recipe.leg.aspect_power", basePower));
+            addAspectPages(aspect);
         }
+    }
+
+    private static void addAspectPages(Aspect aspect) {
+        int type = MTEssentiaEnergyData.getAspectTypeIndex(aspect);
+        long basePower = MTEssentiaEnergyData.getAspectFuelValue(aspect);
+
+        // NORMAL aspects burn without an upgrade item; every other category has exactly one upgrade item.
+        ItemStack[] items = type == MTEssentiaEnergyData.TYPE_NORMAL ? new ItemStack[] { aspectItem(aspect) }
+            : new ItemStack[] { aspectItem(aspect), MTEssentiaUpgradeItem.getStack(type) };
+
+        String baseLine = StatCollector.translateToLocalFormatted("mt.recipe.leg.aspect_power", basePower);
+        String formulaLine = StatCollector.translateToLocal("mt.recipe.leg.formula");
+        for (FluidOption option : optionsForType(type, basePower)) {
+            if (option.fluid != null && option.fluid.getFluid() == null) continue;
+            String multiplierLine = StatCollector
+                .translateToLocalFormatted("mt.recipe.leg.multiplier", option.multiplier);
+            addFakePage(items, option.fluid, new String[] { baseLine, multiplierLine, formulaLine });
+        }
+    }
+
+    /**
+     * The burn options of one aspect category: the auxiliary fluids in the order the generator tries them (the first
+     * one is the best boost) plus, for the categories where the fluid is optional, the no-fluid fallback. The lists
+     * mirror the {@code deplete(...)} calls and multiplier constants of {@code MTLargeEssentiaGenerator}'s
+     * per-category methods; categories that cannot burn without a fluid have no fallback entry.
+     */
+    private static List<FluidOption> optionsForType(int type, long basePower) {
+        return switch (type) {
+            case MTEssentiaEnergyData.TYPE_AIR -> List.of(
+                new FluidOption(Materials.LiquidAir.getFluid(FLUID_DISPLAY_AMOUNT), "×1.5"),
+                new FluidOption(Materials.Air.getGas(FLUID_DISPLAY_AMOUNT), "×1"));
+            case MTEssentiaEnergyData.TYPE_THERMAL -> List.of(
+                new FluidOption(Materials.SuperCoolant.getFluid(FLUID_DISPLAY_AMOUNT), "×9"),
+                new FluidOption(FluidRegistry.getFluidStack("cryotheum", FLUID_DISPLAY_AMOUNT), "×5"),
+                new FluidOption(FluidRegistry.getFluidStack("ic2coolant", FLUID_DISPLAY_AMOUNT), "×1.5"),
+                new FluidOption(FluidRegistry.getFluidStack("ice", FLUID_DISPLAY_AMOUNT), "×1.2"),
+                new FluidOption(FluidRegistry.getFluidStack("ic2distilledwater", FLUID_DISPLAY_AMOUNT), "×1"),
+                new FluidOption(Materials.Water.getFluid(FLUID_DISPLAY_AMOUNT), "×0.5"));
+            case MTEssentiaEnergyData.TYPE_UNSTABLE -> List.of(
+                new FluidOption(WerkstoffLoader.Xenon.getFluidOrGas(FLUID_DISPLAY_AMOUNT), "×4"),
+                new FluidOption(WerkstoffLoader.Krypton.getFluidOrGas(FLUID_DISPLAY_AMOUNT), "×3"),
+                new FluidOption(Materials.Argon.getFluid(FLUID_DISPLAY_AMOUNT), "×2.5"),
+                new FluidOption(WerkstoffLoader.Neon.getFluidOrGas(FLUID_DISPLAY_AMOUNT), "×2.2"),
+                new FluidOption(Materials.Helium.getFluid(FLUID_DISPLAY_AMOUNT), "×2"),
+                new FluidOption(Materials.Nitrogen.getFluid(FLUID_DISPLAY_AMOUNT), "×1"));
+            case MTEssentiaEnergyData.TYPE_VICTUS -> List.of(
+                new FluidOption(FluidRegistry.getFluidStack("xpjuice", FLUID_DISPLAY_AMOUNT), "×2"),
+                new FluidOption(FluidRegistry.getFluidStack("lifeessence", FLUID_DISPLAY_AMOUNT), "×6"),
+                new FluidOption(null, "×1"));
+            case MTEssentiaEnergyData.TYPE_TAINTED -> List.of(
+                new FluidOption(FluidRegistry.getFluidStack("fluidpure", FLUID_DISPLAY_AMOUNT), "×60"),
+                new FluidOption(
+                    FluidRegistry.getFluidStack("fluiddeath", FLUID_DISPLAY_AMOUNT),
+                    StatCollector.translateToLocalFormatted("mt.recipe.leg.multiplier.tainted_death", basePower)),
+                new FluidOption(null, "×1"));
+            case MTEssentiaEnergyData.TYPE_MECHANIC -> List
+                .of(new FluidOption(Materials.Lubricant.getFluid(FLUID_DISPLAY_AMOUNT), "×1"));
+            case MTEssentiaEnergyData.TYPE_SPRITE -> List.of(
+                new FluidOption(
+                    FluidRegistry.getFluidStack("witchery:fluidspirit", FLUID_DISPLAY_AMOUNT),
+                    StatCollector.translateToLocal("mt.recipe.leg.multiplier.spirit_spirit")),
+                new FluidOption(
+                    FluidRegistry.getFluidStack("witchery:hollowtears", FLUID_DISPLAY_AMOUNT),
+                    StatCollector.translateToLocal("mt.recipe.leg.multiplier.spirit_tears")),
+                new FluidOption(null, "×1"));
+            case MTEssentiaEnergyData.TYPE_RADIATION -> List.of(
+                new FluidOption(Materials.Caesium.getMolten(FLUID_DISPLAY_AMOUNT), "×2"),
+                new FluidOption(Materials.Uranium235.getMolten(FLUID_DISPLAY_AMOUNT), "×3"),
+                new FluidOption(Materials.Naquadah.getMolten(FLUID_DISPLAY_AMOUNT), "×4"),
+                new FluidOption(GGMaterial.atomicSeparationCatalyst.getMolten(FLUID_DISPLAY_AMOUNT), "×16"),
+                new FluidOption(null, "×1"));
+            case MTEssentiaEnergyData.TYPE_ELECTRIC -> List
+                .of(new FluidOption(null, StatCollector.translateToLocal("mt.recipe.leg.multiplier.electric")));
+            // NORMAL burns without any fluid at all.
+            default -> List.of(new FluidOption(null, "×1"));
+        };
     }
 
     /** @return The Aspect Recipe Index item showing {@code aspect} as its icon, used as the NEI page input. */
@@ -137,17 +150,29 @@ public final class MTLegFakeRecipes {
         return stack;
     }
 
-    private static void addFakePage(ItemStack item, FluidStack fluid, String neiDescription) {
+    private static void addFakePage(ItemStack[] items, FluidStack fluid, String[] neiDescription) {
         GTRecipeBuilder builder = GTValues.RA.stdBuilder()
-            .itemInputs(item)
+            .itemInputs(items)
             // Display-only pages, like GT's own fuel pages (FuelBackend): no duration / EU/t line in NEI.
             .duration(0)
             .eut(0)
-            // The pages share their input item (same upgrade item, aspect item with a different NBT) on purpose.
+            // The pages share their input items (same upgrade item, aspect item with a different NBT) on purpose.
             .ignoreCollision()
             .fake();
         if (fluid != null) builder.fluidInputs(fluid);
-        if (neiDescription != null) builder.setNEIDesc(neiDescription);
+        builder.setNEIDesc(neiDescription);
         builder.addTo(MTRecipeMaps.legFakeRecipes);
+    }
+
+    /** One burn option of a category: an auxiliary fluid (or none) and how the generator's multiplier is written. */
+    private static final class FluidOption {
+
+        private final FluidStack fluid;
+        private final String multiplier;
+
+        private FluidOption(FluidStack fluid, String multiplier) {
+            this.fluid = fluid;
+            this.multiplier = multiplier;
+        }
     }
 }
