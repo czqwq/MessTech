@@ -434,12 +434,15 @@ machine.bosescraftingarray.tooltip.nanite.tier=§7· Uses the §ehighest§7 nani
 machine.bosescraftingarray.tooltip.nanite.speed=§7· Every nanite adds §b0.5§7 speed, so speed scales with the total nanites in the buses
 machine.bosescraftingarray.tooltip.nanite.steps=§7· Recipe duration is split into equal steps by the number of required nanite tiers, same as the original BEC
 machine.bosescraftingarray.tooltip.nanite.stall=§7· Every tier the swarm is above the current step §chalves§7 the speed: an over-tiered swarm is slower
+machine.bosescraftingarray.tooltip.nanite.astral=§7· An §bAstral Array§7 enables auto-adjust mode: with auto-adjust on, nanites above the target tier no longer slow the machine down; the speed mechanic is unchanged
 machine.bosescraftingarray.tooltip.process.header=§6Operation:
 machine.bosescraftingarray.tooltip.process.energy=§7· No built-in speed or EU bonus (§b×1§7); EU/t follows the recipe and is supplied by energy hatches or laser/multi-amp energy hatches
 machine.bosescraftingarray.tooltip.process.parallel=§7· Parallel cap is §b2,147,483,647§7 (integer limit); real parallel is limited by the available input materials
 machine.bosescraftingarray.tooltip.process.overclock=§7· §aPerfect overclock (PoC)§7 is enabled: each overclock step is §b÷4§7 time and §b×4§7 EU/t, so energy per craft is unchanged
 machine.bosescraftingarray.tooltip.details=§dDetails:§7 Recipes without nanite tiers need no nanites and run as plain recipes, but the structure still needs at least §b1§7 nanite bus
 machine.bosescraftingarray.tooltip.details.hint=§7· Only the §enumber§7 and the §ehighest tier§7 of nanites in the buses matter; the bus tier itself does not change the speed
+machine.bosescraftingarray.tooltip.astral=Contains an Astral Array Fabricator. Use a wire cutter to remove it.
+machine.bosescraftingarray.waila.autoadjust=§dAuto-adjust active§7<will automatically downgrade the nanite swarm tier to a suitable level>
 machine.bosescraftingarray.need_nanite_bus=Requires at least 1 Nanite Containment Bus
 
 GT5U.gui.text.recipe_result.nanite_stalled=§cNanite tier too low or no nanites
@@ -815,6 +818,36 @@ machine.leg.structure.error.hatch_tier=§cHatch tier too high for the diffusion 
 machine.leg.structure.error.input_hatch=§cExactly one input hatch is required
 machine.leg.structure.error.no_essentia_hatch=§cAt least one Essentia Input Hatch is required
 
+# --- Small Essentia Smeltery (MTSmallEssentiaSmeltery) ---
+machine.smallessentiasmeltery.name=Small Essentia Smeltery
+machine.smallessentiasmeltery.machinetype=Essentia Smeltery
+machine.smallessentiasmeltery.tooltip.desc=§7A compact essentia smeltery: melts items and fluids into essentia without vis nodes, pollution or flux gas
+machine.smallessentiasmeltery.tooltip.flavour=§7Small, quiet, and happy to melt a whole ruin into essentia
+machine.smallessentiasmeltery.tooltip.cell.header=§6Essentia Diffusion Cells:
+machine.smallessentiasmeltery.tooltip.cell.tier=§7· The §b7§7 cells on the central axis must be one §buniform tier§7 (blueprint sub-channel §bessentia_cell§7): Novice / Adept / Master / Grandmaster
+machine.smallessentiasmeltery.tooltip.cell.speed=§7· Each level multiplies the duration by §b0.5§7: level 0/1/2/3 → duration ×1 / ×0.5 / ×0.25 / ×0.125
+machine.smallessentiasmeltery.tooltip.cell.parallel=§7· Each level multiplies the parallel by §b4§7: level 0/1/2/3 → parallel 1 / 4 / 16 / 64 (the most units one operation can process)
+machine.smallessentiasmeltery.tooltip.cell.poc=§7· When every §eAlchemical Construct§7 is replaced with §eadvanced alchemical sheets§7, §aPerfect Overclock§7 is unlocked; otherwise only normal overclocking
+machine.smallessentiasmeltery.tooltip.process.header=§6Operation:
+machine.smallessentiasmeltery.tooltip.process.input=§7· One parallel unit consumes §b1§7 item (or §b1000 L§7 of fluid) and yields that item's essentia; an item without aspect tags yields §b1§7 §eEntropy§7
+machine.smallessentiasmeltery.tooltip.process.duration=§7· Base power is §b480 EU/t§7; base duration = total essentia points × §b32§7 ticks, scaled by the diffusion cell level and then overclocked by the energy hatch
+machine.smallessentiasmeltery.tooltip.process.output=§7· The essentia goes into the structure's §eEssentia Output Hatches§7; anything they cannot take is voided
+machine.smallessentiasmeltery.tooltip.structure.header=§6Structure:
+machine.smallessentiasmeltery.tooltip.structure.shell=§7· §b3×3×9§7 shell of §eMagic Casing§7; the middle layer's sides are §b14§7 §eWarded Glass§7
+machine.smallessentiasmeltery.tooltip.structure.constructs=§7· §b14§7 §eAlchemical Constructs§7 on the bottom layer's sides, all replaceable with §eadvanced alchemical sheets§7
+machine.smallessentiasmeltery.tooltip.structure.cells=§7· §b7§7 §eEssentia Diffusion Cells§7 on the central axis, all of the same tier
+machine.smallessentiasmeltery.tooltip.structure.hatches=§7· The shell needs at least §b1§7 energy hatch, §b1§7 input (bus or hatch) and §b1§7 essentia output hatch
+machine.smallessentiasmeltery.tooltip.details=§dDetails:§7 No vis nodes, no pollution and no flux gas, and no "not enough essentia" mechanic
+machine.smallessentiasmeltery.tooltip.details.hint=§7· Without an essentia output hatch the structure check fails; hover a hatch to see its hint dot
+machine.smallessentiasmeltery.tooltip.controller=§7Front center
+machine.smallessentiasmeltery.tooltip.cell_name=Essentia Diffusion Cell
+machine.smallessentiasmeltery.tooltip.hatch_info=Magic Casing
+machine.smallessentiasmeltery.tooltip.output_hatch=Essentia Output Hatch
+machine.smallessentiasmeltery.tooltip.output_hatch_me=ME Essentia Output Hatch
+machine.smallessentiasmeltery.need_output_hatch=§cAt least one Essentia Output Hatch is required
+
+tile.essentiaOutputHatchME.name=ME Essentia Output Hatch
+
 tile.essentiaHatch.name=Essentia Input Hatch
 machine.essentiahatch.tooltip.0=§7Right-click with an essentia container to lock the filter
 machine.essentiahatch.tooltip.1=§7Right-click with an empty hand to clear it
@@ -917,7 +950,7 @@ machine.essentiahatch.me.tooltip.max_input=§7Max input per tick: §b%s
 # --- Rainbow Wrench (MTRainbowWrench / ToolRainbowWrench). GT's item name/tooltip keys are
 # "gt.<unlocalized>.<meta>.name": unlocalized is metatool.messtech, meta is the even tool ID 100.
 # Stats: durability Int.MAX, level 325, mining speed 999.
-gt.metatool.messtech.100.name=Rainbow Wrench
+gt.metatool.messtech.100.name=§[ib]Rainbow Wrench§r
 gt.metatool.messtech.100.tooltip=Hold left-click to dismantle machines
 
 # --- Config screen. The keys are generated by @Config.LangKeyPattern in Config.java

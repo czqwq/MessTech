@@ -435,12 +435,15 @@ machine.bosescraftingarray.tooltip.nanite.tier=§7· 取所有总线中的§e最
 machine.bosescraftingarray.tooltip.nanite.speed=§7· 每个蜂群提供 §b0.5§7 速度，速度与总线内的蜂群总数成正比
 machine.bosescraftingarray.tooltip.nanite.steps=§7· 配方时长按所需蜂群等级的数量均分成分步，规则与原版 BEC 相同
 machine.bosescraftingarray.tooltip.nanite.stall=§7· 蜂群等级每比当前步骤高 §b1§7 级，速度就§c减半§7：等级过高反而更慢
+machine.bosescraftingarray.tooltip.nanite.astral=§7· 输入§b星阵§7后将启用自动调节模式：自动调节模式下提供高出目标的纳米蜂群将不再减速，速度机制不变
 machine.bosescraftingarray.tooltip.process.header=§6运行：
 machine.bosescraftingarray.tooltip.process.energy=§7· 无内置速度或耗电加成（§b×1§7），EU/t 完全按配方结算，由能源仓或激光/多安能源仓供电
 machine.bosescraftingarray.tooltip.process.parallel=§7· 并行上限为 §b2,147,483,647§7（整数上限），实际并行取决于输入原料是否充足
 machine.bosescraftingarray.tooltip.process.overclock=§7· 启用§a无损超频（PoC）§7：每级超频耗时 §b÷4§7、EU/t §b×4§7，总耗电不变
 machine.bosescraftingarray.tooltip.details=§d细节：§7配方未标注蜂群等级时无需蜂群，直接按普通配方运行，但结构仍要求至少 §b1§7 条纳米总线
 machine.bosescraftingarray.tooltip.details.hint=§7· 只统计总线内蜂群的§e数量§7与§e最高等级§7，总线本身等级不影响速度
+machine.bosescraftingarray.tooltip.astral=内含星阵，使用剪线钳可取出。
+machine.bosescraftingarray.waila.autoadjust=§d自动调节已启动§7<将自动降级纳米蜂群等级到合适等级>
 machine.bosescraftingarray.need_nanite_bus=至少需要 1 个纳米蜂群总线
 
 GT5U.gui.text.recipe_result.nanite_stalled=§c纳米蜂群等级不足或没有纳米蜂群
@@ -815,6 +818,36 @@ machine.leg.structure.error.hatch_tier=§c仓室等级超出扩散单元允许�
 machine.leg.structure.error.input_hatch=§c需要恰好 1 个输入仓
 machine.leg.structure.error.no_essentia_hatch=§c至少需要 1 个源质输入仓
 
+# --- 小型源质冶炼厂 (MTSmallEssentiaSmeltery) ---
+machine.smallessentiasmeltery.name=小型源质冶炼厂
+machine.smallessentiasmeltery.machinetype=源质冶炼厂
+machine.smallessentiasmeltery.tooltip.desc=§7一台紧凑的源质冶炼厂：把物品与流体熔炼成源质，不依赖灵气节点，也不会产生污染与咒波气体
+machine.smallessentiasmeltery.tooltip.flavour=§7小巧、安静，还能把整座废墟熔成源质
+machine.smallessentiasmeltery.tooltip.cell.header=§6源质扩散单元：
+machine.smallessentiasmeltery.tooltip.cell.tier=§7· 结构的 §b7§7 个扩散单元必须§b同一等级§7（子频道 §bessentia_cell§7）
+machine.smallessentiasmeltery.tooltip.cell.speed=§7· 每级耗时 §b×0.5§7（乘算）
+machine.smallessentiasmeltery.tooltip.cell.parallel=§7· 每级并行 §b4^等级§7：
+machine.smallessentiasmeltery.tooltip.cell.poc=§7· 使用高级炼金构材§7时解锁§a无损超频§7
+machine.smallessentiasmeltery.tooltip.process.header=§6工作：
+machine.smallessentiasmeltery.tooltip.process.input=§7· 每个并行单位消耗 §b1§7 个物品（或 §b1000L§7 流体）产出该物品的源质；没有源质标签的物品产出 §b1§7 点§e熵§7
+machine.smallessentiasmeltery.tooltip.process.duration=§7· 基础耗电 §b480 EU/t§7，基础时长 = 总源质点数 × §b32§7 tick，再按扩散单元等级减免并按能源仓超频
+machine.smallessentiasmeltery.tooltip.process.output=§7· 产出的源质进入结构中的§e源质输出仓§7；输出仓装不下时会直接丢弃
+machine.smallessentiasmeltery.tooltip.structure.header=§6结构：
+machine.smallessentiasmeltery.tooltip.structure.shell=§7· §b3×3×9§7 的§e魔法机械方块§7外壳，中层两侧是 §b14§7 块§e守卫玻璃§7
+machine.smallessentiasmeltery.tooltip.structure.constructs=§7· 底层两侧是 §b14§7 个§e炼金构装§7，可全部换成§e高级炼金板材§7
+machine.smallessentiasmeltery.tooltip.structure.cells=§7· 中轴是 §b7§7 个§e源质扩散单元§7，必须同一等级
+machine.smallessentiasmeltery.tooltip.structure.hatches=§7· 外壳上至少 §b1§7 个能源仓、§b1§7 个输入（总线或仓）与 §b1§7 个源质输出仓
+machine.smallessentiasmeltery.tooltip.details=§d细节：§7不需要灵气节点、不会产生污染与咒波气体，也没有“源质不足”的设定
+machine.smallessentiasmeltery.tooltip.details.hint=§7· 没有源质输出仓时结构校验失败；鼠标悬停仓室可查看提示点编号
+machine.smallessentiasmeltery.tooltip.controller=§7正面中央
+machine.smallessentiasmeltery.tooltip.cell_name=源质扩散单元
+machine.smallessentiasmeltery.tooltip.hatch_info=魔法机械方块
+machine.smallessentiasmeltery.tooltip.output_hatch=源质输出仓
+machine.smallessentiasmeltery.tooltip.output_hatch_me=ME 源质输出仓
+machine.smallessentiasmeltery.need_output_hatch=§c至少需要 1 个源质输出仓
+
+tile.essentiaOutputHatchME.name=ME 源质输出仓
+
 tile.essentiaHatch.name=源质输入仓
 machine.essentiahatch.tooltip.0=§7手持源质容器右键以锁定过滤
 machine.essentiahatch.tooltip.1=§7空手右键以清除过滤
@@ -916,7 +949,7 @@ machine.essentiahatch.me.tooltip.max_input=§7单次最大输入数量：§b%s
 
 # --- 彩虹小扳手 (MTRainbowWrench / ToolRainbowWrench)。GT 工具的物品名/介绍键是「gt.<unlocalized>.<meta>.name」，
 # 这里 unlocalized 是 metatool.messtech、meta 是偶数工具 ID 100。数值：耐久 Int.MAX、等级 325、挖掘速度 999。
-gt.metatool.messtech.100.name=彩虹小扳手
+gt.metatool.messtech.100.name=§[ib]彩虹小扳手§r
 gt.metatool.messtech.100.tooltip=按住左键以拆卸机器
 
 # --- 配置界面。键名由 Config.java 里的 @Config.LangKeyPattern 生成（"%mod.config.%cat.%field"，小写）；

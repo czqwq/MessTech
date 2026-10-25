@@ -22,6 +22,7 @@ import com.MessTech.common.machine.MTLargeProcessingFactory;
 import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.MTNanoScaleFoundry;
 import com.MessTech.common.machine.MTReactor;
+import com.MessTech.common.machine.MTSmallEssentiaSmeltery;
 import com.MessTech.common.machine.hatch.MTHatchRack;
 import com.MessTech.common.machine.hatch.MTInventoryInputBusME;
 import com.MessTech.common.machine.hatch.MTInventoryInputHatchME;
@@ -211,6 +212,13 @@ public class MTMachineLoader {
             new MTLargeEssentiaGenerator(MT_ID + 37, "LargeEssentiaGenerator", translateToLocal("machine.leg.name"))
                 .getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTLargeEssentiaGenerator.get(1));
+
+        MTItemList.MTSmallEssentiaSmeltery.set(
+            new MTSmallEssentiaSmeltery(
+                MT_ID + 78,
+                "Small Essentia Smeltery",
+                translateToLocal("machine.smallessentiasmeltery.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTSmallEssentiaSmeltery.get(1));
 
         // Reactor access hatches: one variant per tier, EV (1 page) through UIV (8 pages).
         for (int i = 0; i < MTItemList.REACTOR_ACCESS_HATCHES.length; i++) {

@@ -54,6 +54,7 @@ import appeng.api.AEApi;
 import cpw.mods.fml.common.registry.GameRegistry;
 import goodgenerator.items.GGMaterial;
 import goodgenerator.loader.Loaders;
+import goodgenerator.util.ItemRefer;
 import gregtech.api.casing.Casings;
 import gregtech.api.enums.CondensateType;
 import gregtech.api.enums.GTValues;
@@ -79,6 +80,7 @@ import ic2.core.Ic2Items;
 import tectech.recipe.TTRecipeAdder;
 import tectech.recipe.TecTechRecipeMaps;
 import tectech.thing.CustomItemList;
+import thaumcraft.common.config.ConfigBlocks;
 import thaumicenergistics.api.ThEApi;
 
 public class GTRecipes {
@@ -541,6 +543,7 @@ public class GTRecipes {
         addSpaceApiaryRecipes();
         addUltimatePatternTerminalRecipe();
         addLegacyMachineRecipes();
+        addSmallEssentiaSmelteryRecipes();
     }
 
     /**
@@ -629,6 +632,42 @@ public class GTRecipes {
                     .itemOutputs(upgraded)
                     .eut(TierEU.RECIPE_UV)
                     .duration(MINUTES)
+                    .addTo(assemblerRecipes);
+            }
+        }
+    }
+
+    /**
+     * The Small Essentia Smeltery and its ME essentia output hatch. The smeltery is a compact counterpart of the Large
+     * Essentia Smeltery: an IV hull around the same magic parts, so it is an IV assembler recipe. The ME output hatch
+     * is GoodGenerator's normal output hatch plus a ThE 16384k essentia storage component, as requested: one output
+     * hatch, circuit 1, IV assembler, 100 seconds.
+     */
+    private static void addSmallEssentiaSmelteryRecipes() {
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.Hull_IV.get(1),
+                new ItemStack(Loaders.magicCasing, 8, 0),
+                new ItemStack(ConfigBlocks.blockMetalDevice, 8, 9),
+                ItemRefer.Essentia_Cell_T2.get(2),
+                new Object[] { OrePrefixes.circuit.get(Materials.IV), 4 })
+            .fluidInputs(Materials.Thaumium.getMolten(INGOTS * 16))
+            .itemOutputs(MTItemList.MTSmallEssentiaSmeltery.get(1))
+            .eut(RECIPE_IV)
+            .duration(MINUTES * 2)
+            .addTo(assemblerRecipes);
+
+        if (MTItemList.MTEssentiaOutputHatchME.hasBeenSet()) {
+            ThEApi thEApi = ThEApi.instance();
+            if (thEApi != null) {
+                GTValues.RA.stdBuilder()
+                    .itemInputs(
+                        ItemRefer.Essentia_Output_Hatch.get(1),
+                        thEApi.items().EssentiaStorageComponent_16384k.getStacks(1))
+                    .circuit(1)
+                    .itemOutputs(MTItemList.MTEssentiaOutputHatchME.get(1))
+                    .eut(RECIPE_IV)
+                    .duration(SECONDS * 100)
                     .addTo(assemblerRecipes);
             }
         }

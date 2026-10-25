@@ -95,10 +95,14 @@ public enum MTItemList {
     MTLargeProcessingFactory,
     /** Large Essentia Generator (大型源质发电机). */
     MTLargeEssentiaGenerator,
+    /** Small Essentia Smeltery (小型源质冶炼厂). */
+    MTSmallEssentiaSmeltery,
     /** Essentia input hatch block of the LEG (源质输入仓). */
     MTEssentiaHatch,
     /** ME essentia input hatch block of the LEG (ME 源质输入仓); only set when Thaumic Energistics is loaded. */
     MTEssentiaHatchME,
+    /** ME essentia output hatch block of the Small Essentia Smeltery (ME 源质输出仓); only set with ThE. */
+    MTEssentiaOutputHatchME,
     /** LEG upgrade item (源质发电机升级), 10 metadata values. */
     MTEssentiaUpgrade;
 

@@ -28,6 +28,11 @@ public final class MTBlocks {
     public static final MTEssentiaHatchBlock essentiaHatchBlock = new MTEssentiaHatchBlock();
     /** ME essentia input hatch; only registered when Thaumic Energistics is loaded (see {@link MTThaumcraftME}). */
     public static Block essentiaHatchMEBlock;
+    /**
+     * ME essentia output hatch of the Small Essentia Smeltery; only registered when Thaumic Energistics is loaded (see
+     * {@link MTThaumcraftME}).
+     */
+    public static Block essentiaOutputHatchMEBlock;
 
     private MTBlocks() {}
 

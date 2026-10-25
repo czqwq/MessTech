@@ -7,8 +7,13 @@ import static net.minecraft.util.StatCollector.translateToLocal;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import org.jetbrains.annotations.NotNull;
@@ -32,6 +37,7 @@ import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.logic.ProcessingLogic;
+import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
 import gregtech.api.metatileentity.implementations.MTEHatchNanite;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
@@ -42,9 +48,13 @@ import gregtech.api.structure.error.StructureError;
 import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTRecipeConstants;
+import gregtech.api.util.GTUtility;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.IGTHatchAdder;
 import gregtech.api.util.MultiblockTooltipBuilder;
+import mcp.mobius.waila.api.IWailaConfigHandler;
+import mcp.mobius.waila.api.IWailaDataAccessor;
+import tectech.thing.CustomItemList;
 
 public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> implements ISurvivalConstructable {
 
@@ -112,6 +122,13 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
     private List<NaniteStep> naniteSteps;
     private long naniteSubticks;
     private boolean naniteStalled;
+
+    /**
+     * Whether an Astral Array Fabricator has been consumed from an input bus to unlock auto-adjust mode. Saved like
+     * the Nano-Scale Foundry's array: in the world NBT and in the controller item NBT, so breaking and replacing the
+     * machine keeps the unlock. A wire cutter gives the array back and turns auto-adjust off again.
+     */
+    private boolean autoAdjustUnlocked = false;
 
     private static final class NaniteStep {
 
@@ -198,6 +215,18 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
         return MTRecipeMaps.bosesCraftingArrayRecipes;
     }
 
+    /**
+     * The Astral Array is consumed like the Nano-Scale Foundry's: at the top of the recipe check, inside the
+     * {@code startRecipeProcessing()} / {@code endRecipeProcessing()} wrapper GT puts around it, so ME buses commit
+     * the extraction correctly.
+     */
+    @Override
+    @NotNull
+    public CheckRecipeResult checkProcessing() {
+        consumeAstralArrayFromBuses();
+        return super.checkProcessing();
+    }
+
     @Override
     protected ProcessingLogic createProcessingLogic() {
         return new MTProcessingLogic() {
@@ -258,7 +287,11 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
         setNaniteStalled(false);
 
         // Original BEC divisor formula, with no parallel or condensate slowdown on this standalone machine.
-        int aboveTierDivisor = 1 << Math.abs(step.tier.tier - providedTier.tier);
+        // Auto-adjust mode first downgrades the swarm tier to the step's target tier, so an over-tiered swarm no
+        // longer eats the halving divisor; below the target the stall above still applies and the speed formula itself
+        // is untouched.
+        int effectiveTier = autoAdjustUnlocked ? Math.min(step.tier.tier, providedTier.tier) : providedTier.tier;
+        int aboveTierDivisor = 1 << Math.abs(step.tier.tier - effectiveTier);
         int divisor = Math.max(1, aboveTierDivisor);
 
         // Each nanite gives a fixed 0.5 speed bonus, so keep progress in half-tick units.
@@ -354,6 +387,94 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
         return total;
     }
 
+    // region Astral Array / auto-adjust mode
+
+    /**
+     * Consumes one Astral Array Fabricator from an input bus. Only {@code mInputBusses} is read: the pattern input
+     * assemblies (programmable hatches / CRIB and the like) keep their virtual slots to themselves, a star array put
+     * there is not consumed. The unlock and its save mechanism are the Nano-Scale Foundry's, copied here: consumed
+     * once, kept in the machine NBT and in the controller item NBT, extractable again with a wire cutter.
+     */
+    private void consumeAstralArrayFromBuses() {
+        if (autoAdjustUnlocked) return;
+        ItemStack starArray = CustomItemList.astralArrayFabricator.get(1);
+        for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
+            if (bus == null) continue;
+            IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
+            for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
+                ItemStack stack = busTile.getStackInSlot(i);
+                if (stack != null && GTUtility.areStacksEqual(stack, starArray)) {
+                    busTile.decrStackSize(i, 1);
+                    autoAdjustUnlocked = true;
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * A wire cutter gives the Astral Array back into an output bus and turns auto-adjust off. Like the Nano-Scale
+     * Foundry's, the unlock only drops once the array was actually ejected, so a full output bus never eats it.
+     */
+    @Override
+    public boolean onWireCutterRightClick(ForgeDirection side, ForgeDirection wrenchingSide, EntityPlayer aPlayer,
+        float aX, float aY, float aZ, ItemStack aTool) {
+        if (!autoAdjustUnlocked) return false;
+
+        ItemStack starArray = CustomItemList.astralArrayFabricator.get(1);
+        addOutputPartial(starArray);
+        if (starArray.stackSize <= 0) {
+            autoAdjustUnlocked = false;
+            markDirty();
+        }
+        return true;
+    }
+
+    @Override
+    public void saveNBTData(NBTTagCompound aNBT) {
+        super.saveNBTData(aNBT);
+        aNBT.setBoolean("becAutoAdjust", autoAdjustUnlocked);
+    }
+
+    @Override
+    public void loadNBTData(NBTTagCompound aNBT) {
+        super.loadNBTData(aNBT);
+        autoAdjustUnlocked = aNBT.getBoolean("becAutoAdjust");
+    }
+
+    @Override
+    public void setItemNBT(NBTTagCompound aNBT) {
+        super.setItemNBT(aNBT);
+        if (autoAdjustUnlocked) aNBT.setBoolean("becAutoAdjust", true);
+    }
+
+    @Override
+    public void addAdditionalTooltipInformation(ItemStack stack, List<String> tooltip) {
+        if (stack.hasTagCompound() && stack.getTagCompound()
+            .getBoolean("becAutoAdjust")) {
+            tooltip.add(EnumChatFormatting.DARK_PURPLE + translateToLocal("machine.bosescraftingarray.tooltip.astral"));
+        }
+    }
+
+    @Override
+    public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
+        int z) {
+        super.getWailaNBTData(player, tile, tag, world, x, y, z);
+        if (autoAdjustUnlocked) tag.setBoolean("becAutoAdjust", true);
+    }
+
+    @Override
+    public void getWailaBody(ItemStack itemStack, List<String> currentTip, IWailaDataAccessor accessor,
+        IWailaConfigHandler config) {
+        super.getWailaBody(itemStack, currentTip, accessor, config);
+        if (accessor.getNBTData()
+            .getBoolean("becAutoAdjust")) {
+            currentTip.add(translateToLocal("machine.bosescraftingarray.waila.autoadjust"));
+        }
+    }
+
+    // endregion
+
     @Override
     public void construct(ItemStack stackSize, boolean hintsOnly) {
         buildPiece(STRUCTURE_PIECE_MAIN, stackSize, hintsOnly, HORIZONTAL_OFFSET, VERTICAL_OFFSET, DEPTH_OFFSET);
@@ -402,6 +523,7 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.speed"))
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.steps"))
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.stall"))
+            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.astral"))
             .addSeparator()
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.header"))
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.energy"))

@@ -1,5 +1,7 @@
 # MessTech
 
+[`中文`](docs/Readme_ZH.md)
+
 An Community mod for GTNH
 
 ### Get start
