@@ -8,6 +8,13 @@ An Community mod for GTNH
 Download the Latest Mod Jar in Release then drop it to mods
 start the game
 
+### Before Download
+We're currently using Automatic Building System, the release version may not the newest version
+If any issue happened in AutoBuild release. Please Report Bugs in the issues
+
+我们目前使用的是自动构建系统，发布的版本可能不是最新版本。
+如果在自动构建版本发布过程中出现任何问题，请在 issues 中报告错误。
+
 ### Current support version
 
 | GTNH Version | Start Version | Newest Support Version |                                                         Download                                                          | Maintenance status |
