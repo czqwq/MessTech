@@ -6,6 +6,7 @@ import static gregtech.api.recipe.RecipeMaps.assemblerRecipes;
 import static gregtech.api.util.GTModHandler.getModItem;
 
 import com.MessTech.common.items.MTItemList;
+
 import fox.spiteful.avaritia.crafting.ExtremeCraftingManager;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.ItemList;
@@ -17,12 +18,17 @@ import gregtech.common.items.CombType;
 import gregtech.loaders.misc.GTBees;
 
 public class ExtraRecipes {
-    public  static void loadBeeRecipes(){
+
+    public static void loadBeeRecipes() {
         GTValues.RA.stdBuilder()
-            .itemInputs(GTOreDictUnificator.get(OrePrefixes.plate,Materials.Infinity,64),
-                ItemList.Emitter_UEV.get(16),ItemList.Sensor_UEV.get(16),GTBees.combs.getStackForType(CombType.INFINITYCATALYST,64),GTBees.combs.getStackForType(CombType.COSMICNEUTRONIUM, 64),GTOreDictUnificator.get(OrePrefixes.circuit,Materials.UIV,16))
-            .fluidInputs(
-                Materials.Grade8PurifiedWater.getFluid(1000000))
+            .itemInputs(
+                GTOreDictUnificator.get(OrePrefixes.plate, Materials.Infinity, 64),
+                ItemList.Emitter_UEV.get(16),
+                ItemList.Sensor_UEV.get(16),
+                GTBees.combs.getStackForType(CombType.INFINITYCATALYST, 64),
+                GTBees.combs.getStackForType(CombType.COSMICNEUTRONIUM, 64),
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UIV, 16))
+            .fluidInputs(Materials.Grade8PurifiedWater.getFluid(1000000))
             .itemOutputs(MTItemList.MTCombProcessingModule.get(1))
             .eut(RECIPE_UIV)
             .duration(20 * 325)
