@@ -400,7 +400,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     @Override
     public RecipeMap<?> getRecipeMap() {
         if (machineMode == MODE_ONE_STEP_CIRCUIT_POOL) {
-            // Mode 1 is one pool whose selector comes from an input bus circuit slot (1-6), like a standalone
+            // Mode 1 is one pool whose selector comes from an input bus circuit slot (1-9), like a standalone
             // machine's.
             return MTRecipeMaps.oneStepCircuitPoolRecipes;
         }
@@ -1720,7 +1720,6 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.header"))
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.enable"))
-            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.mode1"))
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.restrict"))
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.wirecutter"))
             .addSeparator()

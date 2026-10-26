@@ -70,16 +70,26 @@ public final class MTRecipeMaps {
     /**
      * Selector level of one recipe in the one-step circuit pool, also the NEI ordering key: 1 = Processor,
      * 2 = Processor Cluster/Assembly, 3 = Supercomputer/Computer, 4 = Mainframe, 5 = the primitive GT circuit ladder,
-     * 6 = the special independent circuits (Pico/Quantum/Planck etc.). Every flattened recipe carries its level as a
-     * real {@code GTRecipeBuilder#circuit(int)} input, so it is also the circuit the machine finds in an input bus.
+     * 6-9 = one circuit per special independent chain. Every flattened recipe carries its level as a real
+     * {@code GTRecipeBuilder#circuit(int)} input, so it is also the circuit the machine finds in an input bus.
      */
     public static final RecipeMetadataKey<Integer> ONE_STEP_CIRCUIT_LEVEL = SimpleRecipeMetadataKey
         .create(Integer.class, "mt_onestep_circuit_level");
 
     /**
-     * Circuit of the special independent chains (Pico/Quantum/Planck): the tier ladder uses 1-5, these take the next.
+     * Circuits of the special independent chains: the tier ladder uses 1-5, so every special product takes one of the
+     * next numbers. They used to share 6, but the Quantum page flattens the whole Pico chain into its own inputs (the
+     * Quantum chain consumes Pico circuits through the Pico Circuit Rack), so a shared selector always matched the
+     * cheaper Pico page first and no Quantum circuit was ever made. The selector is the only thing that can tell the
+     * two apart.
      */
-    public static final int ONE_STEP_SPECIAL_CIRCUIT_LEVEL = 6;
+    public static final int ONE_STEP_PICO_CIRCUIT_LEVEL = 6;
+    public static final int ONE_STEP_QUANTUM_CIRCUIT_LEVEL = 7;
+    public static final int ONE_STEP_PLANCK_CIRCUIT_LEVEL = 8;
+    /**
+     * {@code RawManifoldBud} is no circuit item, but it is an Assembly Matrix product shown in this pool all the same.
+     */
+    public static final int ONE_STEP_RAW_MANIFOLD_BUD_CIRCUIT_LEVEL = 9;
 
     /**
      * Minimum structure level a Chemical Twister recipe needs, as
@@ -966,8 +976,9 @@ public final class MTRecipeMaps {
         CircuitComponent outputComponent = getNACComponent(assembly.mOutputs[0]);
         if (outputComponent == null || outputComponent.realComponent == null) return null;
 
-        // Keep every Assembly Matrix product: the special independent circuits (Pico/Quantum/Planck) plus the full
-        // Crystal/Wetware/Bio/Optical lines, including Processor/Assembly/Supercomputer and their Mainframe/主机 tier.
+        // Keep every Assembly Matrix product: the special independent chains (Pico/Quantum/Planck/Raw Manifold Bud)
+        // plus the full Crystal/Wetware/Bio/Optical lines, including Processor/Assembly/Supercomputer and their
+        // Mainframe/主机 tier.
         ItemStack realOutput = outputComponent.realComponent.get();
         if (realOutput == null) return null;
         int circuitLevel = getOneStepCircuitLevel(outputComponent);
@@ -1018,20 +1029,36 @@ public final class MTRecipeMaps {
     }
 
     /**
-     * The circuit one flattened recipe asks for: the tier ladder 1-5, or {@link #ONE_STEP_SPECIAL_CIRCUIT_LEVEL}
-     * for the special independent chains (Pico/Quantum/Planck), which have no tier of their own.
+     * The circuit one flattened recipe asks for: the tier ladder 1-5, or one dedicated circuit per special independent
+     * chain ({@link #ONE_STEP_PICO_CIRCUIT_LEVEL} .. {@link #ONE_STEP_RAW_MANIFOLD_BUD_CIRCUIT_LEVEL}), which have no
+     * tier of their own.
      */
     private static int getOneStepCircuitLevel(CircuitComponent component) {
-        if (component == null) return ONE_STEP_SPECIAL_CIRCUIT_LEVEL;
+        if (component == null) return ONE_STEP_PICO_CIRCUIT_LEVEL;
         // The primitive line is the original GT circuit ladder (Nand chip / Microprocessor / IntegratedProcessor /
         // NanoProcessor / QuantumProcessor): selector 5, instead of falling into the "Processor" name match below.
         if (component.circuitType == CircuitCalibration.PRIMITIVE) return 5;
+        // One selector per special chain, see the constants above.
+        switch (component) {
+            case PicoCircuit:
+                return ONE_STEP_PICO_CIRCUIT_LEVEL;
+            case QuantumCircuit:
+                return ONE_STEP_QUANTUM_CIRCUIT_LEVEL;
+            case PlanckCircuit:
+                return ONE_STEP_PLANCK_CIRCUIT_LEVEL;
+            case RawManifoldBud:
+                return ONE_STEP_RAW_MANIFOLD_BUD_CIRCUIT_LEVEL;
+            default:
+                break;
+        }
         String name = component.name();
         if (name.contains("Mainframe")) return 4;
         if (name.contains("Computer")) return 3;
         if (name.contains("Assembly")) return 2;
         if (name.contains("Processor")) return 1;
-        return ONE_STEP_SPECIAL_CIRCUIT_LEVEL;
+        // A special product this pool does not know yet: shared with Pico's selector. A new chain needs its own number
+        // here and in the mode-1 tooltip text, or the same Pico/Quantum mixing comes back.
+        return ONE_STEP_PICO_CIRCUIT_LEVEL;
     }
 
     /**

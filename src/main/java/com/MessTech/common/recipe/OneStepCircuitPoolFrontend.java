@@ -20,7 +20,7 @@ import gregtech.common.gui.modularui.UIHelper;
  * These recipes are recursively flattened Assembly Matrix chains whose raw material components are packed into molten
  * fluids (see {@code MTRecipeMaps#packMaterialInputs}), so a page is dominated by two wide grids, kept inside the
  * standard 170px background: progress bar, single item output and logo on the header row, {@link #COLUMNS} item columns
- * underneath, then the fluid rows. The 1-6 selector circuit is a real (non-consumed) recipe input since the pool
+ * underneath, then the fluid rows. The 1-9 selector circuit is a real (non-consumed) recipe input since the pool
  * switched
  * to {@code GTRecipeBuilder#circuit(int)}, so it is drawn like any other item input, not in a special slot.
  */
@@ -110,9 +110,8 @@ public class OneStepCircuitPoolFrontend extends RecipeMapFrontend {
 
     /**
      * Orders the page list the way the machine's selector reads: the circuit ladder (1 Processor, 2 Assembly,
-     * 3 Supercomputer, 4 Mainframe, 5 the original GT ladder), then 6 for the special Pico/Quantum/Planck chains;
-     * within
-     * one level the output name decides, so the list is stable.
+     * 3 Supercomputer, 4 Mainframe, 5 the original GT ladder), then one selector per special chain (6 Pico, 7 Quantum,
+     * 8 Planck, 9 Raw Manifold Bud); within one level the output name decides, so the list is stable.
      */
     private static int compareRecipes(GTRecipe left, GTRecipe right) {
         int byLevel = Integer.compare(selectorLevel(left), selectorLevel(right));

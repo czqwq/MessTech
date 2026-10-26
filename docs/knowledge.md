@@ -660,15 +660,42 @@ MTMultiMachineBase<T>
 
 ### MTWirelessVacuumConveyorInput / MTWirelessVacuumConveyorOutput
 - Registered as `32409` (input) / `32410` (output); extend the normal GT5U VCI/VCO classes, so existing NAC module
-  structure code accepts them. Same GUI as the GT5U vacuum hatch plus frequency/popup and private toggle.
-- Pairing: string frequency + optional owner UUID (private), like the advanced wireless redstone covers; the hatch dye
-  colour is part of the match, so NAC colour routing VCI -> VCO survives. `color == -1` (unpainted) never links.
-- Dedicated registry for all wireless hatches (`VacuumFactoryGrid.vertices` only holds elements that already have an
-  edge); `getNeighbours()` = every registered hatch with the same colour/frequency/private key. `canConnectOnSide()`
-  false, so normal Vacuum Conveyor Pipes cannot connect.
-- The wireless input overrides `onPostTick()` for cross-NAC output extraction (no `mainController` equality, 1:1 output
-  rule kept) and queries the registry directly instead of `VacuumFactoryGrid` edge formation - isolated pairs still
-  transfer.
+  structure code accepts them. They keep the plain GT5U vacuum hatch GUI; the frequency/private GUI of the first
+  implementation is gone.
+- Pairing is **data stick address pairing**, adapted from GT-Not-Leisure's `WirelessVacuumConveyor*Hatch`
+  (`tmp/GT-Not-Leisure/src/main/java/com/science/gtnl/common/machine/hatch/`): left-click the output hatch with a
+  data stick -> the stick stores `{type, dim, x, y, z}` (`type = messtechWirelessVacuumConveyorOutput`) plus a
+  display name; right-click an input hatch with that stick -> both hatches store each other's address
+  (`wirelessVacuumLink` NBT on each side, dimension included) and the link is ready. Rebinding detaches the old
+  partners first; an unloaded or foreign old partner is left to self-heal (`isDeadLink`). Binding loads the target
+  chunk once (`GTUtil.getTileEntity(..., true)`) so a far-away output can be paired from an input on the other side of
+  the map; the move tick itself never loads chunks.
+- **Strict 1:1**: the output keeps one input address and the input keeps one output address. The transfer is push-only
+  from the output - a single mover at `tick % 20 == VACUUM_MOVE_TICK` (= 17) - and only while both reverse references
+  match, so the old pull+push double path (two outputs merging into one input, two inputs racing for one output)
+  cannot happen. A missing/wrong-type/re-pointed counterpart is dropped by the tick; a colour mismatch only pauses the
+  link.
+- **Same colour is mandatory** and unpainted never links: the dye is still the NAC module routing channel, so it is
+  checked at bind time and re-checked on every move tick - repainting one end pauses the link until both match again.
+- Cross-container: works across NACs and dimensions while both chunks are loaded (`DimensionManager.getWorld` +
+  `blockExists`, never force-loaded); an unloaded counterpart reports `chunk_unloaded` / `dim_unloaded` and the packet
+  stays in the output hatch.
+- Both hatches: `canConnectOnSide()` false, `getNeighbours()` empty and removed from `VacuumFactoryGrid` on first
+  tick / colour / facing change, so they never join a wired vacuum network. `@IMetaTileEntity.SkipGenerateDescription`
+  on both classes - GT checks the **concrete** class (`ItemMachines#isSkipGenerateDescription`), so it has to be
+  repeated on our subclasses - and `getDescription()` is rebuilt by `WirelessVacuumConveyorUtil#decorateDescription`.
+  `getInfoData()` appends one live link-state line from `WirelessVacuumConveyorUtil#appendLinkInfo` (unpaired / linked
+  with dim+coords / dim or chunk unloaded / target missing / wrong hatch type / colour mismatch / stale link, plus the
+  expected counterpart address when not cleanly linked), encoded with `IGregTechDeviceInformation.encode` so the client
+  translates it.
+- Unbind: sneak + wire cutter right-click on either hatch (`onWireCutterRightClick`). The own side is always cleared,
+  the counterpart only when the player may configure it.
+- Permissions: binding/unbinding re-points the *output* hatch, so `canConfigure` requires the player to be its owner or
+  an operator (`player.canCommandSenderUseCommand(2, ...)`).
+- Legacy: the first implementation stored `wirelessFreq` / `wirelessOwner`; `loadNBTData` reads its own address and then
+  drops both old keys, so an old world's wireless hatches start unpaired and are re-paired with a data stick.
+- Crafting is unchanged: one assembler recipe per hatch on its wired counterpart (`ItemList.Hatch_VacuumConveyor_Input`
+  / `_Output`), UIV.
 
 ### MTWirelessBeamlineInput / MTWirelessBeamlineOutput / MTWirelessBeamlineAdvancedOutput
 - Registered as `32470` (input), `32471` (output), `32472` (filtered output); extend GT5U's
@@ -701,7 +728,8 @@ MTMultiMachineBase<T>
   `translatable(...)` - or as a bare lang key - so the client translates them; registry state stays server-side.
 - Lang in `machine.wirelessbeamline.*`. The hatches carry `@IMetaTileEntity.SkipGenerateDescription` because their
   description goes straight to the tooltip: without it GT5U dumps one instance's description into `GregTech.lang` at
-  client setup, which is why older `MTWirelessVacuumConveyor*` tooltips show a frozen frequency line.
+  client setup. GT5U checks the **concrete** class (`ItemMachines#isSkipGenerateDescription`), so the annotation cannot
+  be inherited - the wireless vacuum conveyor hatches carry it on their own classes for the same reason.
 - Crafting: one assembler recipe per hatch in `GTRecipes.loadRecipes()`, each on its wired counterpart
   (`LanthItemList.LUV_BEAMLINE_INPUT_HATCH` / `LUV_BEAMLINE_OUTPUT_HATCH`, filtered variant on
   `ItemList.AdvancedBeamlineOutputHatch`) reusing the wireless vacuum conveyor kit verbatim: AE2
@@ -784,9 +812,9 @@ MTMultiMachineBase<T>
   protection, ME buses and consumption stay GT's. `findRecipeQuery` never sees them.
 - `populateOneStepCircuitPoolRecipes()` recursively flattens every original Assembly Matrix recipe through Assembly
   Matrix + all module pools down to `CircuitComponent.realComponent` real inputs; keeps the Crystal/Wetware/Bio/Optical
-  line (Processor/Assembly/Supercomputer/Mainframe) plus the special Pico/Quantum/Planck circuits; drops Board Processor
-  fluid inputs (machine-internal/NEI display only), keeps other module and Assembly Matrix fluids, merges duplicates and
-  deduplicates recipes.
+  line (Processor/Assembly/Supercomputer/Mainframe) plus the special Pico/Quantum/Planck/Raw Manifold Bud products;
+  drops Board Processor fluid inputs (machine-internal/NEI display only), keeps other module and Assembly Matrix
+  fluids, merges duplicates and deduplicates recipes.
 - `packMaterialInputs()`: `MOLTEN_PREFIXES` = `bolt`, `foil`, `frameGt`, `itemCasing`, `plate`, `screw`, `wireFine` ->
   the same material's molten fluid (bolt/fine wire/screw `M / 8` = 18 mB, foil `M / 4` = 36 mB, casing `M / 2` = 72 mB,
   plate `M * 1` = 144 mB, frame box `M * 2` = 288 mB, computed as `prefix.getMaterialAmount() * INGOTS / GTValues.M`).
@@ -807,11 +835,16 @@ MTMultiMachineBase<T>
   display name, so a part family (both RAM chips, every superconductor wire, every board) stays adjacent, then by ore
   dictionary signature, item and amount; fluids by localized name.
 - NEI page order from `recipeComparator`: selector levels 1-5 (Processor/Assembly/Supercomputer/Mainframe, then the
-  original GT ladder), level-6 special Pico/Quantum/Planck chains last.
-- Selector 1-6; every flattened recipe carries it as a real `GTRecipeBuilder.circuit(n)` input, so it matches like any
+  original GT ladder), then one selector per special chain (6 Pico, 7 Quantum, 8 Planck, 9 Raw Manifold Bud) last.
+- Selector 1-9; every flattened recipe carries it as a real `GTRecipeBuilder.circuit(n)` input, so it matches like any
   GT machine (the bus circuit slot satisfies the input and is never consumed). `getOneStepCircuitLevel()` returns 5 for
   `CircuitCalibration.PRIMITIVE` (original GT ladder: Nand chip / Microprocessor / IntegratedProcessor / NanoProcessor /
-  QuantumProcessor) and `MTRecipeMaps.ONE_STEP_SPECIAL_CIRCUIT_LEVEL` (= 6) for the special independent chains.
+  QuantumProcessor), 1-4 by name, and one dedicated circuit per special chain,
+  `MTRecipeMaps.ONE_STEP_PICO_CIRCUIT_LEVEL` .. `ONE_STEP_RAW_MANIFOLD_BUD_CIRCUIT_LEVEL` (= 6-9). The specials **used
+  to share 6**, but the Quantum page flattens the whole Pico chain into its own inputs (the Quantum chain consumes Pico
+  circuits through the Pico Circuit Rack), so its inputs are a superset of the Pico page's: a shared selector matched
+  the cheaper Pico page first and no Quantum circuit was ever made. The selector is the only thing that can tell the
+  two apart - do not fold them back under one number.
 - Measured max IO before packing: 61 distinct item inputs / 24 distinct fluid inputs (PlanckCircuit, after the producer
   lookup learned to follow every output slot of a multi-output module recipe). Packing moves entries from the item grid
   into the fluid grid, so the map is declared `maxIO(54, 1, 54, 0)` = 9x6 item + 9x6 fluid rows; the even split keeps

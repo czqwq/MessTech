@@ -1,39 +1,39 @@
 package com.MessTech.common.machine.hatch;
 
-import static net.minecraft.util.StatCollector.translateToLocal;
-
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.EnumChatFormatting;
 import net.minecraftforge.common.util.ForgeDirection;
 
-import com.cleanroommc.modularui.factory.PosGuiData;
-import com.cleanroommc.modularui.screen.ModularPanel;
-import com.cleanroommc.modularui.screen.UISettings;
-import com.cleanroommc.modularui.value.sync.PanelSyncManager;
-
+import gregtech.api.enums.ItemList;
 import gregtech.api.interfaces.ITexture;
+import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.common.tileentities.machines.multi.nanochip.factory.VacuumFactoryElement;
-import gregtech.common.tileentities.machines.multi.nanochip.hatches.MTEHatchVacuumConveyorInput;
+import gregtech.common.tileentities.machines.multi.nanochip.factory.VacuumFactoryGrid;
 import gregtech.common.tileentities.machines.multi.nanochip.hatches.MTEHatchVacuumConveyorOutput;
 import gregtech.common.tileentities.machines.multi.nanochip.util.CircuitComponentPacket;
 
 /**
  * Wireless NAC Vacuum Conveyor Output.
  * <p>
- * Extends the GT5U output hatch so existing NAC module structure code still sees a VCO, but pairs with wireless input
- * hatches of the same frequency and privacy scope instead of coloured pipes, across NACs and dimensions.
+ * Extends the GT5U output hatch so existing NAC module structure code still sees a VCO. Instead of a coloured pipe run
+ * it pushes Circuit Components to one data-stick-paired wireless input hatch, possibly in another NAC or dimension.
+ * This hatch is the only mover of the link: the packet is handed over once per {@code VACUUM_MOVE_TICK} and only while
+ * the input hatch points back at us, so the pair is strictly 1:1.
  */
-public class MTWirelessVacuumConveyorOutput extends MTEHatchVacuumConveyorOutput implements IWirelessVacuumConveyor {
+@IMetaTileEntity.SkipGenerateDescription
+public class MTWirelessVacuumConveyorOutput extends MTEHatchVacuumConveyorOutput {
 
-    protected String frequency = "0";
-    protected UUID ownerUuid = null;
+    /** Address of the single paired input hatch. */
+    private WirelessVacuumConveyorUtil.Target inputLink;
 
     public MTWirelessVacuumConveyorOutput(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional, 11);
@@ -48,111 +48,16 @@ public class MTWirelessVacuumConveyorOutput extends MTEHatchVacuumConveyorOutput
         return new MTWirelessVacuumConveyorOutput(mName, mTier, mDescriptionArray, mTextures);
     }
 
-    @Override
-    public ModularPanel buildUI(PosGuiData data, PanelSyncManager syncManager, UISettings uiSettings) {
-        return new MTWirelessVacuumConveyorGui(this).build(data, syncManager, uiSettings);
+    // ---------------------------------------------------------------- link state
+
+    public WirelessVacuumConveyorUtil.Target getLinkTarget() {
+        return inputLink;
     }
 
-    @Override
-    public void onFirstTick(IGregTechTileEntity aBaseMetaTileEntity) {
-        super.onFirstTick(aBaseMetaTileEntity);
-        WirelessVacuumConveyorUtil.register(this);
-        WirelessVacuumConveyorUtil.onWirelessSettingsChanged(this);
-    }
-
-    @Override
-    public void onUnload() {
-        WirelessVacuumConveyorUtil.unregister(this);
-        super.onUnload();
-    }
-
-    @Override
-    public void onRemoval() {
-        WirelessVacuumConveyorUtil.unregister(this);
-        super.onRemoval();
-    }
-
-    @Override
-    public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        if (aBaseMetaTileEntity.isServerSide()) {
-            // Re-register every tick so hatches that predate the wireless registry are picked up without being
-            // broken and replaced.
-            WirelessVacuumConveyorUtil.register(this);
-
-            // Extra output-push fallback: the original logic is input-pull, this lets a lone output deliver its
-            // packet even when the matching input's movement tick is not running.
-            if (aTick % 20 == VACUUM_MOVE_TICK && contents != null) {
-                List<MTEHatchVacuumConveyorInput> inputs = WirelessVacuumConveyorUtil.findMatchingInputs(this);
-                if (inputs.size() == 1) {
-                    CircuitComponentPacket packet = extractPacket();
-                    inputs.get(0)
-                        .unifyPacket(packet);
-                }
-            }
-        }
-        super.onPostTick(aBaseMetaTileEntity, aTick);
-    }
-
-    @Override
-    public String getFrequency() {
-        return frequency;
-    }
-
-    @Override
-    public void setFrequency(String frequency) {
-        this.frequency = frequency == null ? "" : frequency;
-        IGregTechTileEntity base = getBaseMetaTileEntity();
-        if (base != null && base.isServerSide()) {
-            WirelessVacuumConveyorUtil.onWirelessSettingsChanged(this);
-        }
-    }
-
-    @Override
-    public boolean isPrivate() {
-        return ownerUuid != null;
-    }
-
-    @Override
-    public void setPrivate(boolean isPrivate) {
-        if (isPrivate) {
-            IGregTechTileEntity base = getBaseMetaTileEntity();
-            this.ownerUuid = base == null ? null : base.getOwnerUuid();
-        } else {
-            this.ownerUuid = null;
-        }
-        IGregTechTileEntity base = getBaseMetaTileEntity();
-        if (base != null && base.isServerSide()) {
-            WirelessVacuumConveyorUtil.onWirelessSettingsChanged(this);
-        }
-    }
-
-    @Override
-    public UUID getOwnerUuid() {
-        return ownerUuid;
-    }
-
-    @Override
-    public void setOwnerUuid(UUID ownerUuid) {
-        this.ownerUuid = ownerUuid;
-        IGregTechTileEntity base = getBaseMetaTileEntity();
-        if (base != null && base.isServerSide()) {
-            WirelessVacuumConveyorUtil.onWirelessSettingsChanged(this);
-        }
-    }
-
-    @Override
-    public String[] getDescription() {
-        String[] base = super.getDescription();
-        String[] result = Arrays.copyOf(base, base.length + 4);
-        int idx = base.length;
-        result[idx++] = EnumChatFormatting.AQUA + translateToLocal("machine.wirelessvacuum.desc.0");
-        result[idx++] = EnumChatFormatting.GRAY + translateToLocal("machine.wirelessvacuum.desc.1") + " " + frequency;
-        result[idx++] = EnumChatFormatting.GRAY + translateToLocal("machine.wirelessvacuum.desc.2")
-            + " "
-            + translateToLocal(
-                ownerUuid == null ? "machine.wirelessvacuum.desc.public" : "machine.wirelessvacuum.desc.private");
-        result[idx] = EnumChatFormatting.GRAY + translateToLocal("machine.wirelessvacuum.desc.output");
-        return result;
+    public void setLinkTarget(WirelessVacuumConveyorUtil.Target target) {
+        if (inputLink == null ? target == null : inputLink.equals(target)) return;
+        inputLink = target;
+        markDirty();
     }
 
     @Override
@@ -161,23 +66,123 @@ public class MTWirelessVacuumConveyorOutput extends MTEHatchVacuumConveyorOutput
     }
 
     @Override
-    public void getNeighbours(Collection<VacuumFactoryElement> neighbours) {
-        WirelessVacuumConveyorUtil.collectWirelessNeighbours(this, neighbours);
+    public void getNeighbours(Collection<VacuumFactoryElement> neighbours) {}
+
+    @Override
+    public void onFirstTick(IGregTechTileEntity aBaseMetaTileEntity) {
+        super.onFirstTick(aBaseMetaTileEntity);
+        // the wired output publishes itself to the vacuum factory grid; this hatch must not join it, the wireless
+        // counterpart is the only consumer of its packet
+        VacuumFactoryGrid.INSTANCE.removeElement(this);
+    }
+
+    @Override
+    public void onColorChangeServer(byte aColor) {
+        super.onColorChangeServer(aColor);
+        VacuumFactoryGrid.INSTANCE.removeElement(this);
+    }
+
+    @Override
+    public void onFacingChange() {
+        super.onFacingChange();
+        VacuumFactoryGrid.INSTANCE.removeElement(this);
+    }
+
+    // ---------------------------------------------------------------- data stick copy
+
+    @Override
+    public void onLeftclick(IGregTechTileEntity aBaseMetaTileEntity, EntityPlayer aPlayer) {
+        if (!(aPlayer instanceof EntityPlayerMP)) return;
+        if (aBaseMetaTileEntity == null || !aBaseMetaTileEntity.isServerSide()) return;
+        ItemStack stick = aPlayer.inventory.getCurrentItem();
+        if (!ItemList.Tool_DataStick.isStackEqual(stick, false, true)) return;
+
+        WirelessVacuumConveyorUtil.writeDataStick(stick, WirelessVacuumConveyorUtil.targetOf(aBaseMetaTileEntity));
+        WirelessVacuumConveyorUtil.sendChat(aPlayer, "machine.wirelessvacuum.chat.saved");
+    }
+
+    // ---------------------------------------------------------------- packet move
+
+    @Override
+    public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
+        if (!aBaseMetaTileEntity.isServerSide()) return;
+        if (aTick % 20 != VACUUM_MOVE_TICK) return;
+
+        boolean dirty = false;
+        if (WirelessVacuumConveyorUtil.hasNoComponents(contents)) {
+            if (contents != null) {
+                contents = null;
+                dirty = true;
+            }
+        }
+        if (inputLink != null) {
+            WirelessVacuumConveyorUtil.LinkState state = WirelessVacuumConveyorUtil.evaluateOutput(this, inputLink);
+            if (WirelessVacuumConveyorUtil.isDeadLink(state)) {
+                // the counterpart was broken or re-pointed while we were not looking: drop the one-sided address
+                inputLink = null;
+                dirty = true;
+            } else if (state == WirelessVacuumConveyorUtil.LinkState.LINKED && contents != null) {
+                MTWirelessVacuumConveyorInput input = WirelessVacuumConveyorUtil
+                    .asInput(WirelessVacuumConveyorUtil.resolve(inputLink));
+                if (input != null) {
+                    CircuitComponentPacket packet = extractPacket();
+                    if (packet != null) input.unifyPacket(packet);
+                }
+            }
+        }
+        if (dirty) markDirty();
+        aBaseMetaTileEntity.setActive(contents != null);
+    }
+
+    // ---------------------------------------------------------------- unbinding
+
+    @Override
+    public boolean onWireCutterRightClick(ForgeDirection side, ForgeDirection wrenchingSide, EntityPlayer aPlayer,
+        float aX, float aY, float aZ, ItemStack aTool) {
+        if (!(aPlayer instanceof EntityPlayerMP)) return false;
+        IGregTechTileEntity base = getBaseMetaTileEntity();
+        if (base == null || !base.isServerSide() || !aPlayer.isSneaking()) return false;
+        if (inputLink == null) return false;
+
+        MTWirelessVacuumConveyorInput input = WirelessVacuumConveyorUtil
+            .asInput(WirelessVacuumConveyorUtil.resolve(inputLink));
+        if (input != null && WirelessVacuumConveyorUtil.canConfigure(aPlayer, input.getBaseMetaTileEntity())
+            && WirelessVacuumConveyorUtil.targetOf(base)
+                .equals(input.getLinkTarget())) {
+            input.setLinkTarget(null);
+        }
+        setLinkTarget(null);
+        WirelessVacuumConveyorUtil.sendChat(aPlayer, "machine.wirelessvacuum.chat.unlinked");
+        return true;
+    }
+
+    // ---------------------------------------------------------------- tooltip / scanner / NBT
+
+    @Override
+    public String[] getDescription() {
+        return WirelessVacuumConveyorUtil.decorateDescription(super.getDescription(), "output");
+    }
+
+    @Override
+    public String[] getInfoData() {
+        List<String> info = new ArrayList<>(Arrays.asList(super.getInfoData()));
+        WirelessVacuumConveyorUtil.appendLinkInfo(info, this, inputLink, true);
+        return info.toArray(new String[0]);
     }
 
     @Override
     public void saveNBTData(NBTTagCompound aNBT) {
         super.saveNBTData(aNBT);
-        aNBT.setString("wirelessFreq", frequency);
-        if (ownerUuid != null) {
-            aNBT.setString("wirelessOwner", ownerUuid.toString());
-        }
+        WirelessVacuumConveyorUtil.writeTarget(aNBT, inputLink);
     }
 
     @Override
     public void loadNBTData(NBTTagCompound aNBT) {
         super.loadNBTData(aNBT);
-        frequency = aNBT.getString("wirelessFreq");
-        ownerUuid = aNBT.hasKey("wirelessOwner") ? UUID.fromString(aNBT.getString("wirelessOwner")) : null;
+        inputLink = WirelessVacuumConveyorUtil.readTarget(aNBT);
+        // the old channel-mode implementation stored a frequency and a private flag here; data-stick pairing has no
+        // use for either, and an old world's hatches simply start unpaired until they are re-paired
+        aNBT.removeTag("wirelessFreq");
+        aNBT.removeTag("wirelessOwner");
     }
 }
