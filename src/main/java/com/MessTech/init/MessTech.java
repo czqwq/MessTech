@@ -70,6 +70,7 @@ public class MessTech {
         if (Mods.Computronics.isModLoaded() && Mods.Thaumcraft.isModLoaded() && Mods.Avaritia.isModLoaded()) {
             ExtraRecipes.loadReplacementRecipes();
         }
+        if (Mods.Forestry.isModLoaded() && Mods.ExtraBees.isModLoaded() && Mods.MagicBees.isModLoaded()){ExtraRecipes.loadBeeRecipes();}
     }
 
     @Mod.EventHandler

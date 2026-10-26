@@ -117,6 +117,12 @@ public final class MTItems {
     /** LEG upgrade items (源质发电机升级): metadata 0 empty, 1..9 the essentia categories. */
     public static final com.MessTech.common.thaumcraft.MTEssentiaUpgradeItem essentiaUpgrade = new com.MessTech.common.thaumcraft.MTEssentiaUpgradeItem();
 
+    /**
+     * The comb processing module (蜂窝处理模块) of the Chemical Twister's mode 2: the recipes of the comb processing
+     * pool carry it as a non-consumed input.
+     */
+    public static final MTItemCombProcessingModule combProcessingModule = new MTItemCombProcessingModule();
+
     private MTItems() {}
 
     public static void registerItems() {
@@ -128,9 +134,11 @@ public final class MTItems {
         GameRegistry.registerItem(ultimatePatternTerminal, "UltimatePatternTerminal");
         GameRegistry.registerItem(gameConsole, "GameConsole");
         GameRegistry.registerItem(essentiaUpgrade, "MTEssentiaUpgrade");
+        GameRegistry.registerItem(combProcessingModule, "CombProcessingModule");
         MTItemList.UltimatePatternTerminal.set(new ItemStack(ultimatePatternTerminal, 1));
         MTItemList.GameConsole.set(new ItemStack(gameConsole, 1));
         MTItemList.MTEssentiaUpgrade.set(new ItemStack(essentiaUpgrade, 1));
+        MTItemList.MTCombProcessingModule.set(new ItemStack(combProcessingModule, 1));
         // The fuel rods extend GT's GTGenericItem, whose constructor already calls
         // GameRegistry.registerItem(this, "gt.<unlocalized>") (as GT's own rods do), so they must not be registered
         // here a second time. Same for the Rainbow Wrench (MetaGeneratedTool -> GTGenericItem).

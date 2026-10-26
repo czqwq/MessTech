@@ -645,31 +645,32 @@ messtech.moduleProject=ModularProject
 # ---化学扭曲者---
 machine.largechemicaltwister.name=大型化学扭曲者
 mt.recipe.chemicaltwister=化学扭曲
-machine.chemicaltwister.machinetype=化学扭曲者 | 概率毁灭者
+mt.recipe.comb_processing=蜂窝处理
+machine.chemicaltwister.machinetype=化学扭曲者 | 概率毁灭者 | 蜂窝处理者
 mt.recipe.chemicaltwister.structure_level=需要结构等级
 mt.recipe.qft_probability_destroyer=概率毁灭者(QFT)
 machine.largechemicaltwister.mode.chemical_twister=化学扭曲
 machine.largechemicaltwister.mode.probability_destroyer=概率毁灭者
+machine.largechemicaltwister.mode.comb_processor=蜂窝处理者
+machine.largechemicaltwister.mode.comb_requires_tier2=蜂窝处理者需要结构等级 2 才能切换!
 machine.largechemicaltwister.cannot_switch_active=机器运行时无法切换模式!
-machine.chemicaltwister.tooltip.desc=§7一台能在§b化学扭曲§7与§b概率毁灭者§7两种形态间切换的化学工厂
-machine.chemicaltwister.tooltip.flavour=§7望着这个机器,脑海中突然有一道声音传出...§b扭曲
+machine.chemicaltwister.tooltip.desc=§7一台能在§b化学扭曲§7、§b概率毁灭者§7与§b蜂窝处理者§7三种形态间切换的化学工厂
+machine.chemicaltwister.tooltip.flavour=§7望着这个机器,脑海中突然有一道声音传出...§0扭曲
 machine.chemicaltwister.tooltip.structure.header=§6结构：
 machine.chemicaltwister.tooltip.structure.level1=§7· 结构等级 §b1§7：大型化学反应釜式厂房，§e化学惰性机械方块§7 外壳配 §e力场约束机械方块§7、§e压缩聚变线圈方块 Mk-II 原型§7 与 §e加热线圈§7 环
-machine.chemicaltwister.tooltip.structure.level2=§7· 结构等级 §b2§7：§e量子操纵者§7（QFT）壳体（§e批量生产框架§7、§e量子操纵者线圈方块§7、§e时空连续体撕裂方块§7、§e时空扭曲核心方块§7、§e力场玻璃§7 等），仓室开在 §e时空连续体撕裂方块§7 上，没有加热线圈环
+machine.chemicaltwister.tooltip.structure.level2=§7· 结构等级 §b2§7：§e量子操纵者§7（QFT）壳体（§e批量生产框架§7、§e量子操纵者线圈方块§7、§e时空连续体撕裂方块§7、§e时空扭曲核心方块§7、§e力场玻璃§7 等）
 machine.chemicaltwister.tooltip.structure.hatches=§7· 两种结构都要求至少 §b1§7 个输入、§b1§7 个输出与 §b1§7 个能源仓（可放多安能源仓或激光靶仓）
 machine.chemicaltwister.tooltip.structure.coil=§7· 结构等级 §b1§7 的加热线圈环必须整环同等级，缺失或混用都会让结构校验失败
 machine.chemicaltwister.tooltip.modes.header=§6模式：
 machine.chemicaltwister.tooltip.modes.switch=§7· 螺丝刀右键或控制器 GUI 按钮切换模式；机器运行时会被§c拒绝
 machine.chemicaltwister.tooltip.modes.chemical=§7· §b化学扭曲§7：运行化学扭曲配方池，配方需要结构等级 §b1§7
 machine.chemicaltwister.tooltip.modes.qft=§7· §b概率毁灭者§7：运行 §e量子操纵者§7（QFT）配方池，所有产出概率 §b100%§7、热量固定 §b12601 K§7，需要结构等级 §b2§7
-machine.chemicaltwister.tooltip.modes.catalyst=§7· 量子操纵者配方自带的催化剂会作为不消耗的输入常驻输入总线
+machine.chemicaltwister.tooltip.modes.comb=§7· §b蜂窝处理者§7：运行蜂窝处理配方池
 machine.chemicaltwister.tooltip.heat.header=§6热量与超频：
 machine.chemicaltwister.tooltip.heat.formula=§7· 结构等级 §b1§7 的可用热量 = §e线圈热量§7 + §b100 K§7 ×（§e能源仓等级§7 − 2），与工业高炉相同
 machine.chemicaltwister.tooltip.heat.oc=§7· 有热量需求的配方按工业高炉方式超频：超出所需的热量提供§a热量折扣§7，热量越高越快
 machine.chemicaltwister.tooltip.heat.poc=§7· 启用§a无损超频§7：每级超频 §bEU/t ×4§7、§b耗时 ÷4§7，单次配方总耗能不变
-machine.chemicaltwister.tooltip.heat.parallel=§7· 并行上限 §b123123§7，实际并行由输入原料数量决定；无内置速度或耗电加成（§b×1§7）
-machine.chemicaltwister.tooltip.details=§d细节：§7结构等级与热量是两个独立门槛：等级决定配方能不能用，热量决定够不够热
-machine.chemicaltwister.tooltip.details.hint=§7· 等级不足会返回§c结构等级不足§7，热量不足会返回§c热量不足§7；
+machine.chemicaltwister.tooltip.heat.parallel=§7· 并行上限 §b123123§7，实际并行由输入原料数量决定；
 machine.chemicaltwister.structureinfo.1=§l§9一道低沉的声音在身边回响:§r 部分§k配方§r来自§kT§rS§kT§r
 
 # --- 巨型化学反应釜 (MTHugeChemicalReactor) ---
@@ -799,6 +800,10 @@ messtech.gameConsole.key.weapon7=武器 7
 messtech.gameConsole.key.weapon8=武器 8
 messtech.gameConsole.key.weapon9=武器 9
 messtech.gameConsole.key.weapon0=武器 0
+
+# ---蜂窝处理模块（化学扭曲者模式2 的催化剂）---
+item.messtech.combProcessingModule.name=蜂窝处理模块
+messtech.combProcessingModule.tooltip=§[ib]一个看起来很精致的精密仪器
 
 # 文字动态特效（docs/text-fx/），预览命令 /messtechfx
 command.messtechfx.usage=§c用法: /messtechfx <datafall|eventhorizon|inkbloom|magnetar|resonance|beamcut|cipher|petalfall|all>

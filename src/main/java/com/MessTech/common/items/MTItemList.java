@@ -56,6 +56,8 @@ public enum MTItemList {
     MTReactorCoolantInputHatch,
     MTReactorHotCoolantOutputHatch,
     MTChemicalTwister,
+    /** The comb processing module (蜂窝处理模块): non-consumed catalyst of the Chemical Twister's mode 2. */
+    MTCombProcessingModule,
     MTHugeChemicalReactor,
     /** Comprehensive Mining Plant (综合采掘工厂), ported from Elinar's verification mod. */
     MTComprehensiveMiningPlant,

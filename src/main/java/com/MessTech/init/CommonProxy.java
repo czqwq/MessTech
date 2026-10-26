@@ -21,6 +21,7 @@ import com.MessTech.common.network.MTNetwork;
 import com.MessTech.common.parts.PartUltimatePatternTerminal;
 import com.MessTech.common.process.MTProcessHandler;
 import com.MessTech.common.recipe.MTChemicalTwisterRecipes;
+import com.MessTech.common.recipe.MTCombProcessingRecipes;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.recipe.MTVendingMachineRecipes;
 import com.MessTech.common.recipe.RecipeMessFood;
@@ -181,6 +182,9 @@ public class CommonProxy implements IGuiHandler {
         MTRecipeMaps.populateBosesCraftingArrayRecipes();
         // The QFT pool is filled while the GT recipe loaders run, i.e. possibly after our postInit.
         MTRecipeMaps.populateQftProbabilityDestroyerRecipes();
+        // The comb processing pool is converted from the large chemical reactor comb recipes; a loader that only ran
+        // after the FMLLoadComplete pass would be missed, so the converter is re-run here as well (it is re-runnable).
+        MTCombProcessingRecipes.populateCombProcessingRecipes();
         // Same for the Assembly Factory's Assembly Line pool: it is built from GT's Assembly Line definitions, which
         // other
         // mods (TST's circuit lines, for one) only finish registering in their own postInit.

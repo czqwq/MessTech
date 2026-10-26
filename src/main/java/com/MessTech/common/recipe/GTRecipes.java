@@ -548,6 +548,9 @@ public class GTRecipes {
         addComprehensiveMiningPlantRecipe();
         addSmallEssentiaSmelteryRecipes();
         MTLegFakeRecipes.populate();
+        // The Chemical Twister's mode 2 pool is converted from GT5U's large chemical reactor comb recipes, which GT and
+        // NHCoreMod have registered by now (postInit ran before this FMLLoadComplete pass, and the mod depends on GT).
+        MTCombProcessingRecipes.populateCombProcessingRecipes();
     }
 
     /**

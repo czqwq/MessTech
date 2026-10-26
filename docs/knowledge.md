@@ -413,19 +413,23 @@ MTMultiMachineBase<T>
   `SpaceTimeBendingCore`, J `ForceFieldGlass`; geometry untouched. No coil ring: level 1 keeps EBF formula + coil
   error, level 2 runs at `MTRecipeMaps.QFT_PROBABILITY_DESTROYER_HEAT = 12601` (Hypogen); `checkMachine` checks level 2
   first, speculatively (`null` error list).
-- Modes: `totalMachineMode() = 2` (0 化学扭曲, 1 概率毁灭者); base class adds GUI button, NBT round-trip, Waila line,
-  screwdriver (`onScrewdriverRightClick`, refused while running) switches. `getRecipeMap()` =
-  `MTRecipeMaps.qftProbabilityDestroyerRecipes` (mode 1) / `MTRecipeMaps.MTChemicalTwisterRecipes` (mode 0);
-  `getAvailableRecipeMaps()` lists both (NEI catalyst on either page). Mode 1 recipes need level 2 -> a switch without
-  the tier-2 structure gives `insufficientMachineTier(2)`; mode 0 still runs there (level 2 >= 1, heat 12601).
-  `construct`/`survivalConstruct` build the selected mode's piece.
+- Modes: `totalMachineMode() = 3` (0 化学扭曲, 1 概率毁灭者, 2 蜂窝处理者); base class adds GUI button, NBT round-trip,
+  Waila line, screwdriver (`onScrewdriverRightClick`, refused while running) switches. `getRecipeMap()` =
+  `MTRecipeMaps.combProcessingRecipes` (mode 2) / `MTRecipeMaps.qftProbabilityDestroyerRecipes` (mode 1) /
+  `MTRecipeMaps.MTChemicalTwisterRecipes` (mode 0); `getAvailableRecipeMaps()` lists all three (NEI catalyst on every
+  page). Mode 1 and 2 recipes need level 2 -> a switch without the tier-2 structure gives `insufficientMachineTier(2)`;
+  mode 0 still runs there (level 2 >= 1, heat 12601). `construct`/`survivalConstruct` build the selected mode's piece.
+- Mode cycle gate (`nextMachineMode()`): 0 -> 1 -> 2 -> 0, but mode 2 needs the level 2 shell - below it the cycle
+  skips 2 (0 <-> 1) and the screwdriver prints `machine.largechemicaltwister.mode.comb_requires_tier2`. Both the
+  screwdriver and the GUI button go through `nextMachineMode()`, so the gate holds for both; `mStructureLevel` is the
+  client-synced value, and a machine left in mode 2 by a broken structure reports `insufficientMachineTier(2)`.
 - Level in NEI preview / build hints: trigger stack size (`MTChemicalTwister.STRUCTURE_LEVEL_TIER2 = 2`: 1 = level 1,
   >= 2 = level 2), mode as fallback - GT's usual structure tier switch (PCB Factory picks 1/2/3 the same way). Hence
   BlockRenderer6343's **Tier slider**: BR6343 calls `construct()` with `stackSize = 1, 2, 3, ...` until the world stops
   changing (`ObserverWorld#estimateTier`), slider up to the highest tier that changed, rebuild via
-  `survivalConstruct(getBuildTriggerStack(), ...)` / `construct(trigger, false)`; 2 = 概率毁灭者 shell, 1 = level 1.
-  Own "Heating Coil" channel slider (coil element channel wrapped) can exceed 2 - any value >= 2 is level 2. No mixin,
-  no extra dependency on BlockRenderer6343; hologram projector same rule (scroll to tier 2).
+  `survivalConstruct(getBuildTriggerStack(), ...)` / `construct(trigger, false)`; 2 = 概率毁灭者 / 蜂窝处理者 shell,
+  1 = level 1. Own "Heating Coil" channel slider (coil element channel wrapped) can exceed 2 - any value >= 2 is level 2.
+  No mixin, no extra dependency on BlockRenderer6343; hologram projector same rule (scroll to tier 2).
 - Client: `getUpdateData()` returns `mStructureLevel`; GT's `BaseMetaTileEntity` compares it every tick server side
   (`handleUpdateDataChangeServer`), sends `CHANGE_CUSTOM_DATA` on change, writes it into the tile data packet
   (`tileWriteToStream`, read back as `receiveClientEvent(..., buffer.readByte() & 0x7F)` at chunk load), calls
@@ -440,6 +444,28 @@ MTMultiMachineBase<T>
   `mSpecialValue` via `GTRecipeMapUtil.SPECIAL_VALUE_ALIASES`, read as heat here, hence explicit), QFT catalyst as a
   **non-consumed input** (stackSize 0: required in the bus, never consumed), QFT metadata for NEI. Page:
   `maxIO(9, 9, 9, 9)`, `LargeNEIFrontend`, height 166, MessTech logo.
+- 蜂窝处理者 pool (`mt.recipe.comb_processing`, NEI name `蜂窝处理` / `Comb Processing`, icon = the new
+  `MTItemList.MTCombProcessingModule`): converted from the comb recipes of `RecipeMaps.multiblockChemicalReactorRecipes`
+  by `com.MessTech.common.recipe.MTCombProcessingRecipes` (`populateCombProcessingRecipes()`, re-runnable, called from
+  `GTRecipes.loadRecipes()` at FMLLoadComplete - both sides, after GT's and NHCoreMod's postInit - and again from
+  `CommonProxy.serverStarted` as the usual fallback). Source recipes: GT5U's `ItemComb.addProcessGT` (via
+  `GTRecipeConstants.UniversalChemical`) and NHCoreMod's `ChemicalReactorRecipes#multiBlockOnly` indium ones; recognised
+  by a `beeComb` item input. Conversion, per recipe: **inputs** = the module (stackSize 0, first, never consumed) +
+  `4` of the comb (base comb count normalised to 4, everything else - acids, catalyst dusts, circuits - dropped);
+  **item outputs** = base amounts x4 (`crushedPurified` "洁净粉碎X矿" replaced 1:1 by the `mMacerateInto` material's
+  dust, other items as-is) plus one extra base amount at 50% chance; **nuggets** (neutronium/osmium/platinum/iridium
+  comb recipes) become the material's molten fluid (1 nugget = 16 mB) with the same x4 + 50%; **fluid outputs** kept
+  unchanged (the acidic metal solutions); **indium comb** is a pinned special case: 4 indium combs -> 12 indium dust +
+  50% of 3 indium dust, no fluid product (NHCoreMod's 72000 mB lead-zinc solution is dropped); **time** x4, **EU/t** x4
+  (one tier up, e.g. HV -> EV); `metadata(CHEMICAL_TWISTER_STRUCTURE_LEVEL, 2)` and `specialValue(12601)`. One recipe per
+  comb: GT's collision check keys by input items ignoring stack sizes, so a second recipe with the same comb would never
+  be found - the first pool entry wins and the rest are logged (NHCoreMod's four indium comb recipes collapse into one,
+  its converted duration/EU/t comes from the first of them). Page: `maxIO(4, 6, 0, 2)`, default frontend, MessTech logo,
+  `HeatingCoilSpecialValueFormatter`.
+- `MTItemCombProcessingModule` (`蜂窝处理模块` / `Comb Processing Module`): plain `Item` in
+  `common/items/MTItemCombProcessingModule.java`, registered by `MTItems.registerItems()` (`CombProcessingModule`),
+  texture `assets/messtech/textures/items/comb_processing_module.png` (512x512 source, used as-is), no crafting recipe
+  on purpose. It is the mode 2 catalyst and the pool's NEI display stack.
 - Recipe level: `MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL` (`RecipeMetadataKey<Integer>`, `drawInfo` draws
   "Required Structure Level: N"; absent = `MTRecipeMaps.DEFAULT_CHEMICAL_TWISTER_STRUCTURE_LEVEL = 1`), checked *before*
   the heat; too big -> `CheckRecipeResultRegistry.insufficientMachineTier(requiredLevel)`.

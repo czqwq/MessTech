@@ -643,32 +643,33 @@ messtech.moduleProject=ModularProject
 
 # ---ChemicalTwister---
 machine.largechemicaltwister.name=Large Chemical Twister
-machine.chemicaltwister.machinetype=Chemical Twister | Probability Destroyer
+machine.chemicaltwister.machinetype=Chemical Twister | Probability Destroyer | Comb Processor
 mt.recipe.chemicaltwister=Chemical Twister
+mt.recipe.comb_processing=Comb Processing
 mt.recipe.chemicaltwister.structure_level=Required Structure Level
 mt.recipe.qft_probability_destroyer=Probability Destroyer (QFT)
 machine.largechemicaltwister.mode.chemical_twister=Chemical Twister
 machine.largechemicaltwister.mode.probability_destroyer=Probability Destroyer
+machine.largechemicaltwister.mode.comb_processor=Comb Processor
+machine.largechemicaltwister.mode.comb_requires_tier2=The Comb Processor needs structure level 2 to be switched to!
 machine.largechemicaltwister.cannot_switch_active=Cannot switch mode while the machine is running!
-machine.chemicaltwister.tooltip.desc=§7A chemical plant that switches between §bChemical Twister§7 and §bProbability Destroyer§7
-machine.chemicaltwister.tooltip.flavour=§7A sound suddenly appears in your mind...§bTwist
+machine.chemicaltwister.tooltip.desc=§7A chemical plant that switches between the §bChemical Twister§7, §bProbability Destroyer§7 and §bComb Processor§7 forms
+machine.chemicaltwister.tooltip.flavour=§7A sound suddenly appears in your mind...§0Twist
 machine.chemicaltwister.tooltip.structure.header=§6Structure:
 machine.chemicaltwister.tooltip.structure.level1=§7· Structure level §b1§7: a Large Chemical Reactor style hall - §eChemically Inert Machine Casing§7 shell with §eContainment Field Machine Casing§7, §eCompact Fusion Coil MK-II Prototype§7 and a §eHeating Coil§7 ring
-machine.chemicaltwister.tooltip.structure.level2=§7· Structure level §b2§7: the §eQuantum Force Transformer§7 (QFT) shell (§eBulk Production Frame§7, §eQuantum Force Transformer Coil Casings§7, §eSpaceTime Continuum Ripper§7, §eSpaceTime Bending Core§7, §eForce Field Glass§7 etc.), with the hatches on the §eSpaceTime Continuum Ripper§7 and no heating coil ring
+machine.chemicaltwister.tooltip.structure.level2=§7· Structure level §b2§7: the §eQuantum Force Transformer§7 (QFT) shell (§eBulk Production Frame§7, §eQuantum Force Transformer Coil Casings§7, §eSpaceTime Continuum Ripper§7, §eSpaceTime Bending Core§7, §eForce Field Glass§7 etc.)
 machine.chemicaltwister.tooltip.structure.hatches=§7· Both structures need at least §b1§7 input, §b1§7 output and §b1§7 energy hatch (multi-amp or laser target hatches allowed)
 machine.chemicaltwister.tooltip.structure.coil=§7· The heating coil ring of structure level §b1§7 must be a single tier; a missing or mixed ring fails the structure check
 machine.chemicaltwister.tooltip.modes.header=§6Modes:
-machine.chemicaltwister.tooltip.modes.switch=§7· Switch modes with a screwdriver or the controller GUI button; §crefused while the machine is running
+machine.chemicaltwister.tooltip.modes.switch=§7· Switch modes with a screwdriver or the controller GUI button;
 machine.chemicaltwister.tooltip.modes.chemical=§7· §bChemical Twister§7: runs the Chemical Twister recipe pool; its recipes need structure level §b1§7
 machine.chemicaltwister.tooltip.modes.qft=§7· §bProbability Destroyer§7: runs the §eQuantum Force Transformer§7 (QFT) recipe pool, every output chance is §b100%§7 and the heat is fixed at §b12601 K§7, needs structure level §b2§7
-machine.chemicaltwister.tooltip.modes.catalyst=§7· The catalyst of a Quantum Force Transformer recipe is added as a non-consumed input and has to stay in an input bus
+machine.chemicaltwister.tooltip.modes.comb=§7· §bComb Processor§7: runs the comb processing poolneeds structure level §b2§7;
 machine.chemicaltwister.tooltip.heat.header=§6Heat & Overclock:
 machine.chemicaltwister.tooltip.heat.formula=§7· Available heat of structure level §b1§7 = §ecoil heat§7 + §b100 K§7 × (§eenergy hatch tier§7 - 2), same as the Electric Blast Furnace
 machine.chemicaltwister.tooltip.heat.oc=§7· Recipes with a heat requirement overclock like in the Electric Blast Furnace: heat above the requirement gives a §aheat discount§7 and overclocks further
 machine.chemicaltwister.tooltip.heat.poc=§7· §aPerfect overclock§7 is enabled: each overclock is §bEU/t ×4§7 and §bduration ÷4§7, so the total energy per craft stays the same
 machine.chemicaltwister.tooltip.heat.parallel=§7· Parallel cap is §b123123§7 and the real parallel follows the available inputs; there is no built-in speed or EU bonus (§b×1§7)
-machine.chemicaltwister.tooltip.details=§dDetails:§7 structure level and heat are two independent gates - the level decides whether a recipe can run, the heat decides whether the machine is hot enough
-machine.chemicaltwister.tooltip.details.hint=§7· An insufficient level reports §cinsufficient machine tier§7, insufficient heat reports §cinsufficient heat§7; the hologram picks the structure by stack size: §b1§7 projects level 1, §b≥2§7 projects level 2
 machine.chemicaltwister.structureinfo.1=§l§9A deep voice echoes nearby:§r Some §krecipes§r come from §kT§rS§kT§r
 
 # --- Huge Chemical Reactor (MTHugeChemicalReactor) ---
@@ -799,6 +800,10 @@ messtech.gameConsole.key.weapon7=Weapon 7
 messtech.gameConsole.key.weapon8=Weapon 8
 messtech.gameConsole.key.weapon9=Weapon 9
 messtech.gameConsole.key.weapon0=Weapon 0
+
+# ---Comb Processing Module (catalyst of the Chemical Twister's mode 2)---
+item.messtech.combProcessingModule.name=Comb Processing Module
+messtech.combProcessingModule.tooltip=§[ib]A precision instrument that looks exquisite.
 
 # Text effects (docs/text-fx/), preview command /messtechfx
 command.messtechfx.usage=§cUsage: /messtechfx <datafall|eventhorizon|inkbloom|magnetar|resonance|beamcut|cipher|petalfall|all>

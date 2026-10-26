@@ -434,6 +434,27 @@ public final class MTRecipeMaps {
         .build();
 
     /**
+     * Pool of the Chemical Twister's mode 2, the 蜂窝处理者 (Comb Processor): one-step comb processing recipes converted
+     * from the comb recipes of GT5U's large chemical reactor pool (NHCoreMod registers its indium comb recipes into the
+     * same map), filled by {@link MTCombProcessingRecipes#populateCombProcessingRecipes()}.
+     * <p>
+     * Every recipe carries the {@link MTItemList#MTCombProcessingModule} as its first, non-consumed input (stack size
+     * 0,
+     * like a QFT catalyst) plus the comb itself, outputs the material's dust and keeps the source recipe's fluid
+     * outputs; the heat is the mode's fixed {@link #QFT_PROBABILITY_DESTROYER_HEAT} and the structure level is 2, so
+     * the pool only runs in the 概率毁灭者 / 蜂窝处理者 shell. Item outputs are at most three guaranteed plus their
+     * 50% bonus stacks, fluid outputs at most two.
+     */
+    public static final RecipeMap<RecipeMapBackend> combProcessingRecipes = RecipeMapBuilder
+        .of("mt.recipe.comb_processing")
+        .maxIO(4, 6, 0, 2)
+        .minInputs(1, 0)
+        .logo(MT_LOGO)
+        .neiHandlerInfo(builder -> builder.setDisplayStack(MTItemList.MTCombProcessingModule.get(1)))
+        .neiSpecialInfoFormatter(HeatingCoilSpecialValueFormatter.INSTANCE)
+        .build();
+
+    /**
      * Copies every Quantum Force Transformer recipe into {@link #qftProbabilityDestroyerRecipes} with all output
      * chances at 10000 (= 100%). The QFT catalyst becomes a non-consumed input (stack size 0), the focus tier metadata
      * is kept for NEI, and every recipe gets structure level 2, the mode's fixed heat and this map's own
