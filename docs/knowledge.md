@@ -785,9 +785,9 @@ MTMultiMachineBase<T>
   progress bar and the `MTMultiMachineBase#getWailaNBTData` "running mode" line.
 - `onWireCutterRightClick` refuses to remove the Astral Array while mode 1 runs; a successful extraction drops back to
   mode 0.
-- Mode 0 binds **per input source**: an input bus by its own circuit slot, a programmable hatch's pattern buffer by its
-  carried circuit; no machine-wide selector (the controller slot selects nothing) - several pools at once, items never
-  cross.
+- Mode 0 binds **per input source**: an input bus by the circuit GT exposes for it, a programmable hatch's pattern
+  buffer by its carried circuit; no machine-wide selector (the controller slot selects nothing) - several pools at
+  once, items never cross.
 - **Programmable hatches** (`IDualInputHatch`, e.g. Programmable-Hatches' pattern hatches) go into
   `mDualInputHatches`, **never** `mInputBusses` - the scheduler must read both or the hatch is invisible. Each
   `IDualInputInventory` is its own source (`DualInputBinding`): one buffer per AE pattern with its own unwrapped circuit
@@ -800,10 +800,15 @@ MTMultiMachineBase<T>
 - `checkProcessing()` keeps mode 0 on a one-second GT cycle and calls the scheduler inside the standard `checkRecipe()`
   wrapper, so `startRecipeProcessing()` / `endRecipeProcessing()` run for ME buses/hatches; `lEUt` from running task
   totals so GT drains energy normally.
-- Input-bus circuit numbers are snapshotted in `onPostTick` (`duringProcessing = false`) and at the top of
-  `checkProcessing()` (`duringProcessing = true`): an ME bus exposes its circuit only during the recipe check, at the
-  second-to-last virtual slot (`getSizeInventory() - 2`) - fine for GT's fixed 16+2 layout and variable-size ME bus
-  subclasses; a wrong slot binds the bus to an arbitrary AE item or no pool.
+- Input-bus circuits are read the way GT5U exposes them: inside the recipe-processing window a bus hands its inventory
+  out through `MTEHatchInputBus#getStackInSlot` (the ME, compressed/quantum and variable-slot ME subclasses move the
+  circuit into a virtual slot for exactly that window, a plain bus keeps it in its circuit slot), and the circuit is
+  simply the integrated-circuit item among those stacks - `getBusCircuitNumber` scans highest slot first, GT's own
+  `getStoredInputs` order, and assumes no slot index (the old `size - 2` ME-bus arithmetic is gone). The scheduler runs
+  inside `checkRecipe()`'s window; the only outside reader, the Board immersion tanks filled every 20 ticks in
+  `onPostTick`, opens one explicit `startRecipeProcessing()`/`endRecipeProcessing()` pair when a compressed/quantum bus
+  is present - the fill consumes nothing, so the buses' end phase has no delta to commit. Circuit stacks are selectors:
+  `appendBusItems` / `findThreadResourceInBus` skip them, and a damage-0 circuit selects no pool.
 - **Renamed items match like GT**: `inputSatisfies` ignores NBT exactly when the recipe is not NBT sensitive and the
   ingredient is not one of GT's three NBT-always items (IC2 universal fluid cell, GT data stick, data orb;
   `GTRecipe#shouldCheckNBT`, mirrored from `MTParallelHelper`) - a Forming-Press Mold (Name) rename (`display.Name`)

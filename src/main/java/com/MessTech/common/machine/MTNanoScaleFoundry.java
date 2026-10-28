@@ -62,6 +62,7 @@ import gregtech.api.logic.ProcessingLogic;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatchInput;
 import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
+import gregtech.api.metatileentity.implementations.MTEHatchInputBusCompressed;
 import gregtech.api.modularui2.GTGuiTextures;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
@@ -78,7 +79,6 @@ import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.api.util.shutdown.ShutDownReasonRegistry;
 import gregtech.common.tileentities.machines.IDualInputHatch;
 import gregtech.common.tileentities.machines.IDualInputInventory;
-import gregtech.common.tileentities.machines.MTEHatchInputBusME;
 import ic2.core.Ic2Items;
 import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
@@ -104,9 +104,6 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
      * slot.
      */
     public static final int MODE_ONE_STEP_CIRCUIT_POOL = 1;
-
-    /** Snapshot of each input bus's circuit number, captured while recipe processing is not active. */
-    private final Map<MTEHatchInputBus, Integer> inputBusCircuitNumbers = new HashMap<>();
 
     // region Structure piece offsets
     private static final int HORIZONTAL_OFFSET = 16;
@@ -474,8 +471,6 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         }
 
         consumeAstralArrayFromBuses();
-        // ME buses only expose their circuit while the recipe check is running.
-        refreshInputBusCircuits(true);
 
         if (machineMode == MODE_ONE_STEP_CIRCUIT_POOL) {
             if (!astralArrayUnlocked) {
@@ -677,19 +672,25 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    /** Snapshots each input bus's circuit number; ME buses move the circuit slot while processing, hence the flag. */
-    private void refreshInputBusCircuits(boolean duringProcessing) {
-        inputBusCircuitNumbers.clear();
-        for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
-            if (bus == null) continue;
-            int circuitSlot = duringProcessing ? getBusCircuitSlotDuringProcessing(bus) : bus.getCircuitSlot();
-            ItemStack circuitStack = bus.getBaseMetaTileEntity()
-                .getStackInSlot(circuitSlot);
-            int circuit = circuitStack != null && GTUtility.isAnyIntegratedCircuit(circuitStack)
-                ? circuitStack.getItemDamage()
-                : -1;
-            inputBusCircuitNumbers.put(bus, circuit);
+    /**
+     * GT5U's own input-bus circuit recognition: inside the recipe-processing window a bus exposes its inventory
+     * through {@link MTEHatchInputBus#getStackInSlot(int)} - the ME and compressed/quantum buses move their circuit
+     * into a virtual slot for exactly that window, a plain bus keeps it in its circuit slot - and the circuit is
+     * simply the integrated-circuit item among those stacks. No slot index is assumed, so subclasses with a different
+     * layout need no special case.
+     * <p>
+     * The scan walks the slots highest-first, GT's own {@code getStoredInputs} order, so a bus yields its configured
+     * circuit before any integrated circuit stocked in a lower slot.
+     *
+     * @return the circuit number the bus carries, or -1 when it carries none.
+     */
+    private static int getBusCircuitNumber(MTEHatchInputBus bus) {
+        if (bus == null) return -1;
+        for (int slot = bus.getSizeInventory() - 1; slot >= 0; slot--) {
+            ItemStack stack = bus.getStackInSlot(slot);
+            if (GTUtility.isAnyIntegratedCircuit(stack)) return stack.getItemDamage();
         }
+        return -1;
     }
 
     private void consumeAstralArrayFromBuses() {
@@ -698,9 +699,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
             if (bus == null) continue;
             IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
-            int circuitSlot = getBusCircuitSlotDuringProcessing(bus);
             for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
-                if (i == circuitSlot) continue;
                 ItemStack stack = busTile.getStackInSlot(i);
                 if (stack != null && GTUtility.areStacksEqual(stack, starArray)) {
                     busTile.decrStackSize(i, 1);
@@ -712,29 +711,16 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         }
     }
 
-    /** The input buses bound to {@code circuit} by their own circuit slot. */
+    /** The input buses bound to {@code circuit} by the circuit GT exposes for them. */
     private ArrayList<MTEHatchInputBus> getThreadInputBuses(int circuit) {
         ArrayList<MTEHatchInputBus> result = new ArrayList<>();
         for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
             if (bus == null) continue;
-            Integer cachedCircuit = inputBusCircuitNumbers.get(bus);
-            if (cachedCircuit != null && cachedCircuit == circuit) {
+            if (getBusCircuitNumber(bus) == circuit) {
                 result.add(bus);
             }
         }
         return result;
-    }
-
-    /**
-     * An ME bus moves its circuit behind the stocked slots while processing: second-to-last slot (GT's 16+2 layout and
-     * variable-size subclasses alike).
-     */
-    private int getBusCircuitSlotDuringProcessing(MTEHatchInputBus bus) {
-        if (bus instanceof MTEHatchInputBusME) {
-            int size = bus.getSizeInventory();
-            return size >= 2 ? size - 2 : bus.getCircuitSlot();
-        }
-        return bus.getCircuitSlot();
     }
 
     /** One pattern buffer plus the live stacks the hatch handed out; decrementing them is the consumption. */
@@ -758,11 +744,11 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     private void appendBusItems(ArrayList<ItemStack> items, MTEHatchInputBus bus) {
         IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
         if (busTile == null) return;
-        int circuitSlot = getBusCircuitSlotDuringProcessing(bus);
         for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
-            if (i == circuitSlot) continue;
             ItemStack stack = busTile.getStackInSlot(i);
-            if (stack != null) items.add(stack);
+            // A bus circuit is a selector, not a consumable ingredient (GT matches it as a zero-sized recipe input).
+            if (stack == null || GTUtility.isAnyIntegratedCircuit(stack)) continue;
+            items.add(stack);
         }
     }
 
@@ -808,10 +794,10 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
     private ItemStack findThreadResourceInBus(MTEHatchInputBus bus, ItemStack stack, boolean ignoreNbt) {
         IGregTechTileEntity busTile = bus.getBaseMetaTileEntity();
         if (busTile == null) return null;
-        int circuitSlot = getBusCircuitSlotDuringProcessing(bus);
         for (int i = busTile.getSizeInventory() - 1; i >= 0; i--) {
-            if (i == circuitSlot) continue;
             ItemStack slotStack = busTile.getStackInSlot(i);
+            // The bus circuit selects the pool, it is never a consumable ingredient.
+            if (slotStack == null || GTUtility.isAnyIntegratedCircuit(slotStack)) continue;
             if (inputSatisfies(stack, slotStack, !ignoreNbt) && slotStack.stackSize >= stack.stackSize) {
                 return slotStack;
             }
@@ -1417,17 +1403,43 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
         }
     }
 
+    /**
+     * Whether a bus only publishes its circuit inside GT's recipe-processing window. Plain, ME and debug buses
+     * expose their circuit slot at any time; GT5U's compressed/quantum bus keeps its whole inventory behind the
+     * processing phase and therefore does not.
+     */
+    private boolean needsRecipeProcessingWindowForCircuit() {
+        for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
+            if (bus instanceof MTEHatchInputBusCompressed) return true;
+        }
+        return false;
+    }
+
+    private void tickBoardTanks() {
+        for (WorkThread thread : getThreads()) {
+            if (thread.getCircuitNumber() != 4) continue;
+            BoardTankState tank = getBoardTank(thread);
+            if (tank == null) continue;
+            tank.tick(this, thread);
+        }
+    }
+
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
-        if (aBaseMetaTileEntity.isServerSide()) {
-            refreshInputBusCircuits(false);
-        }
-        if (aBaseMetaTileEntity.isServerSide() && aTick % 20 == 0) {
-            for (WorkThread thread : getThreads()) {
-                if (thread.getCircuitNumber() != 4) continue;
-                BoardTankState tank = getBoardTank(thread);
-                if (tank == null) continue;
-                tank.tick(this, thread);
+        if (aBaseMetaTileEntity.isServerSide() && aTick % 20 == 0 && mMaxProgresstime > 0) {
+            if (needsRecipeProcessingWindowForCircuit()) {
+                // The Board pool resolves its buses by the circuit each bus carries, and a compressed/quantum bus
+                // only publishes it inside GT's recipe-processing window. The machine is always mid-cycle here, so
+                // opening one for the tank fill is lossless: the fill consumes nothing and the buses' own
+                // endRecipeProcessing therefore has no delta to commit.
+                startRecipeProcessing();
+                try {
+                    tickBoardTanks();
+                } finally {
+                    endRecipeProcessing();
+                }
+            } else {
+                tickBoardTanks();
             }
         }
         super.onPostTick(aBaseMetaTileEntity, aTick);
