@@ -268,7 +268,7 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         checkElevatorLinkage(errors, "V");
         // Look for computation only once the elevator has the module mounted: otherwise a missing data hatch on top of
         // the linkage error would send the player to the wrong problem.
-        if (eInputData.isEmpty() && getConnectedElevator() != null && !getConnectedElevator().hasDataHatches()) {
+        if (eInputData.isEmpty() && hasLinkedElevator() && !linkedElevatorHasDataHatches()) {
             errors.add(StructureErrors.of("GT5U.gui.text.structure_error.missing_data_input_hatch"));
         }
         checkHasInputHatch(errors);
@@ -365,8 +365,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
         ItemStack[] itemInputs = gatherItemInputs();
         currentDroneMask = getAvailDroneMask(itemInputs);
         ArrayList<FluidStack> allFluids = new ArrayList<>();
-        if (getConnectedElevator() != null) {
-            allFluids.addAll(getConnectedElevator().getStoredFluids());
+        if (hasLinkedElevator()) {
+            allFluids.addAll(linkedElevatorStoredFluids());
         }
         allFluids.addAll(getStoredFluidsWithDualInput());
         FluidStack[] fluidInputs = allFluids.toArray(new FluidStack[0]);

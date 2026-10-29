@@ -1215,6 +1215,40 @@ other mods' blocks and player edits alone.
 - Forestry is a hard dependency (`implementation(gtnhDev("ForestryMC"))` in `dependencies.gradle`); simulations go through
   `forestry.api.apiculture.BeeManager`.
 
+## Space Elevator (MTSpaceElevator)
+
+- `MTSpaceElevator` is a **copy** of GT5U's `gtnhintergalactic.tile.multi.elevator.TileEntitySpaceElevator` logic,
+  re-seated on `TTMultiblockBase` instead of subclassing it, so the structure, the module limit and the GUI belong to
+  MessTech while GT5U's own elevator stays untouched.
+  - Why not subclass: `TileEntitySpaceElevator.addUIWidgets` creates the "extended structure" toggle and the GTNH
+    contributor button, and Java cannot skip a single superclass method (no `super.super`). With the copy,
+    `super.addUIWidgets` is `TTMultiblockBase`'s panel and the GUI is written here - no mixin involved.
+- Structure: the structure printer's **transposed** scan, registered through `transpose(...)`, 95 x 122 x 78, one
+  piece, offsets `(50, 106, 37)`. Letters: A/B/C = `gt.blockcasingsSE` 0/1/2, D = `gt.blockcasingsSEMotor` (tiered by
+  `GTStructureChannels.SE_MOTOR.use(ofBlocksTiered(...))` + `ElevatorUtil.motorTierConverter/getMotorTiers`), E =
+  Neutronium frame, F = `gt.blockcasingsDyson` 9, G = energy/computation hatch ring, H = module bay skeleton cells,
+  I = module controllers, J = Space Elevator Cable (113 blocks).
+  - 64 `I` cells, each the controller cell of a standard 1 x 5 x 2 module bay with its 9 `H` cells next to it; `H`
+    accepts any module hatch (ignored by the elevator) or the base casing, like GT5U's `M` slots.
+- Module limit: `MODULE_SLOTS_BY_MOTOR_TIER = {12, 24, 36, 48, 64}` replaces GT's `{6, 12, 15, 18, 24}`, checked in
+  `checkMachine` against `mProjectModuleHatches.size()`; error key `machine.mtspaceelevator.module_limit`.
+- `G` = `HatchElement.Energy` + `TTMultiblockBase.HatchElement.EnergyMulti` + `TTMultiblockBase.HatchElement.InputData`.
+  On a TT machine the real exotic energy hatch is the TT multi-amp hatch; GT's `HatchElement.ExoticEnergy` would only
+  fill `mExoticEnergyHatches`, which TT's power loop never drains. The GT `HatchElement` name is written fully
+  qualified because `TTMultiblockBase.HatchElement` is an inherited member type and shadows the import.
+- GUI: own `drawTexts` (structure status, `modules N / capacity`, motor tier) and own `addUIWidgets` = TT base panel +
+  Galacticraft travel button only. No extension toggle, no contributor window.
+- Shape size: 122 layers split into four `shapeChunkN()` methods (~17 KB bytecode each) because one method cannot hold
+  the whole literal (JVM 64 KB method limit); `<clinit>` only concatenates the chunks (~87 bytes). The compiled
+  structure has 41,798 structure-map entries and 192 navigation chars - far inside StructureLib's limits.
+- Module link: MessTech modules implement `IMTSpaceElevatorModule#connectToElevator(MTSpaceElevator)` and the elevator
+  calls it while charging; GT5U modules get the no-parent `connect()` (their `connect(TileEntitySpaceElevator)` cannot
+  take a non-GT elevator - pump/assembler/research/manager run fine, the native miner keeps only its own computation
+  and plasma hatches). `SpaceModuleInfinityBase` keeps both parents (`parentElevator`, `messTechElevator`) and the
+  helpers `hasLinkedElevator` / `linkedElevatorHasDataHatches` / `linkedElevatorStoredFluids` feed the miner.
+- Registration: `MTItemList.MTSpaceElevator`, `MT_ID + 38`, lang `machine.mtspaceelevator.*`. No crafting recipe yet
+  (GT5U's own elevator recipe still makes the GT machine).
+
 ## Mess Food (混乱大杂烩)
 
 - Item: `com.MessTech.common.item.ItemMessFood`, registered as `MessFood` in `MTItems`, texture

@@ -25,6 +25,8 @@ public enum MTItemList {
     SpaceModuleApiaryMK2,
     SpaceModuleApiaryMK3,
     SpaceModuleApiaryMK4,
+    /** The rebuilt Space Elevator: single 95 x 122 x 78 structure, 64 module bays. */
+    MTSpaceElevator,
     MTNQDAFReactor,
     MTInventoryInputBusME,
     MTInventoryInputHatchME,

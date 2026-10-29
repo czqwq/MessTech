@@ -242,6 +242,17 @@ machine.spacemoduleapiary.gui.identical=§7同种蜂后：§b%s 只
 machine.spacemoduleapiary.gui.free=§7空余蜂槽：§b%s
 GT5U.gui.text.recipe_result.insufficient_computation=算力不足
 
+# --- 太空电梯 (MTSpaceElevator) ---
+machine.mtspaceelevator.name=超————大型太空电梯
+machine.mtspaceelevator.machinetype=太空电梯
+machine.mtspaceelevator.tooltip.desc=§7模块槽随等级解锁，MKI 12，II 24，III 36，IV48，V 64。最多 §b64§7 个模块槽。
+machine.mtspaceelevator.tooltip.desc.02=它真的超————大的,虽然我也不知道它有啥用:L
+machine.mtspaceelevator.structure.controller=§7使用§b蓝§3图§7预览
+machine.mtspaceelevator.structure.cable_ring=§7中央线缆周围
+machine.mtspaceelevator.structure.module_bays=§7模块槽上
+machine.mtspaceelevator.gui.motor=加速轨道等级
+machine.mtspaceelevator.module_limit=§c模块数量超限：%s 最多允许 %s 个模块
+
 machine.meinventory.inputbus.name=库存输入总线(ME)
 machine.meinventory.inputbus.desc.0=库存输入总线(ME)
 machine.meinventory.inputbus.desc.1=配方检查时从ME网络中拉取全部物品类型。

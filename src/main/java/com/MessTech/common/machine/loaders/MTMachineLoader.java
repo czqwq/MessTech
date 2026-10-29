@@ -24,6 +24,7 @@ import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.MTNanoScaleFoundry;
 import com.MessTech.common.machine.MTReactor;
 import com.MessTech.common.machine.MTSmallEssentiaSmeltery;
+import com.MessTech.common.machine.MTSpaceElevator;
 import com.MessTech.common.machine.hatch.MTHatchRack;
 import com.MessTech.common.machine.hatch.MTInventoryInputBusME;
 import com.MessTech.common.machine.hatch.MTInventoryInputHatchME;
@@ -128,6 +129,14 @@ public class MTMachineLoader {
                 "Space Module Apiary MK-IV",
                 translateToLocal("machine.spacemoduleapiary4.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.SpaceModuleApiaryMK4.get(1));
+
+        // Our own Space Elevator: the GT5U elevator logic on a single 95 x 122 x 78 structure with 64 module bays.
+        // MT_ID + 38 is the first free slot after the reactor / coolant / space module ID groups.
+        MTItemList.MTSpaceElevator.set(
+            new MTSpaceElevator(MT_ID + 38, "MTSpaceElevator", translateToLocal("machine.mtspaceelevator.name"))
+                .getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTSpaceElevator.get(1));
+
         MTItemList.MTNQDAFReactor.set(
             new MTNQDAFReactor(
                 MT_ID + 6,

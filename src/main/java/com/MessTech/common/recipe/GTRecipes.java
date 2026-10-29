@@ -88,6 +88,7 @@ import thaumicenergistics.api.ThEApi;
 public class GTRecipes {
 
     public static void loadRecipes() {
+        GTValues.RA.stdBuilder().itemInputs(ItemList.SpaceElevatorController.get(2),ItemList.SpaceElevatorCable.get(64),GTOreDictUnificator.get(OrePrefixes.circuit,Materials.UV,16)).itemOutputs(MTItemList.MTSpaceElevator.get(1)).circuit(23).duration(64*MINUTES).eut(RECIPE_UV).addTo(assemblerRecipes);
         GameRegistry.addShapedRecipe(
             MTItemList.GameConsole.get(1),
             "IGI",

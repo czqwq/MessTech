@@ -4,6 +4,7 @@ import static gregtech.common.misc.WirelessNetworkManager.processInitialSettings
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,8 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.NotNull;
 
 import com.MessTech.common.gui.module.SpaceModuleInfinityGui;
+import com.MessTech.common.machine.IMTSpaceElevatorModule;
+import com.MessTech.common.machine.MTSpaceElevator;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.IStructureElement;
@@ -61,20 +64,26 @@ import mcp.mobius.waila.api.IWailaDataAccessor;
 /**
  * Shared base for the wireless MessTech space modules: they extend GTNH's native {@link TileEntityModuleBase}, so
  * they are real Space Elevator project modules rather than machines standing next to one. Each subclass builds the
- * elevator's module slot via {@link #buildModuleStructure} - only a controller standing on such a slot is registered -
- * and the elevator itself calls {@code connect(this)} on modules whose {@code getNeededMotorTier()} the motor tier
- * satisfies and {@code disconnect()} when it stops working, which is exactly what {@link #isMountedOnFormedElevator()}
- * reads.
+ * elevator's module slot via {@link #buildModuleStructure} - only a controller standing on such a slot is registered.
+ * <p>
+ * Two elevators can mount these modules: GT5U's own Space Elevator calls {@code connect(TileEntitySpaceElevator)},
+ * while MessTech's copied {@link MTSpaceElevator} calls {@link #connectToElevator(MTSpaceElevator)}. Whichever one
+ * takes the module in is remembered and read back by {@link #isMountedOnFormedElevator()}; the module is disconnected
+ * when its elevator stops working.
  * <p>
  * The module is 2 wide, 5 long and 2 deep, so only the rotations the elevator's own modules use fit the slot. Power
  * comes from the GT wireless network, not from the elevator's internal EU buffer.
  */
 @Getter
 public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<T>> extends TileEntityModuleBase
-    implements ISurvivalConstructable {
+    implements ISurvivalConstructable, IMTSpaceElevatorModule {
 
-    /** @return the connected Space Elevator, or null when not mounted. */
+    /**
+     * @return the GT5U Space Elevator that mounted this module, or null (MessTech elevators are in the field below).
+     */
     protected TileEntitySpaceElevator parentElevator;
+    /** @return the MessTech Space Elevator that mounted this module, or null. */
+    protected MTSpaceElevator messTechElevator;
 
     private int crossRecipeParallel = 1;
     protected boolean shutdownRequestedDuringBatch = false;
@@ -176,13 +185,35 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
         return tModuleTier;
     }
 
-    /** The elevator this module is mounted on, or null; set in {@code connect(this)}. */
-    public TileEntitySpaceElevator getConnectedElevator() {
-        return parentElevator;
+    /** @return true while linked to either a GT5U or a MessTech Space Elevator. */
+    public boolean hasLinkedElevator() {
+        return parentElevator != null || messTechElevator != null;
+    }
+
+    /** @return true when the linked elevator has computation (data input) hatches of its own. */
+    public boolean linkedElevatorHasDataHatches() {
+        if (messTechElevator != null) {
+            return messTechElevator.hasDataHatches();
+        }
+        return parentElevator != null && parentElevator.hasDataHatches();
+    }
+
+    /** @return the fluids stored in the linked elevator's hatches (the miner can take plasma from there). */
+    public List<FluidStack> linkedElevatorStoredFluids() {
+        if (messTechElevator != null) {
+            return messTechElevator.getStoredFluids();
+        }
+        if (parentElevator != null) {
+            return parentElevator.getStoredFluids();
+        }
+        return Collections.emptyList();
     }
 
     /** @return true while mounted on a formed elevator whose motor tier is at least {@code getNeededMotorTier()}. */
     public boolean isMountedOnFormedElevator() {
+        if (messTechElevator != null) {
+            return messTechElevator.getMotorTier() >= getNeededMotorTier();
+        }
         return parentElevator != null && parentElevator.getMotorTier() >= getNeededMotorTier();
     }
 
@@ -194,7 +225,7 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
      * @param level  level suffix this module needs, e.g. {@code V} for {@code MK-V}
      */
     protected void addElevatorError(List<StructureError> errors, String level) {
-        if (parentElevator == null) {
+        if (!hasLinkedElevator()) {
             errors.add(StructureErrors.of("machine.spacemodule.elevator_not_linked"));
             return;
         }
@@ -342,12 +373,21 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     @Override
     public void connect(TileEntitySpaceElevator parent) {
         this.parentElevator = parent;
+        this.messTechElevator = null;
         super.connect(parent);
+    }
+
+    @Override
+    public void connectToElevator(MTSpaceElevator elevator) {
+        this.messTechElevator = elevator;
+        this.parentElevator = null;
+        connect();
     }
 
     @Override
     public void disconnect() {
         this.parentElevator = null;
+        this.messTechElevator = null;
         super.disconnect();
     }
 
@@ -360,6 +400,9 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     @Override
     protected long getAvailableData_EM() {
         if (eInputData.isEmpty()) {
+            if (messTechElevator != null) {
+                return messTechElevator.getAvailableDataForModules();
+            }
             if (parentElevator == null) return 0;
             return parentElevator.getAvailableDataForModules();
         }

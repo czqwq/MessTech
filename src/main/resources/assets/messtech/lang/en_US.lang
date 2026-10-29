@@ -242,6 +242,17 @@ machine.spacemoduleapiary.gui.identical=§7Identical queens: §b%s
 machine.spacemoduleapiary.gui.free=§7Free bee slots: §b%s
 GT5U.gui.text.recipe_result.insufficient_computation=Not enough computation
 
+# --- Space Elevator (MTSpaceElevator) ---
+machine.mtspaceelevator.name=Grand Space Elevator
+machine.mtspaceelevator.machinetype=Space Elevator
+machine.mtspaceelevator.tooltip.desc=§7GT5U's Space Elevator logic on a single §b95x122x78§7 structure with §b64§7 project module bays.
+machine.mtspaceelevator.tooltip.desc.02=It's extreme big! But I don't know what it used for :L
+machine.mtspaceelevator.structure.controller=§7Use §bBlue§3print§7 to preview
+machine.mtspaceelevator.structure.cable_ring=§7Around the central cable
+machine.mtspaceelevator.structure.module_bays=§7On the module bays
+machine.mtspaceelevator.gui.motor=Motor tier
+machine.mtspaceelevator.module_limit=§cModule limit exceeded: %s allows at most %s project modules
+
 # --- Large NQD Annihilation Field Reactor ---
 misc.structure_tooltip.coil=Force Field Restriction Coil Block
 misc.structure_error.no_coil=Requires a Force Field Restriction Coil

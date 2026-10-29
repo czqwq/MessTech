@@ -36,6 +36,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - MTNanoScaleFoundry and the one-step circuit pool (incl. programmable pattern hatches and renamed items)
   - SpaceModule Infinity machines (pump / miner / assembler)
   - Space apiary modules (太空蜂箱, MK-I..MK-IV)
+  - Space Elevator (`MTSpaceElevator`): copied GT5U elevator logic, own 95×122×78 structure, 64 module bays
   - MTLargeProcessingFactory (LPF, GT++ port) / MTLargeEssentiaGenerator (LEG, GoodGenerator port, incl. the ME
     essentia input hatch and the `essentia_cell` structure sub-channel)
   - Thaumcraft research tab (混乱科技 / MessTech): `MTThaumcraftResearch`, essentia hatch, LEG upgrade items
