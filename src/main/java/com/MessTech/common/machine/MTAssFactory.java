@@ -440,9 +440,6 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
             .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.data.header"))
             .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.data.access"))
             .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.data.stick"))
-            .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.details"))
-            .addInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.details.hint"))
             .addStructureInfo(StatCollector.translateToLocal("machine.assfactory.tooltip.4"))
             .toolTipFinisher();
         return tt;
