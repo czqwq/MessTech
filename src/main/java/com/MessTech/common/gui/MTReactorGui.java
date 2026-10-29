@@ -28,9 +28,8 @@ import gregtech.api.util.GTUtility;
 /**
  * Controller GUI for the nuclear reactor. The default terminal text widget is replaced on purpose: only reactor status
  * numbers, without the recipe progress bar and the machine work progress - core heat and its ceiling, the three-state
- * meltdown report ({@code stable} / {@code N cycles} / countdown running, plus a red countdown alarm), rated vs
- * actually injected EU/t with a dynamo shortfall warning, fluid (wet) mode with its passive cooling, and the per-page
- * heat map.
+ * meltdown report ({@code stable} / {@code N cycles} / countdown running, plus a red countdown alarm), the rated EU/t,
+ * fluid (wet) mode with its passive cooling, and the per-page heat map.
  */
 public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
 
@@ -59,8 +58,6 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
         syncManager.syncValue("mtReactorMeltdownSeconds", new IntSyncValue(multiblock::getMeltdownCountdownSeconds));
         syncManager.syncValue("mtReactorCycles", new IntSyncValue(multiblock::getCyclesToMeltdown));
         syncManager.syncValue("mtReactorRatedOutput", new LongSyncValue(multiblock::getRatedEUPerTick));
-        syncManager.syncValue("mtReactorActualOutput", new LongSyncValue(multiblock::getActualEUPerTick));
-        syncManager.syncValue("mtReactorOutputShortfall", new BooleanSyncValue(multiblock::hasOutputShortfall));
         syncManager.syncValue("mtReactorFluidMode", new BooleanSyncValue(multiblock::isFluidMode));
         syncManager.syncValue("mtReactorCooling", new LongSyncValue(multiblock::getPassiveCoolingPerSecond));
         syncManager.syncValue("mtReactorPendingHeat", new IntSyncValue(multiblock::getPendingCoolantHeat));
@@ -122,9 +119,6 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
         IntSyncValue meltdownSeconds = syncManager.findSyncHandler("mtReactorMeltdownSeconds", IntSyncValue.class);
         IntSyncValue cycles = syncManager.findSyncHandler("mtReactorCycles", IntSyncValue.class);
         LongSyncValue ratedOutput = syncManager.findSyncHandler("mtReactorRatedOutput", LongSyncValue.class);
-        LongSyncValue actualOutput = syncManager.findSyncHandler("mtReactorActualOutput", LongSyncValue.class);
-        BooleanSyncValue outputShortfall = syncManager
-            .findSyncHandler("mtReactorOutputShortfall", BooleanSyncValue.class);
         BooleanSyncValue fluidMode = syncManager.findSyncHandler("mtReactorFluidMode", BooleanSyncValue.class);
         LongSyncValue cooling = syncManager.findSyncHandler("mtReactorCooling", LongSyncValue.class);
         IntSyncValue pendingHeat = syncManager.findSyncHandler("mtReactorPendingHeat", IntSyncValue.class);
@@ -164,18 +158,6 @@ public class MTReactorGui extends MTMultiMachineBaseGui<MTReactor> {
                 line(
                     () -> StatCollector
                         .translateToLocalFormatted("machine.mtreactor.gui.output_rated", ratedOutput.getLongValue())))
-            .child(
-                line(
-                    () -> StatCollector
-                        .translateToLocalFormatted("machine.mtreactor.gui.output_actual", actualOutput.getLongValue())))
-            .child(
-                IKey.dynamic(
-                    () -> EnumChatFormatting.RED
-                        + StatCollector.translateToLocal("machine.mtreactor.gui.output_shortfall"))
-                    .asWidget()
-                    .fullWidth()
-                    .marginBottom(2)
-                    .setEnabledIf(w -> outputShortfall.getBoolValue()))
             .child(
                 line(
                     () -> StatCollector.translateToLocalFormatted(

@@ -240,9 +240,11 @@ MTMultiMachineBase<T>
   modifier (no N-fold irradiation/ignition); meltdown still per page.
 - **`STABILITY_PREDICTION_CYCLES = 20`**: `predictFuture()` repeats the heat pass on page copies until equilibrium or
   the ceiling -> GUI/Waila `getCyclesToMeltdown()` (`-1` = stable), not a "next cycle fatal" boolean.
-- **Rated vs injected EU/t**: `getRatedEUPerTick()` = last cycle's accumulation, `getActualEUPerTick()` = what the
-  dynamos took (untakeable output is lost silently, so both are shown); shortfall under 90% of rated for
-  `OUTPUT_SHORTFALL_REPORT_TICKS = 20` ticks -> `hasOutputShortfall()`. An exploding page still settles its EU/t.
+- **Rated EU/t is GT5U output**: `getRatedEUPerTick()` = last cycle's accumulation, shown as the GUI/Waila "rated
+  output / generation" line. The EU leaves through the shared generator path (`lEUt > 0` ->
+  `MTEExtendedPowerMultiBlockBase#onRunningTick()` -> `addEnergyOutput()`); whatever the dynamo hatches cannot take
+  is lost silently (the shared base caps the injection instead of exploding), so there is no reactor-side
+  shortfall tracking.
 - **Fluid ("wet") mode** (`onScrewdriverRightClick`, per controller): coolant input + hot coolant output hatch, else
   soft-stop; 1 mB `ic2coolant` per 1 HU component heat (`MTReactorHeatSystem.coolantForHeat()`,
   `COOLANT_PER_BUFFER_UNIT = 1` - MessTech's ratio, not IC2's 2 mB/HU `huOutputModifier`), same `ic2hotcoolant`
@@ -256,8 +258,7 @@ MTMultiMachineBase<T>
 - **Explosion limit is a config** (`Config.machines.reactor.REACTOR_IC2_EXPLOSION_POWER_LIMIT`, default 45 = IC2's
   `protection/reactorExplosionPowerLimit`, was hardcoded `45.0F`): clamps summed component influence before the DE
   power scale (`REACTOR_EXPLOSION_DE_POWER_LIMIT`, 40). `explodeReactor()` also clears every page's heat
-  (controller TE + heat store survive `explodeMultiblock()` for the rest of the tick) and settles the accumulated
-  EU/t first.
+  (controller TE + heat store survive `explodeMultiblock()` for the rest of the tick).
 - Controller face: GoodGenerator's neutron activator art (`icons/NeutronActivator_Off` / `_On` + two optional glow
   layers, gregtech assets, five animated 16x16 frames, `frametime: 8`) over the casing already under the face
   (`Casings.AssemblyLineCasing`), other five `Casings.AssemblerMachineCasing`; overlay only, base layer unchanged

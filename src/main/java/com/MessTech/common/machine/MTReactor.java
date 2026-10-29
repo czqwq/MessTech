@@ -61,8 +61,6 @@ import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
-import gregtech.api.metatileentity.implementations.MTEHatch;
-import gregtech.api.metatileentity.implementations.MTEHatchDynamo;
 import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
@@ -120,8 +118,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     private static final int MESSTECH_OUTPUT_MULTIPLIER = 2;
     /** Simulated reactor cycles used by the stability prediction, i.e. how far ahead the GUI can look. */
     private static final int STABILITY_PREDICTION_CYCLES = 20;
-    /** Consecutive ticks of "the dynamos took less than the rated output" before the machine reports it. */
-    private static final int OUTPUT_SHORTFALL_REPORT_TICKS = 20;
 
     public static float getEuPerOutput() {
         if (MainConfig.get() == null) return IC2_EU_PER_OUTPUT * 2 * 5;
@@ -364,13 +360,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     private final MTReactorHeatSystem mHeat = new MTReactorHeatSystem(this);
     /** EU/t currently emitted through dynamo hatches (IC2 keeps the output constant between cycles). */
     private long mReactorEUPerTick = 0;
-    /** EU/t the dynamo hatches swallowed last tick; below the rated value means loss. */
-    private long mReactorActualEUPerTick = 0;
-    /** Rated output the shortfall detector compares against, and how long the shortfall persists. */
-    private long mOutputShortfallRated = 0;
-    private int mOutputShortfallTicks = 0;
-    /** Dynamo energy at the start of the previous tick, sampled to measure the accepted EU. */
-    private long mLastDynamoEnergy = -1;
     /** Ticks until the next IC2 reactor material cycle. */
     private int mReactorCycleTicks = 0;
     /** True once the machine could run at the start of the last tick (everything but the power switch). */
@@ -413,9 +402,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         if (aBaseMetaTileEntity != null && aBaseMetaTileEntity.isServerSide()) {
-            // The machine had the whole previous tick to push its generation into the dynamo hatches: sampling the
-            // accepted amount here turns "the rated output" into "the output that really made it out".
-            settleActualOutputEU();
             refreshHatches();
             // Re-derive the ceiling only after the refresh above: the lists were just rebuilt from the live structure,
             // and a ceiling taken earlier would rescale onto the previous hatch's value for one cycle.
@@ -439,14 +425,12 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             // A page whose grace window ran out detonates here, before any material work of this tick.
             if (explodeExpiredCountdowns(aTick)) {
                 super.onPostTick(aBaseMetaTileEntity, aTick);
-                snapshotDynamoEnergy();
                 return;
             }
             if (mReactorCycleTicks <= 0) {
                 if (runMaterialCycle(aTick)) {
                     // A page detonated; the structure is being removed, so do not report anything else this tick.
                     super.onPostTick(aBaseMetaTileEntity, aTick);
-                    snapshotDynamoEnergy();
                     return;
                 }
             } else {
@@ -466,8 +450,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             }
         }
         super.onPostTick(aBaseMetaTileEntity, aTick);
-        // Baseline for the next tick's shortfall measurement, taken after the base class pushed this tick's generation.
-        snapshotDynamoEnergy();
     }
 
     private static boolean isReactorSoftStopReason(ShutDownReason reason) {
@@ -530,54 +512,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             // would skip the tail pages' heat effects entirely.
             softStopReactor(ExtraShutdownReason.TOO_MANY_PAGES);
         }
-    }
-
-    /**
-     * Samples how much of the rated output the dynamo hatches really swallowed: a generator does not buffer, so
-     * anything the dynamos refuse is lost, and comparing rated against accepted makes it visible.
-     */
-    private void settleActualOutputEU() {
-        long energy = getStoredDynamoEnergy();
-        if (mLastDynamoEnergy >= 0) {
-            long delta = energy - mLastDynamoEnergy;
-            if (mReactorEUPerTick > 0 && delta < (mReactorEUPerTick * 9) / 10) {
-                mOutputShortfallTicks++;
-                mOutputShortfallRated = mReactorEUPerTick;
-            } else {
-                mOutputShortfallTicks = 0;
-                mOutputShortfallRated = 0;
-            }
-            mReactorActualEUPerTick = Math.max(0, delta);
-        }
-        // The snapshot is taken after the base class has had its chance to inject this tick's generation.
-        mLastDynamoEnergy = -1;
-    }
-
-    /**
-     * Energy buffered in every dynamo hatch, to measure how much of the rated output made it out. The exotic dynamo
-     * list holds plain {@link MTEHatch} entries, so it is walked directly.
-     */
-    private long getStoredDynamoEnergy() {
-        long total = 0;
-        for (MTEHatchDynamo dynamo : filterValidMTEs(mDynamoHatches)) {
-            total += dynamo.getBaseMetaTileEntity()
-                .getStoredEU();
-        }
-        for (MTEHatch dynamo : mExoticDynamoHatches) {
-            if (dynamo == null) continue;
-            IGregTechTileEntity base = dynamo.getBaseMetaTileEntity();
-            if (base == null) continue;
-            total += base.getStoredEU();
-        }
-        return total;
-    }
-
-    public boolean hasOutputShortfall() {
-        return mOutputShortfallTicks >= OUTPUT_SHORTFALL_REPORT_TICKS && mOutputShortfallRated > 0;
-    }
-
-    private void snapshotDynamoEnergy() {
-        mLastDynamoEnergy = getStoredDynamoEnergy();
     }
 
     private void ensureLiveSimulation() {
@@ -1330,8 +1264,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
      * IC2's {@code explode()}: power from the components' influence, all components destroyed, the multiblock removed.
      * The IC2 ray explosion is replaced by the Draconic Evolution style {@link MTExplosionDE}, see there for why.
      * Every page's heat is reset on purpose: the controller survives {@code explodeMultiblock()} for the rest of the
-     * tick, so a hot store would be left on a dead machine. The pre-detonation output is settled first, so the
-     * melted-down pages do not cost the player their output.
+     * tick, so a hot store would be left on a dead machine.
      */
     private void explodeReactor(MTReactorAccessHatch explodedHatch, int explodedPage, float hem) {
         float boomPower = 10.0F;
@@ -1358,11 +1291,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
 
         mHeat.clear();
         mReactorEUPerTick = 0;
-        // Settle what the pages produced before the detonation; the machine is about to be removed either way.
-        if (mPendingOutput > 0) {
-            addEnergyOutput((long) (mPendingOutput * getEuPerOutput()));
-            mPendingOutput = 0.0F;
-        }
         mReactorCycleTicks = CYCLE_TICKS;
         mReactorStable = false;
         boomPower *= hem * boomMod;
@@ -1565,7 +1493,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                 StatCollector.translateToLocal(
                     mReactorStable ? "machine.mtreactor.waila.stable.yes" : "machine.mtreactor.waila.stable.no")),
             StatCollector.translateToLocalFormatted("machine.mtreactor.waila.output", mReactorEUPerTick),
-            StatCollector.translateToLocalFormatted("machine.mtreactor.waila.output_actual", mReactorActualEUPerTick),
             StatCollector.translateToLocalFormatted(
                 "machine.mtreactor.waila.fluidmode",
                 StatCollector.translateToLocal(
@@ -1642,11 +1569,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return mReactorEUPerTick;
     }
 
-    /** EU/t the dynamo hatches actually accepted over the last tick. */
-    public long getActualEUPerTick() {
-        return mReactorActualEUPerTick;
-    }
-
     public long getPassiveCoolingPerSecond() {
         return mHeat.getPassiveCoolingPerSecond();
     }
@@ -1697,10 +1619,8 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         tag.setInteger("mtReactorCyclesToMeltdown", mCyclesToMeltdown);
         tag.setInteger("mtReactorCountdownSeconds", getMeltdownCountdownSeconds());
         tag.setLong("mtReactorOutput", mReactorEUPerTick);
-        tag.setLong("mtReactorOutputActual", mReactorActualEUPerTick);
         tag.setBoolean("mtReactorFluidMode", mHeat.isFluidMode());
         tag.setInteger("mtReactorPendingHeat", getPendingCoolantHeat());
-        tag.setBoolean("mtReactorOutputShortfall", hasOutputShortfall());
         tag.setBoolean("mtReactorMissingLocked", hasMissingLockedComponents());
         tag.setBoolean("mtReactorLowLocked", hasLowOrDoomedLockedComponents());
     }
@@ -1755,15 +1675,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         }
         currentTip.add(
             StatCollector.translateToLocalFormatted("machine.mtreactor.waila.output", tag.getLong("mtReactorOutput")));
-        currentTip.add(
-            StatCollector.translateToLocalFormatted(
-                "machine.mtreactor.waila.output_actual",
-                tag.getLong("mtReactorOutputActual")));
-        if (tag.getBoolean("mtReactorOutputShortfall")) {
-            currentTip.add(
-                EnumChatFormatting.RED + StatCollector.translateToLocal("machine.mtreactor.waila.output_shortfall")
-                    + EnumChatFormatting.RESET);
-        }
         if (tag.getBoolean("mtReactorFluidMode")) {
             currentTip.add(
                 EnumChatFormatting.AQUA + StatCollector.translateToLocal("machine.mtreactor.waila.fluidmode.on")
