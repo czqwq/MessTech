@@ -20,6 +20,7 @@ import static gregtech.api.recipe.RecipeMaps.assemblerRecipes;
 import static gregtech.api.recipe.RecipeMaps.cannerRecipes;
 import static gregtech.api.recipe.RecipeMaps.centrifugeRecipes;
 import static gregtech.api.recipe.RecipeMaps.compressorRecipes;
+import static gregtech.api.recipe.RecipeMaps.electrolyzerRecipes;
 import static gregtech.api.util.GTRecipeBuilder.HOURS;
 import static gregtech.api.util.GTRecipeBuilder.INGOTS;
 import static gregtech.api.util.GTRecipeBuilder.MINUTES;
@@ -29,6 +30,7 @@ import static gregtech.api.util.GTRecipeConstants.AssemblyLine;
 import static gregtech.api.util.GTRecipeConstants.NANITE_TIERS;
 import static gregtech.api.util.GTRecipeConstants.RESEARCH_ITEM;
 import static gregtech.api.util.GTRecipeConstants.SCANNING;
+import static gtPlusPlus.core.material.nuclear.MaterialsFluorides.FLUORITE;
 import static tectech.thing.CustomItemList.DATApipe;
 import static tectech.thing.CustomItemList.Machine_Multi_BECGenerator;
 import static tectech.thing.CustomItemList.Machine_Multi_Computer;
@@ -88,7 +90,23 @@ import thaumicenergistics.api.ThEApi;
 public class GTRecipes {
 
     public static void loadRecipes() {
-        GTValues.RA.stdBuilder().itemInputs(ItemList.SpaceElevatorController.get(2),ItemList.SpaceElevatorCable.get(64),GTOreDictUnificator.get(OrePrefixes.circuit,Materials.UV,16)).itemOutputs(MTItemList.MTSpaceElevator.get(1)).circuit(23).duration(64*MINUTES).eut(RECIPE_UV).addTo(assemblerRecipes);
+        GTValues.RA.stdBuilder()
+            .itemInputs(FLUORITE.getDust(16))
+            .itemOutputs(Materials.Calcium.getDust(3), Materials.Iron.getDust(2), Materials.Coal.getDust(1))
+            .fluidOutputs(Materials.Fluorine.getGas(16000))
+            .duration(16 * SECONDS)
+            .eut(RECIPE_HV)
+            .addTo(electrolyzerRecipes);
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.SpaceElevatorController.get(2),
+                ItemList.SpaceElevatorCable.get(64),
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UV, 16))
+            .itemOutputs(MTItemList.MTSpaceElevator.get(1))
+            .circuit(23)
+            .duration(64 * MINUTES)
+            .eut(RECIPE_UV)
+            .addTo(assemblerRecipes);
         GameRegistry.addShapedRecipe(
             MTItemList.GameConsole.get(1),
             "IGI",
