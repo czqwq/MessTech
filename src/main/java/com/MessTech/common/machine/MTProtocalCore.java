@@ -5,10 +5,10 @@ import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose
 import static net.minecraft.util.StatCollector.translateToLocal;
 import static net.minecraft.util.StatCollector.translateToLocalFormatted;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -17,9 +17,7 @@ import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntityBeacon;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
@@ -31,9 +29,11 @@ import com.MessTech.common.machine.Base.MTMultiMachineBase;
 import com.gtnewhorizon.gtnhlib.teams.Team;
 import com.gtnewhorizon.gtnhlib.teams.TeamManager;
 import com.gtnewhorizon.gtnhlib.util.ServerPlayerUtils;
+import com.gtnewhorizon.gtnhlib.util.numberformatting.NumberFormatUtil;
 import com.gtnewhorizon.structurelib.StructureLibAPI;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
 import com.gtnewhorizon.structurelib.structure.AutoPlaceEnvironment;
+import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.IStructureElement;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
@@ -43,12 +43,13 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import ganymedes01.etfuturum.ModBlocks;
 import gregtech.api.casing.Casings;
-import gregtech.api.enums.GTValues;
 import gregtech.api.enums.HatchElement;
 import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
+import gregtech.api.metatileentity.MetaTileEntity;
+import gregtech.api.metatileentity.implementations.MTEHatchEnergy;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
@@ -57,61 +58,60 @@ import gregtech.api.render.TextureFactory;
 import gregtech.api.structure.error.StructureError;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.MultiblockTooltipBuilder;
-import gregtech.api.util.shutdown.ShutDownReason;
 import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
-import gregtech.common.tileentities.machines.RecipeCheckReason;
+import gregtech.common.misc.WirelessNetworkManager;
+import tectech.thing.metaTileEntity.hatch.MTEHatchEnergyMulti;
+import tectech.thing.metaTileEntity.hatch.MTEHatchWirelessMulti;
 import vazkii.botania.common.block.ModFluffBlocks;
 
 /**
- * 协议核心 / Protocal Core: the beacon-tower multiblock (16 x 52 x 16) that broadcasts potion effects to the team of
- * the player who placed it.
+ * 协议核心 / Protocal Core: the beacon-tower multiblock (16 x 52 x 16) that turns the placer's GT5U wireless EU
+ * network into wired power for a whole team.
  * <p>
- * A round starts when the machine is switched on and an energy hatch sits in one of the two {@code X} slots: it applies
- * every enabled level-1 potion effect to all online members of the bound player's team (the bound player is the machine
- * owner; a player without a team only gets the effects themselves) and keeps refreshing the effect until the machine is
- * switched off or loses power. The round length is {@link #BASE_ROUND_SECONDS} seconds per enabled effect (doubling per
- * enabled effect - the original length added again every time), halved once per energy hatch level above EV (lossy
- * overclocking: EU/t grows four-fold per tier while the round only halves), and the running cost is 1 A at the highest
- * hatch tier, i.e. {@code GTValues.V[tier]} EU/t.
+ * While the machine is switched on and the structure is complete it scans the loaded worlds every
+ * {@link #TARGET_REFRESH_INTERVAL} ticks for wired energy hatches ({@link MTEHatchEnergy}) and laser / multi-amp energy
+ * hatches ({@link MTEHatchEnergyMulti}, wireless multi hatches excluded) owned by a member of the placer's GTNHLib
+ * team - or only by the placer when they are not in a team. Every tick each found hatch is charged straight from the
+ * placer's wireless EU network ({@link WirelessNetworkManager}) with up to its own intake voltage times rated amperes,
+ * 1:1. Energy hatch buffers are tiny ({@code 512 + V * 8} for a normal energy hatch), so this has to run per tick like
+ * a cable instead of in bulk.
  * <p>
- * The effect program - a per-effect enable switch plus a per-effect player name blacklist / whitelist incl. the
- * black/white filter mode - is edited in the machine's own ModularUI2 GUI, see {@link MTProtocalCoreGui}, and is stored
- * in the machine's NBT.
+ * The machine has no energy hatch requirement and no running cost of its own: it is only the wireless-to-wired
+ * converter. The wireless network balance must cover the delivered EU; while it does not, the output drops to 0 and
+ * comes back automatically once the network is charged again.
  * <p>
- * The structure itself is the original beacon-tower dump: the block legend of {@code structure_string} is on the field
- * itself. This class does not use a recipe map at all - the round timer is not a GT recipe.
+ * The structure is the original beacon-tower dump; the block legend of {@code structure_string} is on the field
+ * itself. This class does not use a recipe map - the 20 tick GT round is only the delivery clock.
  */
 public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implements ISurvivalConstructable {
 
-    // region Effect program constants
-    /** Round length in seconds with a single enabled effect on an EV energy hatch (the first overclock level). */
-    public static final int BASE_ROUND_SECONDS = 500;
-    /** GT voltage tier index of EV: an EV hatch is overclock level 1 and every level above halves the round. */
-    private static final int EV_TIER_INDEX = 4;
-    /** Extra effect ticks on top of the round so the next round's refresh never leaves a visible one tick gap. */
-    private static final int EFFECT_REFRESH_OVERLAP_TICKS = 20;
-    /** 1.7.10 stores potion ids in a fixed array; each index is a potion id and not every slot is used. */
-    public static final int MAX_EFFECTS = Potion.potionTypes.length;
+    // region Wireless distribution constants
+    /** Ticks between two scans of the loaded worlds for target energy hatches. */
+    private static final int TARGET_REFRESH_INTERVAL = 100;
+    /** Length of one GT processing round; it is only the clock that keeps the per-tick delivery running. */
+    private static final int ROUND_TICKS = 20;
+    /** Ticks between two refreshes of the values shown in the GUI (wireless balance / totals). */
+    private static final int DISPLAY_REFRESH_INTERVAL = 20;
+    // endregion
 
-    /** Per potion id: whether the effect is applied at all (default: every effect is disabled). */
-    private final boolean[] effectEnabled = new boolean[MAX_EFFECTS];
-    /** Per potion id: true = whitelist mode, false = blacklist mode (the default). */
-    private final boolean[] effectWhitelistMode = new boolean[MAX_EFFECTS];
-    /** Per potion id: comma/space/newline separated player names excluded in blacklist mode. */
-    private final String[] effectBlacklist = new String[MAX_EFFECTS];
-    /** Per potion id: comma/space/newline separated player names that are the only ones included in whitelist mode. */
-    private final String[] effectWhitelist = new String[MAX_EFFECTS];
-    /**
-     * Per potion id: 0 = not checked, 1 = not representable through the vanilla {@link PotionEffect} API, 2 = usable.
-     * Lazy because the check constructs a throwaway {@link PotionEffect}; only ids that survive that trip may ever be
-     * handed out - see {@link #isEffectApplyable(int)}.
-     */
-    private static final byte[] EFFECT_APPLYABLE_CACHE = new byte[MAX_EFFECTS];
-    /** Cached bound player / team names for the GUI (server refreshed, see {@link #refreshDisplayNames()}). */
-    private String displayOwnerName = "";
+    // region Wireless distribution state
+    /** Placer of the machine; also the key of the GT5U wireless EU network the machine drains. */
+    private UUID ownerUUID;
+    /** UUIDs whose energy hatches are charged: the owner's GTNHLib team, or only the owner when there is no team. */
+    private final Set<UUID> teamMemberUUIDs = new HashSet<>();
+    /** Energy hatches / laser hatches found by the last world scan (server side only). */
+    private final List<MetaTileEntity> targetHatches = new ArrayList<>();
+    /** Internal tick counter; the GT {@code aTick} argument is not used for the intervals. */
+    private int internalTicks;
+    /** EU actually handed to the target hatches during the last tick. */
+    private long outputEUtPerTick;
+    /** Running total of the EU handed to the target hatches since the machine was placed. */
+    private BigInteger totalDeliveredEUt = BigInteger.ZERO;
+    /** Cached display strings, refreshed server side every {@link #DISPLAY_REFRESH_INTERVAL} ticks. */
+    private String networkBalanceText = "0";
+    private String totalDeliveredText = "0";
     private String displayTeamName = "";
-    /** Duration of the round just started; the effects are applied on the first powered running tick. 0 = no packet. */
-    private int pendingEffectDurationTicks = 0;
+    private String displayOwnerName = "";
     // endregion
 
     // region Structure piece offsets
@@ -288,7 +288,7 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
         return STRUCTURE_DEFINITION;
     }
 
-    /** The protocol core uses its own ModularUI2 screen: default machine layout plus the effect program windows. */
+    /** Read-only status screen: the default multiblock layout plus the wireless distribution readout. */
     @Override
     protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
         return new MTProtocalCoreGui(this);
@@ -296,10 +296,8 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
 
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
+        // Structure only: the machine draws its power from the wireless network, so no energy hatch is required.
         checkPiece(STRUCTURE_PIECE_MAIN, HORIZONTAL_OFFSET, VERTICAL_OFFSET, DEPTH_OFFSET, errors);
-        if (!errors.isEmpty()) return;
-        // The broadcast needs power: at least one energy hatch has to be placed in one of the two X slots.
-        checkHasEnergyHatch(errors);
     }
 
     @Override
@@ -329,7 +327,7 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
 
     @Override
     public RecipeMap<?> getRecipeMap() {
-        // Program machine: there is no recipe map, the round timer and the effect program are the machine's logic.
+        // Program machine: no recipe map, the 20 tick GT round is only the delivery clock.
         return null;
     }
 
@@ -343,17 +341,15 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
             .addInfo(translateToLocal("machine.protocalcore.tooltip.flavour"))
             .addSeparator()
             .addInfo(translateToLocal("machine.protocalcore.tooltip.power.header"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.current"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.min"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.overclock"))
+            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.wireless"))
+            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.empty"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.header"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.apply"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.round"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.stack"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.list"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.team"))
+            .addInfo(translateToLocal("machine.protocalcore.tooltip.targets.header"))
+            .addInfo(translateToLocal("machine.protocalcore.tooltip.targets.scope"))
+            .addInfo(translateToLocal("machine.protocalcore.tooltip.targets.rate"))
+            .addInfo(translateToLocal("machine.protocalcore.tooltip.targets.loaded"))
             .addSeparator()
+            .addInfo(translateToLocal("machine.protocalcore.tooltip.activation"))
             .addInfo(translateToLocal("machine.protocalcore.tooltip.details"))
             .addInfo(translateToLocal("machine.protocalcore.tooltip.details.hint"))
             .addStructureInfo(translateToLocal("machine.protocalcore.structure"))
@@ -403,280 +399,84 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
         return 1;
     }
 
-    // region NBT
-    @Override
-    public void saveNBTData(NBTTagCompound aNBT) {
-        super.saveNBTData(aNBT);
-        NBTTagCompound effects = new NBTTagCompound();
-        for (int potionId = 0; potionId < MAX_EFFECTS; potionId++) {
-            if (Potion.potionTypes[potionId] == null) continue;
-            NBTTagCompound entry = new NBTTagCompound();
-            entry.setBoolean("enabled", effectEnabled[potionId]);
-            entry.setBoolean("whitelistMode", effectWhitelistMode[potionId]);
-            entry.setString("blacklist", effectBlacklist[potionId] == null ? "" : effectBlacklist[potionId]);
-            entry.setString("whitelist", effectWhitelist[potionId] == null ? "" : effectWhitelist[potionId]);
-            effects.setTag(Integer.toString(potionId), entry);
-        }
-        aNBT.setTag("protocalEffects", effects);
-    }
-
-    @Override
-    public void loadNBTData(NBTTagCompound aNBT) {
-        super.loadNBTData(aNBT);
-        NBTTagCompound effects = aNBT.getCompoundTag("protocalEffects");
-        for (int potionId = 0; potionId < MAX_EFFECTS; potionId++) {
-            if (Potion.potionTypes[potionId] == null) continue;
-            String key = Integer.toString(potionId);
-            if (!effects.hasKey(key)) continue;
-            NBTTagCompound entry = effects.getCompoundTag(key);
-            effectEnabled[potionId] = entry.getBoolean("enabled");
-            effectWhitelistMode[potionId] = entry.getBoolean("whitelistMode");
-            effectBlacklist[potionId] = entry.getString("blacklist");
-            effectWhitelist[potionId] = entry.getString("whitelist");
-        }
-    }
-    // endregion
-
     // region Tick hooks
     @Override
     public void onFirstTick(IGregTechTileEntity aBaseMetaTileEntity) {
         super.onFirstTick(aBaseMetaTileEntity);
         if (!aBaseMetaTileEntity.isServerSide()) return;
-        refreshDisplayNames();
+        resolveOwner();
+        refreshTeamMembers();
+        refreshTargets();
+        refreshDisplayCache();
     }
 
     @Override
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         super.onPostTick(aBaseMetaTileEntity, aTick);
-        // Team membership stays cached in the GUI sync values; refresh it now and then so a changed team name shows up.
-        if (aBaseMetaTileEntity.isServerSide() && aTick % 200L == 0L) refreshDisplayNames();
+        if (!aBaseMetaTileEntity.isServerSide()) return;
+        internalTicks++;
+        if (internalTicks % DISPLAY_REFRESH_INTERVAL == 0) refreshDisplayCache();
+        if (internalTicks % TARGET_REFRESH_INTERVAL == 0) {
+            refreshTeamMembers();
+            refreshTargets();
+            // 2.9's multiblock recipe checks are event driven: nudge the controller while it idles so newly placed
+            // target hatches (or a structure that just formed) are picked up without toggling the machine.
+            if (mMaxProgresstime <= 0 && mMachine && aBaseMetaTileEntity.isAllowedToWork()) {
+                scheduleRecipeCheckImmediate();
+            }
+        }
     }
     // endregion
 
-    // region Processing (one GT cycle = one effect round)
+    // region Processing (the GT round is only the delivery clock)
     /**
-     * One round: apply every enabled effect to the online team for {@link #roundTicks(int, int)} ticks and drain 1 A at
-     * the highest energy hatch tier for the whole round. When the round finishes GT calls this again right away, which
-     * keeps the effects refreshed for as long as the machine runs.
+     * The machine has no recipes: a round simply keeps {@link #onRunningTick} coming for {@link #ROUND_TICKS} ticks.
+     * The only failure states are a missing owner and no loaded target hatch - {@link #onPostTick} pushes a fresh recipe
+     * check every {@link #TARGET_REFRESH_INTERVAL} ticks while the machine idles, so both recover on their own.
      */
     @Override
     public CheckRecipeResult checkProcessing() {
-        long hatchTier = getEnergyHatchTier();
-        if (hatchTier <= 0L) return SimpleCheckRecipeResult.ofFailure("protocalcore_no_energy_hatch");
-        // EV is the reference level: a weaker hatch cannot drive the protocol (and would make EV look worse).
-        if (hatchTier < EV_TIER_INDEX) return SimpleCheckRecipeResult.ofFailure("protocalcore_energy_tier_too_low");
-        int enabledEffects = getEnabledEffectCount();
-        if (enabledEffects <= 0) return SimpleCheckRecipeResult.ofFailure("protocalcore_no_enabled_effects");
-        int level = getHatchLevel();
-        int roundTicks = (int) roundTicks(level, enabledEffects);
-
-        refreshDisplayNames();
-        // The effects are applied by the first successfully powered running tick, not here: otherwise switching the
-        // machine on without any stored EU would still hand out one free round before the power loss shutdown.
-        pendingEffectDurationTicks = roundTicks;
+        if (!getBaseMetaTileEntity().isServerSide()) return CheckRecipeResultRegistry.NO_RECIPE;
+        if (ownerUUID == null) resolveOwner();
+        if (ownerUUID == null) return SimpleCheckRecipeResult.ofFailure("protocalcore_no_owner");
+        if (targetHatches.isEmpty()) {
+            refreshTeamMembers();
+            refreshTargets();
+        }
+        if (targetHatches.isEmpty()) return SimpleCheckRecipeResult.ofFailure("protocalcore_no_targets");
 
         mEUt = 0;
+        lEUt = 0;
         mEfficiency = 10000;
         mEfficiencyIncrease = 10000;
         mProgresstime = 0;
-        mMaxProgresstime = roundTicks;
+        mMaxProgresstime = ROUND_TICKS;
         mOutputItems = null;
         mOutputFluids = null;
         mPollution = 0;
-        // 1 A at the highest hatch tier; MTEExtendedPowerMultiBlockBase drains lEUt every running tick.
-        lEUt = -getHatchVoltage();
         return CheckRecipeResultRegistry.SUCCESSFUL;
     }
 
-    /**
-     * The extended-power base drains the 1 A here; only after that first successful drain is the round's effect packet
-     * handed out, so a round without power never results in free effects. The packet lasts the round length plus a
-     * {@link #EFFECT_REFRESH_OVERLAP_TICKS} buffer so the refresh at the next round never leaves a one tick HUD gap.
-     */
     @Override
     public boolean onRunningTick(ItemStack aStack) {
-        boolean stillRunning = super.onRunningTick(aStack);
-        if (stillRunning && pendingEffectDurationTicks > 0) {
-            int durationTicks = pendingEffectDurationTicks;
-            pendingEffectDurationTicks = 0;
-            int effectTicks = durationTicks >= Integer.MAX_VALUE - EFFECT_REFRESH_OVERLAP_TICKS ? Integer.MAX_VALUE
-                : durationTicks + EFFECT_REFRESH_OVERLAP_TICKS;
-            applyEffects(effectTicks);
-        }
-        return stillRunning;
+        IGregTechTileEntity base = getBaseMetaTileEntity();
+        if (base != null && base.isServerSide()) deliverEnergy();
+        return true;
     }
     // endregion
 
-    // region Round maths
-    /** @return 1-based overclock level of the energy hatches, EV = 1 (0 when there is no hatch). */
-    public int getHatchLevel() {
-        long hatchTier = getEnergyHatchTier();
-        if (hatchTier <= 0L) return 0;
-        // EV is level 1 and every level above halves the round (lossy overclocking). Below-EV hatches cannot run the
-        // machine at all (see checkProcessing), the clamp only keeps the GUI readout sane.
-        return (int) Math.max(1L, hatchTier - (EV_TIER_INDEX - 1L));
-    }
-
-    /** @return the voltage of the highest energy hatch tier, i.e. the EU/t of the 1 A the machine draws. */
-    public long getHatchVoltage() {
-        long hatchTier = getEnergyHatchTier();
-        if (hatchTier <= 0L) return 0L;
-        return GTValues.V[(int) Math.min(hatchTier, GTValues.V.length - 1L)];
-    }
-
-    /** @return the round length in ticks: 500 s, queued by every enabled effect, halved per overclock level. */
-    private static long roundTicks(int level, int enabledEffects) {
-        double seconds = (double) BASE_ROUND_SECONDS * Math.pow(2.0D, enabledEffects)
-            / Math.pow(2.0D, Math.max(0, level - 1));
-        double ticks = seconds * 20.0D;
-        if (ticks >= Integer.MAX_VALUE) return Integer.MAX_VALUE;
-        return Math.max(1L, (long) ticks);
-    }
-
-    /** @return the round length the current configuration would use, in seconds (0 = nothing to do). */
-    public int getPlannedRoundSeconds() {
-        int level = getHatchLevel();
-        int enabledEffects = getEnabledEffectCount();
-        if (level <= 0 || enabledEffects <= 0) return 0;
-        return (int) Math.max(1L, roundTicks(level, enabledEffects) / 20L);
-    }
-
-    /** @return the length of the round currently running, in seconds. */
-    public int getRoundTotalSeconds() {
-        return Math.max(0, mMaxProgresstime) / 20;
-    }
-
-    /** @return the seconds left in the currently running round. */
-    public int getRoundRemainingSeconds() {
-        return Math.max(0, mMaxProgresstime - mProgresstime) / 20;
-    }
-    // endregion
-
-    // region Effect program (machine NBT + GUI sync)
-    public boolean isEffectEnabled(int potionId) {
-        return potionId >= 0 && potionId < MAX_EFFECTS && effectEnabled[potionId];
-    }
-
-    public void setEffectEnabled(int potionId, boolean enabled) {
-        if (potionId < 0 || potionId >= MAX_EFFECTS || effectEnabled[potionId] == enabled) return;
-        effectEnabled[potionId] = enabled;
-        markMachineDirty();
-        // 205's multiblock recipe checks are event-driven: without this push the machine would keep idling after the
-        // last enabled effect was switched on in the GUI.
-        scheduleEffectRecheck();
-    }
-
-    /** @return true = whitelist mode (only listed players), false = blacklist mode (everyone but listed players). */
-    public boolean isEffectWhitelistMode(int potionId) {
-        return potionId >= 0 && potionId < MAX_EFFECTS && effectWhitelistMode[potionId];
-    }
-
-    public void setEffectWhitelistMode(int potionId, boolean whitelistMode) {
-        if (potionId < 0 || potionId >= MAX_EFFECTS || effectWhitelistMode[potionId] == whitelistMode) return;
-        effectWhitelistMode[potionId] = whitelistMode;
-        markMachineDirty();
-    }
-
-    public String getEffectBlacklist(int potionId) {
-        if (potionId < 0 || potionId >= MAX_EFFECTS || effectBlacklist[potionId] == null) return "";
-        return effectBlacklist[potionId];
-    }
-
-    public void setEffectBlacklist(int potionId, String playerNames) {
-        if (potionId < 0 || potionId >= MAX_EFFECTS) return;
-        effectBlacklist[potionId] = playerNames == null ? "" : playerNames;
-        markMachineDirty();
-    }
-
-    public String getEffectWhitelist(int potionId) {
-        if (potionId < 0 || potionId >= MAX_EFFECTS || effectWhitelist[potionId] == null) return "";
-        return effectWhitelist[potionId];
-    }
-
-    public void setEffectWhitelist(int potionId, String playerNames) {
-        if (potionId < 0 || potionId >= MAX_EFFECTS) return;
-        effectWhitelist[potionId] = playerNames == null ? "" : playerNames;
-        markMachineDirty();
-    }
-
-    /** @return how many effects are switched on and can actually be applied (unused/inapplicable slots never count). */
-    public int getEnabledEffectCount() {
-        int count = 0;
-        for (int potionId = 0; potionId < MAX_EFFECTS; potionId++) {
-            if (effectEnabled[potionId] && isEffectApplyable(potionId)) count++;
-        }
-        return count;
-    }
-
-    /**
-     * @return whether a potion id can be handed to a player through the vanilla {@link PotionEffect} API without being
-     *         mangled. GTNH's Hodgepodge ({@code fixPotionLimit}, on by default) rewrites the id in the
-     *         {@code PotionEffect(int, int, int, boolean)} constructor to {@code id & 0xFF}; an id above 255 (for
-     *         example Thaumcraft's ids starting at 1000 via EndlessIDs) then points at an unused potion slot and the
-     *         player tick crashes with an NPE in {@link PotionEffect#onUpdate}. Such ids are reported as unsupported so
-     *         the GUI can grey them out instead of crashing; they start working automatically if the pack ever turns
-     *         that fix off.
-     */
-    public static boolean isEffectApplyable(int potionId) {
-        if (potionId < 0 || potionId >= MAX_EFFECTS || Potion.potionTypes[potionId] == null) return false;
-        byte cached = EFFECT_APPLYABLE_CACHE[potionId];
-        if (cached != 0) return cached == 2;
-        boolean applyable;
-        try {
-            applyable = new PotionEffect(potionId, 1, 0).getPotionID() == potionId;
-        } catch (Throwable ignored) {
-            applyable = false;
-        }
-        EFFECT_APPLYABLE_CACHE[potionId] = (byte) (applyable ? 2 : 1);
-        return applyable;
-    }
-
-    private void markMachineDirty() {
+    // region Wireless distribution
+    /** Resolves and registers the placer's UUID for the GT5U wireless network (server side). */
+    private void resolveOwner() {
         IGregTechTileEntity base = getBaseMetaTileEntity();
-        if (base != null) base.markDirty();
-    }
-
-    /** A queued round packet must not survive a shutdown: the next start will queue a fresh one in checkProcessing. */
-    @Override
-    public void stopMachine(@NotNull ShutDownReason reason) {
-        pendingEffectDurationTicks = 0;
-        super.stopMachine(reason);
-    }
-
-    /**
-     * Pushes an immediate recipe check on the server so config changes in the GUI take effect without a manual kick.
-     */
-    private void scheduleEffectRecheck() {
-        IGregTechTileEntity base = getBaseMetaTileEntity();
-        if (base != null && base.isServerSide()) scheduleRecipeCheck(RecipeCheckReason.IMMEDIATE);
-    }
-
-    /** @return the cached name of the bound player (machine owner), empty when unknown. */
-    public String getOwnerNameForGui() {
-        return displayOwnerName;
-    }
-
-    /** @return the cached team name of the bound player, empty when the player has no team. */
-    public String getTeamNameForGui() {
-        return displayTeamName;
-    }
-    // endregion
-
-    // region Effect application
-    /**
-     * @return the player whose team receives the effects: the machine owner, resolved from the owner name if needed.
-     */
-    private UUID getBoundPlayer() {
-        IGregTechTileEntity base = getBaseMetaTileEntity();
-        if (base == null) return null;
+        if (base == null) return;
         UUID owner = base.getOwnerUuid();
-        if (owner != null) return owner;
-        String ownerName = base.getOwnerName();
-        if (ownerName == null || ownerName.isEmpty()) return null;
-        return ServerPlayerUtils.getPlayerUUID(ownerName);
+        if (owner == null) return;
+        ownerUUID = owner;
+        WirelessNetworkManager.strongCheckOrAddUser(owner);
     }
 
-    /** @return the team of the given player, or {@code null} when the player is not in one. */
+    /** @return the GTNHLib team of the given player, or {@code null} when the player is not in one. */
     private static Team findTeam(UUID player) {
         for (Team team : TeamManager.getTeamMap()
             .values()) {
@@ -685,68 +485,163 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
         return null;
     }
 
-    /** Refreshes the bound player / team names shown in the GUI (server side only). */
-    private void refreshDisplayNames() {
-        UUID boundPlayer = getBoundPlayer();
-        if (boundPlayer == null) {
+    /** Rebuilds the set of UUIDs whose energy hatches are target of the machine (server side). */
+    private void refreshTeamMembers() {
+        teamMemberUUIDs.clear();
+        if (ownerUUID == null) resolveOwner();
+        if (ownerUUID == null) {
             displayOwnerName = "";
             displayTeamName = "";
             return;
         }
-        String ownerName = ServerPlayerUtils.getPlayerName(boundPlayer);
+        String ownerName = ServerPlayerUtils.getPlayerName(ownerUUID);
         displayOwnerName = ownerName == null ? "" : ownerName;
-        Team team = findTeam(boundPlayer);
-        displayTeamName = team == null ? "" : team.getTeamName();
+        Team team = findTeam(ownerUUID);
+        if (team != null) {
+            displayTeamName = team.getTeamName();
+            teamMemberUUIDs.addAll(team.getMembers());
+        } else {
+            displayTeamName = "";
+            teamMemberUUIDs.add(ownerUUID);
+        }
     }
 
     /**
-     * Applies every enabled effect to the online targets: all online members of the bound player's team, or only the
-     * bound player when they have no team. Each effect also carries its own player name blacklist / whitelist, so
-     * individual effects can be handed to a subset of the team.
+     * Scans every loaded world for wired energy hatches / laser hatches owned by a team member and caches them. Only
+     * loaded chunks are scanned - hatches in unloaded areas naturally start/stop being supplied with their chunk.
      */
-    private void applyEffects(int durationTicks) {
-        if (durationTicks <= 0) return;
-        UUID boundPlayer = getBoundPlayer();
-        if (boundPlayer == null) return;
-        Team team = findTeam(boundPlayer);
-
-        List<EntityPlayerMP> targets = new ArrayList<>();
-        ServerPlayerUtils.forAllOnlinePlayers(player -> {
-            if (team != null ? team.isMember(player.getUniqueID()) : boundPlayer.equals(player.getUniqueID())) {
-                targets.add(player);
-            }
-        });
-        if (targets.isEmpty()) return;
-
-        for (int potionId = 0; potionId < MAX_EFFECTS; potionId++) {
-            if (!effectEnabled[potionId] || !isEffectApplyable(potionId)) continue;
-            // Build the effect once and verify it survives the constructor: a mangled id would poison the player's
-            // active effect map and crash the next entity tick (see #isEffectApplyable).
-            PotionEffect effect = new PotionEffect(potionId, durationTicks, 0);
-            if (effect.getPotionID() != potionId) continue;
-            boolean whitelistMode = effectWhitelistMode[potionId];
-            Set<String> listedNames = parsePlayerNames(
-                whitelistMode ? effectWhitelist[potionId] : effectBlacklist[potionId]);
-            for (EntityPlayerMP player : targets) {
-                String playerName = player.getCommandSenderName()
-                    .toLowerCase(Locale.ROOT);
-                boolean listed = listedNames.contains(playerName);
-                if (whitelistMode ? listed : !listed) {
-                    player.addPotionEffect(effect);
-                }
+    private void refreshTargets() {
+        targetHatches.clear();
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || ownerUUID == null || teamMemberUUIDs.isEmpty()) return;
+        for (World world : server.worldServers) {
+            if (world == null) continue;
+            for (Object entry : world.loadedTileEntityList) {
+                if (!(entry instanceof IGregTechTileEntity base)) continue;
+                if (!(base.getMetaTileEntity() instanceof MetaTileEntity meta)) continue;
+                if (!isTargetHatch(meta)) continue;
+                UUID hatchOwner = base.getOwnerUuid();
+                if (hatchOwner == null || !teamMemberUUIDs.contains(hatchOwner)) continue;
+                targetHatches.add(meta);
             }
         }
     }
 
-    /** Parses a comma / whitespace separated player name list into lower case names. */
-    private static Set<String> parsePlayerNames(String raw) {
-        Set<String> names = new HashSet<>();
-        if (raw == null || raw.isEmpty()) return names;
-        for (String name : raw.split("[,\\s]+")) {
-            if (name.isEmpty()) continue;
-            names.add(name.toLowerCase(Locale.ROOT));
+    private static boolean isTargetHatch(MetaTileEntity meta) {
+        // Wired energy hatches and laser / multi-amp energy hatches; the wireless multi hatch pulls from the network
+        // itself, so handing it energy as well would double up.
+        if (meta instanceof MTEHatchWirelessMulti) return false;
+        return meta instanceof MTEHatchEnergy || meta instanceof MTEHatchEnergyMulti;
+    }
+
+    /**
+     * One delivery tick: charge every cached hatch up to its own intake (voltage times rated amperes, or the free buffer
+     * space if that is smaller), draining the same amount from the placer's wireless network 1:1. If the network does
+     * not hold enough EU the delivery is trimmed to the available balance for this tick.
+     */
+    private void deliverEnergy() {
+        if (ownerUUID == null || targetHatches.isEmpty()) {
+            outputEUtPerTick = 0L;
+            return;
         }
-        return names;
+
+        long needed = 0L;
+        for (int i = 0; i < targetHatches.size(); i++) {
+            MetaTileEntity hatch = targetHatches.get(i);
+            if (!hatch.isValid()) {
+                targetHatches.remove(i--);
+                continue;
+            }
+            long amount = potentialCharge(hatch);
+            if (amount <= 0L) continue;
+            needed = needed > Long.MAX_VALUE - amount ? Long.MAX_VALUE : needed + amount;
+        }
+        if (needed <= 0L) {
+            outputEUtPerTick = 0L;
+            return;
+        }
+
+        BigInteger available = WirelessNetworkManager.getUserEU(ownerUUID);
+        long budget = available.bitLength() >= 63 ? Long.MAX_VALUE : available.longValue();
+        long deliverable = Math.min(needed, budget);
+        if (deliverable <= 0L) {
+            outputEUtPerTick = 0L;
+            return;
+        }
+        if (!WirelessNetworkManager.addEUToGlobalEnergyMap(ownerUUID, -deliverable)) {
+            outputEUtPerTick = 0L;
+            return;
+        }
+
+        long delivered = 0L;
+        for (MetaTileEntity hatch : targetHatches) {
+            if (delivered >= deliverable) break;
+            long amount = potentialCharge(hatch);
+            if (amount <= 0L) continue;
+            amount = Math.min(amount, deliverable - delivered);
+            IGregTechTileEntity base = hatch.getBaseMetaTileEntity();
+            if (base == null) continue;
+            if (base.increaseStoredEnergyUnits(amount, true)) delivered += amount;
+        }
+        outputEUtPerTick = delivered;
+        totalDeliveredEUt = totalDeliveredEUt.add(BigInteger.valueOf(delivered));
+    }
+
+    /** @return how much EU the hatch can take this tick: its free buffer space capped by its own rated intake. */
+    private static long potentialCharge(MetaTileEntity hatch) {
+        IGregTechTileEntity base = hatch.getBaseMetaTileEntity();
+        if (base == null) return 0L;
+        long free = base.getEUCapacity() - base.getStoredEU();
+        if (free <= 0L) return 0L;
+        long voltage = base.getInputVoltage();
+        long amperes = base.getInputAmperage();
+        if (voltage <= 0L || amperes <= 0L) return 0L;
+        long intake;
+        try {
+            intake = Math.multiplyExact(voltage, amperes);
+        } catch (ArithmeticException overflow) {
+            intake = Long.MAX_VALUE;
+        }
+        return Math.min(free, intake);
+    }
+
+    /** Refreshes the cached strings the GUI and the scanner show (server side). */
+    private void refreshDisplayCache() {
+        if (ownerUUID == null) {
+            networkBalanceText = "0";
+            totalDeliveredText = "0";
+            return;
+        }
+        networkBalanceText = NumberFormatUtil.formatNumber(WirelessNetworkManager.getUserEU(ownerUUID));
+        totalDeliveredText = NumberFormatUtil.formatNumber(totalDeliveredEUt);
+    }
+    // endregion
+
+    // region GUI / scanner values
+    public int getTargetHatchCount() {
+        return targetHatches.size();
+    }
+
+    public long getOutputEUtPerTick() {
+        return outputEUtPerTick;
+    }
+
+    public String getNetworkBalanceText() {
+        return networkBalanceText;
+    }
+
+    public String getTotalDeliveredText() {
+        return totalDeliveredText;
+    }
+
+    /** @return the cached GTNHLib team name of the placer, empty when the player has no team. */
+    public String getTeamNameForGui() {
+        return displayTeamName;
+    }
+
+    /** @return the cached name of the placer, empty when unknown. */
+    public String getOwnerNameForGui() {
+        return displayOwnerName;
     }
     // endregion
 
@@ -758,21 +653,25 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
 
     @Override
     public String[] getInfoData() {
-        boolean active = getBaseMetaTileEntity() != null && getBaseMetaTileEntity().isActive();
+        boolean active = getBaseMetaTileEntity() != null && getBaseMetaTileEntity()
+            .isActive();
         return new String[] {
             translateToLocalFormatted(
                 "machine.protocalcore.info.status",
-                translateToLocal(active ? "machine.protocalcore.info.running" : "machine.protocalcore.info.idle")),
-            translateToLocalFormatted("machine.protocalcore.info.tier", getHatchLevel(), getHatchVoltage()),
+                translateToLocal(
+                    active ? "machine.protocalcore.info.running" : "machine.protocalcore.info.idle")),
             translateToLocalFormatted(
-                "machine.protocalcore.info.round",
-                getPlannedRoundSeconds(),
-                getRoundRemainingSeconds()),
-            translateToLocalFormatted("machine.protocalcore.info.effects", getEnabledEffectCount()),
+                "machine.protocalcore.info.team",
+                displayTeamName.isEmpty() ? translateToLocal("machine.protocalcore.gui.team.none")
+                    : displayTeamName),
             translateToLocalFormatted(
                 "machine.protocalcore.info.owner",
-                displayOwnerName.isEmpty() ? translateToLocal("machine.protocalcore.gui.unknown") : displayOwnerName,
-                displayTeamName.isEmpty() ? translateToLocal("machine.protocalcore.gui.team.none") : displayTeamName) };
+                displayOwnerName.isEmpty() ? translateToLocal("machine.protocalcore.gui.unknown")
+                    : displayOwnerName),
+            translateToLocalFormatted("machine.protocalcore.info.targets", getTargetHatchCount()),
+            translateToLocalFormatted("machine.protocalcore.info.balance", networkBalanceText),
+            translateToLocalFormatted("machine.protocalcore.info.output", outputEUtPerTick),
+            translateToLocalFormatted("machine.protocalcore.info.total", totalDeliveredText) };
     }
     // endregion
 }
