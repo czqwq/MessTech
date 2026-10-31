@@ -61,9 +61,9 @@ import gregtech.common.tileentities.machines.RecipeCheckReason;
 import vazkii.botania.common.block.ModFluffBlocks;
 
 /**
- * 协议信标 / Protocol Beacon - an <b>unregistered scrap copy</b> of {@code MTProtocalCore} (协议核心), kept as a draft
+ * 协议信标 / Protocol Beacon - an <b>unregistered scrap copy</b> of {@code MTProtocolCore} (协议核心), kept as a draft
  * for a future variant. It is intentionally not added to {@code MTItemList} / {@code MTMachineLoader}, so it has no
- * item, no machine id and never shows up in game; the current MTProtocalCore feature code is untouched by this copy.
+ * item, no machine id and never shows up in game; the current MTProtocolCore feature code is untouched by this copy.
  * <p>
  * The effect-program part is a full copy of the original: a round applies every enabled level-1 potion effect to the
  * online members of the bound player's (machine owner's) team and refreshes it while the machine runs. The round length
@@ -72,8 +72,8 @@ import vazkii.botania.common.block.ModFluffBlocks;
  * hatch tier, i.e. {@code GTValues.V[tier]} EU/t. The per-effect enable switch plus the player name blacklist /
  * whitelist are stored in NBT.
  * <p>
- * Unlike the original it does not override {@code getGui()}: {@code MTProtocalCoreGui} is typed against
- * {@code MTProtocalCore}, so this draft currently uses the plain multiblock GUI. Wire up a GUI (and its own lang keys)
+ * Unlike the original it does not override {@code getGui()}: {@code MTProtocolCoreGui} is typed against
+ * {@code MTProtocolCore}, so this draft currently uses the plain multiblock GUI. Wire up a GUI (and its own lang keys)
  * when the variant is actually registered.
  * <p>
  * The structure is the same beacon-tower dump; the block legend of {@code structure_string} is on the field itself.
@@ -329,25 +329,25 @@ public class MTProtocolBeacon extends MTMultiMachineBase<MTProtocolBeacon> imple
     @Override
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
-        tt.addMachineType(translateToLocal("machine.protocalcore.machinetype"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.desc"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.flavour"))
+        tt.addMachineType(translateToLocal("machine.protocolcore.machinetype"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.desc"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.flavour"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.header"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.current"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.min"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.overclock"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.power.header"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.power.current"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.power.min"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.power.overclock"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.header"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.apply"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.round"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.stack"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.list"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.effects.team"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.effects.header"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.effects.apply"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.effects.round"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.effects.stack"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.effects.list"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.effects.team"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.details"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.details.hint"))
-            .addStructureInfo(translateToLocal("machine.protocalcore.structure"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.details"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.details.hint"))
+            .addStructureInfo(translateToLocal("machine.protocolcore.structure"))
             .toolTipFinisher();
         return tt;
     }
@@ -408,13 +408,13 @@ public class MTProtocolBeacon extends MTMultiMachineBase<MTProtocolBeacon> imple
             entry.setString("whitelist", effectWhitelist[potionId] == null ? "" : effectWhitelist[potionId]);
             effects.setTag(Integer.toString(potionId), entry);
         }
-        aNBT.setTag("protocalEffects", effects);
+        aNBT.setTag("protocolEffects", effects);
     }
 
     @Override
     public void loadNBTData(NBTTagCompound aNBT) {
         super.loadNBTData(aNBT);
-        NBTTagCompound effects = aNBT.getCompoundTag("protocalEffects");
+        NBTTagCompound effects = aNBT.getCompoundTag("protocolEffects");
         for (int potionId = 0; potionId < MAX_EFFECTS; potionId++) {
             if (Potion.potionTypes[potionId] == null) continue;
             String key = Integer.toString(potionId);
@@ -453,11 +453,11 @@ public class MTProtocolBeacon extends MTMultiMachineBase<MTProtocolBeacon> imple
     @Override
     public CheckRecipeResult checkProcessing() {
         long hatchTier = getEnergyHatchTier();
-        if (hatchTier <= 0L) return SimpleCheckRecipeResult.ofFailure("protocalcore_no_energy_hatch");
+        if (hatchTier <= 0L) return SimpleCheckRecipeResult.ofFailure("protocolcore_no_energy_hatch");
         // EV is the reference level: a weaker hatch cannot drive the protocol (and would make EV look worse).
-        if (hatchTier < EV_TIER_INDEX) return SimpleCheckRecipeResult.ofFailure("protocalcore_energy_tier_too_low");
+        if (hatchTier < EV_TIER_INDEX) return SimpleCheckRecipeResult.ofFailure("protocolcore_energy_tier_too_low");
         int enabledEffects = getEnabledEffectCount();
-        if (enabledEffects <= 0) return SimpleCheckRecipeResult.ofFailure("protocalcore_no_enabled_effects");
+        if (enabledEffects <= 0) return SimpleCheckRecipeResult.ofFailure("protocolcore_no_enabled_effects");
         int level = getHatchLevel();
         int roundTicks = (int) roundTicks(level, enabledEffects);
 
@@ -752,18 +752,18 @@ public class MTProtocolBeacon extends MTMultiMachineBase<MTProtocolBeacon> imple
         boolean active = getBaseMetaTileEntity() != null && getBaseMetaTileEntity().isActive();
         return new String[] {
             translateToLocalFormatted(
-                "machine.protocalcore.info.status",
-                translateToLocal(active ? "machine.protocalcore.info.running" : "machine.protocalcore.info.idle")),
-            translateToLocalFormatted("machine.protocalcore.info.tier", getHatchLevel(), getHatchVoltage()),
+                "machine.protocolcore.info.status",
+                translateToLocal(active ? "machine.protocolcore.info.running" : "machine.protocolcore.info.idle")),
+            translateToLocalFormatted("machine.protocolcore.info.tier", getHatchLevel(), getHatchVoltage()),
             translateToLocalFormatted(
-                "machine.protocalcore.info.round",
+                "machine.protocolcore.info.round",
                 getPlannedRoundSeconds(),
                 getRoundRemainingSeconds()),
-            translateToLocalFormatted("machine.protocalcore.info.effects", getEnabledEffectCount()),
+            translateToLocalFormatted("machine.protocolcore.info.effects", getEnabledEffectCount()),
             translateToLocalFormatted(
-                "machine.protocalcore.info.owner",
-                displayOwnerName.isEmpty() ? translateToLocal("machine.protocalcore.gui.unknown") : displayOwnerName,
-                displayTeamName.isEmpty() ? translateToLocal("machine.protocalcore.gui.team.none") : displayTeamName) };
+                "machine.protocolcore.info.owner",
+                displayOwnerName.isEmpty() ? translateToLocal("machine.protocolcore.gui.unknown") : displayOwnerName,
+                displayTeamName.isEmpty() ? translateToLocal("machine.protocolcore.gui.team.none") : displayTeamName) };
     }
     // endregion
 }

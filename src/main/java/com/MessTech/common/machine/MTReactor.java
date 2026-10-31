@@ -117,6 +117,27 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     private static final int MESSTECH_OUTPUT_MULTIPLIER = 2;
     /** Simulated reactor cycles used by the stability prediction, i.e. how far ahead the GUI can look. */
     private static final int STABILITY_PREDICTION_CYCLES = 20;
+    /**
+     * Material cycles a measured projection is reused for. The multi-cycle extrapolation is display-only (GUI/Waila
+     * "cycles to meltdown") and a cycle is one second, so re-measuring it on every cycle spent most of the machine's
+     * CPU on a number nobody reads at that rate; between re-fits the cached countdown is decremented once per cycle,
+     * which shows the same thing for a page that keeps heating up.
+     */
+    private static final int STABILITY_REFIT_CYCLES = 5;
+    /** A projection this close to the ceiling is re-measured every cycle, so the alarm is never stale. */
+    private static final int STABILITY_URGENT_CYCLES = 3;
+    /**
+     * While the reactor does not produce, IC2's fuel rods skip the heat pass ({@code produceEnergy()} is false), so the
+     * prediction has nothing to re-measure but a slowly bleeding store; it runs on this slower clock instead of on
+     * every
+     * cycle. A layout change (see {@link #computeShapeSignature()}) bypasses the throttle.
+     */
+    private static final int IDLE_PREDICTION_REFRESH_CYCLES = 20;
+    /**
+     * Ticks between two locked-slot auto input/output passes. One material cycle is enough for the normal path (that
+     * is when the components changed); a reactor soft stop polls every tick, see {@link #onPostTick}.
+     */
+    private static final int AUTO_MATCH_INTERVAL_TICKS = CYCLE_TICKS;
 
     public static float getEuPerOutput() {
         if (MainConfig.get() == null) return IC2_EU_PER_OUTPUT * 2 * 5;
@@ -367,8 +388,29 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     private boolean mReactorMeltingDown = false;
     /** Multi-cycle prediction for the GUI/Waila: cycles left before the meltdown, or -1. */
     private int mCyclesToMeltdown = -1;
-    /** Cheap fingerprint of all reactor items; the live simulation re-runs only when it changes. */
-    private int mReactorInventorySignature = 0;
+    /**
+     * Layout fingerprint (which component sits in which slot, plus the lock states, wear ignored): a change re-fits
+     * the projection immediately instead of waiting for {@link #STABILITY_REFIT_CYCLES}.
+     */
+    private int mShapeSignature = 0;
+    /** True once a projection was measured; false on a fresh machine and after a data load. */
+    private boolean mProjectionFitted = false;
+    /** Material cycles since the last measured projection, the throttle's clock. */
+    private int mProjectionAge = 0;
+    /** Ticks until the next locked-slot auto input/output pass. */
+    private int mAutoMatchCooldown = 0;
+    /** True when the hatch lists changed, so {@link #mSortedHatches} has to be rebuilt. */
+    private boolean mHatchesDirty = true;
+    /** Ticks until the next liveness sweep of {@link #mSortedHatches}. */
+    private int mHatchPollTicks = 0;
+    /** Game tick the slot scan below was taken on (see {@link #refreshSlotScan()}). */
+    private long mSlotScanTick = Long.MIN_VALUE;
+    /** One locked slot holding something other than its remembered type. */
+    private boolean mScanMissingLocked = false;
+    /** One locked slot at or below its auto-output threshold. */
+    private boolean mScanLowLocked = false;
+    /** Occupied reactor slots across every page, counted by the same scan. */
+    private int mScanComponentCount = 0;
     /** Enables automatic input/output of every locked access hatch slot. Default on. */
     private boolean mAutoMatchTarget = true;
     /** Locked slots the next heat pass is predicted to destroy. */
@@ -402,8 +444,9 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     public void onPostTick(IGregTechTileEntity aBaseMetaTileEntity, long aTick) {
         if (aBaseMetaTileEntity != null && aBaseMetaTileEntity.isServerSide()) {
             refreshHatches();
-            // Re-derive the ceiling only after the refresh above: the lists were just rebuilt from the live structure,
-            // and a ceiling taken earlier would rescale onto the previous hatch's value for one cycle.
+            // Re-derive the ceiling only after the refresh above: when it rebuilt, the lists were just taken from the
+            // live structure, and a ceiling collected earlier would rescale onto the previous hatch's value for one
+            // cycle.
             //
             // Guarded by mMachine: on a broken shape getReactorHeatCapacity() falls back to the EV default, and that
             // ceiling change would rescale the store and grant a fresh 30 s grace window - pulling one casing would
@@ -432,19 +475,28 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                     super.onPostTick(aBaseMetaTileEntity, aTick);
                     return;
                 }
+                // The cycle just changed the components: re-check the locked slots right away.
+                mAutoMatchCooldown = 0;
             } else {
                 mReactorCycleTicks--;
             }
-            ensureLiveSimulation();
-            if (mAutoMatchTarget && !mReactorAccessHatches.isEmpty() && processAutoMatchTarget()) {
-                // Inventory changed; refresh the prediction and let the controller re-check immediately.
-                mReactorInventorySignature = 0;
-                ensureLiveSimulation();
-                scheduleRecipeCheckImmediate();
+            // A reactor soft stop is the only state in which a locked slot can be fixed between two cycles and has to
+            // be picked up at once, so it polls every tick; otherwise one pass per material cycle is enough.
+            boolean softStopped = aBaseMetaTileEntity.wasShutdown()
+                && isReactorSoftStopReason(aBaseMetaTileEntity.getLastShutDownReason());
+            if (mAutoMatchTarget && !mReactorAccessHatches.isEmpty() && --mAutoMatchCooldown <= 0) {
+                mAutoMatchCooldown = softStopped ? 1 : AUTO_MATCH_INTERVAL_TICKS;
+                if (processAutoMatchTarget()) {
+                    // Inventory changed; the prediction was measured on the previous one, so both the doomed set and
+                    // the projection are stale, and so is the slot scan of this tick. Let the controller re-check
+                    // immediately.
+                    invalidateSlotScan();
+                    refreshPrediction();
+                    scheduleRecipeCheckImmediate();
+                }
             }
             // While paused for a locked-component problem, poll for a manual/automatic fix.
-            if (aBaseMetaTileEntity.wasShutdown()
-                && isReactorSoftStopReason(aBaseMetaTileEntity.getLastShutDownReason())) {
+            if (softStopped) {
                 scheduleRecipeCheckImmediate();
             }
         }
@@ -475,6 +527,42 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return true;
     }
 
+    /** Block-coordinate order of the access hatches; all three keys, so the page order is stable across a reload. */
+    private static final Comparator<MTReactorAccessHatch> HATCH_ORDER = Comparator
+        .comparingInt(
+            (MTReactorAccessHatch hatch) -> hatch.getBaseMetaTileEntity()
+                .getXCoord())
+        .thenComparingInt(
+            hatch -> hatch.getBaseMetaTileEntity()
+                .getYCoord())
+        .thenComparingInt(
+            hatch -> hatch.getBaseMetaTileEntity()
+                .getZCoord());
+
+    /**
+     * Keeps {@link #mSortedHatches} in step with the live hatches without allocating per tick: the list can only
+     * change when the structure re-checked (which clears the hatch list, so {@link #mHatchesDirty} is set) or when a
+     * hatch died, and the latter is swept once per {@link #CYCLE_TICKS} ticks. Rebuilding it on every tick cost a fresh
+     * {@link ArrayList}, a fresh composed {@link Comparator} and a fresh {@link java.util.HashMap} in
+     * {@link MTReactorHeatSystem#retainOnly(Iterable)} - three allocations per second per reactor for nothing.
+     */
+    private void refreshHatches() {
+        if (!mHatchesDirty && --mHatchPollTicks > 0) return;
+        mHatchPollTicks = CYCLE_TICKS;
+        int live = 0;
+        for (MTReactorAccessHatch hatch : mReactorAccessHatches) {
+            if (hatch == null) continue;
+            IGregTechTileEntity base = hatch.getBaseMetaTileEntity();
+            if (base == null || base.isDead()) {
+                mHatchesDirty = true;
+                continue;
+            }
+            live++;
+        }
+        if (!mHatchesDirty && live == mSortedHatches.size()) return;
+        rebuildHatches();
+    }
+
     /**
      * Rebuilds the sorted access-hatch list and prunes the heat store.
      * <p>
@@ -482,7 +570,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
      * would wipe the heat store and cancel a running countdown one tick after a casing was removed. A hatch that really
      * is gone is still forgotten on the first successful re-check.
      */
-    private void refreshHatches() {
+    private void rebuildHatches() {
         List<MTReactorAccessHatch> sorted = new ArrayList<>(mReactorAccessHatches.size());
         for (MTReactorAccessHatch hatch : mReactorAccessHatches) {
             if (hatch == null) continue;
@@ -490,18 +578,11 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             if (base == null || base.isDead()) continue;
             sorted.add(hatch);
         }
-        sorted.sort(
-            Comparator.comparingInt(
-                (MTReactorAccessHatch hatch) -> hatch.getBaseMetaTileEntity()
-                    .getXCoord())
-                .thenComparingInt(
-                    hatch -> hatch.getBaseMetaTileEntity()
-                        .getYCoord())
-                .thenComparingInt(
-                    hatch -> hatch.getBaseMetaTileEntity()
-                        .getZCoord()));
+        sorted.sort(HATCH_ORDER);
         mSortedHatches.clear();
         mSortedHatches.addAll(sorted);
+        mHatchesDirty = false;
+        invalidateSlotScan();
         if (mMachine) {
             mHeat.retainOnly(sorted);
         }
@@ -510,13 +591,6 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             // The structure cannot offer this many pages: a layout this class does not model, where a silent truncation
             // would skip the tail pages' heat effects entirely.
             softStopReactor(ExtraShutdownReason.TOO_MANY_PAGES);
-        }
-    }
-
-    private void ensureLiveSimulation() {
-        if (mReactorAccessHatches.isEmpty()) return;
-        if (computeInventorySignature() != mReactorInventorySignature) {
-            predictFuture();
         }
     }
 
@@ -619,6 +693,8 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         mReactorHeatHatches.clear();
         mReactorCoolantInputs.clear();
         mReactorCoolantOutputs.clear();
+        // The sorted view is rebuilt from the lists above, and the heat store is pruned there (once, not per tick).
+        mHatchesDirty = true;
         // The stored heat is deliberately NOT dropped here: clearHatches() runs at the start of every re-check (after
         // any
         // block update, and from setFluidMode / setAutoMatchTarget), so dropping it would wipe the heat state - and a
@@ -637,6 +713,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         hatch.updateTexture(aBaseCasingIndex);
         if (!mReactorAccessHatches.contains(hatch)) {
             mReactorAccessHatches.add(hatch);
+            mHatchesDirty = true;
         }
         return true;
     }
@@ -721,27 +798,59 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     // region Locked slot auto input / output
 
     public boolean hasMissingLockedComponents() {
-        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
-            if (hatch != null && hatch.hasMissingLockedComponents()) return true;
-        }
-        return false;
+        refreshSlotScan();
+        return mScanMissingLocked;
     }
 
     /** True when a locked component is at/below its output threshold, or would be destroyed next cycle. */
     public boolean hasLowOrDoomedLockedComponents() {
         if (mNextCycleDoomed) return true;
-        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
+        refreshSlotScan();
+        return mScanLowLocked;
+    }
+
+    /**
+     * Drops the cached slot scan, for the two things that can change it inside one tick: a rebuilt hatch list and the
+     * auto input/output pass.
+     */
+    private void invalidateSlotScan() {
+        mSlotScanTick = Long.MIN_VALUE;
+    }
+
+    /**
+     * One sweep over every page slot, cached for the current game tick: {@link #couldRun()}, {@code checkProcessing()},
+     * the GUI sync values and every Waila poll ask the same three questions about the same slots, and each used to walk
+     * all of them on its own - up to six full passes per tick per reactor, all of them reading the same arrays.
+     * <p>
+     * Two questions are answered here instead of by the hatch: the component count (an occupied slot is an occupied
+     * slot, the hatch exposes exactly the same indices) and the low/doomed-locked threshold, which lives here because
+     * the threshold is a reactor policy. {@link MTReactorAccessHatch#hasMissingLockedComponents()} keeps its own
+     * definition and is called as is.
+     */
+    private void refreshSlotScan() {
+        IGregTechTileEntity base = getBaseMetaTileEntity();
+        long now = base == null ? Long.MIN_VALUE : base.getTimer();
+        if (now != Long.MIN_VALUE) {
+            if (now == mSlotScanTick) return;
+            mSlotScanTick = now;
+        }
+        mScanMissingLocked = false;
+        mScanLowLocked = false;
+        mScanComponentCount = 0;
+        for (MTReactorAccessHatch hatch : mSortedHatches) {
             if (hatch == null) continue;
-            for (int slot = 0; slot < hatch.getSlotCount(); slot++) {
-                if (!hatch.isSlotLocked(slot)) continue;
+            if (hatch.hasMissingLockedComponents()) mScanMissingLocked = true;
+            int slots = hatch.getSlotCount();
+            for (int slot = 0; slot < slots; slot++) {
                 ItemStack stack = hatch.getSlotStack(slot);
                 if (stack == null) continue;
+                mScanComponentCount++;
+                if (mScanLowLocked || !hatch.isSlotLocked(slot)) continue;
                 if (MTReactorAccessHatch.getDurabilityFraction(stack) <= hatch.getSlotThreshold(slot)) {
-                    return true;
+                    mScanLowLocked = true;
                 }
             }
         }
-        return false;
     }
 
     /**
@@ -905,10 +1014,13 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return mSortedHatches;
     }
 
+    /**
+     * Stable block-coordinate key of one hatch. Delegated to the hatch, which caches the object: the heat store keys
+     * every page lookup on it, and those lookups run inside the component loops, so allocating a
+     * {@link ChunkCoordinates} per call was per-chamber garbage.
+     */
     private static ChunkCoordinates key(MTReactorAccessHatch hatch) {
-        IGregTechTileEntity base = hatch.getBaseMetaTileEntity();
-        if (base == null) return null;
-        return new ChunkCoordinates(base.getXCoord(), base.getYCoord(), base.getZCoord());
+        return hatch == null ? null : hatch.mtReactorKey();
     }
 
     /**
@@ -983,7 +1095,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         mReactorEUPerTick = mLastCouldRun ? (long) (mPendingOutput * getEuPerOutput()) : 0L;
         mPendingOutput = 0.0F;
         mReactorCycleTicks = CYCLE_TICKS;
-        predictFuture();
+        refreshPrediction();
         armCountdowns(now);
         // IC2's world effects (ignite / irradiate / evaporate water / ignite wood) are a property of the whole core,
         // not of one page, so they run once per cycle on the hottest page's ratio.
@@ -1066,15 +1178,54 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
     // region Heat prediction
 
     /**
-     * Multi-cycle heat prediction: replays the heat pass on copies, so the GUI/Waila can show how many cycles are
-     * left (a single-cycle check could only answer "is the next cycle fatal") and so the locked slots the next cycle
-     * would destroy are collected.
+     * Refreshes the prediction: the single simulated cycle the reactor's own logic needs always, the display-only
+     * multi-cycle projection only when its throttle allows it.
+     * <p>
+     * {@link #mNextCycleDoomed} / {@link #mNextCycleDestroyed} gate the locked-component soft stop, so one heat pass
+     * per page is part of the machine's logic. {@link #mReactorStable} / {@link #mCyclesToMeltdown} only feed the GUI
+     * and Waila and used to cost up to 19 further heat passes per page every cycle (a cycle is one second), hence the
+     * throttle in {@link #STABILITY_REFIT_CYCLES}.
      */
-    private void predictFuture() {
+    private void refreshPrediction() {
+        int shape = computeShapeSignature();
+        boolean shapeChanged = !mProjectionFitted || shape != mShapeSignature;
+        boolean producing = mLastCouldRun;
+        mProjectionAge++;
+        // While the reactor does not produce, IC2's fuel rods return before the heat pass (produceEnergy() is false),
+        // so
+        // the prediction has nothing new to measure: the store only bleeds down, and a locked component cannot become
+        // doomed without a heat pulse. Keep the previous result and only re-measure on the slow clock below.
+        if (!shapeChanged && !producing && mCyclesToMeltdown < 0 && mProjectionAge < IDLE_PREDICTION_REFRESH_CYCLES) {
+            return;
+        }
+        boolean projectAhead = shapeChanged || mProjectionAge >= STABILITY_REFIT_CYCLES
+            || (mCyclesToMeltdown >= 0 && mCyclesToMeltdown <= STABILITY_URGENT_CYCLES);
+        predictFuture(projectAhead);
+        if (projectAhead) {
+            mProjectionAge = 0;
+            mShapeSignature = shape;
+            mProjectionFitted = true;
+        } else if (producing && mCyclesToMeltdown > 0) {
+            // Measured on an earlier producing cycle: keep the readout counting down instead of freezing it between
+            // re-fits. Not while the reactor is off - there the heat only bleeds down, so a countdown would be a lie.
+            mCyclesToMeltdown--;
+        }
+    }
+
+    /**
+     * One prediction pass over every page.
+     * <p>
+     * The <b>first</b> simulated cycle is always run: it is what the locked-component soft stop reads. The
+     * extrapolation after it replays the same heat pass on the same copies until the page stops heating up or crosses
+     * the ceiling, which is the GUI/Waila "cycles to meltdown" number and nothing else.
+     *
+     * @param projectAhead false to stop after the single cycle the reactor's logic needs
+     */
+    private void predictFuture(boolean projectAhead) {
         mNextCycleDestroyed.clear();
         mNextCycleDoomed = false;
-        mCyclesToMeltdown = -1;
         boolean stable = true;
+        int cyclesToMeltdown = -1;
 
         for (MTReactorAccessHatch hatch : mSortedHatches) {
             if (hatch == null) continue;
@@ -1103,6 +1254,8 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                     }
                 }
 
+                if (!projectAhead) continue;
+
                 // Extrapolate the same heat pass until the page stops heating up or crosses the ceiling.
                 int projected = nextHeat;
                 int cycle = 1;
@@ -1122,24 +1275,28 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                 }
                 if (projected >= limit && cycle > 0) {
                     stable = false;
-                    if (mCyclesToMeltdown < 0 || cycle < mCyclesToMeltdown) {
-                        mCyclesToMeltdown = Math.min(cycle, STABILITY_PREDICTION_CYCLES);
+                    if (cyclesToMeltdown < 0 || cycle < cyclesToMeltdown) {
+                        cyclesToMeltdown = Math.min(cycle, STABILITY_PREDICTION_CYCLES);
                     }
                 }
             }
         }
-        mReactorStable = stable;
-        mReactorInventorySignature = computeInventorySignature();
+        if (projectAhead) {
+            mReactorStable = stable;
+            mCyclesToMeltdown = cyclesToMeltdown;
+        }
     }
 
     /**
-     * Cheap fingerprint of every item in every page (identity, damage, stack size and NBT), to detect item changes
-     * without deep-copying the inventory. The NBT hash is only folded in every few ticks: it is the expensive part,
-     * and fuel rods change their NBT every cycle anyway.
+     * Fingerprint of the reactor <b>layout</b>: which component sits in which slot plus the lock states, with the
+     * per-cycle wear left out on purpose. It decides when the projection is re-measured immediately instead of on the
+     * throttle's clock, so it must stay stable between component changes - a fuel rod's wear changes every cycle, and a
+     * coolant cell's heat is even painted into {@code ItemStack#getItemDamage()} in 1% steps.
      */
-    private int computeInventorySignature() {
+    private int computeShapeSignature() {
         int signature = 1;
         for (MTReactorAccessHatch hatch : mSortedHatches) {
+            if (hatch == null) continue;
             // Lock state / thresholds: a lock change must also refresh the destruction prediction.
             for (byte state : hatch.getSlotStateArray()) {
                 signature = 31 * signature + state;
@@ -1148,10 +1305,7 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                 for (int y = 0; y < MTReactorAccessHatch.PAGE_HEIGHT; y++) {
                     for (int x = 0; x < MTReactorAccessHatch.PAGE_WIDTH; x++) {
                         ItemStack stack = hatch.getReactorItem(page, x, y);
-                        if (stack == null) continue;
-                        signature = 31 * signature + System.identityHashCode(stack.getItem());
-                        signature = 31 * signature + stack.getItemDamage();
-                        signature = 31 * signature + stack.stackSize;
+                        signature = 31 * signature + (stack == null ? 0 : System.identityHashCode(stack.getItem()));
                     }
                 }
             }
@@ -1465,8 +1619,10 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         }
         // Default on for existing/new machines unless explicitly disabled.
         mAutoMatchTarget = !aNBT.hasKey("mtReactorAutoMatch") || aNBT.getBoolean("mtReactorAutoMatch");
-        // The hatch may not be resolved yet at this point; the first onPostTick re-reads the capacity and rescales.
-        mReactorInventorySignature = 0;
+        // The hatch may not be resolved yet at this point; the first onPostTick re-reads the capacity and rescales, and
+        // the first material cycle re-measures the prediction (which was not persisted).
+        mProjectionFitted = false;
+        mHatchesDirty = true;
     }
 
     @Override
@@ -1505,19 +1661,10 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
         return mReactorAccessHatches.size();
     }
 
-    /** Occupied reactor slots across every page. */
+    /** Occupied reactor slots across every page, from the per-tick slot scan. */
     public int getReactorComponentCount() {
-        int count = 0;
-        for (MTReactorAccessHatch hatch : getSortedReactorHatches()) {
-            for (int page = 0; page < hatch.getPageCount(); page++) {
-                for (int y = 0; y < MTReactorAccessHatch.PAGE_HEIGHT; y++) {
-                    for (int x = 0; x < MTReactorAccessHatch.PAGE_WIDTH; x++) {
-                        if (hatch.getReactorItem(page, x, y) != null) count++;
-                    }
-                }
-            }
-        }
-        return count;
+        refreshSlotScan();
+        return mScanComponentCount;
     }
 
     public int getHottestPageHeat() {

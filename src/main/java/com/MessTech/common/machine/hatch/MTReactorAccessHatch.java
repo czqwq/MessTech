@@ -82,6 +82,8 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
     private final byte[] mSlotState;
     /** Remembered item type of every locked slot (matching ignores NBT on purpose). */
     private final ItemStack[] mSlotMemory;
+    /** Cached {@link #mtReactorKey()}; see there for why it is shared. */
+    private ChunkCoordinates mReactorKey;
 
     public MTReactorAccessHatch(int aID, String aName, String aNameRegional, int aTier) {
         super(
@@ -206,12 +208,25 @@ public class MTReactorAccessHatch extends MTEHatch implements IDataCopyable, MTR
      * list, so adding, removing or moving another access hatch cannot renumber this hatch's pages and hand its heat
      * elsewhere. The hatch stores no heat ({@code MTReactor} owns it via {@code MTReactorHeatSystem}); before placement
      * this is {@code null} = "not a page owner".
+     * <p>
+     * The object is cached and shared: {@code MTReactorHeatSystem} looks a page up through it on every access, and
+     * those
+     * accesses sit inside the reactor's component loops (a MOX rod asks for the core heat once per pulse). Callers only
+     * read it - it is a map key, so treat it as immutable. Re-validated against the tile entity's coordinates.
      */
     @Override
     public ChunkCoordinates mtReactorKey() {
         IGregTechTileEntity base = getBaseMetaTileEntity();
         if (base == null) return null;
-        return new ChunkCoordinates(base.getXCoord(), base.getYCoord(), base.getZCoord());
+        int x = base.getXCoord();
+        int y = base.getYCoord();
+        int z = base.getZCoord();
+        ChunkCoordinates cached = mReactorKey;
+        if (cached != null && cached.posX == x && cached.posY == y && cached.posZ == z) {
+            return cached;
+        }
+        mReactorKey = new ChunkCoordinates(x, y, z);
+        return mReactorKey;
     }
 
     /** 9x6 pages, one IC2 reactor grid each. */

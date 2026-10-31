@@ -14,7 +14,6 @@ import java.util.UUID;
 
 import net.minecraft.block.BlockBeacon;
 import net.minecraft.client.renderer.texture.IIconRegister;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
@@ -24,7 +23,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import org.jetbrains.annotations.NotNull;
 
-import com.MessTech.common.gui.MTProtocalCoreGui;
+import com.MessTech.common.gui.MTProtocolCoreGui;
 import com.MessTech.common.machine.Base.MTMultiMachineBase;
 import com.gtnewhorizon.gtnhlib.teams.Team;
 import com.gtnewhorizon.gtnhlib.teams.TeamManager;
@@ -33,7 +32,6 @@ import com.gtnewhorizon.gtnhlib.util.numberformatting.NumberFormatUtil;
 import com.gtnewhorizon.structurelib.StructureLibAPI;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
 import com.gtnewhorizon.structurelib.structure.AutoPlaceEnvironment;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.IStructureElement;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
@@ -50,6 +48,8 @@ import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.implementations.MTEHatchEnergy;
+import gregtech.api.metatileentity.implementations.MTEHatchEnergyDebug;
+import gregtech.api.metatileentity.implementations.MTEWirelessEnergy;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
@@ -60,12 +60,13 @@ import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 import gregtech.common.misc.WirelessNetworkManager;
+import lombok.Getter;
 import tectech.thing.metaTileEntity.hatch.MTEHatchEnergyMulti;
 import tectech.thing.metaTileEntity.hatch.MTEHatchWirelessMulti;
 import vazkii.botania.common.block.ModFluffBlocks;
 
 /**
- * 协议核心 / Protocal Core: the beacon-tower multiblock (16 x 52 x 16) that turns the placer's GT5U wireless EU
+ * 协议核心 / Protocol Core: the beacon-tower multiblock (16 x 52 x 16) that turns the placer's GT5U wireless EU
  * network into wired power for a whole team.
  * <p>
  * While the machine is switched on and the structure is complete it scans the loaded worlds every
@@ -83,7 +84,7 @@ import vazkii.botania.common.block.ModFluffBlocks;
  * The structure is the original beacon-tower dump; the block legend of {@code structure_string} is on the field
  * itself. This class does not use a recipe map - the 20 tick GT round is only the delivery clock.
  */
-public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implements ISurvivalConstructable {
+public class MTProtocolCore extends MTMultiMachineBase<MTProtocolCore> implements ISurvivalConstructable {
 
     // region Wireless distribution constants
     /** Ticks between two scans of the loaded worlds for target energy hatches. */
@@ -104,12 +105,21 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
     /** Internal tick counter; the GT {@code aTick} argument is not used for the intervals. */
     private int internalTicks;
     /** EU actually handed to the target hatches during the last tick. */
+    @Getter
     private long outputEUtPerTick;
     /** Running total of the EU handed to the target hatches since the machine was placed. */
     private BigInteger totalDeliveredEUt = BigInteger.ZERO;
     /** Cached display strings, refreshed server side every {@link #DISPLAY_REFRESH_INTERVAL} ticks. */
+    @Getter
     private String networkBalanceText = "0";
+    @Getter
     private String totalDeliveredText = "0";
+    /** Rate of the last tick, pre-formatted with thousands separators for the GUI and the scanner. */
+    @Getter
+    private String outputRateText = "0";
+    /** Number of target hatches, pre-formatted with thousands separators for the GUI and the scanner. */
+    @Getter
+    private String targetCountText = "0";
     private String displayTeamName = "";
     private String displayOwnerName = "";
     // endregion
@@ -191,8 +201,8 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
     };
     // spotless:on
 
-    private static final IStructureDefinition<MTProtocalCore> STRUCTURE_DEFINITION = StructureDefinition
-        .<MTProtocalCore>builder()
+    private static final IStructureDefinition<MTProtocolCore> STRUCTURE_DEFINITION = StructureDefinition
+        .<MTProtocolCore>builder()
         .addShape(STRUCTURE_PIECE_MAIN, transpose(structure_string))
         // A: Solid Steel Machine Casing - the shell block of the tower, and the fill of every non-hatch position.
         .addElement('A', Casings.SolidSteelMachineCasing.asElement())
@@ -227,7 +237,7 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
         // X: the two hatch slots flanking the controller - any of these hatches at either slot, lapis block otherwise.
         .addElement(
             'X',
-            HatchElementBuilder.<MTProtocalCore>builder()
+            HatchElementBuilder.<MTProtocolCore>builder()
                 .anyOf(HatchElement.Energy, HatchElement.InputBus, HatchElement.OutputBus)
                 .casingIndex(Casings.SolidSteelMachineCasing.textureId)
                 .hint(1)
@@ -235,39 +245,39 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
         // Y: the six beacons in the tower. Accept anything that is a beacon block plus a beacon tile entity, so the
         // vanilla beacon, Et Futurum's New Beacon (BlockNewBeacon / TileEntityNewBeacon) and other mods' beacons work
         // alike - the pattern used by 123Technology's OTEMegaNineInOne.
-        .addElement('Y', new IStructureElement<MTProtocalCore>() {
+        .addElement('Y', new IStructureElement<MTProtocolCore>() {
 
             private final IStructureElement.BlocksToPlace cached = IStructureElement.BlocksToPlace
                 .create(Blocks.beacon, 0);
 
             @Override
-            public boolean check(MTProtocalCore machine, World world, int x, int y, int z) {
+            public boolean check(MTProtocolCore machine, World world, int x, int y, int z) {
                 // Only care that it is a beacon: both the block and the tile entity have to match.
                 return world.getBlock(x, y, z) instanceof BlockBeacon
                     && world.getTileEntity(x, y, z) instanceof TileEntityBeacon;
             }
 
             @Override
-            public boolean couldBeValid(MTProtocalCore machine, World world, int x, int y, int z, ItemStack trigger) {
+            public boolean couldBeValid(MTProtocolCore machine, World world, int x, int y, int z, ItemStack trigger) {
                 // check() is side effect free, so it can be reused here.
                 return check(machine, world, x, y, z);
             }
 
             @Override
-            public boolean spawnHint(MTProtocalCore machine, World world, int x, int y, int z, ItemStack trigger) {
+            public boolean spawnHint(MTProtocolCore machine, World world, int x, int y, int z, ItemStack trigger) {
                 StructureLibAPI.hintParticle(world, x, y, z, Blocks.beacon, 0);
                 return true;
             }
 
             @Override
-            public boolean placeBlock(MTProtocalCore machine, World world, int x, int y, int z, ItemStack trigger) {
+            public boolean placeBlock(MTProtocolCore machine, World world, int x, int y, int z, ItemStack trigger) {
                 world.setBlock(x, y, z, Blocks.beacon, 0, 2);
                 if (check(machine, world, x, y, z)) return true;
                 return world.setBlockToAir(x, y, z);
             }
 
             @Override
-            public IStructureElement.BlocksToPlace getBlocksToPlace(MTProtocalCore machine, World world, int x, int y,
+            public IStructureElement.BlocksToPlace getBlocksToPlace(MTProtocolCore machine, World world, int x, int y,
                 int z, ItemStack trigger, AutoPlaceEnvironment env) {
                 return cached;
             }
@@ -275,23 +285,23 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
         .build();
     // endregion
 
-    public MTProtocalCore(int aID, String aName, String aNameRegional) {
+    public MTProtocolCore(int aID, String aName, String aNameRegional) {
         super(aID, aName, aNameRegional);
     }
 
-    public MTProtocalCore(String aName) {
+    public MTProtocolCore(String aName) {
         super(aName);
     }
 
     @Override
-    public IStructureDefinition<MTProtocalCore> getStructureDefinition() {
+    public IStructureDefinition<MTProtocolCore> getStructureDefinition() {
         return STRUCTURE_DEFINITION;
     }
 
     /** Read-only status screen: the default multiblock layout plus the wireless distribution readout. */
     @Override
     protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
-        return new MTProtocalCoreGui(this);
+        return new MTProtocolCoreGui(this);
     }
 
     @Override
@@ -322,12 +332,12 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
 
     @Override
     public IMetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
-        return new MTProtocalCore(mName);
+        return new MTProtocolCore(mName);
     }
 
     @Override
     public RecipeMap<?> getRecipeMap() {
-        // Program machine: no recipe map, the 20 tick GT round is only the delivery clock.
+        // No recipe map: the 20 tick GT round is only the clock that keeps the per-tick delivery running.
         return null;
     }
 
@@ -336,23 +346,23 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
     @Override
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
-        tt.addMachineType(translateToLocal("machine.protocalcore.machinetype"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.desc"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.flavour"))
+        tt.addMachineType(translateToLocal("machine.protocolcore.machinetype"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.desc"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.flavour"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.header"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.wireless"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.power.empty"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.power.header"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.power.wireless"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.power.empty"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.targets.header"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.targets.scope"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.targets.rate"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.targets.loaded"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.targets.header"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.targets.scope"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.targets.rate"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.targets.loaded"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.activation"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.details"))
-            .addInfo(translateToLocal("machine.protocalcore.tooltip.details.hint"))
-            .addStructureInfo(translateToLocal("machine.protocalcore.structure"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.activation"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.details"))
+            .addInfo(translateToLocal("machine.protocolcore.tooltip.details.hint"))
+            .addStructureInfo(translateToLocal("machine.protocolcore.structure"))
             .toolTipFinisher();
         return tt;
     }
@@ -415,6 +425,8 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
         super.onPostTick(aBaseMetaTileEntity, aTick);
         if (!aBaseMetaTileEntity.isServerSide()) return;
         internalTicks++;
+        // No round is running, so nothing was delivered last tick: the GUI must not keep the last rate on screen.
+        if (mMaxProgresstime <= 0) outputEUtPerTick = 0L;
         if (internalTicks % DISPLAY_REFRESH_INTERVAL == 0) refreshDisplayCache();
         if (internalTicks % TARGET_REFRESH_INTERVAL == 0) {
             refreshTeamMembers();
@@ -431,19 +443,19 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
     // region Processing (the GT round is only the delivery clock)
     /**
      * The machine has no recipes: a round simply keeps {@link #onRunningTick} coming for {@link #ROUND_TICKS} ticks.
-     * The only failure states are a missing owner and no loaded target hatch - {@link #onPostTick} pushes a fresh recipe
-     * check every {@link #TARGET_REFRESH_INTERVAL} ticks while the machine idles, so both recover on their own.
+     * The only failure states are a missing owner and no loaded target hatch - {@link #onPostTick} pushes a fresh
+     * recipe check every {@link #TARGET_REFRESH_INTERVAL} ticks while the machine idles, so both recover on their own.
      */
     @Override
     public CheckRecipeResult checkProcessing() {
         if (!getBaseMetaTileEntity().isServerSide()) return CheckRecipeResultRegistry.NO_RECIPE;
         if (ownerUUID == null) resolveOwner();
-        if (ownerUUID == null) return SimpleCheckRecipeResult.ofFailure("protocalcore_no_owner");
+        if (ownerUUID == null) return SimpleCheckRecipeResult.ofFailure("protocolcore_no_owner");
         if (targetHatches.isEmpty()) {
             refreshTeamMembers();
             refreshTargets();
         }
-        if (targetHatches.isEmpty()) return SimpleCheckRecipeResult.ofFailure("protocalcore_no_targets");
+        if (targetHatches.isEmpty()) return SimpleCheckRecipeResult.ofFailure("protocolcore_no_targets");
 
         mEUt = 0;
         lEUt = 0;
@@ -459,9 +471,11 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
 
     @Override
     public boolean onRunningTick(ItemStack aStack) {
+        // mEUt stays 0: the machine has no power cost of its own, so the base implementation only reports success.
+        boolean stillRunning = super.onRunningTick(aStack);
         IGregTechTileEntity base = getBaseMetaTileEntity();
-        if (base != null && base.isServerSide()) deliverEnergy();
-        return true;
+        if (stillRunning && base != null && base.isServerSide()) deliverEnergy();
+        return stillRunning;
     }
     // endregion
 
@@ -528,16 +542,22 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
     }
 
     private static boolean isTargetHatch(MetaTileEntity meta) {
-        // Wired energy hatches and laser / multi-amp energy hatches; the wireless multi hatch pulls from the network
-        // itself, so handing it energy as well would double up.
-        if (meta instanceof MTEHatchWirelessMulti) return false;
+        // Anything that is not a plain wired input hatch stays out:
+        // - MTEHatchEnergyDebug already supplies unlimited EU to whatever it is installed in, charging it would burn
+        // network EU for nothing;
+        // - MTEWirelessEnergy and the tecTech MTEHatchWirelessMulti pull from the wireless network themselves, so
+        // handing them energy as well would make the network pay twice.
+        if (meta instanceof MTEHatchEnergyDebug || meta instanceof MTEWirelessEnergy
+            || meta instanceof MTEHatchWirelessMulti) {
+            return false;
+        }
         return meta instanceof MTEHatchEnergy || meta instanceof MTEHatchEnergyMulti;
     }
 
     /**
-     * One delivery tick: charge every cached hatch up to its own intake (voltage times rated amperes, or the free buffer
-     * space if that is smaller), draining the same amount from the placer's wireless network 1:1. If the network does
-     * not hold enough EU the delivery is trimmed to the available balance for this tick.
+     * One delivery tick: charge every cached hatch up to its own intake (voltage times rated amperes, or the free
+     * buffer space if that is smaller), draining the same amount from the placer's wireless network 1:1. If the
+     * network does not hold enough EU the delivery is trimmed to the available balance for this tick.
      */
     private void deliverEnergy() {
         if (ownerUUID == null || targetHatches.isEmpty()) {
@@ -607,6 +627,9 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
 
     /** Refreshes the cached strings the GUI and the scanner show (server side). */
     private void refreshDisplayCache() {
+        // Every number is pre-formatted here so the GUI only ever has to draw a finished string.
+        outputRateText = NumberFormatUtil.formatNumber(outputEUtPerTick);
+        targetCountText = NumberFormatUtil.formatNumber(targetHatches.size());
         if (ownerUUID == null) {
             networkBalanceText = "0";
             totalDeliveredText = "0";
@@ -618,22 +641,6 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
     // endregion
 
     // region GUI / scanner values
-    public int getTargetHatchCount() {
-        return targetHatches.size();
-    }
-
-    public long getOutputEUtPerTick() {
-        return outputEUtPerTick;
-    }
-
-    public String getNetworkBalanceText() {
-        return networkBalanceText;
-    }
-
-    public String getTotalDeliveredText() {
-        return totalDeliveredText;
-    }
-
     /** @return the cached GTNHLib team name of the placer, empty when the player has no team. */
     public String getTeamNameForGui() {
         return displayTeamName;
@@ -653,25 +660,21 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
 
     @Override
     public String[] getInfoData() {
-        boolean active = getBaseMetaTileEntity() != null && getBaseMetaTileEntity()
-            .isActive();
+        boolean active = getBaseMetaTileEntity() != null && getBaseMetaTileEntity().isActive();
         return new String[] {
             translateToLocalFormatted(
-                "machine.protocalcore.info.status",
-                translateToLocal(
-                    active ? "machine.protocalcore.info.running" : "machine.protocalcore.info.idle")),
+                "machine.protocolcore.info.status",
+                translateToLocal(active ? "machine.protocolcore.info.running" : "machine.protocolcore.info.idle")),
             translateToLocalFormatted(
-                "machine.protocalcore.info.team",
-                displayTeamName.isEmpty() ? translateToLocal("machine.protocalcore.gui.team.none")
-                    : displayTeamName),
+                "machine.protocolcore.info.team",
+                displayTeamName.isEmpty() ? translateToLocal("machine.protocolcore.gui.team.none") : displayTeamName),
             translateToLocalFormatted(
-                "machine.protocalcore.info.owner",
-                displayOwnerName.isEmpty() ? translateToLocal("machine.protocalcore.gui.unknown")
-                    : displayOwnerName),
-            translateToLocalFormatted("machine.protocalcore.info.targets", getTargetHatchCount()),
-            translateToLocalFormatted("machine.protocalcore.info.balance", networkBalanceText),
-            translateToLocalFormatted("machine.protocalcore.info.output", outputEUtPerTick),
-            translateToLocalFormatted("machine.protocalcore.info.total", totalDeliveredText) };
+                "machine.protocolcore.info.owner",
+                displayOwnerName.isEmpty() ? translateToLocal("machine.protocolcore.gui.unknown") : displayOwnerName),
+            translateToLocalFormatted("machine.protocolcore.info.targets", targetCountText),
+            translateToLocalFormatted("machine.protocolcore.info.balance", networkBalanceText),
+            translateToLocalFormatted("machine.protocolcore.info.output", outputRateText),
+            translateToLocalFormatted("machine.protocolcore.info.total", totalDeliveredText) };
     }
     // endregion
 }

@@ -2,6 +2,7 @@ package com.MessTech.common.recipe;
 
 import static com.MessTech.common.recipe.MTChemicalTwisterRecipes.addChemicalTwisterRecipes;
 import static com.MessTech.common.recipe.MTRecipeMaps.Steel_brick_Recipes;
+import static com.dreammaster.scripts.IngredientFactory.getModItem;
 import static goodgenerator.loader.Loaders.compactFusionCoil;
 import static gregtech.api.casing.Casings.NanochipFirewallProjectionCasing;
 import static gregtech.api.casing.Casings.NanochipMeshInterfaceCasing;
@@ -90,6 +91,24 @@ import thaumicenergistics.api.ThEApi;
 public class GTRecipes {
 
     public static void loadRecipes() {
+        GTValues.RA.stdBuilder()
+            .metadata(RESEARCH_ITEM, getModItem(Mods.Minecraft.ID, "beacon", 1, 0))
+            .metadata(SCANNING, new Scanning(10 * MINUTES, RECIPE_UHV))
+            .itemInputs(
+                ItemList.Robot_Arm_UEV.get(64),
+                ItemList.Emitter_UEV.get(64),
+                ItemList.Sensor_UEV.get(64),
+                GTOreDictUnificator.get(OrePrefixes.gearGt, Materials.Infinity, 16),
+                GTOreDictUnificator.get(OrePrefixes.gearGtSmall, Materials.Infinity, 16),
+                ItemList.UEV_Coil.get(64))
+            .fluidInputs(
+                Materials.Infinity.getMolten(INGOTS * 1024),
+                Materials.Lubricant.getFluid(160000),
+                Materials.Grade6PurifiedWater.getFluid(1000000))
+            .eut(RECIPE_UHV)
+            .duration(MINUTES * 10)
+            .itemOutputs(MTItemList.MTProtocolCore.get(1))
+            .addTo(AssemblyLine);
         GTValues.RA.stdBuilder()
             .itemInputs(FLUORITE.getDust(16))
             .itemOutputs(Materials.Calcium.getDust(3), Materials.Iron.getDust(2), Materials.Coal.getDust(1))

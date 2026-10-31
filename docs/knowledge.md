@@ -238,8 +238,25 @@ MTMultiMachineBase<T>
   page's heat (empty pages must not eat the budget), halved during a countdown; runs while off too.
 - **World heat effects once per cycle, not per page**: `applyHeatEffects()` on the hottest page's ratio + heat effect
   modifier (no N-fold irradiation/ignition); meltdown still per page.
-- **`STABILITY_PREDICTION_CYCLES = 20`**: `predictFuture()` repeats the heat pass on page copies until equilibrium or
-  the ceiling -> GUI/Waila `getCyclesToMeltdown()` (`-1` = stable), not a "next cycle fatal" boolean.
+- **`STABILITY_PREDICTION_CYCLES = 20`**: `predictFuture(boolean)` repeats the heat pass on page copies until
+  equilibrium or the ceiling -> GUI/Waila `getCyclesToMeltdown()` (`-1` = stable), not a "next cycle fatal" boolean.
+  The **first** simulated cycle is the only part the machine's logic reads (`mNextCycleDoomed` -> the locked-component
+  soft stop); the extrapolation above it is display-only, so `refreshPrediction()` throttles it:
+  `STABILITY_REFIT_CYCLES = 5` between re-measures (the cached countdown is decremented once per producing cycle in
+  between), `STABILITY_URGENT_CYCLES = 3` re-measures every cycle near the alarm, a layout change
+  (`computeShapeSignature()`, which ignores wear on purpose) re-measures at once, and a non-producing reactor -
+  IC2 rods return before the heat pass while `produceEnergy()` is false - refreshes only every
+  `IDLE_PREDICTION_REFRESH_CYCLES = 20` cycles. In the profile that prompted this (a soft-stopped reactor, i.e. exactly
+  the non-producing case) the projection was 1.33% of the server tick against 0.01% for the real material cycle - 83%
+  of the machine's own cost - because it re-simulated up to 20 heat passes per page per second for a display number.
+- **Per-tick work is cached, not re-swept**: `refreshHatches()` only rebuilds the coordinate-sorted hatch list when
+  `mHatchesDirty` (structure re-check / a dead hatch) instead of allocating a list, a composed `Comparator` and
+  `MTReactorHeatSystem.retainOnly()`'s `HashMap` every tick; `refreshSlotScan()` answers
+  `hasMissingLockedComponents()` / `hasLowOrDoomedLockedComponents()` / `getReactorComponentCount()` from one sweep
+  per game tick (`mSlotScanTick`, invalidated by a rebuilt hatch list and by `processAutoMatchTarget()`); the locked
+  slot auto in/out pass runs once per material cycle (`AUTO_MATCH_INTERVAL_TICKS`) and every tick only while a reactor
+  soft stop waits for a fix; `MTReactorAccessHatch.mtReactorKey()` caches its `ChunkCoordinates`, which the heat store
+  uses as a map key inside the component loops.
 - **Rated EU/t is GT5U output**: `getRatedEUPerTick()` = last cycle's accumulation, shown as the GUI/Waila "rated
   output / generation" line. The EU leaves through the shared generator path (`lEUt > 0` ->
   `MTEExtendedPowerMultiBlockBase#onRunningTick()` -> `addEnergyOutput()`); whatever the dynamo hatches cannot take
@@ -974,13 +991,15 @@ MTMultiMachineBase<T>
   page is a machine recipe, and in crafting mode AE's next `detectAndSendChanges()` mirrors the first nine cells into the
   matrix (`copyToMatrix`), clamping to 1 and clearing non-items. `PartPatternTerminalEx` already defaults to it - this guards
   hand-switched terminals.
-### MTProtocalCore (协议核心 / Protocal Core)
-- 16 x 52 x 16 beacon-tower multiblock on the `MachineTemplate` skeleton that broadcasts potion effects to a team.
-  Registered as `MT_ID + 80`, item name and machine type "协议核心" / "Protocal Core".
+### MTProtocolCore (协议核心 / Protocol Core)
+- 16 x 52 x 16 beacon-tower multiblock on the `MachineTemplate` skeleton that turns the placer's GT5U wireless EU
+  network into wired power for a whole team. Registered as `MT_ID + 80`, item name and machine type "协议核心" /
+  "Protocol Core". Code `common/machine/MTProtocolCore.java`, GUI `common/gui/MTProtocolCoreGui.java`.
 - Structure: the structure dump's `transpose`d scan (52 layers x 16 rows x 16 wide), controller `~` at `(8, 49, 4)`.
-  `X` (the two slots flanking the controller) is the only hatch element: `Energy.or(ExoticEnergy)` / `InputBus` /
-  `OutputBus`, fill = lapis block; `checkMachine` additionally requires at least one energy hatch
-  (`checkHasEnergyHatch`).
+  `X` (the two slots flanking the controller) accepts `Energy` / `InputBus` / `OutputBus` over a lapis-block fill, but
+  `checkMachine()` now only calls `checkPiece(...)`: there is **no** energy hatch requirement any more (the old
+  `checkHasEnergyHatch` call is gone), the slots may stay empty. An energy hatch may still sit in an `X` slot - it is
+  then charged like any other target hatch of the placer.
 - `Y` = the six beacons: a custom `IStructureElement` accepting any `BlockBeacon` + `TileEntityBeacon` pair (the
   123Technology `OTEMegaNineInOne` pattern), so vanilla beacons, Et Futurum's New Beacon and other mods' beacons pass;
   hints/autoplace use `Blocks.beacon` (Et Futurum's world listener turns it into the New Beacon).
@@ -993,48 +1012,69 @@ MTMultiMachineBase<T>
 - Skin: solid steel machine casing everywhere; the controller's front face additionally carries
   `assets/messtech/textures/blocks/iconsets/controllerFaces/ProtocolCoreOverlay.png` (registered with
   `Textures.BlockIcons.custom("messtech", ...)` in `registerIcons`, added only when `side == facing` in `getTexture`).
-- Effect broadcast: `checkProcessing()` starts a round (`mMaxProgresstime`) and queues the round's effect packet; the
-  packet is applied by the first successfully powered `onRunningTick` (a round that never got its 1 A hands out
-  nothing) as one `new PotionEffect(id, roundTicks + 20, 0)` per enabled effect (the 1 s overlap keeps the effect HUD
-  from flickering between rounds), and returns `SUCCESSFUL` so GT restarts the round as soon as it ends - the effects
-  stay refreshed while the machine runs. Targets are the online members of the bound player's (machine owner's) team,
-  or only the owner when the player has no team; only online players are affected. Per effect there is an enable switch
-  plus a player-name blacklist (default) / whitelist and its mode; names are matched case insensitively and split on
-  comma/whitespace.
-- Potion id safety (`MTProtocalCore.isEffectApplyable(int)`): GTNH's Hodgepodge `fixPotionLimit` (on by default) rewrites
-  the id inside the `PotionEffect(int, int, int, boolean)` constructor to `id & 0xFF`. EndlessIDs expands
-  `Potion.potionTypes` to 65536 and Thaumcraft registers its potions at ids >= 1000, so constructing a `PotionEffect`
-  for those silently mangles the id (1004 -> 236), the player ends up with an effect pointing at an empty potion slot
-  and the next entity tick NPEs in `PotionEffect#onUpdate`. The machine therefore checks every id by constructing a
-  throwaway `PotionEffect` and comparing `getPotionID()` (cached per id), refuses to hand out/round-count mangled ids
-  (`applyEffects` re-checks right before adding), and the GUI lists those potions as button-less rows in the normal
-  theme colour with an explanatory tooltip
-  (tooltip key `machine.protocalcore.gui.effects.unsupported`). If a pack turns `fixPotionLimit` off, the high ids pass
-  the round-trip check and become normal enable-able effects without any code change.
-- Team source = GTNHLib teams (`TeamManager.getTeamMap()` scan; the old `SpaceProjectManager` mapping is deprecated and
-  not used). `getBoundPlayer()` = `getOwnerUuid()`, falling back to the owner name through `ServerPlayerUtils`.
-- Round length: `BASE_ROUND_SECONDS = 500` at EV, doubled per enabled effect (`2^n`, the "original length added again"
-  per effect) and halved per energy hatch level above EV (`getHatchLevel() = max(1, hatchTier - 3)`) - the lossy
-  overclock direction, EU/t already grows 4x per tier because the 1 A is drawn at the higher voltage. Power draw is
-  `lEUt = -GTValues.V[tier]` (1 A at the highest hatch tier), drained by the extended-power `onRunningTick`; a hatch
-  below EV cannot start the machine (`protocalcore_energy_tier_too_low`). A round tick count is clamped to
-  `Integer.MAX_VALUE`.
-- Machine GUI: `MTProtocalCoreGui` (`common/gui`, MUI2). It replaces the terminal text with the protocol status (state,
-  hatch level / 1 A EU/t, enabled effect count, planned round, round remaining, bound player + team), appends GT's own
-  terminal children and adds a potion bottle button to the button column. That button toggles the draggable
-  `protocalEffects` window: one row per registered `Potion.potionTypes[id]` - status icon (vanilla
-  `textures/gui/container/inventory.png`, `(index % 8 * 18, 198 + index / 8 * 18)`), localized name, enable toggle
-  (GT checkmark/cross) and a filter button showing the current mode with the space mining module's
-  `GTGuiTextures.TT_OVERLAY_BUTTON_BLACKLIST` / `TT_OVERLAY_BUTTON_WHITELIST` textures, which opens the per-effect
-  draggable filter window (mode toggle on top, blacklist field above the whitelist field, both auto-applied).
-- MUI2 details: synced sub panels are registered in `initPanelMap` (before `createButtonColumn`) and their builders use
-  the main `PanelSyncManager`, so all sync values live on the main panel and only the panel open state is synced;
-  sub panels are draggable by default (`ModularPanel#isDraggable` is false only on the main panel) but need a fixed
-  size; each window has its own close button using the panel's `PanelSyncHandler#closePanel`.
-- NBT: `protocalEffects` compound, one child per used potion id (`enabled`, `whitelistMode`, `blacklist`, `whitelist`);
-  defaults are all effects disabled, blacklist mode, empty lists. Failure results are
-  `SimpleCheckRecipeResult.ofFailure("protocalcore_no_energy_hatch" / "protocalcore_no_enabled_effects")`, localized via
-  the `GT5U.gui.text.recipe_result.*` keys in both lang files.
+- Power: none. `checkProcessing()` only fills the GT round (`mEUt = lEUt = 0`, `mEfficiency = mEfficiencyIncrease =
+  10000`, `mMaxProgresstime = ROUND_TICKS` = 20) and returns `SUCCESSFUL`; the round is nothing but the clock that keeps
+  `onRunningTick` coming, and GT restarts it immediately after it ends. The machine is only the wireless -> wired
+  converter, so `onRunningTick` calls `super` first (a no-op at `mEUt == 0`) and then delivers.
+- Delivery (`deliverEnergy()`, every running tick, server side): for every cached target hatch
+  `potentialCharge()` = `min(getEUCapacity() - getStoredEU(), getInputVoltage() * getInputAmperage())` - exactly what a
+  cable sitting on that hatch could push - summed into `needed`; then one
+  `WirelessNetworkManager.addEUToGlobalEnergyMap(ownerUUID, -deliverable)` and the same EU handed out with
+  `base.increaseStoredEnergyUnits(amount, true)`. 1:1, no loss, no conversion, no fuel; hatches are charged in list
+  order and the batch is trimmed to the balance, so a nearly empty network still delivers its remainder instead of
+  nothing.
+  - The per-tick cadence is required, not a style choice: `MTEHatchEnergy.maxEUStore() = 512 + V[tier] * 8` with
+    `maxAmperesIn() = 2`, and `MTEHatchEnergyMulti.maxEUStore() = 512 + V[tier] * 4 * A` with
+    `maxAmperesIn() = A + (A >> 2)`; refilling in bulk every N ticks would leave the supplied machine dry in between.
+    The reference is NL's `WirelessMultiEnergyCover` (4 A wireless energy cover): same "voltage x rated amperes per
+    tick" intake, and the `WirelessNetworkManager.ticks_between_energy_addition` (2000 ticks) batching GT's own wireless
+    hatches use is deliberately **not** applied here.
+- Targets: every `TARGET_REFRESH_INTERVAL` (100) ticks `refreshTargets()` walks
+  `MinecraftServer.getServer().worldServers` -> `world.loadedTileEntityList` (loaded chunks only) and keeps every
+  `MetaTileEntity` that is an `MTEHatchEnergy` or a tecTech `MTEHatchEnergyMulti`. Three subclasses are filtered out by
+  `isTargetHatch()`: `MTEHatchEnergyDebug` (it already supplies unlimited EU to the machine it sits in, charging it
+  would burn network EU for nothing), plus `MTEWirelessEnergy` and the tecTech `MTEHatchWirelessMulti` (both pull from
+  the wireless network themselves, so charging them as well would make the network pay twice). The wired laser tunnel
+  `MTEHatchEnergyTunnel` stays in - it is a real wired intake. A hatch counts when its **own**
+  `IGregTechTileEntity#getOwnerUuid()` - set by `ItemMachines` on placement - is in the team set, so hatches placed by
+  players outside the team are never charged. Chunk unload/load simply removes/adds the hatch at the next scan, and the
+  cached list is pruned per tick on `isValid()`.
+- Team: the placer's GTNHLib team. `refreshTeamMembers()` scans `TeamManager.getTeamMap()` for a team whose
+  `isMember(owner)` is true and copies `getMembers()`; without a team the set is only the placer, so single player still
+  works. `TeamManager.getTeamByPlayer` is deliberately not used - it logs `GTNHLib.LOG.error` for every player without a
+  team, and this runs every 100 ticks. Team members do not have to be online; only the target hatches must be loaded.
+  `ownerUUID` = the controller's `getOwnerUuid()`, registered once with `WirelessNetworkManager.strongCheckOrAddUser`;
+  reads and writes go through that UUID (`getUserEU` / `addEUToGlobalEnergyMap` map it through the deprecated
+  `SpaceProjectManager.getLeader`, i.e. the player's own wireless network unless a GT space-project team is involved -
+  the same behaviour as `MTWirelessMultiMachineBase`).
+- Empty network: the batch is capped by `available.bitLength() >= 63 ? Long.MAX_VALUE : available.longValue()`, so an
+  empty network simply means 0 EU that tick. Nothing shuts down, no failure result, and the delivery resumes on its own
+  as soon as the network is charged again.
+- Failure results: only `protocolcore_no_owner` (no placer UUID yet) and `protocolcore_no_targets` (no loaded team hatch)
+  make `checkProcessing()` fail; both are `SimpleCheckRecipeResult.ofFailure(...)` localized through
+  `GT5U.gui.text.recipe_result.*` in both lang files. While the machine idles, `onPostTick` pushes
+  `scheduleRecipeCheckImmediate()` every 100 ticks - GT5U 2.9's recipe checks are event driven, so a hatch that appears
+  later (or a network that just got charged) would otherwise not be noticed until the machine is toggled.
+- GUI: `MTProtocolCoreGui` is read-only - it adds no buttons, no sub panels and no button column of its own (GT's own
+  machine buttons stay). `createTerminalTextWidget()` puts the seven status lines (state / team / placer / target
+  hatches / wireless balance / EU/t / total delivered) in front of GT's own terminal children through
+  `ListWidget#children`. All four numbers are pushed as `StringSyncValue` (team and placer as well, the state line uses
+  GT's `machineActive`): the strings are refreshed server side every 20 ticks by `refreshDisplayCache()` and
+  pre-formatted with `NumberFormatUtil.formatNumber(Number)`, which is what gives them the thousands separators
+  (`1,000,000`, and exponential above 1T per GTNHLib's config) - the raw `long`/`int` is never drawn directly.
+- No NBT at all: the owner, the team member set, the target list, the output rate and the total are runtime state,
+  rebuilt from the world on the first tick. The old `protocolEffects` compound is gone.
+- Tooltip: house style, one `translateToLocal` key per line (`machine.protocolcore.tooltip.*` plus
+  `machine.protocolcore.structure`); `getInfoData()` (scanner / WAILA) reports the same numbers through
+  `machine.protocolcore.info.*`.
+- `MTProtocolBeacon` (`common/machine`, **unregistered draft** - no `MTItemList` / `MTMachineLoader` entry, no lang keys,
+  no `getGui()` override so it uses the plain base GUI) is the scrap copy that keeps the removed potion-effect
+  implementation for reference: 1 A power draw at the highest energy hatch tier, round length `BASE_ROUND_SECONDS = 500`
+  doubled per enabled effect and halved per hatch tier above EV, the per-effect enable / blacklist-whitelist windows with
+  the `protocolEffects` NBT compound, and the `isEffectApplyable` potion-id round-trip guard for Hodgepodge's
+  `fixPotionLimit` (with EndlessIDs + Thaumcraft potions at ids >= 1000, an id above 255 gets `& 0xFF`-mangled - 1004
+  becomes 236 - and the next entity tick NPEs in `PotionEffect#onUpdate`). It must keep compiling; nothing loads it.
+
 ### Blocks
 - `AssMatrixBlock` (Tier 1) / `AdvAssMatrixBlock` (Tier 2).
 - Static helpers: `getBlock()`, `getItem()`, `getItemStack()`, `getItemStack(int)`.
