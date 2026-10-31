@@ -990,7 +990,9 @@ MTMultiMachineBase<T>
   (`ModBlocks.prismarine:0`, `ModFluffBlocks.prismarineStairs:0`, `ModFluffBlocks.stone:4/5/6` =
   polished andesite/basalt/diorite, `ModFluffBlocks.stoneStairs[6]:0` = diorite brick stairs); the rest are vanilla
   blocks plus `Casings.SolidSteelMachineCasing` for the shell.
-- Skin: solid steel machine casing on every face (front included, by request).
+- Skin: solid steel machine casing everywhere; the controller's front face additionally carries
+  `assets/messtech/textures/blocks/iconsets/controllerFaces/ProtocolCoreOverlay.png` (registered with
+  `Textures.BlockIcons.custom("messtech", ...)` in `registerIcons`, added only when `side == facing` in `getTexture`).
 - Effect broadcast: `checkProcessing()` starts a round (`mMaxProgresstime`) and queues the round's effect packet; the
   packet is applied by the first successfully powered `onRunningTick` (a round that never got its 1 A hands out
   nothing) as one `new PotionEffect(id, roundTicks + 20, 0)` per enabled effect (the 1 s overlap keeps the effect HUD

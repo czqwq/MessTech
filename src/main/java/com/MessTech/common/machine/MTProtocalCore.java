@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.block.BlockBeacon;
+import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
@@ -38,10 +39,13 @@ import com.gtnewhorizon.structurelib.structure.IStructureElement;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
 import ganymedes01.etfuturum.ModBlocks;
 import gregtech.api.casing.Casings;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.HatchElement;
+import gregtech.api.interfaces.IIconContainer;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
@@ -358,13 +362,31 @@ public class MTProtocalCore extends MTMultiMachineBase<MTProtocalCore> implement
     }
     // endregion
 
+    // region Rendering
+    /** Front-face overlay of the controller. Registered in {@link #registerIcons(IIconRegister)} (client only). */
+    @SideOnly(Side.CLIENT)
+    private static IIconContainer PROTOCOL_FACE;
+
+    @Override
+    @SideOnly(Side.CLIENT)
+    public void registerIcons(IIconRegister register) {
+        PROTOCOL_FACE = gregtech.api.enums.Textures.BlockIcons
+            .custom("messtech", "iconsets/controllerFaces/ProtocolCoreOverlay");
+        super.registerIcons(register);
+    }
+
     @Override
     public ITexture[] getTexture(IGregTechTileEntity aBaseMetaTileEntity, ForgeDirection side, ForgeDirection facing,
         int colorIndex, boolean aActive, boolean aRedstone) {
-        // The template skin: the same casing the tower's shell (A) uses, on every face.
-        return new ITexture[] { TextureFactory
-            .of(Casings.SolidSteelMachineCasing.getBlock(), Casings.SolidSteelMachineCasing.getBlockMeta()) };
+        // Solid steel machine casing everywhere (the tower's shell block); the protocol overlay only on the front.
+        ITexture casing = TextureFactory
+            .of(Casings.SolidSteelMachineCasing.getBlock(), Casings.SolidSteelMachineCasing.getBlockMeta());
+        if (side == facing) {
+            return new ITexture[] { casing, TextureFactory.of(PROTOCOL_FACE) };
+        }
+        return new ITexture[] { casing };
     }
+    // endregion
 
     @Override
     protected boolean isEnablePerfectOverclock() {
