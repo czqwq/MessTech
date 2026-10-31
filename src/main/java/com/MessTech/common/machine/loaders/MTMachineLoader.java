@@ -22,6 +22,7 @@ import com.MessTech.common.machine.MTLargeEssentiaGenerator;
 import com.MessTech.common.machine.MTLargeProcessingFactory;
 import com.MessTech.common.machine.MTNQDAFReactor;
 import com.MessTech.common.machine.MTNanoScaleFoundry;
+import com.MessTech.common.machine.MTProtocalCore;
 import com.MessTech.common.machine.MTReactor;
 import com.MessTech.common.machine.MTSmallEssentiaSmeltery;
 import com.MessTech.common.machine.MTSpaceElevator;
@@ -303,6 +304,13 @@ public class MTMachineLoader {
                 translateToLocal("machine.comprehensiveminingplant.name")).getStackForm(1L));
         // Hardcoded author line: "添加者: " + Elinar's petalfall-styled name, and no "Add by: MessTech" line.
         AuthorDynamic.registerElinarAuthor(MTItemList.MTComprehensiveMiningPlant.get(1));
+
+        // 协议核心 (Protocal Core): the beacon-tower structure (16 x 52 x 16) built on the machine template skeleton. This
+        // pass is the structure definition and the tooltip name only - no functionality, so no author line and no
+        // recipes. MT_ID + 80 is the first free slot after the comprehensive mining plant's +79.
+        MTItemList.MTProtocalCore.set(
+            new MTProtocalCore(MT_ID + 80, "MTProtocalCore", translateToLocal("machine.protocalcore.name"))
+                .getStackForm(1L));
 
         // Module hatches: speed, EU discount and parallel control, one variant per tier IV..MAX. IDs go out per family
         // so a tier can be added without shifting the others; no author name - the brand line is the modular look.

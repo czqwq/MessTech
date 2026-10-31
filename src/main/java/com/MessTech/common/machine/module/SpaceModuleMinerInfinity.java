@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.StatCollector;
@@ -24,7 +23,6 @@ import org.jetbrains.annotations.NotNull;
 import com.MessTech.common.gui.module.SpaceModuleMinerInfinityGui;
 import com.cleanroommc.modularui.utils.item.ItemStackHandler;
 import com.cleanroommc.modularui.utils.item.LimitingItemStackHandler;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 
@@ -288,11 +286,6 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     @Override
     public void construct(ItemStack stackSize, boolean hintsOnly) {
         buildPiece("main", stackSize, hintsOnly, 0, 1, 0);
-    }
-
-    @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
     }
 
     @Override
@@ -733,7 +726,7 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
     @Override
     @SideOnly(Side.CLIENT)
     public void registerIcons(IIconRegister aBlockIconRegister) {
-        engraving = Textures.BlockIcons.custom("iconsets/OVERLAY_SIDE_MINER_MODULE");
+        engraving = Textures.BlockIcons.custom("gregtech", "iconsets/OVERLAY_SIDE_MINER_MODULE");
         super.registerIcons(aBlockIconRegister);
     }
 

@@ -32,7 +32,6 @@ import com.MessTech.common.gui.MTDTPFGui;
 import com.MessTech.common.machine.Base.MTProcessingLogic;
 import com.MessTech.common.machine.Base.MTWirelessMultiMachineBase;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 import com.gtnewhorizon.structurelib.structure.StructureDefinition;
@@ -345,11 +344,6 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
     @Override
     public void construct(ItemStack stackSize, boolean hintsOnly) {
         buildPiece(STRUCTURE_PIECE_MAIN, stackSize, hintsOnly, HORIZONTAL_OFFSET, VERTICAL_OFFSET, DEPTH_OFFSET);
-    }
-
-    @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
     }
 
     @Override
@@ -914,14 +908,13 @@ public class MTDTPF extends MTWirelessMultiMachineBase<MTDTPF>
 
     /** Front overlay, like MTELargeFusionComputer5#getTextureOverlay: rainbow screen active, random screen idle. */
     private ITexture getTextureOverlay() {
-        return TextureFactory.of(
-            TextureFactory.builder()
-                .addIcon(
-                    getBaseMetaTileEntity() != null && getBaseMetaTileEntity().isActive()
-                        ? TexturesGtBlock.Casing_Machine_Screen_Rainbow
-                        : TexturesGtBlock.Casing_Machine_Screen_1)
-                .extFacing()
-                .build());
+        return TextureFactory.builder()
+            .addIcon(
+                getBaseMetaTileEntity() != null && getBaseMetaTileEntity().isActive()
+                    ? TexturesGtBlock.Casing_Machine_Screen_Rainbow
+                    : TexturesGtBlock.Casing_Machine_Screen_1)
+            .extFacing()
+            .build();
     }
 
     @Override

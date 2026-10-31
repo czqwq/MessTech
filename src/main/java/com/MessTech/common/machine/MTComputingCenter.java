@@ -30,7 +30,6 @@ import com.MessTech.common.machine.hatch.MTHatchRack;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.util.ExtraShutdownReason;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 import com.gtnewhorizon.structurelib.structure.StructureDefinition;
@@ -815,11 +814,6 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     }
 
     @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
-    }
-
-    @Override
     public int survivalConstruct(ItemStack stackSize, int elementBudget, ISurvivalBuildEnvironment env) {
         if (mMachine) return -1;
         return survivalBuildPiece(
@@ -933,8 +927,8 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
     @Override
     @SideOnly(Side.CLIENT)
     public void registerIcons(IIconRegister aBlockIconRegister) {
-        ScreenOFF = Textures.BlockIcons.custom("iconsets/EM_COMPUTER");
-        ScreenON = Textures.BlockIcons.custom("iconsets/EM_COMPUTER_ACTIVE");
+        ScreenOFF = Textures.BlockIcons.custom("gregtech", "iconsets/EM_COMPUTER");
+        ScreenON = Textures.BlockIcons.custom("gregtech", "iconsets/EM_COMPUTER_ACTIVE");
         super.registerIcons(aBlockIconRegister);
     }
 

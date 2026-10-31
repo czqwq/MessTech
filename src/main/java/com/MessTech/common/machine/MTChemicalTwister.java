@@ -19,7 +19,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
@@ -31,7 +30,6 @@ import com.MessTech.common.machine.Base.MTProcessingLogic;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.gtnewhorizon.gtnhlib.util.numberformatting.NumberFormatUtil;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 import com.gtnewhorizon.structurelib.structure.StructureDefinition;
@@ -518,11 +516,6 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
             HORIZONTAL_OFFSET,
             VERTICAL_OFFSET,
             DEPTH_OFFSET);
-    }
-
-    @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
     }
 
     @Override

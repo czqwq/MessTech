@@ -17,7 +17,6 @@ import net.minecraft.util.CombatTracker;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EntityDamageSourceIndirect;
 import net.minecraft.util.IChatComponent;
-import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 
@@ -184,9 +183,7 @@ public abstract class MTKillBase {
         restore(target);
 
         if (thrower instanceof EntityPlayer player) {
-            GTUtility.sendChatToPlayer(
-                player,
-                StatCollector.translateToLocalFormatted(this.failureMessageKey, target.getCommandSenderName()));
+            GTUtility.sendChatTrans(player, this.failureMessageKey, target.getCommandSenderName());
         }
         return false;
     }

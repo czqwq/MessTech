@@ -8,8 +8,9 @@
 
 | Path | Contents / use |
 |---|---|
-| `tmp/GT5-Unofficial-beta3/` | **GT5U 5.09.54.133 源码快照**（上一版基线）；查 `gregtech.api.*` / `gregtech.common.*` 首选，但**已不是当前编译依赖**（`dependencies.gradle` 的 `gtnhVersion` 2.9.0-RC-2 → **5.09.54.205**）；版本敏感 API 对照解析出的 jar（解包到 `%TEMP%\gt205src` 也可），差异见 `tmp/Compare.md` |
-| `tmp/GT5-Unofficial-master/` | master snapshot, **much older than beta3 (5.09.54.133)**; diff/history only — verify against beta3 |
+| `tmp/GT5U-264-src/` | **GT5U 5.09.54.264 源码快照 = 当前编译依赖**（`dependencies.gradle` 的 `gtnhVersion` 2.9.0）；查 `gregtech.*` / `bartworks.*` / `tectech.*` / `goodgenerator.*` 等 API 首选；205→264 的移除/变化见 §18 |
+| `tmp/GT5U-205-src/` | GT5U 5.09.54.205 源码快照（2.9.0-RC-2 的上一版编译依赖），只用于和 264 对照 |
+| `tmp/GT5-Unofficial-beta3/` | **GT5U 5.09.54.133 源码快照**（更早的历史基线）；`tmp/GT5-Unofficial-master/` 更旧 |
 | `tmp/ic2-decompiled/`, `tmp/ic2-src/` | IC2 source, incl. `ic2.core.*` internals (`ItemReactorUranium`, `ItemReactorHeatStorage`, `TileEntityNuclearReactorElectric`, ...) |
 | `build/rfg/minecraft-src/java/` | **Forge + MC 1.7.10 decompiled source** (`net.minecraft.*`: `RenderItem`, `ItemRenderer`, `FontRenderer`; `cpw.mods.fml.*`) |
 | `build/rfg/minecraft-src/resources/` | Vanilla MC assets |
@@ -237,20 +238,17 @@ a tooltip, client-only (`@EventBusSubscriber(side = CLIENT)`).
 * primitives: `text(String)`, `animatedText(text, posstep, delay, colors...)`, `chain(Supplier...)`, colors
   (`AQUA`, `RED`, `BOLD`, ...), `addItemTooltip(ItemStack, Supplier<String>)`.
 * `animatedText`: char i → `colors[(i*posstep - offset) mod len]`; `posstep` = band speed, `delay` = ms/step.
-* `GTAuthors.buildAuthorsWithFormatSupplier(Supplier<String>...)` prepends the localized `"gt.authors"`
-  ("Author:"/"Authors:"), as in `LoaderMetaTileEntities`:
-  ```java
-  addItemTooltip(ItemList.Machine_Multi_PurificationPlant.get(1),
-                 GTAuthors.buildAuthorsWithFormatSupplier(GTAuthors.AuthorNotAPenguinAnimated));
-  ```
-* `GTAuthors`: static colored `String` + animated `Supplier<String>` authors (`AuthorCloud`, `AuthorNoc`,
-  `AuthorThree`, `fancyAuthorChrom`, `AuthorSerenibyss`, ...) on `animatedText`/`chain`.
+* **GT5U 5.09.54.264 removed author credits**: the `GTAuthors` class, the `gt.author`/`gt.authors` lang keys and the
+  author lines of `MultiblockTooltipBuilder` (`toolTipFinisher(String...)` still exists but ignores its arguments,
+  `addAuthorsIfNEI` is gone). Addons that want an author line build it themselves; MessTech keeps
+  `com.MessTech.common.util.AuthorDynamic`, which formats the line locally with
+  `StatCollector.translateToLocalFormatted("messTech.author", GREEN + author + RESET + GRAY)` (same "Author: %s"
+  shape `GTAuthors.buildAuthorsWithFormatSupplier` used to produce) and then hands it to `AnimatedTooltipHandler`.
 
-`com.MessTech.common.util.AuthorDynamic` = self-contained "czqwq" author: rainbow ramp (`GTAuthors.AuthorThree`
-style) + color wave (`AuthorSerenibyss` style) + **ping-pong offset** (triangle wave) → the band wobbles
-**left-right**, not scrolling one way. `AuthorDynamic.author()` → `Supplier<String>`;
-`AuthorDynamic.registerOn(stack)` = `AnimatedTooltipHandler.addItemTooltip(stack,
-GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
+`com.MessTech.common.util.AuthorDynamic` = self-contained "czqwq" author: rainbow ramp + color wave +
+**ping-pong offset** (triangle wave) → the band wobbles **left-right**, not scrolling one way.
+`AuthorDynamic.author_czqwq()` → `Supplier<String>`; `AuthorDynamic.registerOn(stack)` = the `messTech.author` line
+above + the animated `messTech.addBy` line.
 
 ### MessTech's actual refactor (current layout)
 
@@ -264,7 +262,7 @@ Registration moved out of `CommonProxy` into three pieces:
 
 ONE path (the loader calls `AuthorDynamic.registerOn(...)`, never a second inline `addItemTooltip`): `postInit` →
 `MTMachineLoader.loadMachines` → `MTItemList.set(stack)` + `AuthorDynamic.registerOn(stack)` →
-`AnimatedTooltipHandler.addItemTooltip(stack, GTAuthors.buildAuthorsWithFormatSupplier(AuthorDynamic.author()))`.
+`AnimatedTooltipHandler.addItemTooltip(stack, AuthorDynamic.authorLine(...))` (the local `Author:` formatter, §12).
 
 ## 13. GT5U API knowledge from recent work
 
@@ -547,3 +545,76 @@ Reference for MessTech's wireless beamline hatches (`docs/knowledge.md`).
 * `IMetaTileEntity.SkipGenerateDescription` (not inherited by subclasses, `ItemMachines.addDescription` /
   `registerDescription`): without it `getDescription()` is dumped once into `GregTech.lang` at client setup and read
   back → per-instance text ends up frozen.
+
+## 18. 2.9.0 迁移：GT5U 5.09.54.205 → 5.09.54.264
+
+`dependencies.gradle` 的 `gtnhVersion = "2.9.0"` 解析到的关键版本：GT5U **5.09.54.264**、GTNHLib **0.11.54**
+（`configurations.all { force ... }` 必须跟着升 - RC 期钉的 0.11.51 已不是 2.9.0 的版本）、
+NewHorizonsCoreMod 2.9.99、AE2 rv3-beta-1095、NEI 2.8.171、ThaumicEnergistics 1.7.68、Angelica 2.2.42、
+StructureLib 1.4.47。Et-Futurum-Requiem 2.6.65-GTNH 目前用 `libs/etfuturum-2.6.65-GTNH-dev.jar` 本地 jar
+（maven 上也有 `ganymedes01.etfuturum:Et-Futurum-Requiem:2.6.65-GTNH:dev`）。
+
+源码对照：`tmp/GT5U-264-src/`（当前依赖）vs `tmp/GT5U-205-src/`（上一版 2.9.0-RC-2 的依赖）。我们引用的
+297 个 GT5U 家族类型**没有一个被删除**，编译期唯一的破坏点就是下面的 `GTAuthors`；其余 75 个变更文件都是
+新增/内部逻辑，行为由继承自动跟上。
+
+### 18.1 作者信息整体移除（已适配）
+
+* 删类 / 删 lang key：`gregtech.api.enums.GTAuthors`、`gt.author` / `gt.authors`（en_US 里是
+  `Author: %s` / `Authors: %s`）、`GT5U.MBTT.Mod`、`GT5U.MBTT.StructureBy`。
+* `MultiblockTooltipBuilder`：`authors` / `structureAuthors` 列表与 `addAuthorsIfNEI` 等删除；
+  `toolTipFinisher(String... authors)` **保留但忽略参数**（binary compatibility 注释写得很明白），我们的
+  `toolTipFinisher()` 无参调用不受影响。
+* `MTEHatch.formatEnergyInfoDesc(String[] author, ...)` 重载删除（`author` 以前只用于追加作者行）。
+* `MTEHatch.updateCraftingIcon(ItemStack)` 变 `@Deprecated`：没有 owner 时 `clearHatches` 清不掉旧图标 →
+  新写法 `updateCraftingIcon(icon, getBaseMetaTileEntity())`（GT5U 内部全部改成两参）。
+* MessTech 的适配：`AuthorDynamic.authorLine(...)` 本地复刻 `"Author: %s"`（GREEN + name + RESET + GRAY），
+  lang 加 `messTech.author`；`CalculateMultiMachineBase` / `MTSteamMultiBase` / `BosesCraftingArray` 的 8 处
+  `updateCraftingIcon` 全部改成两参版本。
+
+### 18.2 `MultiblockTooltipBuilder` 新增 / 行为变化
+
+* 新增 `addTierNote(String)`、`addEnergyHatchGlassTier()`；`addMinGlassForLaser(t)` 现在走 `addTierNote`
+  （插在结构行前面）；`addMaxTierSkips` 措辞/位置有调整（`GT5U.MBTT.Structure.MaxTierSkips`）。
+* 结构尺寸标签本地化：`GT5U.MBTT.Dimensions.Length/Width/Height`（原来硬编码 `L/W/H`）。
+* `addDeprecatedLine` 会置 deprecated 标记（GUI 里机器人图标）。作者行不再由 GT5U 添加。
+
+### 18.3 基类 / 杂项（无需改代码，行为自动继承）
+
+* `MTEMultiBlockBase`：新增 `protected tryActivateCoilLease()`（线圈租约 hook，替换 `onStructureFormed` 里
+  的内联逻辑）与 `clearCraftingIcons(Collection<? extends MTEHatch>)`；删除 `setMaxParallelForPanel(int)`；
+  **合成输入仓按颜色分桶**（`mDualInputHatches` 先查无颜色、再查 0-15 色）、`getWailaBody` 的进度行受
+  `showRecipeTextInGUI()` 控制、控制器槽 0 大小堆会清空。
+* `MTEEnhancedMultiBlockBase`：新增 `protected getSoundRadiusMultiplier()`。
+* `MTEHatchOutputBus#getStackSizeLimit(int, ItemStack)` 上移到 `IMetaTileEntity` default 方法（`MTDTPF` /
+  `MTComputingCenter` 的 `@Override` 仍有效）。
+* gtnhintergalactic `TileEntityModuleBase`：删除 `addGregTechLogo(ModularWindow.Builder)` /
+  `drawTexts(DynamicPositionedColumn, SlotWidget)`（我们没重写这两个）；`MTEHatchVacuumConveyor` 新增
+  `getItemsForHoloGlasses()`。
+* 构建环境：`gradle.properties` 现在带 `org.gradle.jvmargs = -Xmx4G -XX:MaxMetaspaceSize=1G`。默认 512 MiB
+  堆在 `downgradeMainClasses` / `downgradeJar`（jvmDowngrader）阶段会 GC thrash，Gradle 直接报
+  `Gradle build daemon has been stopped: since the JVM garbage collector is thrashing`。
+* NAC 配方脚本 `ScriptNanochipRecipes.java` 在 NH-Core 2.9.76 / 2.9.84 / 2.9.99 完全一致（SHA-256 相同），
+  所以 `MTRecipeMaps` 的 24 池扁平化逻辑（`tmp/Compare.md` E2）**不需要**再改。
+* 顺带清掉的 deprecated 调用（编译 `-Xlint:deprecation` 扫出来、行为不变）：17 处冗余的
+  `survivalConstruct(ItemStack,int,IItemSource,EntityPlayerMP)`（StructureLib 1.4.47 起推荐
+  `ISurvivalBuildEnvironment` 版本，我们本来就有新版本，旧的直接删）、`Textures.BlockIcons.custom(String)` →
+  `custom(domain, path)`、`TextureFactory.of(ITexture)`（空操作）→ 直接用 builder、`GenericSyncValue` 构造器 →
+  `GenericSyncValue.builder(...)`、ModularUI2 `Rectangle#setColor` → `color`、`GTUtility.sendChatToPlayer` →
+  `sendChatTrans`。
+
+### 18.4 Angelica 2.2.42：2.9.0 真正的运行时破坏点（已适配）
+
+* Angelica 2.2.42 把 `com.gtnewhorizons.angelica.glsm.GLStateManager` 拆成一组 `glsm.GLSM*` 包装类：
+  `BatchingFontRenderer.setupFontDrawState()` 里的混合设置从 `GLStateManager.tryBlendFuncSeparate(IIII)V` 变成
+  `GLSMBlend.tryBlendFuncSeparate(IIII)V`。
+* 我们 `MixinBatchingFontRenderer_TextEffect.mt$compositeMaskCoverage` 的 `@ModifyArg` 目标必须跟着换类，否则
+  启动时 `Critical injection failure: ... failed injection check, (0/1) succeeded. Scanned 0 target(s)` →
+  `NoClassDefFoundError: com/gtnewhorizons/angelica/client/font/BatchingFontRenderer`，
+  客户端崩在 SplashProgress（`FontRenderer` 构造 Angelica batcher）。
+* 已验证：日志里出现 `RemapperAdapterFML is remapping ... tryBlendFuncSeparate(IIII)V for .../GLSMBlend` 与
+  `Forge Mod Loader has successfully loaded 124 mods` 即恢复正常。
+* 其余被注入/影子的成员（`drawString(FFIZZLjava/lang/CharSequence;II)`、`flushDeferredText`、`shouldDeferNow`、
+  `shouldDrawThroughPipeline`、`underlying`、`batchDepth`、`arenaOwner`、`flushBatch`）未变；
+  `AngelicaTextAdapter` 用到的 `FontProvider` / `FontStrategist` / `FontConfig` / `GLStateManager` /
+  `FontRendererAccessor` / `ModelPartBatcher` / `TesrBatchRenderer` 也都还在。细节见 `docs/text-fx/design.md`。

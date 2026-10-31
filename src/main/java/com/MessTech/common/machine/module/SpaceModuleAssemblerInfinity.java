@@ -3,7 +3,6 @@ package com.MessTech.common.machine.module;
 import java.util.List;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
@@ -11,7 +10,6 @@ import net.minecraftforge.common.util.ForgeDirection;
 import org.jetbrains.annotations.NotNull;
 
 import com.MessTech.common.gui.module.SpaceModuleAssemblerInfinityGui;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 
@@ -157,11 +155,6 @@ public class SpaceModuleAssemblerInfinity extends SpaceModuleInfinityBase<SpaceM
     @Override
     public void construct(ItemStack stackSize, boolean hintsOnly) {
         buildPiece("main", stackSize, hintsOnly, 0, 1, 0);
-    }
-
-    @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
     }
 
     @Override

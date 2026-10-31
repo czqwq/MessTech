@@ -974,6 +974,65 @@ MTMultiMachineBase<T>
   page is a machine recipe, and in crafting mode AE's next `detectAndSendChanges()` mirrors the first nine cells into the
   matrix (`copyToMatrix`), clamping to 1 and clearing non-items. `PartPatternTerminalEx` already defaults to it - this guards
   hand-switched terminals.
+### MTProtocalCore (协议核心 / Protocal Core)
+- 16 x 52 x 16 beacon-tower multiblock on the `MachineTemplate` skeleton that broadcasts potion effects to a team.
+  Registered as `MT_ID + 80`, item name and machine type "协议核心" / "Protocal Core".
+- Structure: the structure dump's `transpose`d scan (52 layers x 16 rows x 16 wide), controller `~` at `(8, 49, 4)`.
+  `X` (the two slots flanking the controller) is the only hatch element: `Energy.or(ExoticEnergy)` / `InputBus` /
+  `OutputBus`, fill = lapis block; `checkMachine` additionally requires at least one energy hatch
+  (`checkHasEnergyHatch`).
+- `Y` = the six beacons: a custom `IStructureElement` accepting any `BlockBeacon` + `TileEntityBeacon` pair (the
+  123Technology `OTEMegaNineInOne` pattern), so vanilla beacons, Et Futurum's New Beacon and other mods' beacons pass;
+  hints/autoplace use `Blocks.beacon` (Et Futurum's world listener turns it into the New Beacon).
+- Block mapping from the dump's unlocalized names: Et Futurum `ModBlocks.CHAIN` / `TRAPDOOR_DARK_OAK` /
+  `DEEPSLATE_BRICK_WALL` / `DEEPSLATE_BRICKS` / `END_ROD` / `STONE_WALL_2:1` (its meta 1 = diorite wall) /
+  `IRON_TRAPDOOR` / `SMOOTH_STONE`; the un-prefixed `tile.prismarine` / `tile.stone*` names are Botania's 1.8 decor
+  (`ModBlocks.prismarine:0`, `ModFluffBlocks.prismarineStairs:0`, `ModFluffBlocks.stone:4/5/6` =
+  polished andesite/basalt/diorite, `ModFluffBlocks.stoneStairs[6]:0` = diorite brick stairs); the rest are vanilla
+  blocks plus `Casings.SolidSteelMachineCasing` for the shell.
+- Skin: solid steel machine casing on every face (front included, by request).
+- Effect broadcast: `checkProcessing()` starts a round (`mMaxProgresstime`) and queues the round's effect packet; the
+  packet is applied by the first successfully powered `onRunningTick` (a round that never got its 1 A hands out
+  nothing) as one `new PotionEffect(id, roundTicks + 20, 0)` per enabled effect (the 1 s overlap keeps the effect HUD
+  from flickering between rounds), and returns `SUCCESSFUL` so GT restarts the round as soon as it ends - the effects
+  stay refreshed while the machine runs. Targets are the online members of the bound player's (machine owner's) team,
+  or only the owner when the player has no team; only online players are affected. Per effect there is an enable switch
+  plus a player-name blacklist (default) / whitelist and its mode; names are matched case insensitively and split on
+  comma/whitespace.
+- Potion id safety (`MTProtocalCore.isEffectApplyable(int)`): GTNH's Hodgepodge `fixPotionLimit` (on by default) rewrites
+  the id inside the `PotionEffect(int, int, int, boolean)` constructor to `id & 0xFF`. EndlessIDs expands
+  `Potion.potionTypes` to 65536 and Thaumcraft registers its potions at ids >= 1000, so constructing a `PotionEffect`
+  for those silently mangles the id (1004 -> 236), the player ends up with an effect pointing at an empty potion slot
+  and the next entity tick NPEs in `PotionEffect#onUpdate`. The machine therefore checks every id by constructing a
+  throwaway `PotionEffect` and comparing `getPotionID()` (cached per id), refuses to hand out/round-count mangled ids
+  (`applyEffects` re-checks right before adding), and the GUI lists those potions as button-less rows in the normal
+  theme colour with an explanatory tooltip
+  (tooltip key `machine.protocalcore.gui.effects.unsupported`). If a pack turns `fixPotionLimit` off, the high ids pass
+  the round-trip check and become normal enable-able effects without any code change.
+- Team source = GTNHLib teams (`TeamManager.getTeamMap()` scan; the old `SpaceProjectManager` mapping is deprecated and
+  not used). `getBoundPlayer()` = `getOwnerUuid()`, falling back to the owner name through `ServerPlayerUtils`.
+- Round length: `BASE_ROUND_SECONDS = 500` at EV, doubled per enabled effect (`2^n`, the "original length added again"
+  per effect) and halved per energy hatch level above EV (`getHatchLevel() = max(1, hatchTier - 3)`) - the lossy
+  overclock direction, EU/t already grows 4x per tier because the 1 A is drawn at the higher voltage. Power draw is
+  `lEUt = -GTValues.V[tier]` (1 A at the highest hatch tier), drained by the extended-power `onRunningTick`; a hatch
+  below EV cannot start the machine (`protocalcore_energy_tier_too_low`). A round tick count is clamped to
+  `Integer.MAX_VALUE`.
+- Machine GUI: `MTProtocalCoreGui` (`common/gui`, MUI2). It replaces the terminal text with the protocol status (state,
+  hatch level / 1 A EU/t, enabled effect count, planned round, round remaining, bound player + team), appends GT's own
+  terminal children and adds a potion bottle button to the button column. That button toggles the draggable
+  `protocalEffects` window: one row per registered `Potion.potionTypes[id]` - status icon (vanilla
+  `textures/gui/container/inventory.png`, `(index % 8 * 18, 198 + index / 8 * 18)`), localized name, enable toggle
+  (GT checkmark/cross) and a filter button showing the current mode with the space mining module's
+  `GTGuiTextures.TT_OVERLAY_BUTTON_BLACKLIST` / `TT_OVERLAY_BUTTON_WHITELIST` textures, which opens the per-effect
+  draggable filter window (mode toggle on top, blacklist field above the whitelist field, both auto-applied).
+- MUI2 details: synced sub panels are registered in `initPanelMap` (before `createButtonColumn`) and their builders use
+  the main `PanelSyncManager`, so all sync values live on the main panel and only the panel open state is synced;
+  sub panels are draggable by default (`ModularPanel#isDraggable` is false only on the main panel) but need a fixed
+  size; each window has its own close button using the panel's `PanelSyncHandler#closePanel`.
+- NBT: `protocalEffects` compound, one child per used potion id (`enabled`, `whitelistMode`, `blacklist`, `whitelist`);
+  defaults are all effects disabled, blacklist mode, empty lists. Failure results are
+  `SimpleCheckRecipeResult.ofFailure("protocalcore_no_energy_hatch" / "protocalcore_no_enabled_effects")`, localized via
+  the `GT5U.gui.text.recipe_result.*` keys in both lang files.
 ### Blocks
 - `AssMatrixBlock` (Tier 1) / `AdvAssMatrixBlock` (Tier 2).
 - Static helpers: `getBlock()`, `getItem()`, `getItemStack()`, `getItemStack(int)`.

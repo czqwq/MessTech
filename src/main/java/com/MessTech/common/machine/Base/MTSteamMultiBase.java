@@ -203,7 +203,7 @@ public abstract class MTSteamMultiBase<T extends MTSteamMultiBase<T>> extends GT
 
         if (aTileEntity instanceof MTEHatch mteHatch) {
             mteHatch.updateTexture(aBaseCasingIndex);
-            mteHatch.updateCraftingIcon(this.getMachineCraftingIcon());
+            mteHatch.updateCraftingIcon(this.getMachineCraftingIcon(), getBaseMetaTileEntity());
         }
 
         // Set recipe map for input hatches.

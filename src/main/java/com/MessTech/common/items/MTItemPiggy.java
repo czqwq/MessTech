@@ -132,9 +132,7 @@ public class MTItemPiggy extends Item {
             if (!world.isRemote) {
                 world.playSoundAtEntity(player, "mob.pig.say", 0.6F, 1.4F);
             } else {
-                GTUtility.sendChatToPlayer(
-                    player,
-                    StatCollector.translateToLocalFormatted("messtech.piggy.switched", effect.getDisplayName()));
+                GTUtility.sendChatTrans(player, "messtech.piggy.switched", effect.getDisplayName());
             }
 
             return stack;

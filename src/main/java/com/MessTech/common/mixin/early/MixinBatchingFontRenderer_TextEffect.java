@@ -111,7 +111,7 @@ public abstract class MixinBatchingFontRenderer_TextEffect implements FontBatchB
         method = "setupFontDrawState",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/gtnewhorizons/angelica/glsm/GLStateManager;tryBlendFuncSeparate(IIII)V",
+            target = "Lcom/gtnewhorizons/angelica/glsm/GLSMBlend;tryBlendFuncSeparate(IIII)V",
             ordinal = 0),
         index = 3,
         remap = false,
@@ -119,6 +119,8 @@ public abstract class MixinBatchingFontRenderer_TextEffect implements FontBatchB
     private int mt$compositeMaskCoverage(int destinationAlpha) {
         // Bold glyph copies must add coverage rather than erase the translucent edges of the previous one. Multiple
         // @ModifyArg handlers on one call compose, so another mod's own tweak here is kept.
+        // Angelica 2.2.42 (2.9.0) split GLStateManager into the GLSM* wrappers: the same call is now
+        // GLSMBlend.tryBlendFuncSeparate(...), so the target is the new owner class.
         return EffectTextRenderer.isCapturing() ? GL11.GL_ONE_MINUS_SRC_ALPHA : destinationAlpha;
     }
 }

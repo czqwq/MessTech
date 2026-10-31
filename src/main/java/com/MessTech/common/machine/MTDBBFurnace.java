@@ -9,7 +9,6 @@ import java.util.Collection;
 import java.util.List;
 
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChatComponentText;
@@ -22,7 +21,6 @@ import com.MessTech.common.machine.Base.MTMultiMachineBase;
 import com.MessTech.common.machine.Base.MTProcessingLogic;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 import com.gtnewhorizon.structurelib.structure.StructureDefinition;
@@ -173,11 +171,6 @@ public class MTDBBFurnace extends MTMultiMachineBase<MTDBBFurnace>
     }
 
     @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
-    }
-
-    @Override
     public int survivalConstruct(ItemStack stackSize, int elementBudget, ISurvivalBuildEnvironment env) {
         if (mMachine) return -1;
         return survivalBuildPiece(
@@ -310,14 +303,13 @@ public class MTDBBFurnace extends MTMultiMachineBase<MTDBBFurnace>
     }
 
     private ITexture getTextureOverlay() {
-        return TextureFactory.of(
-            TextureFactory.builder()
-                .addIcon(
-                    getBaseMetaTileEntity() != null && getBaseMetaTileEntity().isActive()
-                        ? Textures.BlockIcons.MACHINE_CASING_BRICKEDBLASTFURNACE_ACTIVE
-                        : Textures.BlockIcons.MACHINE_CASING_BRICKEDBLASTFURNACE_INACTIVE)
-                .extFacing()
-                .build());
+        return TextureFactory.builder()
+            .addIcon(
+                getBaseMetaTileEntity() != null && getBaseMetaTileEntity().isActive()
+                    ? Textures.BlockIcons.MACHINE_CASING_BRICKEDBLASTFURNACE_ACTIVE
+                    : Textures.BlockIcons.MACHINE_CASING_BRICKEDBLASTFURNACE_INACTIVE)
+            .extFacing()
+            .build();
     }
 
     @Override

@@ -13,17 +13,17 @@ import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.animatedText;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.chain;
 import static com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler.text;
 import static net.minecraft.util.StatCollector.translateToLocal;
+import static net.minecraft.util.StatCollector.translateToLocalFormatted;
 
 import java.util.function.Supplier;
 
 import net.minecraft.item.ItemStack;
-
-import gregtech.api.enums.GTAuthors;
+import net.minecraft.util.EnumChatFormatting;
 
 /**
  * Dynamic animated author "czqwq" for MessTech machine tooltips, on gtnhlib's {@code AnimatedTooltipHandler}:
- * rainbow cycling and a colour "wave" over the letters, as {@code GTAuthors.AuthorThree} /
- * {@code GTAuthors.AuthorSerenibyss} do, plus a ping-pong offset so the band slides back and forth instead of
+ * rainbow cycling and a colour "wave" over the letters, in the style of the {@code GTAuthors} animations GT5U used to
+ * ship (that class was removed in 5.09.54.264), plus a ping-pong offset so the band slides back and forth instead of
  * scrolling one way.
  * <p>
  * {@link #author_czqwq()} gives the author for {@link #registerOn(ItemStack)};
@@ -79,8 +79,8 @@ public final class AuthorDynamic {
     }
 
     /**
-     * Register the author line at the end of a machine item's tooltip, the way {@code LoaderMetaTileEntities} does:
-     * {@code AnimatedTooltipHandler.addItemTooltip(...)}.
+     * Register the author line at the end of a machine item's tooltip through gtnhlib's
+     * {@code AnimatedTooltipHandler.addItemTooltip(...)} (GT5U stopped adding author lines itself in 5.09.54.264).
      */
     public static void registerOn(ItemStack machineStack) {
         registerOn(author_czqwq(), machineStack);
@@ -89,7 +89,7 @@ public final class AuthorDynamic {
     /**
      * Register the author line + animated MessTech add-on line.
      *
-     * @param author author tooltip supplier, e.g. {@link #author_czqwq()} or a GTAuthors supplier
+     * @param author author tooltip supplier, e.g. {@link #author_czqwq()}
      */
     public static void registerOn(Supplier<String> author, ItemStack machineStack) {
         addAuthorLine(author, machineStack, null);
@@ -170,10 +170,20 @@ public final class AuthorDynamic {
     private static void addAuthorLine(Supplier<String> author, ItemStack machineStack, MTTextAnimation animation) {
         if (author == null || machineStack == null) return;
 
-        MTAnimatedTooltipHandler
-            .addItemTooltip(machineStack, GTAuthors.buildAuthorsWithFormatSupplier(author), animation);
+        MTAnimatedTooltipHandler.addItemTooltip(machineStack, authorLine(author), animation);
         MTAnimatedTooltipHandler
             .addItemTooltip(machineStack, chain(text(translateToLocal("messTech.addBy") + " "), messTechAnimated()));
+    }
+
+    /**
+     * The {@code Author: <name>} line. GT5U 5.09.54.264 removed author credits together with the {@code GTAuthors}
+     * class and its {@code gt.author} lang keys, so the formatting that class applied is done locally here: the name
+     * in green, then a reset + gray so the rest of the tooltip keeps its normal colour.
+     */
+    private static Supplier<String> authorLine(Supplier<String> author) {
+        return () -> translateToLocalFormatted(
+            "messTech.author",
+            EnumChatFormatting.GREEN + author.get() + EnumChatFormatting.RESET + EnumChatFormatting.GRAY);
     }
 
     /** Animated "MessTech" with a flowing purple gradient. */

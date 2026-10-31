@@ -108,7 +108,7 @@ public class MTSmallEssentiaSmelteryGui extends MTMultiMachineBaseGui<MTSmallEss
         Aspect aspect = rowAspect(pending, row);
         if (aspect == null) return IDrawable.EMPTY;
         if (!ASPECT_ICONS_AVAILABLE) {
-            return new Rectangle().setColor(0xFF000000 | aspect.getColor());
+            return new Rectangle().color(0xFF000000 | aspect.getColor());
         }
         ItemStack icon = new ItemStack(ModItems.itemAspect);
         ItemAspect.setAspect(icon, aspect);

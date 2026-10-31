@@ -22,7 +22,6 @@ import com.MessTech.common.machine.Base.MTMultiMachineBase;
 import com.MessTech.common.machine.Base.MTProcessingLogic;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructable;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 import com.gtnewhorizon.structurelib.structure.StructureDefinition;
@@ -165,7 +164,7 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
             // GT5U 5.09.54.183 uses one nanite bus; the legacy Singularity ItemList entry is unset.
 
             hatch.updateTexture(texture);
-            hatch.updateCraftingIcon(machine.getMachineCraftingIcon());
+            hatch.updateCraftingIcon(machine.getMachineCraftingIcon(), machine.getBaseMetaTileEntity());
             return machine.naniteHatches.add(hatch);
         }
 
@@ -478,11 +477,6 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
     @Override
     public void construct(ItemStack stackSize, boolean hintsOnly) {
         buildPiece(STRUCTURE_PIECE_MAIN, stackSize, hintsOnly, HORIZONTAL_OFFSET, VERTICAL_OFFSET, DEPTH_OFFSET);
-    }
-
-    @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
     }
 
     @Override

@@ -98,24 +98,22 @@ public class MTReactorAccessHatchGui extends MTEHatchBaseGui<MTReactorAccessHatc
     protected void registerSyncValues(PanelSyncManager syncManager) {
         super.registerSyncValues(syncManager);
 
-        slotStates = new GenericSyncValue<>(
-            byte[].class,
-            machine::getSlotStateArray,
-            null,
-            ByteBufAdapters.BYTE_ARR,
-            ByteBufAdapters.BYTE_ARR,
-            Arrays::equals,
-            byte[]::clone);
+        slotStates = GenericSyncValue.builder(byte[].class)
+            .getter(machine::getSlotStateArray)
+            .deserializer(ByteBufAdapters.BYTE_ARR)
+            .serializer(ByteBufAdapters.BYTE_ARR)
+            .equals(Arrays::equals)
+            .copy(byte[]::clone)
+            .build();
         syncManager.syncValue("mtReactorSlotStates", slotStates);
 
-        slotMemories = new GenericSyncValue<>(
-            ItemStack[].class,
-            machine::getSlotMemoryArray,
-            null,
-            MTReactorMemorySyncAdapter.INSTANCE,
-            MTReactorMemorySyncAdapter.INSTANCE,
-            MTReactorMemorySyncAdapter.INSTANCE,
-            MTReactorAccessHatchGui::copyMemoryArray);
+        slotMemories = GenericSyncValue.builder(ItemStack[].class)
+            .getter(machine::getSlotMemoryArray)
+            .deserializer(MTReactorMemorySyncAdapter.INSTANCE)
+            .serializer(MTReactorMemorySyncAdapter.INSTANCE)
+            .equals(MTReactorMemorySyncAdapter.INSTANCE)
+            .copy(MTReactorAccessHatchGui::copyMemoryArray)
+            .build();
         syncManager.syncValue("mtReactorSlotMemories", slotMemories);
 
         slotAction = new MTReactorSlotActionSyncHandler(machine);

@@ -6,7 +6,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -18,7 +17,6 @@ import org.jetbrains.annotations.NotNull;
 import com.MessTech.common.gui.module.SpaceModuleApiaryGui;
 import com.MessTech.common.gui.module.SpaceModuleInfinityGui;
 import com.MessTech.common.util.MTBeeSimulator;
-import com.gtnewhorizon.structurelib.structure.IItemSource;
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 
@@ -236,11 +234,6 @@ public abstract class SpaceModuleApiary extends SpaceModuleInfinityBase<SpaceMod
     @Override
     public void construct(ItemStack stackSize, boolean hintsOnly) {
         buildPiece("main", stackSize, hintsOnly, 0, 1, 0);
-    }
-
-    @Override
-    public int survivalConstruct(ItemStack stackSize, int elementBudget, IItemSource source, EntityPlayerMP actor) {
-        return super.survivalConstruct(stackSize, elementBudget, source, actor);
     }
 
     /**

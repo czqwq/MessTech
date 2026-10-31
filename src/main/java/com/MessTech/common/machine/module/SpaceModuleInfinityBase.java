@@ -799,8 +799,8 @@ public abstract class SpaceModuleInfinityBase<T extends SpaceModuleInfinityBase<
     @Override
     @SideOnly(Side.CLIENT)
     public void registerIcons(net.minecraft.client.renderer.texture.IIconRegister aBlockIconRegister) {
-        ScreenOFF = gregtech.api.enums.Textures.BlockIcons.custom("iconsets/EM_CONTROLLER");
-        ScreenON = gregtech.api.enums.Textures.BlockIcons.custom("iconsets/EM_CONTROLLER_ACTIVE");
+        ScreenOFF = gregtech.api.enums.Textures.BlockIcons.custom("gregtech", "iconsets/EM_CONTROLLER");
+        ScreenON = gregtech.api.enums.Textures.BlockIcons.custom("gregtech", "iconsets/EM_CONTROLLER_ACTIVE");
         super.registerIcons(aBlockIconRegister);
     }
 

@@ -46,6 +46,20 @@ Mixin：`MixinFontRenderer_TextEffect`（draw/width/trim/wrap/split）、`MixinG
 coremod 在启动阶段就构造字体渲染器，放在 late 配置会报 `MixinTargetAlreadyLoadedException`（目标类已被提前加载）；
 `MixinFormattedTextField_TextEffect`（仅 NEI）走 late 配置，由 `Mixins` 枚举按模组过滤。
 
+**Angelica 2.2.42 / GTNH 2.9.0 的变化**：`com.gtnewhorizons.angelica.glsm.GLStateManager` 被拆成一组 `GLSM*` 包装类，
+`BatchingFontRenderer.setupFontDrawState()` 里的混合设置从 `GLStateManager.tryBlendFuncSeparate(...)` 变成
+`GLSMBlend.tryBlendFuncSeparate(IIII)V`。`MixinBatchingFontRenderer_TextEffect.mt$compositeMaskCoverage` 的
+`@ModifyArg` 目标必须跟着改，否则启动时整类注入失败：
+
+```
+Critical injection failure: Argument modifier method mt$compositeMaskCoverage(I)I ... failed injection check,
+(0/1) succeeded. Scanned 0 target(s).
+→ NoClassDefFoundError: com/gtnewhorizons/angelica/client/font/BatchingFontRenderer
+```
+
+其余被注入/影子的成员（`drawString(FFIZZLjava/lang/CharSequence;II)`、`flushDeferredText`、`shouldDeferNow`、
+`shouldDrawThroughPipeline`、`underlying`、`batchDepth`、`arenaOwner`、`flushBatch`）在 2.2.42 未变。
+
 ## 3. 着色器契约
 
 每个效果 = 一个 `<id>.frag.glsl`，`#version 120` + `#include "common.glsl"`，只写亮部（阴影由管线画）。

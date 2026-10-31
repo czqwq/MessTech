@@ -1,7 +1,7 @@
 dependencies {
     elytraModpackVersion {
         // 在这配置的gtnh版本 用于自动拉取依赖版本
-        gtnhVersion = "2.9.0-RC-2"
+        gtnhVersion = "2.9.0"
         // 是否不缓存拉取的依赖清单文件
         manifestNoCache = false
         // 是否自动为输出的jar添加 `gtnhVersion` 后缀
@@ -13,6 +13,7 @@ dependencies {
     implementation(gtnhDev("NotEnoughEnergistics"))
     implementation(gtnhDev("ForestryMC"))
     implementation(gtnhDev("Infernal-Mobs"))
+    implementation(files("libs/etfuturum-2.6.65-GTNH-dev.jar"))
     implementation("com.cubefury.vendingmachine:VendingMachine:0.4.82:dev")
     implementation(gtnhDev("Galaxy-Space-GTNH"))
     implementation(gtnhDev("SGCraft"))
@@ -81,7 +82,7 @@ dependencies {
 
     configurations.all {
         resolutionStrategy {
-            force "com.github.GTNewHorizons:GTNHLib:0.11.51"
+            force "com.github.GTNewHorizons:GTNHLib:0.11.54"
         }
     }
 }

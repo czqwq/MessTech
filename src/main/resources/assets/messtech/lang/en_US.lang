@@ -7,6 +7,7 @@ machine.generatorbase.generation=Wireless Generation
 machine.generatorbase.total=Total Generated
 messTech.addBy=Add by:
 messTech.addByAuthor=Added by:
+messTech.author=Author: %s
 GT5U.gui.text.shutdown_reason.datastick=Removed or otherwise extracted the datastick before the research was completed.
 GT5U.gui.text.shutdown_reason.overheating=Machine OverHeating!
 
@@ -139,6 +140,61 @@ machine.template.machinetype=Template Machine
 machine.template.tooltip.0=Template machine: every 'A' position accepts any hatch of the base class (buses/hatches/energy/exotic/dynamo/maintenance/muffler)
 machine.template.tooltip.1=Perfect Overclock disabled, speed bonus 1.0, max parallel 1 - copy this class and adjust
 machine.template.tooltip.2=Structure: 3 x 3 x 3, controller on the middle of the front face
+
+# --- Protocal Core (协议核心) ---
+machine.protocalcore.name=Protocal Core
+machine.protocalcore.machinetype=Protocal Core
+machine.protocalcore.tooltip.desc=§6Protocal Core:
+machine.protocalcore.tooltip.flavour=§7A beacon tower that broadcasts potion effects to a whole team.
+machine.protocalcore.tooltip.power.header=§6Power:
+machine.protocalcore.tooltip.power.current=§7· Runs on §b1 A§7 at the tier of the §ehighest energy hatch§7 (2048 EU/t on EV)
+machine.protocalcore.tooltip.power.min=§7· Needs an energy hatch of §eEV§7 or higher, lower tiers cannot start it
+machine.protocalcore.tooltip.power.overclock=§7· Every energy hatch level above EV halves the round (lossy overclocking: EU/t ×4)
+machine.protocalcore.tooltip.effects.header=§6Effects:
+machine.protocalcore.tooltip.effects.apply=§7· Every round applies all enabled level-§b1§7 potion effects to the §aonline members§7 of the bound player's (machine owner's) team
+machine.protocalcore.tooltip.effects.round=§7· Base length §b500§7 s (EV = level 1); the effect is refreshed round after round while the machine runs
+machine.protocalcore.tooltip.effects.stack=§7· Every enabled effect doubles the length again, the voltage stays the same
+machine.protocalcore.tooltip.effects.list=§7· Every effect has its own enable switch and a §bplayer name blacklist / whitelist§7 (blacklist by default)
+machine.protocalcore.tooltip.effects.team=§7· Without a team only the owner gets the effects; only online players are affected
+machine.protocalcore.tooltip.details=§dDetails:
+machine.protocalcore.tooltip.details.hint=§7· The effect program is stored in the machine NBT; changes apply from the next round on
+machine.protocalcore.structure=§6Structure: §e16 × 52 × 16§7, controller on the front face at (8, 49, 4); the two §eX§7 slots next to the controller take the energy hatches, §eY§7 is beacons
+machine.protocalcore.gui.button.effects=Potion effect program
+machine.protocalcore.gui.drag=Click and hold to drag this window
+machine.protocalcore.gui.effects.title=Potion effects
+machine.protocalcore.gui.effects.hint=Check/cross toggles an effect, the filter icon opens its player black/white list. Changes apply from the next round.
+machine.protocalcore.gui.effects.enable=Click to enable this effect
+machine.protocalcore.gui.effects.disable=Click to disable this effect
+machine.protocalcore.gui.effects.filter=Player black/white list
+machine.protocalcore.gui.effects.unsupported=§7This potion's id cannot be applied through the vanilla potion effect API (it would be truncated), so it cannot be enabled
+machine.protocalcore.gui.filter.title=Black/white list
+machine.protocalcore.gui.filter.toggle=Click to switch between blacklist / whitelist
+machine.protocalcore.gui.filter.mode.blacklist=Mode: blacklist (everyone outside the list gets the effect)
+machine.protocalcore.gui.filter.mode.whitelist=Mode: whitelist (only players on the list get the effect)
+machine.protocalcore.gui.filter.blacklist=Blacklisted player names (comma/space separated)
+machine.protocalcore.gui.filter.whitelist=Whitelisted player names (comma/space separated)
+machine.protocalcore.gui.filter.hint=Player names, comma/space separated, case insensitive. Empty: blacklist = everyone, whitelist = nobody. Online players only.
+machine.protocalcore.gui.status.running=Status: §aRunning
+machine.protocalcore.gui.status.idle=Status: §7Idle
+machine.protocalcore.gui.noHatch=Energy hatch: §cnone
+machine.protocalcore.gui.hatch=Energy hatch: §blevel %s§7 / §b1 A %s EU/t
+machine.protocalcore.gui.enabled=Enabled effects: §b%s
+machine.protocalcore.gui.round=Round length: §b%s§7 s
+machine.protocalcore.gui.progress=Round left: §b%s§7 / §b%s§7 s
+machine.protocalcore.gui.owner=Bound player: §b%s
+machine.protocalcore.gui.team=Team: §b%s
+machine.protocalcore.gui.team.none=none
+machine.protocalcore.gui.unknown=unknown
+machine.protocalcore.info.status=§eStatus: %s
+machine.protocalcore.info.running=§aRunning
+machine.protocalcore.info.idle=§7Idle
+machine.protocalcore.info.tier=§eEnergy hatch: §blevel %s§7 / §b1 A %s EU/t
+machine.protocalcore.info.round=§eRound: §b%s§7 s (left: §b%s§7 s)
+machine.protocalcore.info.effects=§eEnabled effects: §b%s
+machine.protocalcore.info.owner=§eBound player: §b%s§7 / team: §b%s
+GT5U.gui.text.recipe_result.protocalcore_no_energy_hatch=§cNo energy hatch
+GT5U.gui.text.recipe_result.protocalcore_energy_tier_too_low=§cEnergy hatch below EV, cannot start
+GT5U.gui.text.recipe_result.protocalcore_no_enabled_effects=§cNo potion effect enabled
 
 # --- Space Modules Infinity ---
 machine.spacemodule.parallel=Parallel

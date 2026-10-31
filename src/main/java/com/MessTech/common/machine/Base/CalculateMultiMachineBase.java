@@ -68,7 +68,7 @@ public abstract class CalculateMultiMachineBase<T extends CalculateMultiMachineB
         if (aMetaTileEntity instanceof MTEHatchUncertainty hatch) {
             addIfSmartInput(hatch);
             hatch.updateTexture(aBaseCasingIndex);
-            hatch.updateCraftingIcon(this.getMachineCraftingIcon());
+            hatch.updateCraftingIcon(this.getMachineCraftingIcon(), getBaseMetaTileEntity());
             return eUncertainHatches.add(hatch);
         }
         return false;
@@ -80,7 +80,7 @@ public abstract class CalculateMultiMachineBase<T extends CalculateMultiMachineB
         if (aMetaTileEntity instanceof MTEHatchDataInput hatch) {
             addIfSmartInput(hatch);
             hatch.updateTexture(aBaseCasingIndex);
-            hatch.updateCraftingIcon(this.getMachineCraftingIcon());
+            hatch.updateCraftingIcon(this.getMachineCraftingIcon(), getBaseMetaTileEntity());
             return eInputData.add(hatch);
         }
         return false;
@@ -91,7 +91,7 @@ public abstract class CalculateMultiMachineBase<T extends CalculateMultiMachineB
         IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
         if (aMetaTileEntity instanceof MTEHatchDataOutput hatch) {
             hatch.updateTexture(aBaseCasingIndex);
-            hatch.updateCraftingIcon(this.getMachineCraftingIcon());
+            hatch.updateCraftingIcon(this.getMachineCraftingIcon(), getBaseMetaTileEntity());
             return eOutputData.add(hatch);
         }
         return false;
@@ -102,7 +102,7 @@ public abstract class CalculateMultiMachineBase<T extends CalculateMultiMachineB
         IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
         if (aMetaTileEntity instanceof MTHatchRack rack) {
             rack.updateTexture(aBaseCasingIndex);
-            rack.updateCraftingIcon(this.getMachineCraftingIcon());
+            rack.updateCraftingIcon(this.getMachineCraftingIcon(), getBaseMetaTileEntity());
             return eRacks.add(rack);
         }
         return false;
@@ -114,7 +114,7 @@ public abstract class CalculateMultiMachineBase<T extends CalculateMultiMachineB
         if (aMetaTileEntity instanceof MTEHatchObjectHolder holder) {
             addIfSmartInput(holder);
             holder.updateTexture(aBaseCasingIndex);
-            holder.updateCraftingIcon(this.getMachineCraftingIcon());
+            holder.updateCraftingIcon(this.getMachineCraftingIcon(), getBaseMetaTileEntity());
             return eHolders.add(holder);
         }
         return false;
@@ -125,7 +125,7 @@ public abstract class CalculateMultiMachineBase<T extends CalculateMultiMachineB
         IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
         if (aMetaTileEntity instanceof MTEHatchWirelessComputationOutput hatch) {
             hatch.updateTexture(aBaseCasingIndex);
-            hatch.updateCraftingIcon(this.getMachineCraftingIcon());
+            hatch.updateCraftingIcon(this.getMachineCraftingIcon(), getBaseMetaTileEntity());
             return eWirelessComputationOutputs.add(hatch) && eOutputData.add(hatch);
         }
         return false;

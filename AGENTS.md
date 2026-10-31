@@ -82,6 +82,7 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - 15. MTReactor heat control hatch (`MTReactorHeatHatch`)
 - 16. Reactor recipes (`GTRecipes.addReactorRecipes()`)
 - 17. Beamline / particle hatch API (GT5U 5.09.54.133)
+- 18. 2.9.0 迁移：GT5U 5.09.54.205 → 5.09.54.264（GTAuthors 移除等）
 
 ### `docs/repo-readme.md` - the repo summary it started as
 - Machine base hierarchy
@@ -154,9 +155,10 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - **Looking a dependency up, in this order:** (1) the "Local reference source trees" table in
   `docs/GT5U-NOTES.md` § 0 - it lists what is already decompiled on disk, notably
   `build/rfg/minecraft-src/java/` for Forge + vanilla `net.minecraft.*` / `cpw.mods.fml.*` and
-  `tmp/GT5-Unofficial-beta3/` for the GT5U **5.09.54.133 snapshot** (note: the compile dependency is resolved
-  from the `gtnhVersion` manifest in `dependencies.gradle` and is newer - 5.09.54.205 as of 2.9.0-RC-2 - so check
-  version-sensitive APIs against the resolved jar and see `tmp/Compare.md` for what moved); (2) the rest of `tmp/`; (3) only if
+  `tmp/GT5U-264-src/` for the GT5U **5.09.54.264 snapshot**, which is what 2.9.0 resolves to (the compile
+  dependency comes from the `gtnhVersion` manifest in `dependencies.gradle`; the older
+  `tmp/GT5U-205-src/` / `tmp/GT5-Unofficial-beta3/` trees are only for diffs, see `docs/GT5U-NOTES.md` §18);
+  (2) the rest of `tmp/`; (3) only if
   neither has it, unpack or decompile the jar from the gradle cache. Do not start at (3).
 - When a check *is* asked for, prefer the narrowest thing that proves the change; do not sweep the whole
   `tools/**` tree.

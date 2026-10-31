@@ -109,6 +109,8 @@ public enum MTItemList {
     MTEssentiaHatchME,
     /** ME essentia output hatch block of the Small Essentia Smeltery (ME 源质输出仓); only set with ThE. */
     MTEssentiaOutputHatchME,
+    /** 协议核心 (Protocal Core): the beacon-tower structure on the machine template skeleton, no functionality yet. */
+    MTProtocalCore,
     /** LEG upgrade item (源质发电机升级), 10 metadata values. */
     MTEssentiaUpgrade;
 
