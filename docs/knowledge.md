@@ -1009,6 +1009,15 @@ MTMultiMachineBase<T>
   (`ModBlocks.prismarine:0`, `ModFluffBlocks.prismarineStairs:0`, `ModFluffBlocks.stone:4/5/6` =
   polished andesite/basalt/diorite, `ModFluffBlocks.stoneStairs[6]:0` = diorite brick stairs); the rest are vanilla
   blocks plus `Casings.SolidSteelMachineCasing` for the shell.
+- `G` / `K` / `L` are resolved at runtime with `common/util/MTStructureBlocks.ofBlockOrAir`: GTNH 2.9.0's shipped
+  `config/etfuturum/blocksitems.cfg` turns `enableIronTrapdoor`, `enableVanillaTrapdoors` and `enableStones` off, so
+  `ModBlocks.TRAPDOOR_DARK_OAK` / `STONE_WALL_2` / `IRON_TRAPDOOR` exist as objects but are never registered (no
+  item). Feeding such a block to StructureLib's autoplace throws `IllegalArgumentException` ("not an ItemBlock") from
+  `StructureUtility.survivalPlaceBlock`, which crashed the NEI preview (and would crash a survival build). The helper
+  therefore prefers the Et Futurum block while it has an item and otherwise takes the first placeable alternative:
+  Twilight Forest `TFBlocks.trapdoorDarkwood` (dark wood trapdoor), Botania `ModFluffBlocks.stoneWall:2` (diorite
+  wall) and registry name `malisisdoors:iron_trapdoor` (the pack's replacement for Et Futurum's); with no alternative
+  at all the position degrades to air so the structure still forms instead of throwing.
 - Skin: solid steel machine casing everywhere; the controller's front face additionally carries
   `assets/messtech/textures/blocks/iconsets/controllerFaces/ProtocolCoreOverlay.png` (registered with
   `Textures.BlockIcons.custom("messtech", ...)` in `registerIcons`, added only when `side == facing` in `getTexture`).
@@ -1074,6 +1083,7 @@ MTMultiMachineBase<T>
   the `protocolEffects` NBT compound, and the `isEffectApplyable` potion-id round-trip guard for Hodgepodge's
   `fixPotionLimit` (with EndlessIDs + Thaumcraft potions at ids >= 1000, an id above 255 gets `& 0xFF`-mangled - 1004
   becomes 236 - and the next entity tick NPEs in `PotionEffect#onUpdate`). It must keep compiling; nothing loads it.
+  It reuses the same `structure_string` / `MTStructureBlocks` fallbacks as `MTProtocolCore`, so keep both in sync.
 
 ### Blocks
 - `AssMatrixBlock` (Tier 1) / `AdvAssMatrixBlock` (Tier 2).

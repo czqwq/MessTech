@@ -1,5 +1,7 @@
 package com.MessTech.common.machine;
 
+import static com.MessTech.common.util.MTStructureBlocks.BlockCandidate;
+import static com.MessTech.common.util.MTStructureBlocks.ofBlockOrAir;
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.ofBlock;
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose;
 import static net.minecraft.util.StatCollector.translateToLocal;
@@ -58,6 +60,7 @@ import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.api.util.shutdown.ShutDownReason;
 import gregtech.common.tileentities.machines.RecipeCheckReason;
+import twilightforest.block.TFBlocks;
 import vazkii.botania.common.block.ModFluffBlocks;
 
 /**
@@ -131,6 +134,9 @@ public class MTProtocolBeacon extends MTMultiMachineBase<MTProtocolBeacon> imple
     // V = Botania diorite brick stairs, W = vanilla stone brick slab,
     // X = the hatch slots flanking the controller (lapis block as their fill),
     // Y = beacons (any block that carries a beacon tile entity).
+    // G / K / L are resolved at runtime: GTNH's default Et Futurum config disables those blocks, so they fall back to
+    // the GTNH equivalent (TF darkwood trapdoor / Botania diorite wall / MalisisDoors iron trapdoor) and finally to
+    // air - see com.MessTech.common.util.MTStructureBlocks.
     // spotless:off
     private static final String[][] structure_string = new String[][]{
         {"                ","                ","                ","                ","                ","                ","                ","                ","                ","                ","                ","                ","                ","                ","                ","                "},
@@ -198,15 +204,31 @@ public class MTProtocolBeacon extends MTMultiMachineBase<MTProtocolBeacon> imple
         .addElement('C', ofBlock(Blocks.stained_hardened_clay, 9))
         .addElement('D', ofBlock(Blocks.wool, 5))
         .addElement('E', ofBlock(Blocks.wool, 15))
-        // F-M: Et Futurum's blocks, exactly the block+meta pairs of the dump.
+        // F-M: Et Futurum's blocks, exactly the block+meta pairs of the dump. G / K / L are disabled by GTNH's default
+        // Et Futurum config, hence the runtime fallbacks (see the legend above).
         .addElement('F', ofBlock(ModBlocks.CHAIN.get(), 0))
-        .addElement('G', ofBlock(ModBlocks.TRAPDOOR_DARK_OAK.get(), 0))
+        .addElement(
+            'G',
+            ofBlockOrAir(
+                BlockCandidate.of(ModBlocks.TRAPDOOR_DARK_OAK.get(), 0),
+                BlockCandidate.of(TFBlocks.trapdoorDarkwood, 0)))
         .addElement('H', ofBlock(ModBlocks.DEEPSLATE_BRICK_WALL.get(), 0))
         .addElement('I', ofBlock(ModBlocks.DEEPSLATE_BRICKS.get(), 0))
         .addElement('J', ofBlock(ModBlocks.END_ROD.get(), 0))
-        // STONE_WALL_2 is Et Futurum's granite/diorite/andesite wall block: meta 1 is the diorite wall.
-        .addElement('K', ofBlock(ModBlocks.STONE_WALL_2.get(), 1))
-        .addElement('L', ofBlock(ModBlocks.IRON_TRAPDOOR.get(), 0))
+        // STONE_WALL_2 is Et Futurum's granite/diorite/andesite wall block: meta 1 is the diorite wall. Botania's
+        // stoneWall covers the same 1.8 stones (its meta 2 is the diorite wall).
+        .addElement(
+            'K',
+            ofBlockOrAir(
+                BlockCandidate.of(ModBlocks.STONE_WALL_2.get(), 1),
+                BlockCandidate.of(ModFluffBlocks.stoneWall, 2)))
+        // MalisisDoors' iron trapdoor is the GTNH replacement for Et Futurum's (which is why the pack turns the
+        // Et Futurum one off); MalisisDoors is not a compile dependency, so it is resolved by registry name.
+        .addElement(
+            'L',
+            ofBlockOrAir(
+                BlockCandidate.of(ModBlocks.IRON_TRAPDOOR.get(), 0),
+                BlockCandidate.named("malisisdoors:iron_trapdoor", 0)))
         .addElement('M', ofBlock(ModBlocks.SMOOTH_STONE.get(), 0))
         // N-V: Botania's 1.8 decorative blocks (their registry names carry no modid prefix in the dump). The prismarine
         // block lives on Botania's ModBlocks, passed fully qualified because Et Futurum's ModBlocks is imported above.
