@@ -16,12 +16,16 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
 
 import org.jetbrains.annotations.NotNull;
 
+import com.MessTech.common.gui.base.MTModuleMultiMachineBaseGui;
 import com.MessTech.common.machine.Base.MTModuleHatchElement;
 import com.MessTech.common.machine.Base.MTModuleMultiMachineBase;
 import com.MessTech.common.machine.Base.MTProcessingLogic;
@@ -41,6 +45,7 @@ import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.logic.ProcessingLogic;
 import gregtech.api.metatileentity.implementations.MTEHatchInput;
+import gregtech.api.modularui2.GTGuiTextures;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.RecipeMaps;
 import gregtech.api.recipe.check.CheckRecipeResult;
@@ -52,6 +57,7 @@ import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.MultiblockTooltipBuilder;
+import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 import gtPlusPlus.core.block.ModBlocks;
 import gtPlusPlus.xmod.gregtech.api.metatileentity.implementations.MTEHatchSolidifier;
 
@@ -137,6 +143,19 @@ public class MTLargeProcessingFactory extends MTModuleMultiMachineBase<MTLargePr
     @Override
     public boolean getDefaultInputSeparationMode() {
         return true;
+    }
+
+    /**
+     * No single recipe locking on this machine. {@link #getRecipeMap()} is null, so GT's {@code ParallelHelper} can
+     * never build the {@code SingleRecipeCheck} the lock is made of ({@code ParallelHelper#determineParallel}: the
+     * builder is only created for a non-null recipe map) and {@code ProcessingLogic#process} never takes its
+     * locked-recipe branch - the toggle only ever flipped the button, or the screwdriver, which is exactly what
+     * {@code MTEMultiBlockBase#onScrewdriverRightClick} spends that click on. Off, so the nine pools stay the only way
+     * to a recipe and the screwdriver is free to switch modes ({@link #onScrewdriverRightClick}).
+     */
+    @Override
+    public boolean supportsSingleRecipeLocking() {
+        return false;
     }
     // endregion
 
@@ -355,6 +374,47 @@ public class MTLargeProcessingFactory extends MTModuleMultiMachineBase<MTLargePr
         machineModeIcons.add(GTUITextures.OVERLAY_BUTTON_MACHINEMODE_LPF_METAL);
         machineModeIcons.add(GTUITextures.OVERLAY_BUTTON_MACHINEMODE_LPF_FLUID);
         machineModeIcons.add(GTUITextures.OVERLAY_BUTTON_MACHINEMODE_DEFAULT);
+    }
+
+    /**
+     * The mode switch on the screwdriver, like the original's {@code onModeChangeByScrewdriver}: metal -> fluid ->
+     * misc -> metal. Without this override that click lands in {@code MTEMultiBlockBase#onScrewdriverRightClick},
+     * which spends it on the single recipe lock - a lock that cannot even engage here (see
+     * {@link #supportsSingleRecipeLocking()}) - and the mode could then only be changed from the GUI. Switching while a
+     * recipe runs is safe: {@code setMachineMode} only schedules a check and the running recipe finishes first
+     * ({@code MTEMultiBlockBase#runMachine} only looks for a recipe once {@code mMaxProgresstime} is back at 0).
+     */
+    @Override
+    public void onScrewdriverRightClick(ForgeDirection side, EntityPlayer aPlayer, float aX, float aY, float aZ,
+        ItemStack aTool) {
+        setMachineMode(nextMachineMode());
+        if (aPlayer != null) {
+            aPlayer.addChatMessage(
+                new ChatComponentText(
+                    EnumChatFormatting.AQUA + "Mode: " + getMachineModeName(machineMode) + EnumChatFormatting.RESET));
+        }
+    }
+
+    /**
+     * The mode switch button lives in the MUI2 GUI, which draws it only while <b>its own</b> icon list is non-empty
+     * ({@code MTEMultiBlockBaseGui#createLeftPanelGapRow}); the list {@link #setMachineModeIcons()} fills belongs to
+     * the machine and is only read by the old MUI1 GUI. So the three icons go to the GUI object here - without it the
+     * machine has no control to leave the mode it was placed in, as the circuit only picks a column inside a mode. The
+     * lock-recipe button is dropped instead of being shown greyed out, since the lock can never engage on this machine
+     * (see {@link #supportsSingleRecipeLocking()}).
+     */
+    @Override
+    protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
+        return new MTModuleMultiMachineBaseGui(this) {
+
+            @Override
+            protected boolean shouldDisplayRecipeLock() {
+                return false;
+            }
+        }.withMachineModeIcons(
+            GTGuiTextures.OVERLAY_BUTTON_MACHINEMODE_LPF_METAL,
+            GTGuiTextures.OVERLAY_BUTTON_MACHINEMODE_LPF_FLUID,
+            GTGuiTextures.OVERLAY_BUTTON_MACHINEMODE_DEFAULT);
     }
     // endregion
 

@@ -323,6 +323,11 @@ MTMultiMachineBase<T>
 - Three machine modes (metal / fluid / misc) × circuit 20/21/22 select one of nine recipe maps (`POOLS`).
   `getRecipeMap()` is null and a custom `ProcessingLogic` picks the pool from the found circuit, dropping
   `CompressionTierKey` recipes like the original; `getAvailableRecipeMaps()` returns all nine for NEI.
+- The mode switch has both routes the original had: the screwdriver (`onScrewdriverRightClick`, metal → fluid → misc,
+  chat line) and the MUI2 GUI button via `getGui()` → `withMachineModeIcons(...)` (`GTGuiTextures`) - the GUI only draws
+  that button when *its* icon list is filled, while `setMachineModeIcons()`/`GTUITextures` here is the dead MUI1 list.
+  Single recipe locking is off (`supportsSingleRecipeLocking()` = false, lock button dropped): with a null recipe map
+  `ParallelHelper` never builds a `SingleRecipeCheck`, so GT's inherited screwdriver toggle could only pretend to lock.
 - Misc mode keeps the GT++ solidifier hatch: `checkRecipeForCustomHatches` feeds its mold + circuit 22 to the logic and
   `getStoredFluidsForColor` hides that hatch's own fluid from the pool search. Like the original, input separation is on
   by default (`getDefaultInputSeparationMode() = true`), so each input bus (and the solidifier hatch) is matched on its own.
