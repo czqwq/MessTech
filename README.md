@@ -19,11 +19,12 @@ If any issue happened in AutoBuild release. Please Report Bugs in the issues
 
 | GTNH Version | Start Version | Newest Support Version |                                                         Download                                                          | Maintenance status |
 |:------------:|:-------------:|:----------------------:|:-------------------------------------------------------------------------------------------------------------------------:|:------------------:|
-|  2.9.0-RC-2  |      2.5      |          3.0           |     [![1.7.0](https://img.shields.io/badge/release-v3.0-00FF00)](https://github.com/czqwq/MessTech/releases/tag/3.0)      |         ✔️         |
-|  2.9.0-RC-1  |      2.5      |          3.0           |     [![1.7.0](https://img.shields.io/badge/release-v3.0-00FF00)](https://github.com/czqwq/MessTech/releases/tag/3.0)      |         ✔️         |
-| 2.9.0-beta3  |      1,3      |      2.5-beta2(3)      | [![1.7.0](https://img.shields.io/badge/release-v2.5-FFA500)](https://github.com/czqwq/MessTech/releases/tag/2.5-beta2(3)) |     Uncertain      |
-| 2.9.0-beta2  |      1.0      |          2.3           | [![1.7.0](https://img.shields.io/badge/release-v2.5-FFA500)](https://github.com/czqwq/MessTech/releases/tag/2.5-beta2(3)) |     As I hope?     |
-| 2.9.0-beta1  |    1.3-pre    |        1.6-pre         |   [![1.7.0](https://img.shields.io/badge/release-v1.6-FF0000)](https://github.com/czqwq/MessTech/releases/tag/1.6-pre)    |       Maybe?       |
+|  2.9.0  |      3.1      |          3.3           |     [![1.7.0](https://img.shields.io/badge/release-v3.3-00FF00)](https://github.com/czqwq/MessTech/releases/tag/3.3)      |         ✔️         |
+|  2.9.0-RC-2  |      2.5      |          3.0           |     [![1.7.0](https://img.shields.io/badge/release-v3.0-00FF00)](https://github.com/czqwq/MessTech/releases/tag/3.0)      |         ❌         |
+|  2.9.0-RC-1  |      2.5      |          3.0           |     [![1.7.0](https://img.shields.io/badge/release-v3.0-00FF00)](https://github.com/czqwq/MessTech/releases/tag/3.0)      |         ❌         |
+| 2.9.0-beta3  |      1,3      |      2.5-beta2(3)      | [![1.7.0](https://img.shields.io/badge/release-v2.5-FFA500)](https://github.com/czqwq/MessTech/releases/tag/2.5-beta2(3)) |     ❌      |
+| 2.9.0-beta2  |      1.0      |          2.3           | [![1.7.0](https://img.shields.io/badge/release-v2.5-FFA500)](https://github.com/czqwq/MessTech/releases/tag/2.5-beta2(3)) |     ❌     |
+| 2.9.0-beta1  |    1.3-pre    |        1.6-pre         |   [![1.7.0](https://img.shields.io/badge/release-v1.6-FF0000)](https://github.com/czqwq/MessTech/releases/tag/1.6-pre)    |       ❌       |
 
 ### Why I write this mod
 I don't know. Maybe just for fun.Enjoy it
