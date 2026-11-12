@@ -10,6 +10,7 @@ import net.minecraft.util.ResourceLocation;
 
 import com.MessTech.common.items.MTItemList;
 import com.MessTech.init.MessTech;
+import com.dreammaster.item.NHItemList;
 
 import bartworks.common.loaders.ItemRegistry;
 import bartworks.system.material.WerkstoffLoader;
@@ -251,8 +252,9 @@ public final class MTThaumcraftResearch {
         // The empty upgrade: arcane crafting, the ingredient of all nine category upgrades.
         ItemStack broad = new ItemStack(ConfigBlocks.blockCosmeticSolid, 1, 6);
         if (Mods.NewHorizonsCoreMod.isModLoaded()) {
-            ItemStack slate = GTModHandler.getModItem(Mods.NewHorizonsCoreMod.ID, "item.ArcaneSlate", 1);
-            if (slate != null) broad = slate;
+            // The Arcane Slate (神秘石板) is registered as "ArcaneSlate" through NHItemList.registerAll(), so ask the
+            // enum for it instead of a "item.ArcaneSlate" string that no New Horizons version ever registered.
+            broad = NHItemList.ArcaneSlate.get(1);
         }
         new ResearchItem(
             UPGRADE_BLANK,
@@ -490,6 +492,11 @@ public final class MTThaumcraftResearch {
         return ItemList.Field_Generator_MV.get(1);
     }
 
+    /**
+     * Agar (琼脂): New Horizons' {@code GTNHBioItems} is a plain {@code SimpleSubItemClass} with no enum, so meta 2 can
+     * only be addressed by name. FML drops the mod id handed to {@code GameRegistry.registerItem}, so the item really
+     * does live in {@code dreamcraft:GTNHBioItems} even though the mod passes BartWorks' id.
+     */
     private static ItemStack meatDust() {
         ItemStack dust = GTOreDictUnificator.get(OrePrefixes.dust, Materials.MeatRaw, 1);
         if (Mods.NewHorizonsCoreMod.isModLoaded()) {

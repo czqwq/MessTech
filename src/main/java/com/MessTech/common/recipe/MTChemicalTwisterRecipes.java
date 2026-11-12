@@ -18,6 +18,7 @@ import goodgenerator.items.GGMaterial;
 import gregtech.api.enums.GTValues;
 import gregtech.api.enums.ItemList;
 import gregtech.api.enums.Materials;
+import gregtech.api.enums.Mods;
 import gregtech.api.enums.OrePrefixes;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.RecipeMapBackend;
@@ -270,7 +271,7 @@ public class MTChemicalTwisterRecipes {
                 Materials.SulfuricAcid.getFluid(4000),
                 Materials.PhosphoricAcid.getFluid(1000),
                 Materials.Water.getFluid(8000))
-            .itemOutputs(GTModHandler.getModItem("dreamcraft", "GTNHBioItems", 8, 2))
+            .itemOutputs(GTModHandler.getModItem(Mods.NewHorizonsCoreMod.ID, "GTNHBioItems", 8, 2))
             .specialValue(9900)
             .metadata(MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL, 1)
             .eut(RECIPE_IV)
@@ -283,7 +284,9 @@ public class MTChemicalTwisterRecipes {
                 GTUtility.copyAmountUnsafe(64 * 6, Materials.MeatRaw.getDust(64)))
             .fluidInputs(Materials.SulfuricAcid.getFluid(4000 * 64), Materials.PhosphoricAcid.getFluid(64000))
             .itemOutputs(
-                GTUtility.copyAmountUnsafe(64 * 8, GTModHandler.getModItem("dreamcraft", "GTNHBioItems", 64, 2)))
+                GTUtility.copyAmountUnsafe(
+                    64 * 8,
+                    GTModHandler.getModItem(Mods.NewHorizonsCoreMod.ID, "GTNHBioItems", 64, 2)))
             .specialValue(10800)
             .metadata(MTRecipeMaps.CHEMICAL_TWISTER_STRUCTURE_LEVEL, 1)
             .eut(RECIPE_IV)

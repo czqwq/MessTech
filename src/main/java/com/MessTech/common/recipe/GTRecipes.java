@@ -350,7 +350,7 @@ public class GTRecipes {
 
         GTValues.RA.stdBuilder()
             .itemInputs(
-                GTModHandler.getModItem("gregtech", "gt.blockmachines", 1, 2712),
+                ItemList.Hatch_Input_ME_Advanced.get(1),
                 ItemList.Electric_Pump_UHV.get(4),
                 ItemList.Electric_Piston_UHV.get(4),
                 ItemList.Emitter_UHV.get(4),
@@ -365,7 +365,7 @@ public class GTRecipes {
 
         GTValues.RA.stdBuilder()
             .itemInputs(
-                GTModHandler.getModItem("gregtech", "gt.blockmachines", 1, 2711),
+                ItemList.Hatch_Input_Bus_ME_Advanced.get(1),
                 ItemList.Conveyor_Module_IV.get(4),
                 ItemList.Robot_Arm_IV.get(4),
                 ItemList.Emitter_IV.get(4),
