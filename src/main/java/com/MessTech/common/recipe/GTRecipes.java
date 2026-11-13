@@ -4,6 +4,7 @@ import static com.MessTech.common.recipe.MTChemicalTwisterRecipes.addChemicalTwi
 import static com.MessTech.common.recipe.MTRecipeMaps.Steel_brick_Recipes;
 import static com.dreammaster.scripts.IngredientFactory.getModItem;
 import static goodgenerator.loader.Loaders.compactFusionCoil;
+import static gregtech.api.casing.Casings.AdvancedFusionCoil;
 import static gregtech.api.casing.Casings.NanochipFirewallProjectionCasing;
 import static gregtech.api.casing.Casings.NanochipMeshInterfaceCasing;
 import static gregtech.api.enums.TierEU.RECIPE_HV;
@@ -534,7 +535,7 @@ public class GTRecipes {
                 ItemList.MegaChemicalReactor.get(8),
                 ItemList.Robot_Arm_UV.get(64),
                 ItemList.Field_Generator_UV.get(16),
-                new ItemStack(compactFusionCoil, 16, 3),
+                new ItemStack(AdvancedFusionCoil.getItem(), 64,13),
                 GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UHV, 32))
             .fluidInputs(Materials.Kevlar.getMolten(1024 * 144))
             .circuit(24)
