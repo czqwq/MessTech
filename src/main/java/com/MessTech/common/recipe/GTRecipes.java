@@ -535,7 +535,7 @@ public class GTRecipes {
                 ItemList.MegaChemicalReactor.get(8),
                 ItemList.Robot_Arm_UV.get(64),
                 ItemList.Field_Generator_UV.get(16),
-                new ItemStack(AdvancedFusionCoil.getItem(), 64,13),
+                new ItemStack(AdvancedFusionCoil.getItem(), 64, 13),
                 GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UHV, 32))
             .fluidInputs(Materials.Kevlar.getMolten(1024 * 144))
             .circuit(24)
