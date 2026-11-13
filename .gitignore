@@ -10,6 +10,7 @@
 .project
 /bin/
 /.dsh-vision-router/
+/.dsh/
 /tools/
 /config/
 /crash-reports/
