@@ -506,11 +506,6 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.desc"))
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.flavour"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.header"))
-            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.frame"))
-            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.casings"))
-            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.hatches"))
-            .addSeparator()
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.header"))
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.bus"))
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.tier"))
@@ -520,12 +515,14 @@ public class BosesCraftingArray extends MTMultiMachineBase<BosesCraftingArray> i
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.nanite.astral"))
             .addSeparator()
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.header"))
-            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.energy"))
-            .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.parallel"))
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.process.overclock"))
             .addSeparator()
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.details"))
             .addInfo(translateToLocal("machine.bosescraftingarray.tooltip.details.hint"))
+            .addStructureInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.header"))
+            .addStructureInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.frame"))
+            .addStructureInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.casings"))
+            .addStructureInfo(translateToLocal("machine.bosescraftingarray.tooltip.structure.hatches"))
             .toolTipFinisher();
         return tt;
     }

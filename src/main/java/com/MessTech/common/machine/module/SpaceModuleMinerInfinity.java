@@ -669,11 +669,6 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
             .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.desc"))
             .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.flavour"))
             .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.header"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.rail"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.frame"))
-            .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.hatches"))
-            .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.header"))
             .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.distance"))
             .addInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.mining.asteroid"))
@@ -700,6 +695,8 @@ public class SpaceModuleMinerInfinity extends SpaceModuleInfinityBase<SpaceModul
                 StatCollector.translateToLocal("ig.elevator.structure.DataInputHatch"),
                 StatCollector.translateToLocal("gt.mbtt.structure.any_casing"),
                 1)
+            .addStructureInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.rail"))
+            .addStructureInfo(StatCollector.translateToLocal("machine.spacemoduleminer.tooltip.structure.hatches"))
             .addStructureInfo("")
             .addStructureFooter(StatCollector.translateToLocal("ig.elevator.structure.SharedResources"))
             .toolTipFinisher();

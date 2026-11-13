@@ -606,16 +606,8 @@ public class MTLargeEssentiaGenerator extends MTGeneratorMultiBase<MTLargeEssent
             .addInfo(translateToLocal("machine.leg.tooltip.output.header"))
             .addInfo(translateToLocal("machine.leg.tooltip.output.hatch"))
             .addInfo(translateToLocal("machine.leg.tooltip.output.overmax"))
-            .addInfo(translateToLocal("machine.leg.tooltip.output.wireless"))
-            .addSeparator()
-            .addInfo(translateToLocal("machine.leg.tooltip.structure.header"))
-            .addInfo(translateToLocal("machine.leg.tooltip.structure.cells"))
-            .addInfo(translateToLocal("machine.leg.tooltip.structure.cells.limit"))
-            .addInfo(translateToLocal("machine.leg.tooltip.structure.blocks"))
-            .addInfo(translateToLocal("machine.leg.tooltip.structure.hatches"))
             .addSeparator()
             .addInfo(translateToLocal("machine.leg.tooltip.details"))
-            .addInfo(translateToLocal("machine.leg.tooltip.details.hint"))
             .beginStructureBlock(9, 3, 9, true)
             .addController(translateToLocal("machine.leg.tooltip.controller"))
             .addCasingInfoMin(translateToLocal("machine.leg.tooltip.cells_name"), 25, true)
@@ -631,7 +623,10 @@ public class MTLargeEssentiaGenerator extends MTGeneratorMultiBase<MTLargeEssent
                 translateToLocal("machine.leg.tooltip.hatch_info"),
                 1);
         }
-        tt.addSubChannel(GTStructureChannels.LES_ESSENTIA_CELL)
+        tt.addStructureInfo(translateToLocal("machine.leg.tooltip.structure.cells"))
+            .addStructureInfo(translateToLocal("machine.leg.tooltip.structure.cells.limit"))
+            .addStructureInfo(translateToLocal("machine.leg.tooltip.structure.hatches"))
+            .addSubChannel(GTStructureChannels.LES_ESSENTIA_CELL)
             .toolTipFinisher();
         return tt;
     }

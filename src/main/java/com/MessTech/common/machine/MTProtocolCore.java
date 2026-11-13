@@ -383,7 +383,6 @@ public class MTProtocolCore extends MTMultiMachineBase<MTProtocolCore> implement
             .addSeparator()
             .addInfo(translateToLocal("machine.protocolcore.tooltip.activation"))
             .addInfo(translateToLocal("machine.protocolcore.tooltip.details"))
-            .addInfo(translateToLocal("machine.protocolcore.tooltip.details.hint"))
             .addStructureInfo(translateToLocal("machine.protocolcore.structure"))
             .toolTipFinisher();
         return tt;

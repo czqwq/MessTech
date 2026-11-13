@@ -849,7 +849,6 @@ public class MTComputingCenter extends CalculateMultiMachineBase<MTComputingCent
             .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.heat.header"))
             .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.heat.limit"))
             .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.heat.cooling"))
-            .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.heat.lock"))
             .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.power.header"))
             .addInfo(StatCollector.translateToLocal("machine.computingcenter.tooltip.power.computing"))

@@ -254,10 +254,6 @@ public class MTDBBFurnace extends MTMultiMachineBase<MTDBBFurnace>
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.desc"))
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.flavour"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.structure.header"))
-            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.structure.buses"))
-            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.structure.materials"))
-            .addSeparator()
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.mode.header"))
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.mode.switch"))
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.mode.blast"))
@@ -265,12 +261,9 @@ public class MTDBBFurnace extends MTMultiMachineBase<MTDBBFurnace>
             .addSeparator()
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.header"))
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.free"))
-            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.tier"))
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.one_tick"))
-            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.power.parallel"))
             .addSeparator()
             .addInfo(translateToLocal("machine.dbbfurnace.tooltip.details"))
-            .addInfo(translateToLocal("machine.dbbfurnace.tooltip.details.hint"))
             .toolTipFinisher();
         return tt;
     }

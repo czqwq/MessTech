@@ -511,14 +511,7 @@ public class MTSmallEssentiaSmeltery extends MTMultiMachineBase<MTSmallEssentiaS
             .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.process.duration"))
             .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.process.output"))
             .addSeparator()
-            .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.header"))
-            .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.shell"))
-            .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.constructs"))
-            .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.cells"))
-            .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.hatches"))
-            .addSeparator()
             .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.details"))
-            .addInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.details.hint"))
             .beginStructureBlock(3, 3, 9, false)
             .addController(translateToLocal("machine.smallessentiasmeltery.tooltip.controller"))
             .addCasingInfoMin(translateToLocal("machine.smallessentiasmeltery.tooltip.cell_name"), 7, true)
@@ -535,7 +528,11 @@ public class MTSmallEssentiaSmeltery extends MTMultiMachineBase<MTSmallEssentiaS
                 translateToLocal("machine.smallessentiasmeltery.tooltip.hatch_info"),
                 1);
         }
-        tt.addSubChannel(GTStructureChannels.LES_ESSENTIA_CELL)
+        tt.addStructureInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.shell"))
+            .addStructureInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.constructs"))
+            .addStructureInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.cells"))
+            .addStructureInfo(translateToLocal("machine.smallessentiasmeltery.tooltip.structure.hatches"))
+            .addSubChannel(GTStructureChannels.LES_ESSENTIA_CELL)
             .toolTipFinisher();
         return tt;
     }

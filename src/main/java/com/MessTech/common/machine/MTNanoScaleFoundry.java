@@ -1726,11 +1726,7 @@ public class MTNanoScaleFoundry extends TickableParallelismAcrossMultiMachineBas
             .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.header"))
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.enable"))
-            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.restrict"))
             .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.astral.wirecutter"))
-            .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.details"))
-            .addInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.details.hint"))
             .addStructureInfo(StatCollector.translateToLocal("machine.nanoscale.tooltip.3"))
             .toolTipFinisher();
         return tt;

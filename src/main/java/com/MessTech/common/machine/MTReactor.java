@@ -1849,17 +1849,10 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.desc"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.flavour"))
             .addSeparator()
-            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.header"))
-            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.access"))
-            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.pages"))
-            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.heat"))
-            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.tier"))
-            .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.header"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.cycle"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.heat"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.meltdown"))
-            .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.core.cooling"))
             .addSeparator()
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.power.header"))
             .addInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.power.output"))
@@ -1879,6 +1872,8 @@ public class MTReactor extends MTGeneratorMultiBase<MTReactor> implements ISurvi
                 StatCollector.translateToLocal("gt.mbtt.structure.any_casing"))
             .addMaintenanceHatch(StatCollector.translateToLocal("gt.mbtt.structure.any_casing"), 1)
             // No muffler hatch line: this machine produces no pollution and the structure never accepted one.
+            .addStructureInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.access"))
+            .addStructureInfo(StatCollector.translateToLocal("machine.mtreactor.tooltip.structure.heat"))
             .toolTipFinisher();
         return tt;
     }
