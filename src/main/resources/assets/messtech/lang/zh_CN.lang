@@ -120,6 +120,8 @@ machine.assfactory.require_tier2=装配线模式需要更高级结构方块
 machine.assfactory.error.need_tier2=装配线模式需要更高级结构方块
 machine.assfactory.error.need_data_access=装配线模式至少需要一个数据访问仓
 mt.recipe.assfactory.assemblyline=全能原初装配矩阵-装配线
+mt.recipe.assfactory.circuit_conflict.line1=§c检测到冲突§7:
+mt.recipe.assfactory.circuit_conflict.line2=分配电路板 §b%d§7 来制作该配方.
 
 # --- Assembly Matrix Blocks ---
 tile.AssMatrixBlock.name=装配矩阵方块

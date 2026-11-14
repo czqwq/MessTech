@@ -693,6 +693,32 @@ MTMultiMachineBase<T>
   ingredients may sit in any bus in any order, "A or B" satisfied by whichever is there. That list then runs the normal
   `ProcessingLogic` pipeline: parallels, perfect overclock, void protection, debug/ME buses and consumption stay shared
   code.
+- Assembly Line **recipe conflict solver** (`MTAssemblyLineConflictSolver`, run from
+  `MTRecipeMaps#populateAssFactoryAssemblyLineRecipes` before the NEI pages are built). The unordered pool makes a
+  definition whose ingredients are contained in another one's input list match while the player loaded the bigger
+  recipe: with `{D,A,B,C}`, `{A,B,C}` and `{E,B,A,C}` registered, loading the first recipe's materials also satisfies
+  `{A,B,C}`, and the matcher's cheap-EU/t-first order let it run and leave `D` behind ("串配方"). The solver simulates
+  each definition as a loaded pool - item amounts as the definition asks, one variant per alternative choice and per
+  single-slot substitution (`mOreDictAlt`), fluids included - and asks `MTAssemblyLineMatcher#materialise` which other
+  definitions the pool also satisfies. Every definition on either side of a conflict pair is marked, connected groups
+  get GT programming circuits `1..24` (`ItemIntegratedCircuit#MAX_CIRCUIT_NUMBER`; smallest groups first, registration
+  order inside a group, so the assignment is deterministic and identical on client and server); groups that no longer
+  fit 24 stay without a circuit.
+- A conflicted definition only matches while an input bus carries its number in the **ghost circuit slot**: GT5U
+  stores that slot's stack with size 0 (`MetaTileEntity#setInventorySlotContents`) and the ME/compressed buses expose
+  it through `getStackInSlot` inside the recipe-processing window, so `MTAssFactory#selectorCircuits` scans each bus'
+  slots highest-first and collects the zero-sized integrated circuits (`GTUtility.isAnyIntegratedCircuit`; a physical
+  circuit stack in a stock slot is an ingredient and stays ignored). `MTAssemblyLineMatcher#materialise` also appends
+  `GTUtility.getIntegratedCircuit(N)` - stack size 0, the same "present but never consumed" convention as
+  `GTRecipeBuilder#circuit` - so the materialised recipe carries its selector. Candidates sort by required item count
+  (most first) then EU/t: for the groups without a circuit number the bigger recipe keeps the run, and for
+  unambiguous matches only one candidate can match anyway.
+- NEI pages show the assignment with `MTRecipeMaps#ASS_FACTORY_CONFLICT_CIRCUIT`, a `RecipeMetadataKey` drawn in the
+  description area (like the Chemical Twister's structure level): two lines,
+  `mt.recipe.assfactory.circuit_conflict.line1/line2`, "检测到冲突: 分配电路板 N 来制作该配方." The pool height is 130
+  so three generic description lines plus those two fit. The solver logs definition count, conflicting recipes, group
+  count, circuit count and elapsed time; groups skipped by the 24 limit and truncated supply-variant scans are warned
+  about.
 - Front texture: Advanced Molecular Casing base + Quantum Force Transformer face overlay; tooltips mention modes, data
   access, energy tier limit.
 

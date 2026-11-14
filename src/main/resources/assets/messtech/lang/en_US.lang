@@ -120,6 +120,8 @@ machine.assfactory.require_tier2=Assembly Line mode requires higher structure le
 machine.assfactory.error.need_tier2=Assembly Line mode requires higher structure level
 machine.assfactory.error.need_data_access=Assembly Line mode requires at least one Data Access hatch
 mt.recipe.assfactory.assemblyline=Omni-Primordial Assembly Matrix:Assembly Line
+mt.recipe.assfactory.circuit_conflict.line1=§cConflict detected§7:
+mt.recipe.assfactory.circuit_conflict.line2=Use circuit board §b%d§7.
 
 # --- Assembly Matrix Blocks ---
 tile.AssMatrixBlock.name=Assembly Matrix Block

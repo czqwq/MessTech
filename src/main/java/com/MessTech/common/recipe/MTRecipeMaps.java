@@ -127,6 +127,30 @@ public final class MTRecipeMaps {
         }
     }
 
+    /**
+     * Programming circuit a conflicting Assembly Line definition was assigned by
+     * {@link MTAssemblyLineConflictSolver}: the definition only runs while an input bus' ghost circuit slot carries
+     * that number. Metadata keys draw their own NEI line in the description area, the same way the Chemical Twister's
+     * structure level does, so the page tells the player which circuit to set.
+     */
+    public static final RecipeMetadataKey<Integer> ASS_FACTORY_CONFLICT_CIRCUIT = new AssFactoryConflictCircuitKey();
+
+    public static final class AssFactoryConflictCircuitKey extends RecipeMetadataKey<Integer> {
+
+        private AssFactoryConflictCircuitKey() {
+            super(Integer.class, "mt_assfactory_conflict_circuit");
+        }
+
+        @Override
+        public void drawInfo(RecipeDisplayInfo recipeInfo, @Nullable Object value) {
+            // Two lines: the full sentence does not fit one 166px NEI page line, and the language files should not
+            // have to split it by hand.
+            recipeInfo.drawText(StatCollector.translateToLocal("mt.recipe.assfactory.circuit_conflict.line1"));
+            recipeInfo.drawText(
+                StatCollector.translateToLocalFormatted("mt.recipe.assfactory.circuit_conflict.line2", cast(value, 1)));
+        }
+    }
+
     /** Fake recipe pool for the Computing Center (Nano Computing mode), with its own NEI/frontend registration. */
     public static final RecipeMap<RecipeMapBackend> computingCenterFakeRecipes = RecipeMapBuilder
         .of("mt.recipe.computingcenter")
@@ -176,7 +200,9 @@ public final class MTRecipeMaps {
         .neiTransferRect(124, 8, 18, 72)
         .neiTransferRect(142, 26, 18, 18)
         .frontend(AssemblyLineFrontend::new)
-        .neiHandlerInfo(builder -> builder.setHeight(110))
+        // Three description lines (total power, EU/t, duration) plus the two conflict circuit lines: the generic
+        // description starts at y = 74, so 130 keeps five text lines inside the page.
+        .neiHandlerInfo(builder -> builder.setHeight(130))
         .build();
 
     /**
@@ -203,6 +229,15 @@ public final class MTRecipeMaps {
     public static void populateAssFactoryAssemblyLineRecipes() {
         assFactoryAssemblyLineRecipes.getBackend()
             .clearRecipes();
+        // The unordered match lets a definition whose ingredients fit inside another one's input list steal its run;
+        // the solver finds those definitions and hands each conflict group its own programming circuits, which the
+        // pages below then display. Recomputed on every populate call, i.e. after every recipe loader has run. A
+        // failure here must not abort world load: the machine simply keeps the pre-solver behaviour.
+        try {
+            MTAssemblyLineConflictSolver.solve();
+        } catch (RuntimeException e) {
+            MessTech.MT_LOG.error("[AssFactory] Assembly Line conflict solver failed, no circuits assigned", e);
+        }
 
         int definitions = 0;
         int displayed = 0;
@@ -224,12 +259,13 @@ public final class MTRecipeMaps {
     /**
      * Registers the single NEI page of one Assembly Line definition: fake, per-slot alternatives kept so NEI cycles
      * through them, collision checking off (every definition is a page of its own), the flash drive in the special
-     * slot.
+     * slot. A definition the conflict solver pulled out of the plain pool also carries its assigned programming
+     * circuit as page metadata, which draws the "conflict detected" line in the description area.
      *
      * @return whether the page was registered.
      */
     private static boolean addAssemblyLineDisplayRecipe(GTRecipe.RecipeAssemblyLine recipe) {
-        Collection<GTRecipe> added = GTValues.RA.stdBuilder()
+        GTRecipeBuilder builder = GTValues.RA.stdBuilder()
             .itemInputs(displayInputSpec(recipe.mInputs, recipe.mOreDictAlt))
             .itemOutputs(recipe.mOutput)
             .fluidInputs(MTAssemblyLineMatcher.nonNullFluids(recipe.mFluidInputs))
@@ -237,8 +273,12 @@ public final class MTRecipeMaps {
             .eut(recipe.mEUt)
             .duration(recipe.mDuration)
             .fake()
-            .ignoreCollision()
-            .addTo(assFactoryAssemblyLineRecipes);
+            .ignoreCollision();
+        Integer circuit = MTAssemblyLineConflictSolver.circuitFor(recipe);
+        if (circuit != null) {
+            builder.metadata(ASS_FACTORY_CONFLICT_CIRCUIT, circuit);
+        }
+        Collection<GTRecipe> added = builder.addTo(assFactoryAssemblyLineRecipes);
         if (added.isEmpty()) {
             MessTech.MT_LOG.warn(
                 "[AssFactory] Assembly Line NEI page for {} was refused by assFactoryAssemblyLineRecipes",

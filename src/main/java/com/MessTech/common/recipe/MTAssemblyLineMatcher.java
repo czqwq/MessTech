@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
@@ -32,30 +33,79 @@ import gregtech.api.util.GTUtility;
  * against the current pool on demand: every slot picks the alternative leaving the most parallels for the whole
  * definition, and that concrete ingredient list goes to the ordinary GT recipe pipeline (parallels, overclock, void
  * protection, ME buses, input consumption), which matches and consumes it against the same pool.
+ * <p>
+ * Because the pool is shared, a definition whose ingredients fit inside another one's input list would also match
+ * while the player loaded the bigger recipe - see {@link MTAssemblyLineConflictSolver}, which pulls every such
+ * definition out of the plain pool and gives it a GT programming circuit. A definition carrying an assigned number
+ * only matches while an input bus' ghost circuit slot carries that number: GT5U stores the slot with stack size 0, the
+ * same "non-consumed input" marker the recipe gets appended as {@code GTUtility.getIntegratedCircuit(N)}. Candidates
+ * are then ordered by specificity (most required items first), so a bigger recipe wins over a smaller one even for a
+ * conflict group that exceeded the 24 circuit numbers.
  */
 public final class MTAssemblyLineMatcher {
+
+    /**
+     * Candidate order: more required item count first, then more input slots, then cheapest EU/t. The first key is the
+     * fallback for conflict groups without a circuit number - a definition whose ingredients are contained in another
+     * one's always asks for fewer items, so the bigger recipe keeps the run. For unambiguous matches only one
+     * definition can match anyway and the order does not matter.
+     */
+    private static final Comparator<GTRecipe.RecipeAssemblyLine> SPECIFICITY_FIRST = (left, right) -> {
+        final long leftRequired = requiredItemCount(left);
+        final long rightRequired = requiredItemCount(right);
+        if (leftRequired != rightRequired) return Long.compare(rightRequired, leftRequired);
+        final int leftSlots = inputSlotCount(left);
+        final int rightSlots = inputSlotCount(right);
+        if (leftSlots != rightSlots) return Integer.compare(rightSlots, leftSlots);
+        return Integer.compare(left.mEUt, right.mEUt);
+    };
 
     private MTAssemblyLineMatcher() {}
 
     /**
-     * Every definition the pool can satisfy, cheapest EU/t first so the caller's recipe search takes the one a player
-     * would expect; definitions whose slots cannot all be filled are left out.
+     * Every definition the pool can satisfy in specificity order, so the caller's recipe search takes the one a player
+     * would expect; definitions whose slots cannot all be filled are left out, and so are definitions whose conflict
+     * circuit is not set in an input bus. {@code selectors} is the set of programming circuit numbers the machine's
+     * input buses carry in their ghost circuit slots (see {@code MTAssFactory}'s reader).
      */
-    public static Stream<GTRecipe> matches(Collection<GTRecipe.RecipeAssemblyLine> definitions, ItemStack[] pool) {
+    public static Stream<GTRecipe> matches(Collection<GTRecipe.RecipeAssemblyLine> definitions, ItemStack[] pool,
+        Set<Integer> selectors) {
         if (definitions == null || definitions.isEmpty()) return Stream.empty();
         Map<GTUtility.ItemId, Long> availability = poolOf(pool);
         return definitions.stream()
-            .sorted(Comparator.comparingInt(definition -> definition.mEUt))
+            .filter(definition -> allowsCircuit(MTAssemblyLineConflictSolver.circuitFor(definition), selectors))
+            .sorted(SPECIFICITY_FIRST)
             .map(definition -> materialise(definition, availability))
             .filter(Objects::nonNull);
+    }
+
+    /** Whether a definition without an assigned circuit may run, or the bus offers the one it was given. */
+    private static boolean allowsCircuit(@Nullable Integer circuit, @Nullable Set<Integer> circuits) {
+        return circuit == null || (circuits != null && circuits.contains(circuit));
+    }
+
+    /** The total amount of items one definition asks for, the "specificity" of its input list. */
+    private static long requiredItemCount(GTRecipe.RecipeAssemblyLine definition) {
+        if (definition.mInputs == null) return 0;
+        long required = 0;
+        for (ItemStack ingredient : definition.mInputs) {
+            if (ingredient != null && ingredient.stackSize > 0) required += ingredient.stackSize;
+        }
+        return required;
+    }
+
+    private static int inputSlotCount(GTRecipe.RecipeAssemblyLine definition) {
+        return definition.mInputs == null ? 0 : definition.mInputs.length;
     }
 
     /**
      * Every input stack as one pool of {@code item -> amount}. Each stack is also filed under its wildcard-damage
      * alias, because a definition slot may ask for any damage value of an item; NBT stays out of the keys, matching how
-     * the recipe pipeline compares an ingredient with the stored stacks.
+     * the recipe pipeline compares an ingredient with the stored stacks. Non-positive stacks (the ghost circuit slot's
+     * selectors) are not ingredients and stay out. Shared with {@link MTAssemblyLineConflictSolver}, so the solver
+     * simulates exactly the pool this matcher reads.
      */
-    private static Map<GTUtility.ItemId, Long> poolOf(@Nullable ItemStack[] pool) {
+    static Map<GTUtility.ItemId, Long> poolOf(@Nullable ItemStack[] pool) {
         Map<GTUtility.ItemId, Long> availability = new HashMap<>();
         if (pool == null) return availability;
         for (ItemStack stack : pool) {
@@ -69,15 +119,20 @@ public final class MTAssemblyLineMatcher {
 
     /**
      * One definition as a concrete recipe against the given pool, or null when a slot cannot be filled. The amounts are
-     * the definition's; the pool is only read.
+     * the definition's; the pool is only read. A definition that the conflict solver gave a programming circuit also
+     * gets {@code GTUtility.getIntegratedCircuit(N)} appended - GT5U's own circuit convention: stack size 0 means "must
+     * be present, never consumed" ({@code GTRecipeBuilder#circuit} builds them the same way).
      */
     @Nullable
-    private static GTRecipe materialise(GTRecipe.RecipeAssemblyLine definition, Map<GTUtility.ItemId, Long> pool) {
+    static GTRecipe materialise(GTRecipe.RecipeAssemblyLine definition, Map<GTUtility.ItemId, Long> pool) {
         if (definition.mOutput == null || definition.mInputs == null || definition.mInputs.length == 0) return null;
         if (definition.mEUt < 0 || definition.mDuration <= 0) return null;
 
         List<ItemStack> ingredients = chooseIngredients(definition, pool);
         if (ingredients == null) return null;
+
+        Integer circuit = MTAssemblyLineConflictSolver.circuitFor(definition);
+        if (circuit != null) ingredients.add(GTUtility.getIntegratedCircuit(circuit));
 
         return GTRecipeBuilder.builder()
             .itemInputsUnsafe(ingredients.toArray(new ItemStack[0]))

@@ -7,7 +7,9 @@ import static com.gtnewhorizon.structurelib.structure.StructureUtility.transpose
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import javax.annotation.Nonnull;
@@ -46,6 +48,7 @@ import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.logic.ProcessingLogic;
 import gregtech.api.metatileentity.implementations.MTEHatch;
 import gregtech.api.metatileentity.implementations.MTEHatchDataAccess;
+import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
@@ -54,6 +57,7 @@ import gregtech.api.structure.error.StructureError;
 import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.AssemblyLineUtils;
 import gregtech.api.util.GTRecipe;
+import gregtech.api.util.GTUtility;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.IGTHatchAdder;
 import gregtech.api.util.MultiblockTooltipBuilder;
@@ -350,7 +354,7 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
             @Override
             protected @NotNull Stream<GTRecipe> findRecipeMatches(@Nullable RecipeMap<?> map) {
                 if (machineMode != 1) return super.findRecipeMatches(map);
-                return MTAssemblyLineMatcher.matches(allowedAssemblyRecipes, inputItems);
+                return MTAssemblyLineMatcher.matches(allowedAssemblyRecipes, inputItems, selectorCircuits());
             }
 
             @Override
@@ -377,6 +381,32 @@ public class MTAssFactory extends MTMultiMachineBase<MTAssFactory> implements IS
                 return super.process();
             }
         }.setMaxParallelSupplier(this::getLimitedMaxParallel);
+    }
+
+    /**
+     * Programming circuit numbers set in the input buses' ghost circuit slots, read the way GT5U stores them: a bus'
+     * circuit slot holds the configured integrated circuit with stack size 0 (the plain bus and the ME/compressed buses
+     * all expose it through {@code getStackInSlot}, the ME ones only inside the recipe-processing window this runs in;
+     * {@code MetaTileEntity#setInventorySlotContents} writes the 0 there). Physical circuit stacks in the stock slots
+     * are recipe ingredients and never selectors.
+     * <p>
+     * The scan walks the slots highest first because a bus' circuit slot is one of its last slots - for the ME buses it
+     * is a virtual slot in front of the stock slots - and stops at the first zero-sized integrated circuit, so one bus
+     * contributes at most one number.
+     */
+    private Set<Integer> selectorCircuits() {
+        Set<Integer> circuits = null;
+        for (MTEHatchInputBus bus : GTUtility.filterValidMTEs(mInputBusses)) {
+            if (bus == null) continue;
+            for (int slot = bus.getSizeInventory() - 1; slot >= 0; slot--) {
+                ItemStack stack = bus.getStackInSlot(slot);
+                if (stack == null || stack.stackSize != 0 || !GTUtility.isAnyIntegratedCircuit(stack)) continue;
+                if (circuits == null) circuits = new HashSet<>(4);
+                circuits.add(stack.getItemDamage());
+                break;
+            }
+        }
+        return circuits == null ? Collections.emptySet() : circuits;
     }
 
     /** Tier fetcher for StructureLib's {@code StructureUtility#ofBlocksTiered}, element 'I'. */
