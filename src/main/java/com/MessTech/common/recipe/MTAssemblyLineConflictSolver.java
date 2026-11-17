@@ -235,7 +235,7 @@ public final class MTAssemblyLineConflictSolver {
     // region Conflict detection
 
     /** The definitions the NEI pages are built for too: a null output, no inputs, negative EU/t or no duration. */
-    private static List<GTRecipe.RecipeAssemblyLine> loadableDefinitions() {
+    static List<GTRecipe.RecipeAssemblyLine> loadableDefinitions() {
         final List<GTRecipe.RecipeAssemblyLine> definitions = new ArrayList<>(
             GTRecipe.RecipeAssemblyLine.sAssemblylineRecipes.size());
         for (GTRecipe.RecipeAssemblyLine definition : GTRecipe.RecipeAssemblyLine.sAssemblylineRecipes) {
@@ -274,7 +274,7 @@ public final class MTAssemblyLineConflictSolver {
      * The stacks a player can put into one slot: the definition's ingredient plus every alternative it accepts. They
      * are deduplicated because GT's own builder usually repeats the first alternative in {@code mInputs}.
      */
-    private static List<ItemStack> slotChoices(GTRecipe.RecipeAssemblyLine definition, int slot) {
+    static List<ItemStack> slotChoices(GTRecipe.RecipeAssemblyLine definition, int slot) {
         final List<ItemStack> choices = new ArrayList<>(4);
         addChoice(choices, definition.mInputs[slot]);
         final ItemStack[][] alternatives = definition.mOreDictAlt;
@@ -301,9 +301,10 @@ public final class MTAssemblyLineConflictSolver {
 
     /**
      * The item pools a player can load for one definition: the primary choice of every slot, then one variant per
-     * single-slot alternative so {@code mOreDictAlt} slots are not all forced onto their first choice.
+     * single-slot alternative so {@code mOreDictAlt} slots are not all forced onto their first choice. Shared with
+     * {@code MTAssemblyLineProbe}, which feeds the same variants to the matcher.
      */
-    private static SupplyVariants supplyVariants(GTRecipe.RecipeAssemblyLine definition) {
+    static SupplyVariants supplyVariants(GTRecipe.RecipeAssemblyLine definition) {
         final int slots = definition.mInputs.length;
         final List<List<ItemStack>> choices = new ArrayList<>(slots);
         for (int slot = 0; slot < slots; slot++) choices.add(slotChoices(definition, slot));
@@ -338,7 +339,7 @@ public final class MTAssemblyLineConflictSolver {
      * real stack of it, so the simulation uses one item.
      */
     @Nullable
-    private static ItemStack supplyStack(@Nullable ItemStack recipeStack) {
+    static ItemStack supplyStack(@Nullable ItemStack recipeStack) {
         if (recipeStack == null) return null;
         if (recipeStack.stackSize > 0) return GTUtility.copy(recipeStack);
         return GTUtility.copyAmount(1, recipeStack);
@@ -369,7 +370,7 @@ public final class MTAssemblyLineConflictSolver {
         return true;
     }
 
-    private record SupplyVariants(List<ItemStack[]> variants, boolean truncated) {}
+    record SupplyVariants(List<ItemStack[]> variants, boolean truncated) {}
 
     // endregion
 

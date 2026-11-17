@@ -20,6 +20,7 @@ import com.MessTech.common.machine.loaders.MTMachineLoader;
 import com.MessTech.common.network.MTNetwork;
 import com.MessTech.common.parts.PartUltimatePatternTerminal;
 import com.MessTech.common.process.MTProcessHandler;
+import com.MessTech.common.recipe.MTAssemblyLineProbe;
 import com.MessTech.common.recipe.MTChemicalTwisterRecipes;
 import com.MessTech.common.recipe.MTCombProcessingRecipes;
 import com.MessTech.common.recipe.MTRecipeMaps;
@@ -196,6 +197,10 @@ public class CommonProxy implements IGuiHandler {
         if (Mods.VendingMachine.isModLoaded()) {
             MTVendingMachineRecipes.register();
         }
+        // Dev regression probe: no-op unless a `messtech-probe.enabled` marker file sits in the working directory. It
+        // re-runs the Assembly Line pool, exercises conflict circuits through a Crafting Input Buffer and the Wetware
+        // Mainframe recipe family, then shuts the server down (see MTAssemblyLineProbe).
+        MTAssemblyLineProbe.runIfRequested();
     }
 
     public void serverStopped(FMLServerStoppedEvent event) {

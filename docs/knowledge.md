@@ -704,15 +704,31 @@ MTMultiMachineBase<T>
   get GT programming circuits `1..24` (`ItemIntegratedCircuit#MAX_CIRCUIT_NUMBER`; smallest groups first, registration
   order inside a group, so the assignment is deterministic and identical on client and server); groups that no longer
   fit 24 stay without a circuit.
-- A conflicted definition only matches while an input bus carries its number in the **ghost circuit slot**: GT5U
-  stores that slot's stack with size 0 (`MetaTileEntity#setInventorySlotContents`) and the ME/compressed buses expose
-  it through `getStackInSlot` inside the recipe-processing window, so `MTAssFactory#selectorCircuits` scans each bus'
-  slots highest-first and collects the zero-sized integrated circuits (`GTUtility.isAnyIntegratedCircuit`; a physical
-  circuit stack in a stock slot is an ingredient and stays ignored). `MTAssemblyLineMatcher#materialise` also appends
-  `GTUtility.getIntegratedCircuit(N)` - stack size 0, the same "present but never consumed" convention as
-  `GTRecipeBuilder#circuit` - so the materialised recipe carries its selector. Candidates sort by required item count
-  (most first) then EU/t: for the groups without a circuit number the bigger recipe keeps the run, and for
-  unambiguous matches only one candidate can match anyway.
+- A conflicted definition only matches while the machine offers its number as a **programming circuit selector**.
+  `MTAssemblyLineCircuitSelectors` collects them from all three places GT5U keeps a configured circuit, always the
+  zero-sized integrated circuit (`stackSize == 0`, `GTUtility.isAnyIntegratedCircuit`); a physical circuit stack is a
+  recipe ingredient and stays ignored:
+  - an ordinary input bus' ghost circuit slot (the ME/compressed buses expose it through `getStackInSlot` inside the
+    recipe-processing window; the scan walks the highest slots first, one number per bus);
+  - a dual input hatch's own circuit slot (`IConfigurationCircuitSupport`; e.g. the Crafting Input Buffer's ghost
+    circuit). `MTEMultiBlockBase#doCheckRecipe` routes such hatches into `mDualInputHatches`, **not** `mInputBusses`;
+  - zero-sized integrated circuits among the recipe check's current input items: GT5U adds an `IDualInputHatch`'s
+    shared items - its circuit slot included - to that array (`doCheckRecipe`, and the pattern cache through
+    `getPatternInputs`), which is also how a Crafting Input Buffer machine's circuit reaches the matcher.
+    (Issue #12: the first version scanned only `mInputBusses`, so every conflict-gated recipe silently matched nothing
+    on a CRIB-fed machine - `MTAssemblyLineProbe` shows bus-only selectors 0/24 vs item-based 24/24.)
+  `MTAssemblyLineMatcher#materialise` also appends `GTUtility.getIntegratedCircuit(N)` - stack size 0, the same
+  "present but never consumed" convention as `GTRecipeBuilder#circuit` - so the materialised recipe carries its
+  selector. Candidates sort by required item count (most first) then EU/t: for the groups without a circuit number the
+  bigger recipe keeps the run, and for unambiguous matches only one candidate can match anyway.
+- `MTAssemblyLineProbe` (dev regression probe, no effect unless enabled): put a `messtech-probe.enabled` file into the
+  server working directory and start the dev server
+  (`./gradlew runServer -PrunServerWorkingDirectory=run/probe-server --no-configuration-cache`); at
+  `FMLServerStartedEvent` it re-runs the Assembly Line pool and checks, logging `[ALProbe]` lines and shutting the
+  server down afterwards: every conflict-gated recipe fed through a simulated Crafting Input Buffer input array (with
+  and without the input-item selector source), every alternative variant of the Wetware Mainframe definition, and
+  self-materialisation + parallel acceptance of all definitions. The 8 definitions it reports as unmatchable have null
+  ingredients registered by addons (broken recipes, unmatchable in GT's own Assembly Line too).
 - NEI pages show the assignment with `MTRecipeMaps#ASS_FACTORY_CONFLICT_CIRCUIT`, a `RecipeMetadataKey` drawn in the
   description area (like the Chemical Twister's structure level): two lines,
   `mt.recipe.assfactory.circuit_conflict.line1/line2`, "检测到冲突: 分配电路板 N 来制作该配方." The pool height is 130
