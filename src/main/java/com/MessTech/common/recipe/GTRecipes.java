@@ -684,15 +684,11 @@ public class GTRecipes {
     }
 
     /**
-     * The Comprehensive Mining Plant, built from the structure it is made of plus the two GT machines whose behaviour
-     * it combines: the tower's casing, frames, metal blocks, advanced casing and High Power Casing, a ring of eight IV
-     * fluid drilling rigs and one LuV Void Miner I. The Void Miner I is read from BartWorks' own registry list
-     * ({@code ItemRegistry.voidminer[0]}); the source mod instead scanned {@code GregTechAPI.METATILEENTITIES} for the
-     * {@code MTEVoidMiners$VMLUV} class name, which the registry makes unnecessary.
-     * <p>
-     * The counts follow the structure: 8 A (Steel Gearbox Casing), 4 B (Steel Frame), 19 C (Tritanium Frame), 7 D (HSLA
-     * Steel Block), 4 E (Steel Block), 8 G (Rebolted Naquadah Casing). F (High Power Casing, 19 positions) is taken as
-     * 16 because the hatches use part of it.
+     * The Comprehensive Mining Plant: a LuV hull carrying the tower's frames and metal blocks, its advanced casing ring
+     * and High Power Casing, eight oil drilling rigs and one Void Miner I as the functional core. The Void Miner I is
+     * read from BartWorks' own registry list ({@code ItemRegistry.voidminer[0]}); the source mod instead scanned
+     * {@code GregTechAPI.METATILEENTITIES} for the {@code MTEVoidMiners$VMLUV} class name, which the registry makes
+     * unnecessary.
      */
     private static void addComprehensiveMiningPlantRecipe() {
         // BartWorks fills its lists in GT's preInit, long before this mod's recipe load, but a missing entry must not

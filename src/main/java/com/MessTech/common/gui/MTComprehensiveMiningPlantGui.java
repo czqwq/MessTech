@@ -1,5 +1,6 @@
 package com.MessTech.common.gui;
 
+import static net.minecraft.util.StatCollector.canTranslate;
 import static net.minecraft.util.StatCollector.translateToLocal;
 import static net.minecraft.util.StatCollector.translateToLocalFormatted;
 
@@ -25,9 +26,12 @@ import com.cleanroommc.modularui.value.sync.StringSyncValue;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
+import com.cleanroommc.modularui.widgets.slot.ItemSlot;
+import com.cleanroommc.modularui.widgets.slot.ModularSlot;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 
 import gregtech.api.modularui2.GTGuiTextures;
+import gtneioreplugin.util.DimensionHelper;
 
 /**
  * Controller GUI for the Comprehensive Mining Plant. The default terminal text widget is replaced on purpose - the
@@ -40,9 +44,12 @@ import gregtech.api.modularui2.GTGuiTextures;
  * ({@code PanelSyncManager#detectAndSendChanges} runs there), which is why no translated text may come from the
  * machine.
  * <p>
- * The button column drops the controller slot (nothing to put there) and otherwise mirrors the base one: power switch,
- * structure update button and the screwdriver button that opens the parallel settings sub panel instead; those settings
- * apply on the next start of the machine, as in the source mod.
+ * The button column mirrors the base one - power switch, structure update button, the screwdriver button that opens the
+ * parallel settings sub panel (those settings apply on the next start of the machine, as in the source mod) - and also
+ * keeps the controller's special slot.
+ * <p>
+ * That special slot is where an EOH dimension marker (维度标记) goes: the machine then mines the marker's dimension, so
+ * the GUI shows the effective dimension next to the status line and accepts the marker in the slot.
  */
 public class MTComprehensiveMiningPlantGui extends MTMultiMachineBaseGui<MTComprehensiveMiningPlant> {
 
@@ -66,6 +73,8 @@ public class MTComprehensiveMiningPlantGui extends MTMultiMachineBaseGui<MTCompr
         syncManager.syncValue("cmpOreSpeed", new LongSyncValue(multiblock::getOrePerSecond));
         syncManager.syncValue("cmpFluidCount", new IntSyncValue(multiblock::getFluidTypeCount));
         syncManager.syncValue("cmpEmptyDim", new BooleanSyncValue(multiblock::isDimensionEmpty));
+        // Raw GalacticGreg dimension name of the dimension being mined; localized client side.
+        syncManager.syncValue("cmpMiningDim", new StringSyncValue(multiblock::getMiningDimensionName));
         // One raw "fluidRegistry|mB/s" line per visible row, localized client side.
         for (int i = 0; i < MTComprehensiveMiningPlant.FLUID_LINE_COUNT; i++) {
             final int index = i;
@@ -88,6 +97,7 @@ public class MTComprehensiveMiningPlantGui extends MTMultiMachineBaseGui<MTCompr
         LongSyncValue oreSpeed = syncManager.findSyncHandler("cmpOreSpeed", LongSyncValue.class);
         IntSyncValue fluidCount = syncManager.findSyncHandler("cmpFluidCount", IntSyncValue.class);
         BooleanSyncValue emptyDimension = syncManager.findSyncHandler("cmpEmptyDim", BooleanSyncValue.class);
+        StringSyncValue miningDimension = syncManager.findSyncHandler("cmpMiningDim", StringSyncValue.class);
 
         ListWidget<IWidget, ?> list = new ListWidget<>().fullWidth()
             .crossAxisAlignment(Alignment.CrossAxis.START)
@@ -99,6 +109,11 @@ public class MTComprehensiveMiningPlantGui extends MTMultiMachineBaseGui<MTCompr
                         translateToLocal(
                             running.getBoolValue() ? "machine.comprehensiveminingplant.status.running"
                                 : "machine.comprehensiveminingplant.status.idle"))))
+            .child(
+                line(
+                    () -> translateToLocalFormatted(
+                        "machine.comprehensiveminingplant.gui.override",
+                        dimensionDisplayName(miningDimension.getStringValue()))))
             .child(line(() -> translateToLocal("machine.comprehensiveminingplant.gui.power")));
 
         list.child(
@@ -160,6 +175,19 @@ public class MTComprehensiveMiningPlantGui extends MTMultiMachineBaseGui<MTCompr
         return translateToLocalFormatted("machine.comprehensiveminingplant.gui.fluidLine", name, rate / 1000L);
     }
 
+    /**
+     * The localizable name of one raw dimension name. Runs client side; the raw value is a GalacticGreg dimension
+     * name, which the pack localizes under {@code gtnop.world.<name>} (e.g. {@code gtnop.world.horus}).
+     */
+    private static String dimensionDisplayName(String internalName) {
+        if (internalName == null || internalName.isEmpty()) {
+            return translateToLocal("machine.comprehensiveminingplant.gui.override.unknown");
+        }
+        String key = DimensionHelper.getDimUnlocalizedName(internalName);
+        if (canTranslate(key)) return translateToLocal(key);
+        return internalName;
+    }
+
     /** A terminal text line: full width, small gap below, text supplied per frame. */
     private static IWidget line(Supplier<String> text) {
         return IKey.dynamic(text)
@@ -169,10 +197,9 @@ public class MTComprehensiveMiningPlantGui extends MTMultiMachineBaseGui<MTCompr
     }
 
     /**
-     * The machine has no item inventory (no controller slot to tool), so the default column's controller slot is left
-     * out; the power switch, the structure update button (the structure is a real 11×10×10 tower with construct
-     * support)
-     * and the parallel settings button make up the column.
+     * The power switch, the structure update button (the structure is a real 11×10×10 tower with construct support),
+     * the parallel settings button and the controller's special slot: the EOH dimension marker goes there, so the hint
+     * of that line doubles as the slot tooltip.
      */
     @Override
     protected Flow createButtonColumn(ModularPanel panel, PanelSyncManager syncManager) {
@@ -181,6 +208,17 @@ public class MTComprehensiveMiningPlantGui extends MTMultiMachineBaseGui<MTCompr
             .leftRel(1, -2, 1)
             .mainAxisAlignment(MainAxis.END)
             .reverseLayout(true)
+            .childIf(
+                multiblock.doesBindPlayerInventory(),
+                () -> new ItemSlot()
+                    .slot(new ModularSlot(multiblock.inventoryHandler, multiblock.getControllerSlotIndex()) {
+
+                        @Override
+                        public int getSlotStackLimit() {
+                            return multiblock.getInventoryStackLimit();
+                        }
+                    }.singletonSlotGroup())
+                    .tooltip(t -> t.addLine(IKey.lang("machine.comprehensiveminingplant.tooltip.details.override"))))
             .child(createPowerSwitchButton())
             .child(createParallelButton(syncManager, panel))
             .child(createStructureUpdateButton(syncManager));

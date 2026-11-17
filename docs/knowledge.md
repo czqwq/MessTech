@@ -594,7 +594,8 @@ MTMultiMachineBase<T>
   so `addShape(MAIN, transpose(structure_string))` and `checkPiece/buildPiece(MAIN, 5, 7, 4, ...)`; `construct` /
   `survivalConstruct` use the same offsets (`survivalBuildPiece(..., skipPlaceHints = false, skipSolidBlocks = true)`).
   Elements: A = `Casings.SteelGearBoxCasing`, B = `ofFrame(Materials.Steel)`, C = `ofFrame(Materials.Tritanium)`, D =
-  `ofBlock(GregTechAPI.sBlockMetal3, 8)` (HSLA Steel Block), E = `ofBlock(GregTechAPI.sBlockMetal6, 13)` (Steel Block),
+  `ofBlock(GregTechAPI.sBlockMetal9, 5)` (奥利哈钢块 / Oriharukon Block - it replaced the recipe-less HSLA Steel Block),
+  E = `ofBlock(GregTechAPI.sBlockMetal6, 13)` (Steel Block),
   G = `Casings.ReboltedNaquadahCasing` (the scan's "special tile" `BWTileEntityMetaGeneratedBlocksCasingAdvanced` - the
   scanner prints every tile entity as a class, so the scan could not say the meta; the chosen casing is the fixed one),
   F = `HatchElementBuilder.atLeast(OutputBus, OutputHatch).casingIndex(Casings.HighPowerCasing.getTextureId())
@@ -639,9 +640,23 @@ MTMultiMachineBase<T>
 - Parallel settings are GUI-only and take effect on the next start (`configuredOre` / `configuredFluid`); the GUI is
   `MTComprehensiveMiningPlantGui` (extends `MTMultiMachineBaseGui`, so the MT logo stays) whose terminal text is
   replaced - and ends with `createStructureErrorWidget`, so a missing output bus/hatch is visible - and whose button
-  column has the power switch, the structure update button (the tower supports construct/survival build) and the
-  screwdriver button opening the parallel sub panel. `shouldDisplayVoidExcess/InputSeparation/BatchMode/RecipeLock` are
-  `false` (no recipe map).
+  column has the power switch, the structure update button (the tower supports construct/survival build), the
+  screwdriver button opening the parallel sub panel and the **controller special slot**. `shouldDisplayVoidExcess/
+  InputSeparation/BatchMode/RecipeLock` are `false` (no recipe map).
+- **Dimension marker override (维度标记)**: an EOH dimension marker (`gtneioreplugin`'s `ItemDimensionDisplay`, the block
+  item EOH uses to pick its planet recipe) in the controller's **special slot** (`mInventory[1]` via
+  `getControllerSlot()`) overrides the dimension the machine mines - both the ore table and the underground oil field.
+  `readDimensionMarker` maps the marker's abbreviation through `DimensionHelper.ABBR_TO_INTERNAL`; `computeDropMap` then
+  uses that GalacticGreg name instead of `DimensionDef#getDefForWorld` (a marker for a dimension without an ore table
+  simply yields no ores), and `computeFluids` resolves the target's `GTUODimension` without loading its world:
+  `GalaxyRegistry`'s celestial body registry gives the dimension id (`CelestialBody#getDimensionID`, the body names are
+  exactly the GalacticGreg names), then GT's own id / provider-class-fragment / `Default` rules apply, blacklisted ids
+  included. The marker is never consumed; `onPostTick` -> `refreshDimensionOverride` re-resolves whenever it is inserted,
+  swapped or removed (also while the machine is idle) and the first tick after a reload resolves once
+  (`dimensionInitialised`). The GUI terminal shows `维度覆盖：<维度名>` from `getMiningDimensionName()` - the raw
+  GalacticGreg name is localized client side via `DimensionHelper#getDimUnlocalizedName` (`gtnop.world.<name>`), never
+  the dimension id - and the machine tooltip only gained the single line
+  `machine.comprehensiveminingplant.tooltip.details.override` (`§7· 可使用维度标记覆盖机器勘探维度`).
 - **Localization rule for this machine** (it has no recipe map, so all its text is its own): the sync values, WAILA NBT
   and `MTMiningPlantRegistry` only carry raw numbers and fluid registry names; every visible string is formatted client
   side from `machine.comprehensiveminingplant.*` keys in both lang files. `getInfoData()` is the exception (GT calls it
@@ -652,13 +667,12 @@ MTMultiMachineBase<T>
   `AuthorDynamic.registerElinarAuthor(...)` prints `messTech.addByAuthor` (`添加者:` / `Added by:`) + one space +
   `AuthorDynamic.Author_Elinar = "§[pf]乳胶芷若喵§r"` (the `§[pf]` marker is the petalfall text effect, closed by `§r`)
   and adds **no** `添加模组: MessTech` line. `messTech.addByAuthor` lives next to `messTech.addBy` in both lang files.
-- Assembler recipe in `GTRecipes#addComprehensiveMiningPlantRecipe`, following the structure: LuV hull, 8 Steel Gearbox
-  Casings (A), 4 Steel frames (B), 19 Tritanium frames (C), 7 HSLA Steel Blocks (D), 4 Steel Blocks (E), 8 Rebolted
-  Naquadah Casings (G), 16 High Power Casings (F, 16 of 19 because the hatches take the rest), 8 `ItemList.OilDrill4`
-  and `bartworks.common.loaders.ItemRegistry.voidminer[0]` (Void Miner I) as the functional core; 2304 L molten PTFE,
-  circuit 6, `eut(RECIPE_LuV)`, 2 minutes. Casing stacks are built with the local `casingStack(Casing, amount)` helper:
-  GT's `ICasing#toStack(int)` **ignores its amount argument** in 5.09.54.205 (always returns a stack of one), so
-  `.toStack(8)` would silently make the recipe need a single casing - note that several older recipes in
+- Assembler recipe in `GTRecipes#addComprehensiveMiningPlantRecipe`: LuV hull, 64 Steel frames, 32 Tritanium frames, 4
+  Steel Blocks, 8 Rebolted Naquadah Casings, 16 High Power Casings, 8 `ItemList.OilDrill4` and
+  `bartworks.common.loaders.ItemRegistry.voidminer[0]` (Void Miner I) as the functional core, 16 UV circuits; 2304 L
+  molten PTFE, circuit 6, `eut(RECIPE_ZPM)`, 325 seconds. Casing stacks are built with the local `casingStack(Casing,
+  amount)` helper: GT's `ICasing#toStack(int)` **ignores its amount argument** in 5.09.54.205 (always returns a stack of
+  one), so `.toStack(8)` would silently make the recipe need a single casing - note that several older recipes in
   `GTRecipes` still use `.toStack(N)` and therefore under-count the same way. The source mod scanned
   `GregTechAPI.METATILEENTITIES` for the Void Miner class name; the BartWorks list is the direct reference.
 - `/messtech infiore` lists the loaded machines: `MTMiningPlantRegistry` is a static, save-local `LinkedHashMap` keyed

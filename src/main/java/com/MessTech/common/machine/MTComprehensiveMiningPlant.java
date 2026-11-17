@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 
@@ -22,6 +23,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.ChunkCoordIntPair;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldProvider;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
@@ -52,6 +54,8 @@ import gregtech.api.interfaces.tileentity.ICasingTextureProvider;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.metatileentity.implementations.MTEEnhancedMultiBlockBase;
 import gregtech.api.objects.GTChunkManager;
+import gregtech.api.objects.GTUODimension;
+import gregtech.api.objects.GTUOFluid;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.structure.error.StructureError;
@@ -62,8 +66,12 @@ import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.common.UndergroundOil;
 import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 import gregtech.common.misc.WirelessNetworkManager;
+import gtneioreplugin.plugin.item.ItemDimensionDisplay;
+import gtneioreplugin.util.DimensionHelper;
 import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
+import micdoodle8.mods.galacticraft.api.galaxies.CelestialBody;
+import micdoodle8.mods.galacticraft.api.galaxies.GalaxyRegistry;
 
 /**
  * 综合采掘工厂 (Comprehensive Mining Plant), ported from Elinar's standalone verification mod and then given a real
@@ -80,7 +88,10 @@ import mcp.mobius.waila.api.IWailaDataAccessor;
  * <li>output: no AE shortcut - every second's ores and fluids are handed to GT as {@code mOutputItems} /
  * {@code mOutputFluids}, i.e. they go out through the output buses and output hatches placed in the structure's
  * {@code F} region. At least one of each is required, so neither items nor fluids are silently voided;</li>
- * <li>chunk: the machine keeps its own working chunk loaded ({@link IChunkLoader}).</li>
+ * <li>chunk: the machine keeps its own working chunk loaded ({@link IChunkLoader});</li>
+ * <li>dimension: by default the machine mines the dimension it stands in ({@link DimensionDef#getDefForWorld}), but
+ * an EOH dimension marker (维度标记) in the controller's special slot overrides both the ore table and the underground
+ * oil field with the marker's dimension.</li>
  * </ul>
  * The structure (controller at {@code 5, 7, 4}, i.e. front face, 8th layer up, centred):
  *
@@ -88,7 +99,7 @@ import mcp.mobius.waila.api.IWailaDataAccessor;
  * A = Steel Gearbox Casing            (main casing)
  * B = Steel frame                     (core columns)
  * C = Tritanium frame                 (tower skeleton)
- * D = HSLA Steel block                (core)
+ * D = Oriharukon block                (core)
  * E = Steel block                     (core)
  * F = High Power Casing               (hatch region: at least one output bus and one output hatch)
  * G = Rebolted Naquadah Casing        (advanced casing ring; the structure scanner sees it as the
@@ -149,7 +160,7 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
         .addElement('A', Casings.SteelGearBoxCasing.asElement())
         .addElement('B', ofFrame(Materials.Steel))
         .addElement('C', ofFrame(Materials.Tritanium))
-        .addElement('D', ofBlock(GregTechAPI.sBlockMetal3, 8))
+        .addElement('D', ofBlock(GregTechAPI.sBlockMetal9, 5))
         .addElement('E', ofBlock(GregTechAPI.sBlockMetal6, 13))
         // The hatch ring: output buses and output hatches go here, High Power Casing fills the rest. Both the fallback
         // block and the hatch background use HighPowerCasing: its casing texture id (texturePage 8, i.e. 1024) is
@@ -190,6 +201,15 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
     /** Fluids of the current dimension's underground oil field and their rates, mB/s. */
     private transient final HashMap<Fluid, Long> fluidRates = new HashMap<>();
     private boolean chunkLoaded;
+    /**
+     * GalacticGreg name of the dimension the machine currently mines, or null when it cannot be resolved; read by the
+     * GUI, never localized here.
+     */
+    private transient String miningDimensionName;
+    /** GalacticGreg name of the dimension marker in the controller's special slot, or null when there is none. */
+    private transient String markerDimensionName;
+    /** False until ores/fluids were resolved once; the first tick after a reload must not skip the resolution. */
+    private transient boolean dimensionInitialised;
     // endregion
 
     public MTComprehensiveMiningPlant(int aID, String aName, String aNameRegional) {
@@ -391,6 +411,14 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
         }
         return "";
     }
+
+    /**
+     * @return the GalacticGreg name of the dimension the machine mines, or an empty string when it cannot be resolved;
+     *         raw and locale free, the GUI localizes it client side.
+     */
+    public String getMiningDimensionName() {
+        return miningDimensionName == null ? "" : miningDimensionName;
+    }
     // endregion
 
     // region Processing (one GT cycle = one second of extraction)
@@ -464,6 +492,9 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
         super.onPostTick(aBaseMetaTileEntity, aTick);
         if (!aBaseMetaTileEntity.isServerSide()) return;
 
+        // Runs before the work check so the GUI also follows a marker that is inserted while the machine is idle.
+        refreshDimensionOverride();
+
         boolean allowed = aBaseMetaTileEntity.isAllowedToWork() && mMachine;
         if (allowed && !wasWorking) {
             wasWorking = true;
@@ -504,6 +535,8 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
     private void prepareWorkData() {
         oreParallel = Math.max(1, Math.min(MAX_PARALLEL, configuredOre));
         fluidParallel = Math.max(0, Math.min(MAX_PARALLEL, configuredFluid));
+        markerDimensionName = readDimensionMarker();
+        dimensionInitialised = true;
         computeDropMap();
         computeFluids();
     }
@@ -518,13 +551,30 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
     // endregion
 
     // region Dimension data
-    /** Reads the drop map of the dimension the controller is in; no map means the dimension cannot be void mined. */
+    /**
+     * Reads the ores of the dimension the machine mines: the dimension marker's dimension when one sits in the
+     * controller's special slot, otherwise the dimension the controller stands in. No map means the dimension has no
+     * void-miner ore table.
+     */
     private void computeDropMap() {
         dropMap = null;
+        miningDimensionName = null;
+        if (markerDimensionName != null) {
+            // The marker decides the dimension even when it has no ore table; the machine then simply yields no ores.
+            miningDimensionName = markerDimensionName;
+            DropMap base = VoidMinerUtility.dropMapsByDimName.get(markerDimensionName);
+            if (base == null) return;
+            DropMap extra = VoidMinerUtility.extraDropsByDimName.get(markerDimensionName);
+            base.isDistributionCached(extra);
+            dropMap = base;
+            return;
+        }
         try {
             ModDimensionDef def = DimensionDef.getDefForWorld(getBaseMetaTileEntity().getWorld());
-            if (def == null || !def.canBeVoidMined()) return;
+            if (def == null) return;
             final String dimensionName = def.getDimensionName();
+            miningDimensionName = dimensionName;
+            if (!def.canBeVoidMined()) return;
             DropMap base = VoidMinerUtility.dropMapsByDimName.get(dimensionName);
             DropMap extra = VoidMinerUtility.extraDropsByDimName.get(dimensionName);
             if (base == null) {
@@ -539,17 +589,22 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
     }
 
     /**
-     * Reads the dimension's underground oil field. The amount of a vein is a per-operation value; dividing it by
+     * Reads the mining dimension's underground oil field. The amount of a vein is a per-operation value; dividing it by
      * {@link #OIL_DIVIDER} gives the mB a second of extraction per fluid parallel, exactly what the GT oil drilling
      * rigs produce.
      */
     private void computeFluids() {
         fluidRates.clear();
         try {
-            int dim = getBaseMetaTileEntity().getWorld().provider.dimensionId;
-            gregtech.api.objects.GTUODimension dimension = GTMod.proxy.mUndergroundOil.GetDimension(dim);
+            final GTUODimension dimension;
+            if (markerDimensionName != null) {
+                dimension = findUndergroundOil(markerDimensionName);
+            } else {
+                int dim = getBaseMetaTileEntity().getWorld().provider.dimensionId;
+                dimension = GTMod.proxy.mUndergroundOil.GetDimension(dim);
+            }
             if (dimension == null) return;
-            for (gregtech.api.objects.GTUOFluid fluid : dimension.getFluids()
+            for (GTUOFluid fluid : dimension.getFluids()
                 .values()) {
                 if (fluid == null || fluid.getFluid() == null) continue;
                 // Deterministic per fluid, as in the source mod: the same fluid always yields the same vein amount.
@@ -564,6 +619,83 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
         } catch (Throwable ignored) {
             fluidRates.clear();
         }
+    }
+
+    /**
+     * Server tick: watches the controller's special slot and re-resolves the ores and fluids whenever the dimension
+     * marker (维度标记) in it changed - inserted, swapped or removed. The first tick after a reload always resolves once.
+     */
+    private void refreshDimensionOverride() {
+        final String marker = readDimensionMarker();
+        if (dimensionInitialised && Objects.equals(marker, markerDimensionName)) return;
+        dimensionInitialised = true;
+        markerDimensionName = marker;
+        computeDropMap();
+        computeFluids();
+    }
+
+    /**
+     * Reads the EOH dimension marker (维度标记, the {@code gtneioreplugin} dimension display block) from the controller's
+     * special slot.
+     *
+     * @return the GalacticGreg name of the dimension the marker points at, or null when the slot holds no marker.
+     */
+    private String readDimensionMarker() {
+        final ItemStack marker = getControllerSlot();
+        if (marker == null || marker.stackSize <= 0 || !(marker.getItem() instanceof ItemDimensionDisplay)) return null;
+        try {
+            return DimensionHelper.ABBR_TO_INTERNAL.get(ItemDimensionDisplay.getDimension(marker));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Resolves the underground oil field of the dimension a marker points at. GT keys the oil config by dimension id
+     * ("0" for the Overworld) or by a provider class name fragment; Galacticraft's celestial body registry knows the
+     * dimension id of its planets/moons and their names are exactly the GalacticGreg dimension names, so the lookup
+     * also works for dimensions that are not loaded.
+     */
+    private static GTUODimension findUndergroundOil(String dimensionName) {
+        final CelestialBody body = findCelestialBody(dimensionName);
+        final Integer dimensionId = body != null ? body.getDimensionID()
+            : DimensionDef.DimNames.OW.equals(dimensionName) ? Integer.valueOf(0) : null;
+        final Map<String, GTUODimension> dimensions = GTMod.proxy.mUndergroundOil.getDimensionList();
+        if (dimensionId != null) {
+            // GTUODimensionList#GetDimension refuses blacklisted dimensions; blackList is sorted.
+            if (Arrays.binarySearch(GTMod.proxy.mUndergroundOil.blackList, dimensionId) >= 0) return null;
+            GTUODimension byId = dimensions.get(Integer.toString(dimensionId));
+            if (byId != null) return byId;
+        }
+        final Class<? extends WorldProvider> providerClass = body == null ? null : body.getWorldProvider();
+        if (providerClass != null) {
+            // The same rule GTUODimensionList#GetDimension applies to the loaded world, without loading it.
+            final String providerName = providerClass.getName();
+            for (GTUODimension candidate : dimensions.values()) {
+                final String fragment = candidate.Dimension;
+                if (fragment != null && !fragment.isEmpty()
+                    && !"null".equals(fragment)
+                    && providerName.contains(fragment)) return candidate;
+            }
+        }
+        return dimensions.get("Default");
+    }
+
+    /** @return the Galacticraft planet or moon registered under a GalacticGreg dimension name, or null. */
+    private static CelestialBody findCelestialBody(String dimensionName) {
+        if (dimensionName == null || dimensionName.isEmpty()) return null;
+        CelestialBody body = findByName(GalaxyRegistry.getRegisteredPlanets(), dimensionName);
+        return body != null ? body : findByName(GalaxyRegistry.getRegisteredMoons(), dimensionName);
+    }
+
+    private static CelestialBody findByName(Map<String, ? extends CelestialBody> bodies, String name) {
+        CelestialBody body = bodies.get(name);
+        if (body != null) return body;
+        for (Map.Entry<String, ? extends CelestialBody> entry : bodies.entrySet()) {
+            if (entry.getKey()
+                .equalsIgnoreCase(name)) return entry.getValue();
+        }
+        return null;
     }
     // endregion
 
@@ -668,12 +800,13 @@ public class MTComprehensiveMiningPlant extends MTEEnhancedMultiBlockBase<MTComp
             .addSeparator()
             .addInfo(translateToLocal("machine.comprehensiveminingplant.tooltip.details"))
             .addInfo(translateToLocal("machine.comprehensiveminingplant.tooltip.details.hint"))
+            .addInfo(translateToLocal("machine.comprehensiveminingplant.tooltip.details.override"))
             .beginStructureBlock(11, 10, 10, false)
             .addController(translateToLocal("machine.comprehensiveminingplant.structure.controller"))
             .addCasing("8", Casings.SteelGearBoxCasing.getLocalizedName(), false)
             .addCasing("4", blockName(GregTechAPI.sBlockFrames, Materials.Steel.mMetaItemSubID), false)
             .addCasing("19", blockName(GregTechAPI.sBlockFrames, Materials.Tritanium.mMetaItemSubID), false)
-            .addCasing("7", blockName(GregTechAPI.sBlockMetal3, 8), false)
+            .addCasing("7", blockName(GregTechAPI.sBlockMetal9, 5), false)
             .addCasing("4", blockName(GregTechAPI.sBlockMetal6, 13), false)
             .addCasing("0-19", Casings.HighPowerCasing.getLocalizedName(), false)
             .addCasing("8", Casings.ReboltedNaquadahCasing.getLocalizedName(), false)
