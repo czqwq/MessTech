@@ -23,6 +23,7 @@ import static gregtech.api.recipe.RecipeMaps.cannerRecipes;
 import static gregtech.api.recipe.RecipeMaps.centrifugeRecipes;
 import static gregtech.api.recipe.RecipeMaps.compressorRecipes;
 import static gregtech.api.recipe.RecipeMaps.electrolyzerRecipes;
+import static gregtech.api.recipe.RecipeMaps.fluidSolidifierRecipes;
 import static gregtech.api.util.GTRecipeBuilder.HOURS;
 import static gregtech.api.util.GTRecipeBuilder.INGOTS;
 import static gregtech.api.util.GTRecipeBuilder.MINUTES;
@@ -58,6 +59,7 @@ import com.MessTech.init.MessTech;
 import appeng.api.AEApi;
 import bartworks.common.loaders.ItemRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
+import ggfab.GGItemList;
 import goodgenerator.items.GGMaterial;
 import goodgenerator.loader.Loaders;
 import goodgenerator.util.ItemRefer;
@@ -577,6 +579,23 @@ public class GTRecipes {
                 CondensateType.Neutronium.getEntangled(3_024_000), CondensateType.Bedrockium.getEntangled(4_032_000) },
             10 * MINUTES,
             TierEU.RECIPE_UIV);
+
+        // The Rainbow Wrench (彩虹小扳手) is cast, not assembled: the single-use wrench's cast (ggfab:gt.ggfab.d1:31,
+        // 铸件（一次性扳手）) is the Fluid Solidifier shape and 1,000,000 L of molten Infinity is the metal. GT's shape
+        // inputs are reusable, so the cast goes in with amount 0 - the same non-consumed mold input GT's own solidifier
+        // recipes use.
+        ItemStack rainbowWrench = MTItems.rainbowWrench.createStack();
+        if (rainbowWrench == null) {
+            MessTech.MT_LOG.warn("Rainbow Wrench recipe not registered: the Rainbow material is missing");
+        } else {
+            GTValues.RA.stdBuilder()
+                .itemInputs(GGItemList.SingleUseWrenchMold.get(0L))
+                .fluidInputs(Materials.Infinity.getMolten(1_000_000))
+                .itemOutputs(rainbowWrench)
+                .eut(RECIPE_UHV)
+                .duration(SECONDS * 325)
+                .addTo(fluidSolidifierRecipes);
+        }
 
         addReactorRecipes();
         addChemicalTwisterRecipes();

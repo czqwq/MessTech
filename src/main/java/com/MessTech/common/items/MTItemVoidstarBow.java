@@ -8,7 +8,6 @@ import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
 import net.minecraft.item.EnumRarity;
 import net.minecraft.item.ItemBow;
 import net.minecraft.item.ItemStack;
@@ -20,6 +19,7 @@ import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.ArrowLooseEvent;
+import net.minecraftforge.event.entity.player.ArrowNockEvent;
 
 import com.MessTech.common.entity.MTEntityVoidstarArrow;
 import com.MessTech.common.particle.MTVoidstarFx;
@@ -40,8 +40,11 @@ import cpw.mods.fml.relauncher.SideOnly;
  * curve stretched over it instead of twenty ticks, the draw minimum moving with it (same curve, same fifth, about
  * 0.7 s). {@code MTMagicCircleRenderer} unfolds the circle over exactly that time, in world space, from this item's
  * use state.</li>
+ * <li><b>No ammunition:</b> the bow makes its own arrow - drawing and firing never look for an arrow item in the
+ * inventory and nothing is consumed, so it fires with an empty quiver (the Infinity enchantment has nothing to save
+ * either).</li>
  * <li><b>Release heals the archer</b> to full ({@link Config#VOIDSTAR_BOW_HEALS_SHOOTER}), server side, in the arrow
- * branch - a shot that never happens (draw too weak, no arrow) heals nothing; kills use {@link MTBowKill}.</li>
+ * branch - a shot that never happens (draw too weak) heals nothing; kills use {@link MTBowKill}.</li>
  * <li>Always glinting ({@link #hasEffect}); the name wears the {@code magnetar} text effect: its lang entry carries the
  * inline {@code §[mg]} marker (see {@code docs/text-fx/}), so every place the font draws the name gets the field-line
  * shader - no tooltip handler involved.</li>
@@ -60,7 +63,7 @@ public class MTItemVoidstarBow extends ItemBow {
     /** Pull frames: {@code _pulling_0} is the first pixel of the draw, {@code _pulling_2} a full one. */
     private static final int PULL_FRAMES = 3;
 
-    /** Durability: 1,024 shots, i.e. under three stacks of arrows. */
+    /** Durability: 1,024 shots. */
     public static final int MAX_DAMAGE = 1024;
 
     /**
@@ -162,9 +165,13 @@ public class MTItemVoidstarBow extends ItemBow {
      * Sneaking with the bow in hand switches its sub-mode and announces it in the chat. Only the server writes the
      * mode - a client's would be overwritten by the next item sync anyway.
      * <p>
-     * The sneak branch must not fall through to {@code super}: vanilla's {@code ItemBow} starts the draw right here
+     * The sneak branch must not fall through to the draw: vanilla's {@code ItemBow} starts the draw right here
      * ({@code player.setItemInUse}), and a switch that also started it would fire an arrow when the player let go of
      * shift. Both sides return early, so neither begins a use.
+     * <p>
+     * The draw itself is started here, not by {@code super}: vanilla's {@code ItemBow} gates it on an arrow in the
+     * inventory, which this bow does not need. {@link ArrowNockEvent} is still posted first, so a mod vetoing the
+     * draw (or replacing the stack) still works.
      */
     @Override
     public ItemStack onItemRightClick(ItemStack stack, World world, EntityPlayer player) {
@@ -178,7 +185,14 @@ public class MTItemVoidstarBow extends ItemBow {
             return stack;
         }
 
-        return super.onItemRightClick(stack, world, player);
+        ArrowNockEvent event = new ArrowNockEvent(player, stack);
+        MinecraftForge.EVENT_BUS.post(event);
+        if (event.isCanceled()) {
+            return event.result;
+        }
+
+        player.setItemInUse(stack, getMaxItemUseDuration(stack));
+        return stack;
     }
 
     /**
@@ -217,9 +231,10 @@ public class MTItemVoidstarBow extends ItemBow {
 
     /**
      * Fire: vanilla's {@code ItemBow#onPlayerStoppedUsing} with two differences - an {@link MTEntityVoidstarArrow}
-     * (server side only; clients get it from the spawn packet, muzzle position in its data watcher), and the arrow is
-     * never pickable, so it is not given back. Everything else stays, events included: {@link ArrowLooseEvent} can
-     * still cancel the shot, Infinity still saves the arrow, Power/Punch/Flame still apply.
+     * (server side only; clients get it from the spawn packet, muzzle position in its data watcher), and it fires
+     * without ammunition: no arrow item is looked for or consumed, so the Infinity enchantment has nothing to save.
+     * Everything else stays, events included: {@link ArrowLooseEvent} can still cancel the shot, Power/Punch/Flame
+     * still apply.
      */
     @Override
     public void onPlayerStoppedUsing(ItemStack stack, World world, EntityPlayer player, int useRemaining) {
@@ -231,13 +246,6 @@ public class MTItemVoidstarBow extends ItemBow {
             return;
         }
         drawn = event.charge;
-
-        boolean infinite = player.capabilities.isCreativeMode
-            || EnchantmentHelper.getEnchantmentLevel(Enchantment.infinity.effectId, stack) > 0;
-
-        if (!infinite && !player.inventory.hasItem(Items.arrow)) {
-            return;
-        }
 
         // Vanilla's curve over this bow's own draw length instead of twenty ticks: arrow speed and tunnel range read
         // the result. See Config#VOIDSTAR_BOW_DRAW_TICKS.
@@ -284,10 +292,6 @@ public class MTItemVoidstarBow extends ItemBow {
 
         stack.damageItem(1, player);
         world.playSoundAtEntity(player, "random.bow", 1.0F, 1.0F / (itemRand.nextFloat() * 0.4F + 1.2F) + draw * 0.5F);
-
-        if (!infinite) {
-            player.inventory.consumeInventoryItem(Items.arrow);
-        }
     }
 
     /**

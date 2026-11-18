@@ -126,7 +126,7 @@ public class Config {
 
         @Comment({
             "Whether letting go of the Voidstar Piercer heals the archer back to full health. A shot that does not",
-            "happen (a draw too weak to fire, no arrow in the inventory) heals nothing." })
+            "happen (a draw too weak to fire) heals nothing." })
         @DefaultBoolean(true)
         public boolean VOIDSTAR_BOW_HEALS_SHOOTER = true;
 

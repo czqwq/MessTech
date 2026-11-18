@@ -1861,15 +1861,17 @@ other mods' blocks and player edits alone.
 
 ## 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`)
 - `item.messtech.voidstarBow.name` = `混沌终焉·虚无贯星弓` / `Chaos Finale: Voidstar Piercer`; registry `VoidstarBow`,
-  unlocalized `messtech.voidstarBow`, tab `tabCombat`, max stack 1, durability 1,024 (`MTItemVoidstarBow.MAX_DAMAGE`,
-  under three stacks of arrows).
-- Plain `ItemBow` except **draw length** and **sub-modes**: `f < 0.1` no-fire floor, arrow consumption, the Infinity
-  enchantment, Power / Punch / Flame and the enchantment table are vanilla's; projectile, charge effect, icons, glint,
-  draw length and sub-modes are this mod's.
+  unlocalized `messtech.voidstarBow`, tab `tabCombat`, max stack 1, durability 1,024 (`MTItemVoidstarBow.MAX_DAMAGE`).
+- Plain `ItemBow` except **draw length**, **sub-modes** and **no ammunition**: `f < 0.1` no-fire floor, Power / Punch /
+  Flame and the enchantment table are vanilla's; projectile, charge effect, icons, glint, draw length and sub-modes are
+  this mod's. The bow fletches its own arrow, so firing needs no arrow item: `onItemRightClick` starts the draw itself
+  instead of letting vanilla's `ItemBow` gate it on `Items.arrow`, and `onPlayerStoppedUsing` neither checks for nor
+  consumes one (the Infinity enchantment therefore has nothing to save).
 - **Sub-modes (`MTItemVoidstarBow.MODE_PIERCE` / `MODE_DE`) via sneak + right click.** Mode in the stack's NBT
   (`MTVoidstarMode`): per-bow, survives a relog, missing or out of range = `MODE_PIERCE`. `onItemRightClick` **must not
-  fall through to `super`** (vanilla's `ItemBow` starts the draw there, so it would fire on shift release), returns early
-  on both sides, only the server writes. `ChatComponentTranslation` message (not a translated string) so each player reads
+  call `super`**: vanilla's `ItemBow` starts the draw there (gated on an arrow), and on the sneak path that would fire on
+  shift release. The override starts the draw itself after posting `ArrowNockEvent`, returns early on both sides for the
+  switch, and only the server writes the mode. `ChatComponentTranslation` message (not a translated string) so each player reads
   their own language: `messtech.voidstarBow.mode.pierce` / `.mode.de`, tooltip `messtech.voidstarBow.tooltip.mode` +
   `.modeName.*`. A block GUI takes the click first (`ItemInWorldManager#activateBlockOrUseItem` ->
   `onBlockActivated`): switch while aiming at air.
@@ -2001,7 +2003,7 @@ other mods' blocks and player edits alone.
   - **Letting go heals the archer to full** (`Config.voidstarbow.VOIDSTAR_BOW_HEALS_SHOOTER`, default **true**,
     `MTItemVoidstarBow#onPlayerStoppedUsing`): `player.heal(max - current)`, a real heal of the difference, so the heal path
     runs (Forge heal event included) and the archer cannot pass their maximum. In the same `!world.isRemote` branch that
-    spawns the arrow, so a failed shot (draw too weak, no arrow) heals nothing.
+    spawns the arrow, so a failed shot (draw too weak) heals nothing.
   - A player's shot posts `BlockEvent.BreakEvent` per block and leaves it standing if a protection mod cancels it; the
     vanilla "block destroyed" effect (`World#playAuxSFX` id 2001, what `Explosion` sends per block) goes out only within 12
     blocks of the impact - one packet per block over a long tunnel is what makes big explosions lag.
@@ -2101,9 +2103,15 @@ A GT5U tool item with an animated rainbow icon and three pinned numbers (耐久 
   (NEI follows) the bare stack plus a **Neutronium**-material copy - neither carries the Rainbow material. That method is
   the hook that sees both (it is called by `getSubItems`, by `getToolWithStats`, and by `getToolStats` before every
   tooltip/render), and GT already uses it for NBT fix-up (enchantments), so `prepareStack` runs there. Result: both
-  creative entries, NEI's copies and every stack later held read the intended stats. There is deliberately **no crafting
-  recipe** - the wrench is a creative/NEI item for now; `MTRainbowWrench#createStack()` builds the proper stack if a
-  recipe or command is ever added.
+  creative entries, NEI's copies and every stack later held read the intended stats.
+- **Obtaining**: one GT recipe, in the Fluid Solidifier pool (`GTRecipes.loadRecipes`): the single-use wrench's cast
+  `ggfab:gt.ggfab.d1:31` (铸件（一次性扳手）, ggfab's `GGItemList.SingleUseWrenchMold`) is the reusable shape input -
+  `get(0L)`, a non-consumed input exactly like GT's own molds - plus 1,000,000 L of molten Infinity
+  (`Materials.Infinity.getMolten`), UHV, 325 s, output `MTRainbowWrench#createStack()` (the NBT-pinned stack, not a
+  bare `new ItemStack`). There is no crafting-table recipe. Note that a single-block Fluid Solidifier tank tops out at
+  256,000 L (`MTEBasicMachineWithRecipe` -> `getCapacityForTier`), so the 1,000,000 L recipe is only usable in the
+  multiblocks that read the same pool, e.g. Mass Solidifier 大规模固化器 and Fluid Shaper 流体塑形机 - the latter's
+  solidifier input hatch even lists this mold among its accepted molds (`MTEHatchSolidifier.solidifierMolds`).
 - **Text**: lang keys are GT's meta-tool shape `gt.metatool.messtech.100.name` / `.tooltip` (see `zh_CN.lang`:
   `彩虹小扳手`, `按住左键以拆卸机器`) plus `Material.rainbowwrench` (the material's internal name is `RainbowWrench`,
   namespaced so it cannot collide with another addon's material); the tooltip's 耐久/等级/伤害/挖掘速度 lines are GT's
