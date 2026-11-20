@@ -539,7 +539,8 @@ MTMultiMachineBase<T>
   `DummyWorld.isRemote` even `false` -> GT sees server side) learns the tier only from the trigger.
 - 概率毁灭者 pool (`mt.recipe.qft_probability_destroyer`, NEI name `概率毁灭者(QFT)`): independent copy of
   `RecipeMaps.quantumForceTransformerRecipes`, filled by `MTRecipeMaps.populateQftProbabilityDestroyerRecipes()`
-  (`CommonProxy.serverStarted`, idempotent) with **all item and fluid output chances at 10000 = 100%**,
+  (`MTClientRecipePools` on the client's first tick, `CommonProxy.serverStarted` on a server, both idempotent) with
+  **all item and fluid output chances at 10000 = 100%**,
   `metadata(CHEMICAL_TWISTER_STRUCTURE_LEVEL, 2)`, `specialValue(12601)` (QFT recipes carry the focus tier in
   `mSpecialValue` via `GTRecipeMapUtil.SPECIAL_VALUE_ALIASES`, read as heat here, hence explicit), QFT catalyst as a
   **non-consumed input** (stackSize 0: required in the bus, never consumed), QFT metadata for NEI. Page:
@@ -547,8 +548,9 @@ MTMultiMachineBase<T>
 - 蜂窝处理者 pool (`mt.recipe.comb_processing`, NEI name `蜂窝处理` / `Comb Processing`, icon = the new
   `MTItemList.MTCombProcessingModule`): converted from the comb recipes of `RecipeMaps.multiblockChemicalReactorRecipes`
   by `com.MessTech.common.recipe.MTCombProcessingRecipes` (`populateCombProcessingRecipes()`, re-runnable, called from
-  `GTRecipes.loadRecipes()` at FMLLoadComplete - both sides, after GT's and NHCoreMod's postInit - and again from
-  `CommonProxy.serverStarted` as the usual fallback). Source recipes: GT5U's `ItemComb.addProcessGT` (via
+  `GTRecipes.loadRecipes()` at FMLLoadComplete - both sides, after GT's and NHCoreMod's postInit - once more from
+  `MTClientRecipePools` on the client's first tick, and again from `CommonProxy.serverStarted` as the usual fallback).
+  Source recipes: GT5U's `ItemComb.addProcessGT` (via
   `GTRecipeConstants.UniversalChemical`) and NHCoreMod's `ChemicalReactorRecipes#multiBlockOnly` indium ones; recognised
   by a `beeComb` item input. Conversion, per recipe: **inputs** = the module (stackSize 0, first, never consumed) +
   `4` of the comb (base comb count normalised to 4, everything else - acids, catalyst dusts, circuits - dropped);
@@ -1028,6 +1030,20 @@ MTMultiMachineBase<T>
   line (Processor/Assembly/Supercomputer/Mainframe) plus the special Pico/Quantum/Planck/Raw Manifold Bud products;
   drops Board Processor fluid inputs (machine-internal/NEI display only), keeps other module and Assembly Matrix
   fluids, merges duplicates and deduplicates recipes.
+- The pool's inputs are registered **late**, after MessTech's own postInit: GT's `CircuitWraps` at the end of GT's
+  postload, and the NAC Assembly Matrix recipes from NHCoreMod's `FMLLoadCompleteEvent` (`ScriptNanochipRecipes`); TST
+  adds its own Assembly Matrix chains from the same event. `populateOneStepCircuitPoolRecipes()` defers while either is
+  missing (`GT circuit wraps are not registered yet` / `the Assembly Matrix recipes are not registered yet`), and the
+  real build happens only at two points that are after every mod's complete-load handler: the first client tick
+  (`MTClientRecipePools`) and `FMLServerStartedEvent` (`CommonProxy#serverStarted`). Both paths are idempotent, so the
+  second one is a no-op when the first already built the pool. Building inside `FMLLoadCompleteEvent` would be wrong:
+  the event is dispatched mod by mod, so an early build silently bakes an incomplete pool and the "already populated"
+  guard never repairs it.
+- The same late build covers the other NEI-only pools a remote client cannot get from the server (recipe maps are not
+  synced and NEI only shows categories that have recipes): the 11 `mt.recipe.nanoscale.*` module pools, the BEC
+  (`bosesCraftingArrayRecipes`) and QFT (`qftProbabilityDestroyerRecipes`) copies, the comb pool (re-runnable) and the
+  Assembly Factory's Assembly Line pages (re-runnable). All of them are built from `MTClientRecipePools` on the client
+  and re-run from `CommonProxy#serverStarted` on a server.
 - `packMaterialInputs()`: `MOLTEN_PREFIXES` = `bolt`, `foil`, `frameGt`, `itemCasing`, `plate`, `screw`, `wireFine` ->
   the same material's molten fluid (bolt/fine wire/screw `M / 8` = 18 mB, foil `M / 4` = 36 mB, casing `M / 2` = 72 mB,
   plate `M * 1` = 144 mB, frame box `M * 2` = 288 mB, computed as `prefix.getMaterialAmount() * INGOTS / GTValues.M`).
@@ -1039,7 +1055,7 @@ MTMultiMachineBase<T>
   its selector, the machine's own slot already carrying the pool selector). Amounts identical
   (`16 x 1x wire == 1 x 16x wire`, wrap = 16 parts + polyethylene); same-material entries merge, a remainder keeps its
   item form, no molten form -> item kept. `chipWraps` is built first and the build deferred while empty (GT registers
-  the wraps in postload), so the server-started fallback has them instead of baking plain chips in. Lookup:
+  the wraps at the end of its postload), so the fallback pass has them instead of baking plain chips in. Lookup:
   `GTOreDictUnificator.getAssociation()`, else `moltenOfName()` parses the ore dictionary name (`boltRhugnor`,
   `screwQuantum`) -> `Materials.get()` / case-insensitive `Materials.values()` -> GT++ `Material.mMaterialsByName` /
   `mMaterialCache` (`getFluidStack`) - GT++ materials (Rhugnor, Quantum, AstralTitanium, ...) are **not** GT `Materials`

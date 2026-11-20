@@ -67,6 +67,8 @@ public class MessTech {
     @Mod.EventHandler
     public void completeInit(FMLLoadCompleteEvent event) {
         GTRecipes.loadRecipes();
+        // No NEI-only pools here: other mods are still adding their source recipes in this same event. The client
+        // builds them on its first tick (MTClientRecipePools), the server at FMLServerStartedEvent.
         if (Mods.Computronics.isModLoaded() && Mods.Thaumcraft.isModLoaded() && Mods.Avaritia.isModLoaded()) {
             ExtraRecipes.loadReplacementRecipes();
         }
