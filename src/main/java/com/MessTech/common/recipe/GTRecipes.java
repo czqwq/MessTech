@@ -605,6 +605,9 @@ public class GTRecipes {
         addLegacyMachineRecipes();
         addComprehensiveMiningPlantRecipe();
         addSmallEssentiaSmelteryRecipes();
+        // The arcane assembly pool is converted from Thaumcraft's arcane workbench recipes; every mod that adds such
+        // recipes did so in its postInit, which ran before this FMLLoadComplete pass.
+        MTArcaneAssemblyRecipes.populateArcaneAssemblyRecipes();
         MTLegFakeRecipes.populate();
         // The Chemical Twister's mode 2 pool is converted from GT5U's large chemical reactor comb recipes, which GT and
         // NHCoreMod have registered by now (postInit ran before this FMLLoadComplete pass, and the mod depends on GT).
@@ -779,6 +782,20 @@ public class GTRecipes {
                     .addTo(assemblerRecipes);
             }
         }
+
+        GTValues.RA.stdBuilder()
+            .itemInputs(
+                ItemList.Hatch_Input_Bus_EV.get(1),
+                getModItem(Mods.AppliedEnergistics2.getID(), "item.ItemMultiMaterial", 4, 23),
+                getModItem(Mods.AppliedEnergistics2.getID(), "item.ItemMultiMaterial", 2, 56),
+                new Object[] { OrePrefixes.circuit.get(Materials.EV), 2 },
+                ItemList.Emitter_EV.get(1),
+                ItemList.Robot_Arm_EV.get(1))
+            .fluidInputs(Materials.Lubricant.getFluid(2000))
+            .itemOutputs(MTItemList.MTPatternAccessHatch.get(1))
+            .eut(TierEU.RECIPE_EV)
+            .duration(MINUTES * 1)
+            .addTo(assemblerRecipes);
     }
 
     /**

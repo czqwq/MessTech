@@ -10,7 +10,13 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
+
+import com.cleanroommc.modularui.factory.PosGuiData;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
@@ -19,6 +25,8 @@ import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.common.tileentities.machines.multi.nanochip.factory.VacuumFactoryElement;
 import gregtech.common.tileentities.machines.multi.nanochip.factory.VacuumFactoryGrid;
 import gregtech.common.tileentities.machines.multi.nanochip.hatches.MTEHatchVacuumConveyorInput;
+import mcp.mobius.waila.api.IWailaConfigHandler;
+import mcp.mobius.waila.api.IWailaDataAccessor;
 
 /**
  * Wireless NAC Vacuum Conveyor Input.
@@ -46,6 +54,13 @@ public class MTWirelessVacuumConveyorInput extends MTEHatchVacuumConveyorInput {
     @Override
     public MetaTileEntity newMetaEntity(IGregTechTileEntity aTileEntity) {
         return new MTWirelessVacuumConveyorInput(mName, mTier, mDescriptionArray, mTextures);
+    }
+
+    // ---------------------------------------------------------------- GUI
+
+    @Override
+    public ModularPanel buildUI(PosGuiData data, PanelSyncManager syncManager, UISettings uiSettings) {
+        return new MTWirelessVacuumConveyorGui(this).build(data, syncManager, uiSettings);
     }
 
     // ---------------------------------------------------------------- link state
@@ -228,6 +243,20 @@ public class MTWirelessVacuumConveyorInput extends MTEHatchVacuumConveyorInput {
         List<String> info = new ArrayList<>(Arrays.asList(super.getInfoData()));
         WirelessVacuumConveyorUtil.appendLinkInfo(info, this, outputLink, false);
         return info.toArray(new String[0]);
+    }
+
+    @Override
+    public void getWailaNBTData(EntityPlayerMP player, TileEntity tile, NBTTagCompound tag, World world, int x, int y,
+        int z) {
+        super.getWailaNBTData(player, tile, tag, world, x, y, z);
+        WirelessVacuumConveyorUtil.writeWailaData(tag, this);
+    }
+
+    @Override
+    public void getWailaBody(ItemStack itemStack, List<String> currentTip, IWailaDataAccessor accessor,
+        IWailaConfigHandler config) {
+        super.getWailaBody(itemStack, currentTip, accessor, config);
+        WirelessVacuumConveyorUtil.appendWailaBody(currentTip, accessor.getNBTData());
     }
 
     @Override

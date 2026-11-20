@@ -103,6 +103,10 @@ public enum MTItemList {
     MTLargeEssentiaGenerator,
     /** Small Essentia Smeltery (小型源质冶炼厂). */
     MTSmallEssentiaSmeltery,
+    /** Small Molecular Arcane Assembler (小型分子奥术装配室). */
+    MTSmallMolecularArcaneAssembler,
+    /** Pattern access hatch of the Small Molecular Arcane Assembler (样板访问仓). */
+    MTPatternAccessHatch,
     /** Essentia input hatch block of the LEG (源质输入仓). */
     MTEssentiaHatch,
     /** ME essentia input hatch block of the LEG (ME 源质输入仓); only set when Thaumic Energistics is loaded. */

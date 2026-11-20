@@ -26,6 +26,7 @@ import com.MessTech.common.items.MTNACComponentItemRenderer;
 import com.MessTech.common.parts.PartUltimatePatternTerminal;
 import com.MessTech.common.render.MTDEBlastRenderer;
 import com.MessTech.common.render.MTMagicCircleRenderer;
+import com.MessTech.common.render.highlight.HighlighterManager;
 import com.MessTech.common.util.MTAnimatedTooltipHandler;
 import com.MessTech.common.util.MTDynamicItemHelper;
 import com.MessTech.common.util.MTPigTech;
@@ -74,6 +75,8 @@ public class ClientProxy extends CommonProxy {
         MTMagicCircleRenderer.init();
         // The fireball of a DE explosion: MTEntityDEBlast carries it to the client, this draws it.
         MTDEBlastRenderer.init();
+        // The AE2-derived block highlight mechanism: the wireless NAC vacuum hatches' GUI outlines the peer hatch.
+        HighlighterManager.init();
         // Text effects: the eight shaders with their palettes, the mask cache's reload hook (shader resources and font
         // atlases both live there), and the local /messtechfx preview command.
         BuiltinTextEffects.register();
