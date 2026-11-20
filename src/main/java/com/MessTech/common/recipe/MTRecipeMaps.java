@@ -653,9 +653,8 @@ public final class MTRecipeMaps {
             .isEmpty()) {
             return;
         }
-        // GT registers its circuit wraps (bartworks' CircuitWraps) during its own postload, which can happen after the
-        // first call here: building now would bake plain chips into every page instead of the wraps, so leave the pool
-        // empty and let the next call - the load-complete fallback or the server-started fallback - build it.
+        // The wraps arrive at the end of GT's postload and the Assembly Matrix recipes from other mods' complete-load
+        // handlers: build only once both are there, and leave the pool empty so a later call can retry.
         chipWraps = buildChipWraps();
         if (chipWraps.isEmpty()) {
             MessTech.MT_LOG.info(
@@ -663,8 +662,16 @@ public final class MTRecipeMaps {
             return;
         }
 
-        List<GTRecipe> generated = new ArrayList<>();
-        for (GTRecipe assembly : RecipeMaps.nanochipAssemblyMatrixRecipes.getAllRecipes()) {
+        Collection<GTRecipe> assemblyRecipes = RecipeMaps.nanochipAssemblyMatrixRecipes.getAllRecipes();
+        if (assemblyRecipes.isEmpty()) {
+            MessTech.MT_LOG.info(
+                "Nano-Scale Foundry one-step circuit pool: the Assembly Matrix recipes are not registered yet, "
+                    + "deferring the pool");
+            return;
+        }
+
+        List<GTRecipe> generated = new ArrayList<>(assemblyRecipes.size());
+        for (GTRecipe assembly : assemblyRecipes) {
             GTRecipe flat = flattenAssemblyToOneStepPool(assembly);
             if (flat == null) continue;
             warnIfWiderThanPool(flat);
@@ -682,7 +689,9 @@ public final class MTRecipeMaps {
             added++;
         }
         MessTech.MT_LOG.info(
-            "Nano-Scale Foundry one-step circuit pool: built {} recipes from {} assembly recipes", added, generated.size());
+            "Nano-Scale Foundry one-step circuit pool: built {} recipes from {} Assembly Matrix recipes",
+            added,
+            assemblyRecipes.size());
     }
 
     /**

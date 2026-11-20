@@ -12,6 +12,7 @@ import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.oredict.OreDictionary;
 
 import com.MessTech.client.command.MTTextEffectCommand;
+import com.MessTech.client.recipe.MTClientRecipePools;
 import com.MessTech.client.text.EffectTextRenderer;
 import com.MessTech.client.text.effect.BuiltinTextEffects;
 import com.MessTech.common.entity.MTEntityPiggy;
@@ -86,6 +87,8 @@ public class ClientProxy extends CommonProxy {
         // The MessTech Thaumonomicon tab icon: a dynamic texture the client tick redraws; the tick handler registers
         // it under MTThaumcraftResearch.TAB_ICON before any research GUI can open.
         com.MessTech.client.thaumcraft.MTResearchTabIcon.init();
+        // NEI-only recipe pools a remote client cannot get from the server: built once on the first client tick.
+        MTClientRecipePools.init();
     }
 
     @Override

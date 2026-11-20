@@ -176,7 +176,8 @@ public class CommonProxy implements IGuiHandler {
     }
 
     public void serverStarted(FMLServerStartedEvent event) {
-        // Fallback in case GT5U's NAC pools are only populated after MessTech postInit.
+        // The same late pools the client builds on its first tick (MTClientRecipePools); a remote client has no server
+        // events, so it needs that client-side pass.
         MTRecipeMaps.populateNanoScaleFoundryRecipes();
         MTRecipeMaps.populateOneStepCircuitPoolRecipes();
         // BEC recipes are registered by GT5U's postload recipe loader.
