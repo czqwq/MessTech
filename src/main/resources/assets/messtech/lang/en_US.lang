@@ -347,6 +347,20 @@ machine.wirelessvacuum.info.wrong_side=§7Link state: §cthe target has the wron
 machine.wirelessvacuum.info.color_mismatch=§7Link state: §cthe two hatches are painted differently
 machine.wirelessvacuum.info.broken=§7Link state: §cthe link is stale
 machine.wirelessvacuum.info.target=§7Expected counterpart: dim %s, %s/%s/%s
+# --- Wireless Vacuum Conveyor: GUI status bar / highlight button / WAILA / highlight feedback ---
+machine.wirelessvacuum.gui.state.linked=§aConnected
+machine.wirelessvacuum.gui.state.unbound=§cNot connected
+machine.wirelessvacuum.gui.state.broken=§eNot connected (error)
+machine.wirelessvacuum.gui.target=§7Peer: dim %s, %s/%s/%s
+machine.wirelessvacuum.gui.target.none=§7Peer: not set
+machine.wirelessvacuum.gui.highlight=Highlight the connected hatch
+machine.wirelessvacuum.gui.highlight.disabled=Not connected, nothing to highlight
+machine.wirelessvacuum.waila.linked=§7Connected: §adim %s, %s/%s/%s
+machine.wirelessvacuum.waila.unbound=§cNot connected
+machine.wirelessvacuum.waila.unloaded=§eNot connected: peer not loaded
+machine.wirelessvacuum.waila.invalid=§cNot connected: link error
+machine.wirelessvacuum.chat.highlighted=§aHighlighted the connected hatch: dim %s, %s/%s/%s
+machine.wirelessvacuum.chat.highlight.other_dim=§eThe connected hatch is in dimension %s and cannot be highlighted here
 machine.wirelessbeamline.input.name=Wireless Beam Input Hatch
 machine.wirelessbeamline.output.name=Wireless Beam Output Hatch
 machine.wirelessbeamline.advanced.name=Wireless Filtered Beam Output Hatch
@@ -882,6 +896,37 @@ machine.smallessentiasmeltery.tooltip.output_hatch=Essentia Output Hatch
 machine.smallessentiasmeltery.tooltip.output_hatch_me=ME Essentia Output Hatch
 machine.smallessentiasmeltery.need_output_hatch=§cAt least one Essentia Output Hatch is required
 
+# --- Small Molecular Arcane Assembler (MTSmallMolecularArcaneAssembler) ---
+machine.smallmoleculararcaneassembler.name=Small Molecular Arcane Assembler
+machine.smallmoleculararcaneassembler.machinetype=Molecular Arcane Assembler
+machine.smallmoleculararcaneassembler.tooltip.desc=§7Buys primal aspects with EU and runs arcane workbench recipes automatically
+machine.smallmoleculararcaneassembler.tooltip.flavour=§[bc]The tech geek is changing the magical world
+machine.smallmoleculararcaneassembler.tooltip.refill=§7· §b2048§7 EU per aspect point, at most §b1§7 point of each aspect per tick
+machine.smallmoleculararcaneassembler.tooltip.staff=§7· A §eWand/Sceptre§7 must sit in the control slot: the buffer capacity is its per-aspect vis capacity (no storage and no crafting without one)
+machine.smallmoleculararcaneassembler.tooltip.research=§7· Only crafts recipes whose research the machine owner has unlocked
+machine.smallmoleculararcaneassembler.tooltip.pattern=§7· Encoded AE patterns in the §ePattern Access Hatch§7 drive the crafting
+machine.smallmoleculararcaneassembler.tooltip.controller=§7Front center
+machine.smallmoleculararcaneassembler.tooltip.casing_name=Magic Casing
+machine.smallmoleculararcaneassembler.tooltip.warded_glass_name=Warded Glass
+machine.smallmoleculararcaneassembler.tooltip.hatch_info=Magic Casing
+machine.smallmoleculararcaneassembler.tooltip.pattern_hatch_name=Pattern Access Hatch
+machine.smallmoleculararcaneassembler.error.need_pattern_hatch=§cAt least 1 Pattern Access Hatch is required
+machine.smallmoleculararcaneassembler.gui.no_staff=§cInsert a wand/sceptre!
+mt.recipe.arcaneassembler=Small Molecular Arcane Assembler
+GT5U.gui.text.recipe_result.arcaneroom_no_staff=§cInsert a wand/sceptre!
+GT5U.gui.text.recipe_result.arcaneroom_research_locked=§cThe machine owner has not unlocked the research for this recipe
+GT5U.gui.text.recipe_result.arcaneroom_not_enough_aspects=§cNot enough aspects
+GT5U.gui.text.recipe_result.arcaneroom_capacity_too_low=§cRequired aspects exceed the current wand/sceptre capacity
+GT5U.gui.text.recipe_result.arcaneroom_unknown_pattern=§cThe pattern does not describe any arcane recipe
+
+# --- Pattern Access Hatch (MTEHatchPatternAccess) ---
+machine.patternaccesshatch.name=Pattern Access Hatch
+machine.patternaccesshatch.tooltip.1=§eSmall Molecular Arcane Assembler§r pattern storage
+machine.patternaccesshatch.tooltip.2=Capacity: §b25§r encoded AE patterns
+machine.patternaccesshatch.tooltip.3=Connects directly to the ME network; the pattern's inputs/outputs must match an arcane recipe
+machine.patternaccesshatch.tooltip.4=The AE crafting CPU pushes patterns to the machine
+machine.patternaccesshatch.tooltip.5=Non-consumed inputs (e.g. the Primordial Pearl) must be encoded in the pattern too
+
 tile.essentiaOutputHatchME.name=ME Essentia Output Hatch
 
 tile.essentiaHatch.name=Essentia Input Hatch
@@ -913,6 +958,11 @@ tc.research_text.messtech.leg.3=Pannus: 600EU<BR><BR>Vinculum: 500EU<BR><BR>Magn
 tc.research_name.messtech.cells=Better Cells
 tc.research_text.messtech.cells=And higher efficiency.
 tc.research_text.messtech.cells.0=The Novice Cell has such low efficiency that you can't bear it. So you discovered a new way to make some better Cells<BR><BR>The Novice Cell only provides 1 StablePoint, the Adept one provides 2 StablePoint, the Master one provides 5 StablePoint, and the Grandmaster one provides 10 StablePoint!<BR><BR>With higher StablePoint, the generator can create more electricity from per Essentia.<BR><BR>They also allow you to use better hatches.
+
+tc.research_name.messtech.arcaneassembler=Small Molecular Arcane Assembler
+tc.research_text.messtech.arcaneassembler=Fit an arcane workbench into a multiblock.<BR><BR>EU buys the Aspects; patterns drive the crafting.
+tc.research_text.messtech.arcaneassembler.0=The arcane workbench is too small, and your ME network is too large.<BR><BR>The Small Molecular Arcane Assembler fits the arcane workbench into a 5x5x5 magic-mechanical structure: it buys the Vis of a wand with EU, stores it as Aspects, and then crafts according to the patterns in the ME network.<BR><BR>The machine needs a wand or sceptre as the Aspect container, at least one Pattern Access Hatch, and an energy hatch.
+tc.research_text.messtech.arcaneassembler.1=The Pattern Access Hatch is the machine's "molecular assembler": insert encoded AE patterns and the hatch connects directly to the ME network; the crafting CPU pushes the ingredients into the machine and the products are injected back into the network.<BR><BR>A pattern must match an arcane recipe of the recipe pool exactly; non-consumed inputs (e.g. the Primordial Pearl) must be encoded in the pattern too, and the machine owner must have unlocked the recipe's research.<BR><BR>Each point of Aspect costs 2048 EU, at most 1 point of each Aspect is refilled per tick; one craft takes 100 ticks at 2048 EU/t.
 
 tc.research_name.messtech.upgrade.blank=Upgrade your generator
 tc.research_text.messtech.upgrade.blank=Let's try some more dangerous essentia.

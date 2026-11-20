@@ -25,7 +25,9 @@ import com.MessTech.common.machine.MTNanoScaleFoundry;
 import com.MessTech.common.machine.MTProtocolCore;
 import com.MessTech.common.machine.MTReactor;
 import com.MessTech.common.machine.MTSmallEssentiaSmeltery;
+import com.MessTech.common.machine.MTSmallMolecularArcaneAssembler;
 import com.MessTech.common.machine.MTSpaceElevator;
+import com.MessTech.common.machine.hatch.MTEHatchPatternAccess;
 import com.MessTech.common.machine.hatch.MTHatchRack;
 import com.MessTech.common.machine.hatch.MTInventoryInputBusME;
 import com.MessTech.common.machine.hatch.MTInventoryInputHatchME;
@@ -45,6 +47,7 @@ import com.MessTech.common.machine.module.SpaceModuleApiary;
 import com.MessTech.common.machine.module.SpaceModuleAssemblerInfinity;
 import com.MessTech.common.machine.module.SpaceModuleMinerInfinity;
 import com.MessTech.common.machine.module.SpaceModulePumpInfinity;
+import com.MessTech.common.recipe.MTArcaneAssemblyRecipes;
 import com.MessTech.common.recipe.MTRecipeMaps;
 import com.MessTech.common.util.AuthorDynamic;
 import com.MessTech.common.util.MTAnimatedTooltipHandler;
@@ -56,6 +59,9 @@ public class MTMachineLoader {
 
     public static void loadMachines() {
         final int MT_ID = 32400;
+        // Create the arcane assembly recipe map (and its NEI recipe category) here, in postInit: the category captures
+        // the owning mod when it is constructed, and its recipes are only converted later at load complete.
+        MTArcaneAssemblyRecipes.init();
         MTItemList.MTDTPF.set(
             new MTDTPF(
                 MT_ID,
@@ -230,6 +236,20 @@ public class MTMachineLoader {
                 "Small Essentia Smeltery",
                 translateToLocal("machine.smallessentiasmeltery.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTSmallEssentiaSmeltery.get(1));
+
+        MTItemList.MTSmallMolecularArcaneAssembler.set(
+            new MTSmallMolecularArcaneAssembler(
+                MT_ID + 81,
+                "Small Molecular Arcane Assembler",
+                translateToLocal("machine.smallmoleculararcaneassembler.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTSmallMolecularArcaneAssembler.get(1));
+
+        MTItemList.MTPatternAccessHatch.set(
+            new MTEHatchPatternAccess(
+                MT_ID + 82,
+                "Pattern Access Hatch",
+                translateToLocal("machine.patternaccesshatch.name")).getStackForm(1L));
+        AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTPatternAccessHatch.get(1));
 
         // Reactor access hatches: one variant per tier, EV (1 page) through UIV (8 pages).
         for (int i = 0; i < MTItemList.REACTOR_ACCESS_HATCHES.length; i++) {

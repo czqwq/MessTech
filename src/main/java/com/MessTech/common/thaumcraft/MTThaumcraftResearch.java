@@ -63,6 +63,8 @@ public final class MTThaumcraftResearch {
     private static final String UPGRADE_SPRITE = "messtech.upgrade.sprite";
     private static final String UPGRADE_RADIATION = "messtech.upgrade.radiation";
     private static final String UPGRADE_ELECTRIC = "messtech.upgrade.electric";
+    /** The Small Molecular Arcane Assembler research; its only recipe is the infusion recipe. */
+    private static final String ARCANE_ASSEMBLER = "messtech.arcaneassembler";
 
     private MTThaumcraftResearch() {}
 
@@ -75,6 +77,7 @@ public final class MTThaumcraftResearch {
     public static void registerResearches() {
         registerLeg();
         registerCells();
+        registerArcaneAssembler();
         registerUpgrades();
     }
 
@@ -245,6 +248,51 @@ public final class MTThaumcraftResearch {
                                 new ItemStack(ConfigItems.itemShard, 1, 6)))))
                 .setParents(LEG)
                 .setConcealed()
+                .registerResearchItem();
+    }
+
+    /**
+     * The Small Molecular Arcane Assembler (小型分子奥术装配室). It is deliberately an infusion item: the GT side of the
+     * machine is EV technology, but the block itself is an arcane construct, so the only recipe is the infusion below
+     * (the pattern access hatch keeps its own EV assembler recipe and is not part of this infusion). The node sits at
+     * (2,0) of our tab, visible as soon as the vanilla Infusion research is known.
+     */
+    private static void registerArcaneAssembler() {
+        new ResearchItem(
+            ARCANE_ASSEMBLER,
+            CATEGORY,
+            new AspectList().add(a(TCAspects.MACHINA), 10)
+                .add(a(TCAspects.PRAECANTATIO), 10)
+                .add(a(TCAspects.MOTUS), 10)
+                .add(a(TCAspects.COGNITIO), 10)
+                .add(Aspect.ORDER, 10),
+            2,
+            0,
+            2,
+            MTItemList.MTSmallMolecularArcaneAssembler.get(1))
+                .setPages(
+                    new ResearchPage("tc.research_text." + ARCANE_ASSEMBLER + ".0"),
+                    new ResearchPage(
+                        ThaumcraftApi.addInfusionCraftingRecipe(
+                            ARCANE_ASSEMBLER,
+                            MTItemList.MTSmallMolecularArcaneAssembler.get(1),
+                            8,
+                            new AspectList().add(a(TCAspects.PRAECANTATIO), 128)
+                                .add(a(TCAspects.MACHINA), 256)
+                                .add(a(TCAspects.MOTUS), 64)
+                                .add(a(TCAspects.COGNITIO), 32)
+                                .add(a(TCAspects.ORDO), 64),
+                            ItemList.Hull_EV.get(1L),
+                            ingredients(
+                                ItemRefer.Magic_Casing.get(1),
+                                new ItemStack(ConfigItems.itemResource, 1, 2),
+                                new ItemStack(ConfigItems.itemResource, 1, 15),
+                                ItemList.Emitter_EV.get(1L),
+                                new ItemStack(ConfigBlocks.blockJar, 1),
+                                GTModHandler
+                                    .getModItem(Mods.AppliedEnergistics2.getID(), "item.ItemMultiMaterial", 1, 23)))),
+                    new ResearchPage("tc.research_text." + ARCANE_ASSEMBLER + ".1"))
+                .setParents("INFUSION")
                 .registerResearchItem();
     }
 

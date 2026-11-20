@@ -381,6 +381,83 @@ MTMultiMachineBase<T>
   `dependencies.gradle`). Hatch block/item, upgrade item textures (`textures/items/upgradeEssentia/`) and the hull texture
   come from GT5U 5.09.51.242 (the PRs deleted Java, not PNGs).
 
+### MTSmallMolecularArcaneAssembler (小型分子奥术装配室)
+- Thaumic Energistics' Arcane Assembler rebuilt as a GT multiblock, but pattern-driven instead of knowledge-core/vis-P2P:
+  its recipe pool `MTArcaneAssemblyRecipes.arcaneAssemblyRecipes` (`mt.recipe.arcaneassembler`) is a plain GT recipe map
+  used for the NEI pages only, and actual crafting is triggered by AE2 encoded patterns in the machine's
+  `MTEHatchPatternAccess` (样板访问仓). The pool is filled at `GTRecipes.loadRecipes()` (FMLLoadComplete) from
+  `ThaumcraftApi.getCraftingRecipes()`; each GT recipe keeps the vis cost in metadata (`ARCANE_ASPECTS`, whose
+  `RecipeMetadataKey.drawInfo` writes the NEI line `Aer: 8 Ignis: 8`, omitting unused aspects) and its research keys in
+  `ARCANE_RESEARCH`.
+- Conversion rules: one item per grid cell (Thaumcraft ignores the template stack size), `Object[]`/`ArrayList` cells
+  become `OreDictItemStack` when they are the live `OreDictionary` list (otherwise item alternatives), damage 32767
+  stays a GT wildcard, container items are appended as outputs, and the primordial pearl (`itemEldritchObject` meta 3)
+  is encoded as GT's zero-size "must be present, never consumed" input. `ArcaneWandRecipe` / `ArcaneSceptreRecipe` are
+  enumerated over `WandCap.caps × WandRod.rods` with their dynamic NBT outputs, aspect costs and research keys
+  (`CAP_*` / `ROD_*` / `SCEPTRE`, wood + iron excluded for wands). Every converted definition is also kept in
+  `MTArcaneAssemblyRecipes.DEFINITIONS` for the pattern matching (`findRecipeForPattern`, `unconsumedInputs`).
+- Pattern matching: a pattern must describe one pool recipe - its condensed inputs have to fill the recipe's item slots
+  exactly (the recipe's own ore-dictionary/item alternatives decide which concrete stack is accepted) and every pattern
+  output must be one of the recipe's outputs; otherwise the hatch refuses the pattern on insertion
+  (`arcaneroom_unknown_pattern` status) and does not register it with AE. Both AE crafting patterns and processing
+  patterns are accepted: the pool is a GT recipe map (not a vanilla `IRecipe`), so pattern terminals encode it as a
+  processing pattern, and the machine's `isCraftable` filter must not exclude those. Non-consumed inputs (catalysts,
+  e.g. the Primordial Pearl) are still a slot of the recipe, so they have to be encoded in the pattern as well (NEE's
+  default "non-consumable ingredients" setting omits them; the hatch tooltip calls this out). Because AE's crafting CPU
+  only knows the pattern, it will still extract that catalyst from the network before pushing the job - the machine
+  cannot tell AE "I already have it locally". On push the machine additionally scans its own input buses
+  (`inputBusesContainAll`): when the buses hold the catalyst, the machine keeps that local copy and immediately returns
+  the AE-provided copy to the network; otherwise the AE copy is the catalyst for the job and is returned once it
+  finishes. There is no automatic recipe matching at all: the processing logic only reports the last pattern rejection
+  reason while the machine idles.
+- Buffer: six primal aspects in centivis (100 CV = 1 vis). Capacity per aspect = the controller-slot wand / sceptre's
+  `getMaxVis`, using the same `ItemWandCasting && !isStaff` predicate as the arcane workbench slot, so 法杖/权杖 work
+  and 手杖/手权杖 do not. Without one the buffer is inactive, a pushed pattern is rejected with the "请放入法杖/权杖！"
+  result and the GUI shows the same reminder. Swapping in a smaller staff clamps the buffer to its capacity; a pattern
+  whose recipe aspect cost exceeds the inserted staff's capacity is rejected with the "capacity too low" result.
+- Refill: every tick at most one point of each primal aspect is bought for 2048 EU through `drainEnergyExactly`
+  (all-or-nothing over the energy hatches), limited by the EU the energy hatches really hold and keeping the running
+  pattern job's EU/t in reserve.
+- Pattern job: fixed 100 ticks and 2048 EU/t (no overclock/parallel/batch; `getMaxParallelRecipes() = 1`); the aspect
+  cost is deducted when the hatch accepts the push, the job then runs on the normal multiblock progress bar. Both EU/t
+  fields are set (`lEUt`, which `MTEExtendedPowerMultiBlockBase#onRunningTick` drains, and the int `mEUt`, which the GUI
+  and NBT use). A power loss pauses it (`stopMachine(POWER_LOSS)` zeroes the progress counters) and `resumePatternJob`
+  restarts it when EU is back - resetting `mEfficiency` to 10000, because the stop path zeroes it and
+  `getActualEnergyUsage` would otherwise bill 10x EU/t. Jobs survive world/chunk reload (NBT: recipe index, inputs,
+  pending outputs) and are only restarted once the structure check passed again - the reload must not abort a job whose
+  `mMachine` is still false on the first tick. When the progress finishes, `outputAfterRecipe` injects the recipe
+  results plus the non-consumed pattern inputs into the ME network through the hatch, retrying every tick; stacks the
+  network refuses stay in the controller NBT instead of being dropped/voided. Research gating uses
+  `ThaumcraftApiHelper.isResearchComplete(ownerName, key)` against the machine owner (its placer); a machine without a
+  real owner (GT's "Player" fallback) is not gated. The pool is created in `MTMachineLoader.loadMachines()` (postInit)
+  via `MTArcaneAssemblyRecipes.init()`, so its NEI recipe category belongs to MessTech; the recipes are converted at
+  load complete.
+- Structure 5×5×5 (offsets 2,2,0): the 44-block Magic Casing frame ('A') accepts the energy hatch and input bus (the  pattern access hatch itself is an input bus), 0-42 casings remain; the shell ('B') is Thaumcraft warded glass
+  (`blockCosmeticOpaque` meta 2): 53 blocks, because the front-face centre 'B' is the controller. `ofTileAdder` claims
+  every unowned `TileOwned` warded glass for the machine owner, and the adder checks block + meta explicitly because
+  `ofTileAdder` itself accepts any tile entity (arcane doors/warded wooden devices are `TileOwned` too). At least one
+  pattern access hatch is required (`...error.need_pattern_hatch`). Maintenance is not wired (the MT base disables
+  maintenance checks). Controller texture = Magic Casing with the LPF `industrialMultiMachine(Active)` front overlay. The
+  GUI lists the six buffers in the terminal text area. The machine implements `RecipeMapWorkable`, so it is registered as
+  the NEI catalyst of its pool.
+- Recipe and research: the machine itself is an infusion item only (no GT assembler recipe; the pattern access hatch has
+  one). `MTThaumcraftResearch#registerArcaneAssembler` adds the `messtech.arcaneassembler` node to the MessTech tab at
+  (2,0), parent Thaumcraft's `INFUSION`, visible, with an intro page, the infusion recipe page (instability 8; EV hull
+  centre; components: magic casing, Thaumium ingot, charm, EV emitter, essentia jar, an AE2 processor; aspects
+  Praecantatio 128, Machina 256, Motus 64, Cognitio 32, Order 64) and a usage page.
+- `MTEHatchPatternAccess` (样板访问仓, `MT_ID + 82`, crafting recipe: EV assembler): extends `MTEHatchInputBus` (EV, 25
+  pattern slots = `(tier + 1)^2`, the slot count the inherited GUI derives from the tier, so a custom count would crash
+  the GUI; sorting/filter off, only valid arcane patterns insertable, `allowPutStack`/screwdriver overridden so pipes and
+  the inherited toggles cannot bypass that) and is the machine's AE2 node - it implements `IGridProxyable` +
+  `ICraftingProvider` with its own `AENetworkProxy` (the same proxy setup as GT's `MTEHatchInputBusME`; the controller
+  itself has no grid proxy), so ME cables connect directly to the hatch. It registers its valid patterns via
+  `provideCrafting`, the AE crafting CPU extracts the ingredients and calls `pushPattern`, the hatch hands the job to
+  `MTSmallMolecularArcaneAssembler#pushArcanePattern` and reports `isBusy` while the machine crafts. Finished/leftover
+  stacks are injected with `injectIntoNetwork`. Pattern changes are posted as `MENetworkCraftingPatternChange` and
+  retried every second until a live grid accepted the event (power/boot/channel events also re-flag them). Textures:
+  Magic Casing `getCasingTexture()` with GT5U's `OVERLAY_HATCH_PATTERN_PROVIDER` on the front, i.e. the Large Molecular
+  Assembler's pattern provider hatch icon; the inherited generic bus description is replaced by the hatch's own tooltip.
+
 ### Thaumcraft research tab (混乱科技 / MessTech)
 - `MTThaumcraftResearch` registers its own `messtech` category (`ResearchCategories.registerCategory`, run from
   `CommonProxy#postInit` after Thaumcraft's own postInit thanks to the hard dependency) and eleven research entries with
@@ -765,8 +842,8 @@ MTMultiMachineBase<T>
 
 ### MTWirelessVacuumConveyorInput / MTWirelessVacuumConveyorOutput
 - Registered as `32409` (input) / `32410` (output); extend the normal GT5U VCI/VCO classes, so existing NAC module
-  structure code accepts them. They keep the plain GT5U vacuum hatch GUI; the frequency/private GUI of the first
-  implementation is gone.
+  structure code accepts them. They are built from GT5U's vacuum hatch GUI (`MTEHatchVacuumConveyorGui`, re-wrapped by
+  `MTWirelessVacuumConveyorGui` below); the frequency/private GUI of the first implementation is gone.
 - Pairing is **data stick address pairing**, adapted from GT-Not-Leisure's `WirelessVacuumConveyor*Hatch`
   (`tmp/GT-Not-Leisure/src/main/java/com/science/gtnl/common/machine/hatch/`): left-click the output hatch with a
   data stick -> the stick stores `{type, dim, x, y, z}` (`type = messtechWirelessVacuumConveyorOutput`) plus a
@@ -793,6 +870,32 @@ MTMultiMachineBase<T>
   with dim+coords / dim or chunk unloaded / target missing / wrong hatch type / colour mismatch / stale link, plus the
   expected counterpart address when not cleanly linked), encoded with `IGregTechDeviceInformation.encode` so the client
   translates it.
+- **GUI** (`com.MessTech.common.machine.hatch.MTWirelessVacuumConveyorGui`, returned by both hatches' `buildUI`):
+  GT5U's vacuum conveyor content (4x4 circuit-component grid, storage-cell drain row, void button) plus a one-row link
+  bar in the strip under the grid (`bottomRel(0).leftRel(0)`): an 8x8 colour dot (green linked / red unbound / yellow
+  broken - AE2's wireless status indicator idea), the state text (`machine.wirelessvacuum.gui.state.*`) and an 18x18
+  `GTGuiTextures.OVERLAY_BUTTON_HIGHLIGHT_BLOCK` button. The panel is 198x203, the native size of the nanochip theme's
+  `BACKGROUND_NANOCHIP` texture, which leaves the bar an 18-px strip instead of overlapping GT's widgets; the stored peer
+  address is not inline (it does not fit next to the state text in both languages) but the second line of the button's
+  tooltip (`gui.target` / `gui.target.none`). Left click on the button closes the screen and outlines the peer hatch in
+  the world; while nothing is paired the button is inert (an MUI2 disabled widget is not rendered at all) and its tooltip
+  says why.
+- The link state and peer address are server-side only, so the GUI gets them through MUI2 sync values (`linkState` /
+  `linkHasTarget` / `linkTargetDim|X|Y|Z`, `IntSyncValue`/`BooleanSyncValue` getters that `detectAndSendChanges` re-reads
+  every tick). The getters are side-safe - `WirelessVacuumConveyorUtil#linkState` returns `UNBOUND` on the client, the
+  address getters 0 - so no server-only world lookup ever runs client-side.
+- **Highlight mechanism** (`com.MessTech.common.render.highlight`, ported from AE2's
+  `appeng.client.render.highlighter`): `IHighlighter` (noWork / renderHighlightedBlocks / clear / getExpireTime) +
+  `HighlighterManager` (one `RenderWorldLastEvent` handler with AE2's 500 ms wall-clock blink phase and expiry check;
+  `init()` registered from the client proxy) + `BlockPosHighlighter` (static `highlight(player, dimension, x, y, z)`; red
+  1x1x1 outline drawn through walls; AE2's duration `clamp(500 ms * taxicab distance, 3 s, 30 s)`; a block in another
+  dimension is not drawn and is reported in chat instead). No packet is involved - the GUI already holds the synced
+  coordinates, and the render hook keeps the outline alive after the screen closes.
+- **Waila**: both hatches override `getWailaNBTData` (server: `WirelessVacuumConveyorUtil#writeWailaData` writes the live
+  `LinkState` and the peer address into the Waila tag) and `getWailaBody` (client: `appendWailaBody` decodes and
+  translates it), AE2 wireless-connector wording: `machine.wirelessvacuum.waila.linked` ("已连接: dim/coords", green),
+  `waila.unbound` ("未连接", red), plus `waila.unloaded` / `waila.invalid` for the unloaded and broken states. The
+  `getInfoData` scanner lines above are unchanged.
 - Unbind: sneak + wire cutter right-click on either hatch (`onWireCutterRightClick`). The own side is always cleared,
   the counterpart only when the player may configure it.
 - Permissions: binding/unbinding re-points the *output* hatch, so `canConfigure` requires the player to be its owner or

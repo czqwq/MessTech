@@ -269,6 +269,101 @@ public final class WirelessVacuumConveyorUtil {
         return state == LinkState.MISSING || state == LinkState.WRONG_SIDE || state == LinkState.BROKEN;
     }
 
+    // ------------------------------------------------------------------ live state / WAILA
+
+    /** NBT keys of the WAILA payload written by {@link #writeWailaData} and decoded by {@link #appendWailaBody}. */
+    private static final String WAILA_STATE = "wirelessVacuumState";
+    private static final String WAILA_DIM = "wirelessVacuumDim";
+    private static final String WAILA_X = "wirelessVacuumX";
+    private static final String WAILA_Y = "wirelessVacuumY";
+    private static final String WAILA_Z = "wirelessVacuumZ";
+
+    /**
+     * Live pairing state of a wireless hatch, dispatching on its direction. Returns {@link LinkState#UNBOUND} on the
+     * client: the stored address only lives in server-side NBT and resolving the counterpart needs the loaded worlds,
+     * so the client must not try to compute the state itself.
+     */
+    public static LinkState linkState(MTEHatchVacuumConveyor hatch) {
+        IGregTechTileEntity base = hatch == null ? null : hatch.getBaseMetaTileEntity();
+        if (base == null || !base.isServerSide()) return LinkState.UNBOUND;
+        if (hatch instanceof MTWirelessVacuumConveyorOutput output) {
+            return evaluateOutput(output, output.getLinkTarget());
+        }
+        if (hatch instanceof MTWirelessVacuumConveyorInput input) {
+            return evaluateInput(input, input.getLinkTarget());
+        }
+        return LinkState.UNBOUND;
+    }
+
+    /** Address of the single counterpart of a wireless hatch, or {@code null} when it is not paired yet. */
+    public static Target linkTargetOf(MTEHatchVacuumConveyor hatch) {
+        if (hatch instanceof MTWirelessVacuumConveyorOutput output) return output.getLinkTarget();
+        if (hatch instanceof MTWirelessVacuumConveyorInput input) return input.getLinkTarget();
+        return null;
+    }
+
+    /** Decodes a {@link LinkState} ordinal (GUI sync value or WAILA payload), defaulting to unbound. */
+    public static LinkState decodeState(int ordinal) {
+        LinkState[] states = LinkState.values();
+        return ordinal >= 0 && ordinal < states.length ? states[ordinal] : LinkState.UNBOUND;
+    }
+
+    /**
+     * Colour of a link state wherever it is shown: green for a clean link, red for no link, yellow for a broken one.
+     */
+    public static EnumChatFormatting stateColor(LinkState state) {
+        if (state == LinkState.LINKED) return EnumChatFormatting.GREEN;
+        if (state == LinkState.UNBOUND) return EnumChatFormatting.RED;
+        return EnumChatFormatting.YELLOW;
+    }
+
+    /**
+     * WAILA server-provider side: writes the live link state and, when a counterpart is stored, its address into the
+     * WAILA NBT tag. Resolving the peer needs the loaded worlds, so the state is computed here, server-side; the client
+     * only decodes and translates it in {@link #appendWailaBody}.
+     */
+    public static void writeWailaData(NBTTagCompound tag, MTEHatchVacuumConveyor hatch) {
+        if (tag == null) return;
+        tag.setInteger(WAILA_STATE, linkState(hatch).ordinal());
+        Target target = linkTargetOf(hatch);
+        if (target == null) return;
+        tag.setInteger(WAILA_DIM, target.dimension);
+        tag.setInteger(WAILA_X, target.x);
+        tag.setInteger(WAILA_Y, target.y);
+        tag.setInteger(WAILA_Z, target.z);
+    }
+
+    /**
+     * WAILA client side: appends the AE2 wireless-connector style link status line for a wireless hatch. Does nothing
+     * when the tag was not written by {@link #writeWailaData}.
+     */
+    public static void appendWailaBody(List<String> currentTip, NBTTagCompound tag) {
+        if (currentTip == null || tag == null || !tag.hasKey(WAILA_STATE)) return;
+        LinkState state = decodeState(tag.getInteger(WAILA_STATE));
+        String line;
+        switch (state) {
+            case LINKED:
+                line = StatCollector.translateToLocalFormatted(
+                    "machine.wirelessvacuum.waila.linked",
+                    tag.getInteger(WAILA_DIM),
+                    tag.getInteger(WAILA_X),
+                    tag.getInteger(WAILA_Y),
+                    tag.getInteger(WAILA_Z));
+                break;
+            case UNBOUND:
+                line = StatCollector.translateToLocal("machine.wirelessvacuum.waila.unbound");
+                break;
+            case DIM_UNLOADED:
+            case CHUNK_UNLOADED:
+                line = StatCollector.translateToLocal("machine.wirelessvacuum.waila.unloaded");
+                break;
+            default:
+                line = StatCollector.translateToLocal("machine.wirelessvacuum.waila.invalid");
+                break;
+        }
+        currentTip.add(stateColor(state) + line);
+    }
+
     /**
      * True when the packet holds no components. GT5U's own {@code isEmpty()} only checks the map, but
      * {@code CircuitComponentPacket#consume} leaves drained per-component lists behind, so a fully consumed hatch would

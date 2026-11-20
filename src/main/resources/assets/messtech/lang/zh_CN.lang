@@ -323,7 +323,7 @@ machine.nqdafreactor.tooltip.output=任意反应堆外壳
 machine.wirelessvacuum.input.name=无线真空传送输入仓
 machine.wirelessvacuum.output.name=无线真空传送输出仓
 machine.wirelessvacuum.desc.0=无线 NAC 真空传送仓
-machine.wirelessvacuum.desc.1=手持数据棒左键输出仓记录地址，再右键输入仓完成配对
+machine.wirelessvacuum.desc.1=手持闪存左键输出仓记录地址，再右键输入仓完成配对
 machine.wirelessvacuum.desc.2=两端必须染成同一种颜色（未染色不连接），严格一对一
 machine.wirelessvacuum.desc.3=潜行时用线剪右键可断开配对
 machine.wirelessvacuum.desc.input=无线接收已配对输出仓送来的电路组件。
@@ -348,6 +348,20 @@ machine.wirelessvacuum.info.wrong_side=§7连接状态：§c对端仓类型不�
 machine.wirelessvacuum.info.color_mismatch=§7连接状态：§c两端颜色不一致
 machine.wirelessvacuum.info.broken=§7连接状态：§c配对已失效
 machine.wirelessvacuum.info.target=§7预期对端：维度 %s，坐标 %s/%s/%s
+# --- 无线真空传送仓：GUI 状态栏 / 高亮按钮 / WAILA / 高亮反馈 ---
+machine.wirelessvacuum.gui.state.linked=§a已连接
+machine.wirelessvacuum.gui.state.unbound=§c未连接
+machine.wirelessvacuum.gui.state.broken=§e未连接(连接异常)
+machine.wirelessvacuum.gui.target=§7对端：维度 %s，坐标 %s/%s/%s
+machine.wirelessvacuum.gui.target.none=§7对端：未设置
+machine.wirelessvacuum.gui.highlight=高亮已连接的仓
+machine.wirelessvacuum.gui.highlight.disabled=未连接，没有可高亮的仓
+machine.wirelessvacuum.waila.linked=§7已连接：§a维度 %s，坐标 %s/%s/%s
+machine.wirelessvacuum.waila.unbound=§c未连接
+machine.wirelessvacuum.waila.unloaded=§e未连接：对端未加载
+machine.wirelessvacuum.waila.invalid=§c未连接：连接异常
+machine.wirelessvacuum.chat.highlighted=§a已高亮已连接的仓：维度 %s，坐标 %s/%s/%s
+machine.wirelessvacuum.chat.highlight.other_dim=§e已连接的仓位于维度 %s，无法在当前世界高亮
 machine.wirelessbeamline.input.name=无线束流输入仓
 machine.wirelessbeamline.output.name=无线束流输出仓
 machine.wirelessbeamline.advanced.name=无线过滤式束流输出仓
@@ -882,6 +896,37 @@ machine.smallessentiasmeltery.tooltip.output_hatch=源质输出仓
 machine.smallessentiasmeltery.tooltip.output_hatch_me=ME 源质输出仓
 machine.smallessentiasmeltery.need_output_hatch=§c至少需要 1 个源质输出仓
 
+# --- 小型分子奥术装配室 (MTSmallMolecularArcaneAssembler) ---
+machine.smallmoleculararcaneassembler.name=小型分子奥术装配室
+machine.smallmoleculararcaneassembler.machinetype=分子奥术装配
+machine.smallmoleculararcaneassembler.tooltip.desc=§7用电力补充元始要素，自动完成奥术工作台的合成
+machine.smallmoleculararcaneassembler.tooltip.flavour=§[bc]科技宅改变魔法世界
+machine.smallmoleculararcaneassembler.tooltip.refill=§7· 每 §b2048§7 EU 补充 §b1§7 点要素，每 tick 每种要素最多补充 §b1§7 点
+machine.smallmoleculararcaneassembler.tooltip.staff=§7· 控制槽必须放入§e法杖/权杖§7，要素上限 = 其单种 Vis 上限（未放入时无法存储，也无法运行）
+machine.smallmoleculararcaneassembler.tooltip.research=§7· 只有机器主人已解锁对应研究时才会合成
+machine.smallmoleculararcaneassembler.tooltip.pattern=§7· 在§e样板访问仓§7中放入 AE 编码样板，机器按样板自动合成
+machine.smallmoleculararcaneassembler.tooltip.controller=§7正面中央
+machine.smallmoleculararcaneassembler.tooltip.casing_name=魔法机械方块
+machine.smallmoleculararcaneassembler.tooltip.warded_glass_name=守卫者玻璃
+machine.smallmoleculararcaneassembler.tooltip.hatch_info=魔法机械方块
+machine.smallmoleculararcaneassembler.tooltip.pattern_hatch_name=样板访问仓
+machine.smallmoleculararcaneassembler.error.need_pattern_hatch=§c至少需要 1 个样板访问仓
+machine.smallmoleculararcaneassembler.gui.no_staff=§c请放入法杖/权杖！
+mt.recipe.arcaneassembler=小型分子奥术装配室
+GT5U.gui.text.recipe_result.arcaneroom_no_staff=§c请放入法杖/权杖！
+GT5U.gui.text.recipe_result.arcaneroom_research_locked=§c机器主人尚未解锁该配方的研究
+GT5U.gui.text.recipe_result.arcaneroom_not_enough_aspects=§c要素不足
+GT5U.gui.text.recipe_result.arcaneroom_capacity_too_low=§c要素需求超过当前法杖/权杖的容量
+GT5U.gui.text.recipe_result.arcaneroom_unknown_pattern=§c该样板不对应任何奥术配方
+
+# --- 样板访问仓 (MTEHatchPatternAccess) ---
+machine.patternaccesshatch.name=样板访问仓
+machine.patternaccesshatch.tooltip.1=§e小型分子奥术装配室§r的样板存储
+machine.patternaccesshatch.tooltip.2=容量：§b25§r 个 AE 编码样板
+machine.patternaccesshatch.tooltip.3=直接连接 ME 网络，样板输入/输出必须匹配奥术配方
+machine.patternaccesshatch.tooltip.4=AE 合成 CPU 会把样板推送给机器
+machine.patternaccesshatch.tooltip.5=非消耗性输入（如元始珍珠）也必须编入样板
+
 tile.essentiaOutputHatchME.name=ME 源质输出仓
 
 tile.essentiaHatch.name=源质输入仓
@@ -913,6 +958,11 @@ tc.research_text.messtech.leg.3=Pannus：600EU<BR><BR>Vinculum：500EU<BR><BR>Ma
 tc.research_name.messtech.cells=更好的单元
 tc.research_text.messtech.cells=还有更高的效率。
 tc.research_text.messtech.cells.0=新手源质扩散单元的效率实在太低，你完全不能忍受。所以你研发了一些新的源质扩散单元。<BR><BR>新手源质扩散单元只提供 1 稳定点，学徒级的单元提供 2 稳定点，大师级的单元提供 5 稳定点，而宗师级的单元可以提供足足 10 稳定点！<BR><BR>稳定点越高，每点源质在发电机中产生的能量就越多。<BR><BR>同时也可以解锁更好的仓室。
+
+tc.research_name.messtech.arcaneassembler=小型分子奥术装配室
+tc.research_text.messtech.arcaneassembler=把奥术工作台塞进多方块结构。<BR><BR>EU 买要素，样板管合成。
+tc.research_text.messtech.arcaneassembler.0=奥术工作台太小，而你的 ME 网络又太大。<BR><BR>小型分子奥术装配室把奥术工作台塞进了一个 5×5×5 的魔法机械结构：它用 EU 购买法杖里的 Vis，以要素的形式储存，再按照 ME 网络里的样板完成合成。<BR><BR>机器需要法杖或权杖作为要素容器，至少一个样板访问仓，以及一个能源仓。
+tc.research_text.messtech.arcaneassembler.1=样板访问仓就是机器的“分子装配室”：AE 编码样板放进去后，样板访问仓会直接连上 ME 网络，合成 CPU 把原料推进机器，产物再注回网络。<BR><BR>样板必须与配方池中的奥术配方完全一致，非消耗性输入（例如元始珍珠）也要编入样板，并且机器主人必须已解锁对应研究。<BR><BR>每点要素需要 2048 EU，每 tick 每种要素最多补充 1 点；每次合成耗时 100 tick，耗电 2048 EU/t。
 
 tc.research_name.messtech.upgrade.blank=升级你的发电机
 tc.research_text.messtech.upgrade.blank=来试试更危险的源质吧。
