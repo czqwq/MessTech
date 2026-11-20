@@ -3,8 +3,6 @@ name: Auto Release build
 on:
   push:
     branches: [ master, master-29x-beta2-3, master-2.9.0-beta1 ]
-  pull_request:
-    branches: [ master, master-29x-beta2-3, master-2.9.0-beta1 ]
   workflow_dispatch:
 
 concurrency:
