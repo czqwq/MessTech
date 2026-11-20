@@ -655,7 +655,7 @@ public final class MTRecipeMaps {
         }
         // GT registers its circuit wraps (bartworks' CircuitWraps) during its own postload, which can happen after the
         // first call here: building now would bake plain chips into every page instead of the wraps, so leave the pool
-        // empty and let the next call - the server-started fallback - build it.
+        // empty and let the next call - the load-complete fallback or the server-started fallback - build it.
         chipWraps = buildChipWraps();
         if (chipWraps.isEmpty()) {
             MessTech.MT_LOG.info(
@@ -673,12 +673,16 @@ public final class MTRecipeMaps {
 
         RecipeCategory defaultCategory = oneStepCircuitPoolRecipes.getDefaultRecipeCategory();
         Set<String> seen = new HashSet<>();
+        int added = 0;
         for (GTRecipe recipe : generated) {
             String signature = recipeSignature(recipe);
             if (!seen.add(signature)) continue;
             recipe.setRecipeCategory(defaultCategory);
             oneStepCircuitPoolRecipes.addFakeRecipe(false, recipe);
+            added++;
         }
+        MessTech.MT_LOG.info(
+            "Nano-Scale Foundry one-step circuit pool: built {} recipes from {} assembly recipes", added, generated.size());
     }
 
     /**

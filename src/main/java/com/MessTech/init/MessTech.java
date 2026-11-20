@@ -5,6 +5,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.MessTech.common.recipe.ExtraRecipes;
 import com.MessTech.common.recipe.GTRecipes;
+import com.MessTech.common.recipe.MTRecipeMaps;
 
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.SidedProxy;
@@ -67,6 +68,11 @@ public class MessTech {
     @Mod.EventHandler
     public void completeInit(FMLLoadCompleteEvent event) {
         GTRecipes.loadRecipes();
+        // GT registers its circuit wraps in sAfterGTPostload, which runs during GT's postload on both the client and a
+        // dedicated server. FMLLoadCompleteEvent is the first common point after that, so build the one-step circuit
+        // pool here instead of relying only on FMLServerStartedEvent: a remote client has no local server and never
+        // receives that event, leaving its NEI copy of the pool empty (and NEI hides empty recipe categories).
+        MTRecipeMaps.populateOneStepCircuitPoolRecipes();
         if (Mods.Computronics.isModLoaded() && Mods.Thaumcraft.isModLoaded() && Mods.Avaritia.isModLoaded()) {
             ExtraRecipes.loadReplacementRecipes();
         }
