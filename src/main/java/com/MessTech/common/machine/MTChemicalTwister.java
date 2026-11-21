@@ -7,10 +7,15 @@ import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_FRONT_LARGE_CHEMICA
 import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_FRONT_LARGE_CHEMICAL_REACTOR_ACTIVE;
 import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_FRONT_LARGE_CHEMICAL_REACTOR_ACTIVE_GLOW;
 import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_FRONT_LARGE_CHEMICAL_REACTOR_GLOW;
+import static gregtech.api.util.GTRecipeBuilder.INGOTS;
 import static gregtech.api.util.GTStructureUtility.activeCoils;
 import static gregtech.api.util.GTStructureUtility.ofCoil;
+import static gregtech.api.util.ParallelHelper.addFluidsLong;
+import static gregtech.api.util.ParallelHelper.addItemsLong;
+import static gregtech.api.util.ParallelHelper.calculateIntegralChancedOutputMultiplier;
 import static net.minecraft.util.StatCollector.translateToLocal;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -20,10 +25,14 @@ import javax.annotation.Nullable;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraftforge.fluids.FluidStack;
+
+import org.jetbrains.annotations.NotNull;
 
 import com.MessTech.common.machine.Base.MTMultiMachineBase;
 import com.MessTech.common.machine.Base.MTProcessingLogic;
@@ -37,6 +46,7 @@ import com.gtnewhorizon.structurelib.structure.StructureDefinition;
 import gregtech.api.casing.Casings;
 import gregtech.api.enums.HatchElement;
 import gregtech.api.enums.HeatingCoilLevel;
+import gregtech.api.enums.Materials;
 import gregtech.api.enums.TAE;
 import gregtech.api.enums.Textures;
 import gregtech.api.interfaces.IIconContainer;
@@ -46,17 +56,20 @@ import gregtech.api.interfaces.tileentity.ICasingTextureProvider;
 import gregtech.api.interfaces.tileentity.IGregTechDeviceInformation;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.logic.ProcessingLogic;
+import gregtech.api.objects.ItemData;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.render.TextureFactory;
 import gregtech.api.structure.error.StructureError;
 import gregtech.api.structure.error.StructureErrorRegistry;
+import gregtech.api.util.GTOreDictUnificator;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.api.util.OverclockCalculator;
+import gregtech.api.util.ParallelHelper;
 import gregtech.common.misc.GTStructureChannels;
 import gtPlusPlus.xmod.gregtech.common.blocks.textures.TexturesGtBlock;
 
@@ -366,6 +379,66 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
                 setOverclock(isEnablePerfectOverclock() ? 4 : 2, 4);
                 return super.process();
             }
+
+            /**
+             * GT++ QFT parity ({@code MTEQuantumForceTransformer#createParallelHelper}): in fluid mode an item output
+             * that has a material becomes that material's fluid instead of an item, while outputs without a material
+             * stay items. The hooks replace the regular output calculation of the parallel helper and use the same
+             * chanced-output roll GT uses, so the conversion follows parallel and output chance like a real output.
+             * Only installed for {@link MTChemicalTwister#MODE_QFT_PROBABILITY_DESTROYER} with fluid mode on; any other
+             * recipe keeps the standard calculation untouched.
+             */
+            @NotNull
+            @Override
+            protected ParallelHelper createParallelHelper(@NotNull GTRecipe recipe) {
+                ParallelHelper helper = super.createParallelHelper(recipe);
+                if (machineMode != MODE_QFT_PROBABILITY_DESTROYER || !mFluidMode) return helper;
+
+                ItemStack[] outputs = recipe.mOutputs == null ? new ItemStack[0] : recipe.mOutputs;
+                FluidStack[] converted = new FluidStack[outputs.length];
+                boolean anyConverted = false;
+                for (int i = 0; i < outputs.length; i++) {
+                    converted[i] = fluidOutputOf(outputs[i]);
+                    anyConverted |= converted[i] != null;
+                }
+                if (!anyConverted) return helper;
+
+                return helper.setCustomItemOutputCalculation(parallel -> {
+                    ArrayList<ItemStack> items = new ArrayList<>();
+                    for (int i = 0; i < outputs.length; i++) {
+                        ItemStack output = recipe.getOutput(i);
+                        if (output == null || converted[i] != null) continue;
+                        long multiplier = calculateIntegralChancedOutputMultiplier(recipe.getOutputChance(i), parallel);
+                        addItemsLong(items, output.copy(), (long) output.stackSize * multiplier);
+                    }
+                    return items.toArray(new ItemStack[0]);
+                })
+                    .setCustomFluidOutputCalculation(parallel -> {
+                        ArrayList<FluidStack> fluids = new ArrayList<>();
+                        // Converted item outputs: one ingot of molten metal (or 1000 mB of fluid) per item, times the
+                        // parallel-counted multiplier and the item stack size, exactly like GT++ QFT.
+                        for (int i = 0; i < converted.length; i++) {
+                            if (converted[i] == null) continue;
+                            long multiplier = calculateIntegralChancedOutputMultiplier(
+                                recipe.getOutputChance(i),
+                                parallel);
+                            long amount = (long) converted[i].amount * multiplier * outputs[i].stackSize;
+                            addFluidsLong(fluids, converted[i].copy(), amount);
+                        }
+                        // The recipe's own fluid outputs are still produced.
+                        if (recipe.mFluidOutputs != null) {
+                            for (int i = 0; i < recipe.mFluidOutputs.length; i++) {
+                                FluidStack output = recipe.getFluidOutput(i);
+                                if (output == null) continue;
+                                long multiplier = calculateIntegralChancedOutputMultiplier(
+                                    recipe.getFluidOutputChance(i),
+                                    parallel);
+                                addFluidsLong(fluids, output.copy(), (long) output.amount * multiplier);
+                            }
+                        }
+                        return fluids.toArray(new FluidStack[0]);
+                    });
+            }
         }.setMaxParallelSupplier(this::getLimitedMaxParallel);
     }
 
@@ -479,6 +552,64 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
     }
     // endregion
 
+    // region QFT fluid mode
+    /**
+     * GT++ QFT parity: QFT's {@code mFluidMode} (see {@code MTEQuantumForceTransformer}) replaces the item outputs of a
+     * recipe with their materials' fluids. Here the toggle is a wire cutter right-click instead of QFT's screwdriver -
+     * this machine's screwdriver already cycles the machine modes - and it only takes effect in
+     * {@link #MODE_QFT_PROBABILITY_DESTROYER}; the other modes keep their item outputs. Saved to NBT with the machine
+     * mode, so the toggle survives a reload.
+     */
+    private boolean mFluidMode = false;
+
+    /**
+     * Fluid a QFT item output is replaced with in fluid mode: one ingot of the material's molten fluid (GT++ QFT uses
+     * {@code INGOTS} the same way), else 1000 mB of the material's normal fluid. {@code null} means the item has no
+     * material association, in which case it is still produced as an item.
+     */
+    @Nullable
+    private static FluidStack fluidOutputOf(@Nullable ItemStack item) {
+        if (item == null) return null;
+        ItemData data = GTOreDictUnificator.getAssociation(item);
+        Materials material = data == null || data.mMaterial == null ? null : data.mMaterial.mMaterial;
+        if (material == null || material == Materials._NULL) return null;
+        if (material.mStandardMoltenFluid != null) return material.getMolten(INGOTS);
+        if (material.mFluid != null) return material.getFluid(1000);
+        return null;
+    }
+
+    /**
+     * Wire cutter toggles fluid mode. Sneaking falls through to the base class so GT's sneak + wire cutter batch mode
+     * toggle keeps working.
+     */
+    @Override
+    public boolean onWireCutterRightClick(ForgeDirection side, ForgeDirection wrenchingSide, EntityPlayer aPlayer,
+        float aX, float aY, float aZ, ItemStack aTool) {
+        if (aPlayer != null && !aPlayer.isSneaking()) {
+            mFluidMode = !mFluidMode;
+            GTUtility.sendChatTrans(
+                aPlayer,
+                mFluidMode ? "machine.largechemicaltwister.fluid_mode.enabled"
+                    : "machine.largechemicaltwister.fluid_mode.disabled");
+            return true;
+        }
+        return super.onWireCutterRightClick(side, wrenchingSide, aPlayer, aX, aY, aZ, aTool);
+    }
+
+    /** Fluid mode is a player setting like the machine mode, so it has to survive a reload. */
+    @Override
+    public void saveNBTData(NBTTagCompound aNBT) {
+        super.saveNBTData(aNBT);
+        aNBT.setBoolean("mFluidMode", mFluidMode);
+    }
+
+    @Override
+    public void loadNBTData(NBTTagCompound aNBT) {
+        super.loadNBTData(aNBT);
+        mFluidMode = aNBT.getBoolean("mFluidMode");
+    }
+    // endregion
+
     /**
      * Which piece a build hint / survival build / NEI preview shows. The trigger's stack size is GT's "structure tier"
      * switch: {@code 1} = level 1, {@code >= 2} = level 2 - which is what makes BlockRenderer6343 offer its Tier slider
@@ -552,6 +683,7 @@ public class MTChemicalTwister extends MTMultiMachineBase<MTChemicalTwister>
             .addInfo(translateToLocal("machine.chemicaltwister.tooltip.modes.qft"))
             .addInfo(translateToLocal("machine.chemicaltwister.tooltip.modes.comb"))
             .addInfo(translateToLocal("machine.chemicaltwister.tooltip.modes.catalyst"))
+            .addInfo(translateToLocal("machine.chemicaltwister.tooltip.modes.fluid"))
             .addInfo(translateToLocal("machine.chemicaltwister.tooltip.heat.poc"))
             .addSeparator()
             .addSubChannel(GTStructureChannels.HEATING_COIL)

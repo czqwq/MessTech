@@ -661,6 +661,8 @@ machine.largechemicaltwister.mode.probability_destroyer=Probability Destroyer
 machine.largechemicaltwister.mode.comb_processor=Comb Processor
 machine.largechemicaltwister.mode.comb_requires_tier2=The Comb Processor needs structure level 2 to be switched to!
 machine.largechemicaltwister.cannot_switch_active=Cannot switch mode while the machine is running!
+machine.largechemicaltwister.fluid_mode.enabled=Fluid Mode: Enabled
+machine.largechemicaltwister.fluid_mode.disabled=Fluid Mode: Disabled
 machine.chemicaltwister.tooltip.desc=§7A chemical plant that switches between the §bChemical Twister§7, §bProbability Destroyer§7 and §bComb Processor§7 forms
 machine.chemicaltwister.tooltip.flavour=§7A sound suddenly appears in your mind...§0Twist
 machine.chemicaltwister.tooltip.modes.header=§6Modes:
@@ -669,6 +671,7 @@ machine.chemicaltwister.tooltip.modes.chemical=§7· §bChemical Twister§7: run
 machine.chemicaltwister.tooltip.modes.qft=§7· §bProbability Destroyer§7: runs the §eQuantum Force Transformer§7 (QFT) recipe pool, every output chance is §b100%§7 and the heat is fixed at §b12601 K§7, needs at least structure level §b2§7
 machine.chemicaltwister.tooltip.modes.comb=§7· §bComb Processor§7: needs structure level §b2§7
 machine.chemicaltwister.tooltip.modes.catalyst=§7· A Quantum Force Transformer recipe needs its catalyst in an input bus; the catalyst is not consumed
+machine.chemicaltwister.tooltip.modes.fluid=§7· Wire cutter right-click toggles Fluid mode: in §bProbability Destroyer§7 mode, all possible outputs are turned into their fluid variant, if available
 machine.chemicaltwister.tooltip.heat.poc=§7· §aPerfect overclock§7 is enabled
 machine.chemicaltwister.structureinfo.1=§l§9A deep voice echoes nearby:§r Some §krecipes§r come from §kT§rS§kT§r
 

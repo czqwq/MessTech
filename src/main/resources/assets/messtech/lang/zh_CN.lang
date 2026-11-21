@@ -662,6 +662,8 @@ machine.largechemicaltwister.mode.probability_destroyer=概率毁灭者
 machine.largechemicaltwister.mode.comb_processor=蜂窝处理者
 machine.largechemicaltwister.mode.comb_requires_tier2=蜂窝处理者需要结构等级 2 才能切换!
 machine.largechemicaltwister.cannot_switch_active=机器运行时无法切换模式!
+machine.largechemicaltwister.fluid_mode.enabled=流体模式：已启用
+machine.largechemicaltwister.fluid_mode.disabled=流体模式：已禁用
 machine.chemicaltwister.tooltip.desc=§7一台能在§b化学扭曲§7、§b概率毁灭者§7与§b蜂窝处理者§7三种形态间切换的化学工厂
 machine.chemicaltwister.tooltip.flavour=§7望着这个机器,脑海中突然有一道声音传出...§0扭曲
 machine.chemicaltwister.tooltip.modes.header=§6模式：
@@ -670,6 +672,7 @@ machine.chemicaltwister.tooltip.modes.chemical=§7· §b化学扭曲§7：运行
 machine.chemicaltwister.tooltip.modes.qft=§7· §b概率毁灭者§7：运行 §e量子操纵者§7（QFT）配方池，所有产出概率 §b100%§7、热量固定 §b12601 K§7，至少需要结构等级 §b2§7
 machine.chemicaltwister.tooltip.modes.comb=§7· §b蜂窝处理者§7：需要结构等级 §b2§7
 machine.chemicaltwister.tooltip.modes.catalyst=§7· 量子操纵者配方需要在输入总线中放入催化剂，催化剂不消耗
+machine.chemicaltwister.tooltip.modes.fluid=§7· 剪线钳右键切换流体模式：§b概率毁灭者§7模式下，所有有流体形态的产物改为输出对应流体
 machine.chemicaltwister.tooltip.heat.poc=§7· 启用§a无损超频§7
 machine.chemicaltwister.structureinfo.1=§l§9一道低沉的声音在身边回响:§r 部分§k配方§r来自§kT§rS§kT§r
 

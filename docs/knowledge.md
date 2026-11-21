@@ -545,6 +545,17 @@ MTMultiMachineBase<T>
   `mSpecialValue` via `GTRecipeMapUtil.SPECIAL_VALUE_ALIASES`, read as heat here, hence explicit), QFT catalyst as a
   **non-consumed input** (stackSize 0: required in the bus, never consumed), QFT metadata for NEI. Page:
   `maxIO(9, 9, 9, 9)`, `LargeNEIFrontend`, height 166, MessTech logo.
+- Fluid mode (QFT parity, 5.09.54.264 `MTEQuantumForceTransformer`): plain (non-sneaking) wire-cutter right-click toggles
+  `mFluidMode` (NBT `mFluidMode`; sneak+wire cutter stays GT's batch-mode toggle, so the plain click was free - modes
+  themselves stay on the screwdriver). Only 概率毁灭者 uses it: `createProcessingLogic`'s `createParallelHelper` installs
+  `MTParallelHelper#setCustomItemOutputCalculation`/`setCustomFluidOutputCalculation`; item outputs with a material
+  association are dropped from the item outputs and emitted as fluids instead - 1 item = `INGOTS` (144 mB) of
+  `mStandardMoltenFluid` when present, else 1000 mB of `mFluid`, GT5U QFT's exact rule - x parallel and x GT's chance
+  multiplier; the recipe's own fluid outputs stay unchanged. Nothing renders the flag, so no client sync; chat feedback
+  keys `machine.largechemicaltwister.fluid_mode.enabled/disabled`, tooltip line `machine.chemicaltwister.tooltip.modes.fluid`.
+  Void protection still plans from the recipe's original item outputs (GT's `VoidProtectionHelper` runs before the custom
+  output calculation), so with void protection on the item bus can cap parallels although those items become fluids;
+  GT++ QFT has no void protection, so this is the one place the port differs from it in effect.
 - 蜂窝处理者 pool (`mt.recipe.comb_processing`, NEI name `蜂窝处理` / `Comb Processing`, icon = the new
   `MTItemList.MTCombProcessingModule`): converted from the comb recipes of `RecipeMaps.multiblockChemicalReactorRecipes`
   by `com.MessTech.common.recipe.MTCombProcessingRecipes` (`populateCombProcessingRecipes()`, re-runnable, called from
