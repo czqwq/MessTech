@@ -1050,6 +1050,8 @@ messtech.config.general.piggy_tumbles_wearer=Piggy Tumbles With Its Wearer
 messtech.config.general.text_effects=Text Effects
 messtech.config.general.galacticraft_fast_ascent_opens_space_gui=Fast Ascent Opens the Space GUI
 messtech.config.general.moved_too_quickly_threshold=Moved Too Quickly Threshold
+messtech.config.general.item_oredict_groups=Item Ore Dictionary Filter Groups
+messtech.config.general.item_oredict_groups.tooltip=At load complete, register whole item categories into the ore dictionary so a filter can select them by it:\nplayerArmor = every item extending vanilla ItemArmor, sword = every item extending vanilla ItemSword,\nunstackableItem = every item whose max stack size is 1 (armor and swords included).
 messtech.config.machines=Machines
 messtech.config.machines.enable_one_batch_calculator=Enable One Batch Calculator
 messtech.config.machines.enable_one_batch_calculator.tooltip=Skip the parallel calculation: every matching material in the input buses is consumed in one run.\nThe EU/t becomes the normal batch total divided by the parallel count and the duration is multiplied by that count, so the total EU is unchanged.\nThe machine's parallel cap and the power-based parallel limit are ignored; void protection and the int tick limit of the duration still apply.\nMachines that draw from the wireless network need enough balance for the whole run up front.

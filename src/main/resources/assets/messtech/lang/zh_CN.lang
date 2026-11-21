@@ -1049,6 +1049,8 @@ messtech.config.general.piggy_tumbles_wearer=小猪人偶随佩戴者翻滚
 messtech.config.general.text_effects=文字特效
 messtech.config.general.galacticraft_fast_ascent_opens_space_gui=高速上升时打开星系界面
 messtech.config.general.moved_too_quickly_threshold=“移动过快”检测上限
+messtech.config.general.item_oredict_groups=物品矿辞筛选组
+messtech.config.general.item_oredict_groups.tooltip=加载完成时把整类物品注册进矿辞，供筛选器按矿辞选中：\nplayerArmor = 所有继承原版 ItemArmor 的护甲，sword = 所有继承原版 ItemSword 的剑，\nunstackableItem = 所有最大堆叠数为 1 的物品（包含前两类）。
 messtech.config.machines=机器
 messtech.config.machines.enable_one_batch_calculator=启用单批计算器
 messtech.config.machines.enable_one_batch_calculator.tooltip=跳过并行计算：同一批输入总线里所有能匹配的材料会在一次运行里全部消耗。\nEU/t 变为正常并行整批总耗电 ÷ 并行数，时长按同一数值放大，因此总耗电不变。\n机器的并行上限与按电量计算的并行限制被无视；无损保护和 int 时长上限仍然生效。\n无线模式机器需要电网能一次性付清整轮耗电。

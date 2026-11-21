@@ -43,6 +43,8 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - Blocks
 - GT5U API knowledge
 - NEI collapsible item groups (物品折叠：速度/节能/并行模块仓与 NAC 部件, via `config/NEI/collapsibleitems.cfg`)
+- Item ore dictionary filter groups (`playerArmor` / `sword` / `unstackableItem`: pack-wide `ItemArmor` / `ItemSword`
+  subclasses and max-stack-1 items, `MTItemOreDictGroups`)
 - Own-code conventions
 - Chaos Matter (混乱物质): GT material registration and the stacked-renderer look
 - 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`): magic-circle charge FX, straight penetrating

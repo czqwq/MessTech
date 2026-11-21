@@ -3,6 +3,7 @@ package com.MessTech.init;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.MessTech.common.items.MTItemOreDictGroups;
 import com.MessTech.common.recipe.ExtraRecipes;
 import com.MessTech.common.recipe.GTRecipes;
 
@@ -66,6 +67,11 @@ public class MessTech {
 
     @Mod.EventHandler
     public void completeInit(FMLLoadCompleteEvent event) {
+        // Every mod's items exist by now: one pack-wide scan registers the armor/sword/unstackable ore dictionary
+        // filter groups (see MTItemOreDictGroups).
+        if (Config.general.ITEM_OREDICT_GROUPS) {
+            MTItemOreDictGroups.register();
+        }
         GTRecipes.loadRecipes();
         // No NEI-only pools here: other mods are still adding their source recipes in this same event. The client
         // builds them on its first tick (MTClientRecipePools), the server at FMLServerStartedEvent.

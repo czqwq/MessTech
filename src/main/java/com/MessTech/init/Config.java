@@ -74,6 +74,14 @@ public class Config {
         @DefaultDouble(2000.0D)
         @RangeDouble(min = Double.MIN_VALUE, max = Double.MAX_VALUE)
         public double MOVED_TOO_QUICKLY_THRESHOLD = 2000.0D;
+
+        @Comment({
+            "Register ore dictionary filter groups over whole item categories at load complete (see MTItemOreDictGroups):",
+            "playerArmor = every item extending vanilla ItemArmor, sword = every item extending vanilla ItemSword,",
+            "unstackableItem = every item whose max stack size is 1 (armor and swords included). Off: no group is",
+            "registered." })
+        @DefaultBoolean(true)
+        public boolean ITEM_OREDICT_GROUPS = true;
     }
 
     public static class Machines {

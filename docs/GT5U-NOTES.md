@@ -321,6 +321,13 @@ ONE path (the loader calls `AuthorDynamic.registerOn(...)`, never a second inlin
   * carrier material without items: `MaterialBuilder` in an `IMaterialHandler` added from the `@Mod` constructor (same
     timing as Chaos Matter - `Materials.init()` runs in GT's preInit). A material with `mMetaItemSubID == -1` and no
     `add*Items()` call generates nothing and only supplies the NBT `PrimaryMaterial` name.
+* Ore dictionary names a mod registers are re-parsed by `OreDictRegistrationHandler` (every `OreDictionary.registerOre`
+  posts `OreRegisterEvent`): a name that **is** an `OrePrefixes` name (`armor`, `stick`, ...) is treated as a prefix used
+  as a full ore name and the stacks registered under it are renamed to "Invalid OreDictionary Tag"; a name that starts
+  with a prefix followed by a material name is unified into that prefix (the stack joins the prefix's list). Check the
+  name against `OrePrefixes` first - `MTItemOreDictGroups` uses `playerArmor` because `armor` is taken, while `sword` and
+  `unstackableItem` collide with nothing. Truly unknown names only produce the "prefix is null" info line, and that
+  logger (`Gregtech.general.loggingOreDict`) is off by default.
 
 ## 14. MessTech's IC2/GT fuel rods (Transcendent Metal)
 

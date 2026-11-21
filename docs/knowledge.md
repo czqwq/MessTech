@@ -1305,6 +1305,31 @@ other mods' blocks and player edits alone.
   (`loadPluginsInParallel`) could in theory race another mod writing the same file; their blocks are regenerated on the
   next launch, the marker design is the same one TST uses.
 
+## Item ore dictionary filter groups (`playerArmor` / `sword` / `unstackableItem`)
+
+`MTItemOreDictGroups#register()` (called from `MessTech#completeInit` = `FMLLoadCompleteEvent`, gated by
+`Config.general.ITEM_OREDICT_GROUPS`, default on) walks `GameData.getItemRegistry()` once and registers three ore
+dictionary entries, so one entry selects a whole category in an ore dictionary filter:
+
+- `playerArmor` - every item whose class extends vanilla `ItemArmor` (GT's `MechArmorBase` / `ItemEnergyArmor` extend
+  it, so GT armor counts).
+- `sword` - every item whose class extends vanilla `ItemSword`; GT's own swords are `MetaGeneratedTool` and are **not**
+  included.
+- `unstackableItem` - every item whose max stack size is 1 (`new ItemStack(item).getMaxStackSize()`); a superset of the
+  two categories above, plus bows, tools, books and whatever else only stacks to one.
+
+Each item is registered once with `OreDictionary.WILDCARD_VALUE` metadata: armor and swords are damageable, so the
+stack in play can carry any damage value and only the wildcard entry matches through `OreDictionary#getOreIDs` (the
+lookup checks both the item-wide and the meta-specific registration). Items the game registry does not know are
+skipped - the ore dictionary rejects their stacks with a big warning. The scan is pack-wide (every loaded mod), so it
+runs at load complete, when every mod's items exist.
+
+The armor tag is `playerArmor`, not `armor`, on purpose: `OrePrefixes.armor` owns the name `armor` in GT5U, and
+`OreDictRegistrationHandler` treats a prefix used as a full ore dictionary name as invalid - it renames the stacks
+registered under that name to "Invalid OreDictionary Tag" (matching is unaffected, only the display name of the ore
+dictionary pile copies is). `sword` and `unstackableItem` match no GT prefix; GT only logs its "prefix is null" line for
+them, and that logger (`Gregtech.general.loggingOreDict`) is off by default.
+
 ## GT5U API knowledge
 
 - Upstream `MTEMultiBlockBase#getWailaBody` reads `tag.getString("mode")` - write the mode as a string name, not an integer,
