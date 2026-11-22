@@ -12,8 +12,8 @@ import cpw.mods.fml.relauncher.SideOnly;
 
 /**
  * The mod's config screen, opened from the Mods menu. {@code categorized} makes the first screen the category list
- * (general / machines / voidstarbow / gameconsole); titles and comments come from the GTNHLib annotations and the
- * generated lang keys, see {@link Config}.
+ * (general / machines / voidstarbow / gameconsole / commands); titles and comments come from the GTNHLib annotations
+ * and the generated lang keys, see {@link Config}.
  */
 @SideOnly(Side.CLIENT)
 public class MTGuiClientConfig extends SimpleGuiConfig {

@@ -1076,6 +1076,9 @@ messtech.config.gameconsole.game_console_threads=Render Threads
 messtech.config.gameconsole.game_console_sound=Sound Effects
 messtech.config.gameconsole.game_console_music=Music
 messtech.config.gameconsole.game_console_pauses_world=Pause the World While Open
+messtech.config.commands=Commands
+messtech.config.commands.override_kill=Override /kill
+messtech.config.commands.override_kill.tooltip=Replace vanilla's /kill with the entity-selector version ported from 1.20.1 (permission level 2).\nOff: /kill reproduces vanilla 1.7.10 exactly (permission level 0, kills only the sender).
 
 # --- LEG fake recipe pool (Large Essentia Generator: upgrades and essentia) ---
 mt.recipe.leg=Large Essentia Generator: Upgrades & Essentia
@@ -1092,3 +1095,26 @@ messtech.nei.collapsible.speed=Speed Modules
 messtech.nei.collapsible.eu=EU Discount Modules
 messtech.nei.collapsible.parallel=Parallel Control Modules
 messtech.nei.collapsible.nac=NAC Components
+
+# --- /kill entity selectors (ported from 1.20.1; see MTCommandKill / MTEntitySelectorParser) ---
+commands.kill.usage.targets=/kill [targets]
+commands.kill.success.single=Killed %s
+commands.kill.success.multiple=Killed %s entities
+argument.entity.invalid=Invalid name or UUID
+argument.entity.notfound.entity=No entity was found
+argument.entity.selector.unknown=Unknown selector type '%s'
+argument.entity.selector.missing=Missing selector type
+argument.entity.options.unterminated=Unterminated options
+argument.entity.options.valueless=Expected value for option '%s'
+argument.entity.options.unknown=Unknown option '%s'
+argument.entity.options.inapplicable=Option '%s' is not applicable here
+argument.entity.options.unsupported=Option '%s' is not supported on Minecraft 1.7.10
+argument.entity.options.distance.negative=Distance cannot be negative
+argument.entity.options.level.negative=Level cannot be negative
+argument.entity.options.limit.toosmall=Limit must be at least 1
+argument.entity.options.sort.irreversible=Unknown sort type '%s'
+argument.entity.options.mode.invalid=Invalid game mode '%s'
+argument.entity.options.type.invalid=Invalid entity type '%s'
+argument.entity.options.nbt.invalid=Invalid NBT: %s
+argument.range.empty=Range cannot be empty
+argument.range.swapped=Minimum cannot be greater than maximum

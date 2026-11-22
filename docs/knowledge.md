@@ -2273,3 +2273,42 @@ A GT5U tool item with an animated rainbow icon and three pinned numbers (耐久 
   own (`gt.item.desc.*`), nothing custom is added.
 - **Verification**: `gradlew compileJava` (and `spotlessApply`), no runtime-only hooks. Gotchas that cost the most time
   are in `docs/GT5U-NOTES.md` §13 ("Registering an addon GT tool/wrench").
+
+## `/kill` 实体选择器（从 1.20.1 移植：`MTCommandKill` / `MTEntitySelector` / `MTEntitySelectorParser` / `MixinCommandHandler`）
+- 指令名不变，还是 `/kill`；权限等级改成 **2**（跟 1.20.1 `KillCommand` 一致；1.7.10 命令方块允许执行 ≤2 级，
+  所以命令方块照旧能用，普通玩家不能）。无参数 = 杀自己；有参数 = 1.20.1 `EntityArgument.entities()` 的实体选择器。
+- **注册方式**：`MixinCommandHandler`（early mixin）在 `CommandHandler#registerCommand` 的 HEAD 用
+  `@ModifyVariable` 把 `ServerCommandManager` 构造时传入的 `new CommandKill()` 换成 `new MTCommandKill()`。
+  这样 commandMap / commandSet 里只有我们的对象：`/help` 不会出现两条 kill，用法、权限、tab 补全都来自
+  `MTCommandKill`。开关 `Config.commands.OVERRIDE_KILL`（默认 `true`）在**执行时**读（不在注册时读，所以不受
+  类加载顺序影响）；关闭时 `MTCommandKill` 精确复刻原版行为（0 级、只杀自己、忽略参数、原版 usage/提示）。
+- **解析**：`MTEntitySelectorParser` 逐项照 1.20.1 `EntitySelectorParser` + `EntitySelectorOptions` —— 每种
+  选择器的默认值、`!` 取反、选项的适用性（canUse）规则、错误 key 都保留。`MTEntitySelector` 照 `EntitySelector`
+  做“收集 → 排序（nearest/furthest/random）→ 截断到 limit”。
+  - 类型：`@p`（最近玩家，limit 1）、`@a`（全部玩家）、`@r`（随机玩家，limit 1）、`@s`（执行者自己；1.7.10
+    里只有玩家能当命令实体）、`@e`（全部已加载实体，附带 `isEntityAlive` 过滤），以及普通玩家名 / 玩家 UUID。
+  - 选项：`name`、`distance`、`level`、`x/y/z`、`dx/dy/dz`、`x_rotation/y_rotation`、`limit`、
+    `sort`、`gamemode`、`team`、`type`、`nbt`、`scores`。`tag` / `advancements` / `predicate` /
+    `type=#标签` 在 1.7.10 没有对应物，**显式报错** `argument.entity.options.unsupported`，不会静默放过。
+    `type` 的写法两种都认：1.7.10 注册名（`Zombie`）和 1.20.1 风格（`zombie` / `pig_zombie`），比较时忽略大小写
+    和下划线；`player` 单独处理（等同于只选玩家）。
+  - 1.7.10 旧写法也认（用户要求两套都支持）：位置参数 `@p[x,y,z,r]`、`r=` / `rm=` / `c=`（`c<=0` 表示
+    不限）/ `m=`（0/1/2 → 生存/创造/冒险）/ `l=` / `lm=` / `score_<objective>=`（“至少”，1.7.10 语义）。
+  - 原点与范围：发送者是实体时用实体的精确坐标，否则用 `getPlayerCoordinates()`（命令方块/控制台）。`distance` /
+    `x/y/z` / `dx/dy/dz` 会把选择器限制在发送者所在维度（1.20.1 的 `worldLimited`）；否则 `@a`/`@e` 遍历
+    `DimensionManager.getWorlds()` 的所有已加载维度 —— 和 1.20.1 跨维度选择一致。
+  - `nbt=`：值用 1.7.10 `JsonToNBT`（`/testforblock` 的语法）解析；目标实体 `writeToNBT` 之后（玩家再加
+    `SelectedItem`）按 1.20.1 `NbtUtils.compareNbt(..., true)` 的规则比较：compound 部分匹配、compound 元素的
+    list 无序包含（1.7.10 `NBTTagList` 没有通用下标访问，原始类型 list 只能整体相等，比 1.20.1 严格一点）。
+    注意 1.7.10 指令按空格切参数，所以 `nbt={...}` 里不能有空格。
+  - `scores=` 用主世界 scoreboard（`MinecraftServer#worldServerForDimension(0).getScoreboard()`，与 1.7.10
+    `/scoreboard` 一致）；目标没有该 objective 的分数就算不匹配（不创建分数）。
+  - `name=`：玩家名 / 自定义名精确匹配；没有自定义名的实体额外接受注册名（大小写不敏感），因为 1.7.10 没有
+    en_US 的类型描述字符串可用（中文客户端下 `name=Zombie` 仍然可用）。
+- **击杀语义**：`EntityLivingBase` 走 1.7.10 原版 `/kill` 的 `attackEntityFrom(DamageSource.outOfWorld,
+  Float.MAX_VALUE)`（`outOfWorld` 绕过护甲、允许在创造模式生效）；非生物实体（掉落物、箭、TNT、船、经验球）
+  直接 `setDead()`，对应 1.20.1 `Entity#kill` 的 `remove(KILLED)`。成功提示按 1.20.1 分成
+  `commands.kill.success.single` / `.multiple`。
+- **文案**：中英 lang 都加了 `commands.kill.usage.targets`、`commands.kill.success.*` 和一组沿用 1.20.1 key
+  名的 `argument.entity.*` / `argument.range.*` 解析错误。配置项在 `messtech.config.commands.override_kill`。
+- **验证**：`gradlew compileJava`。
