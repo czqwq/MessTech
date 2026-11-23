@@ -44,7 +44,7 @@ public final class MTUltraAeRecipes {
                 .itemInputsUnsafe(GTUtility.copyAmountUnsafe(1000, meController))
                 .itemOutputs(new ItemStack(MTUltraDenseControllerBlock.INSTANCE, 1))
                 .eut(RECIPE_IV)
-                .duration(1 * HOURS)
+                .duration(HOURS)
                 .addTo(compressorRecipes);
         }
 
@@ -59,7 +59,7 @@ public final class MTUltraAeRecipes {
                 .itemInputsUnsafe(GTUtility.copyAmountUnsafe(1000, neutronController))
                 .itemOutputs(new ItemStack(MTUltraDenseNeutronControllerBlock.INSTANCE, 1))
                 .eut(RECIPE_IV)
-                .duration(1 * HOURS)
+                .duration(HOURS)
                 .addTo(compressorRecipes);
         }
     }
@@ -67,17 +67,17 @@ public final class MTUltraAeRecipes {
     private static void addCableRecipes() {
         for (AEColor color : MTUltraDenseCables.colors()) {
             GTValues.RA.stdBuilder()
-                .itemInputs(MTUltraDenseCables.ae2DenseCable(color, 64))
+                .itemInputsUnsafe(GTUtility.copyAmountUnsafe(512,MTUltraDenseCables.ae2DenseCable(color, 1)))
                 .itemOutputs(MTUltraDenseCables.ultraDenseStack(color))
                 .eut(RECIPE_IV)
-                .duration(1 * HOURS)
+                .duration(HOURS)
                 .addTo(compressorRecipes);
 
             GTValues.RA.stdBuilder()
-                .itemInputs(MTUltraDenseCables.ae2GlassCable(color, 64))
+                .itemInputsUnsafe(GTUtility.copyAmountUnsafe(512,MTUltraDenseCables.ae2GlassCable(color, 64)))
                 .itemOutputs(MTUltraDenseCables.compressedGlassStack(color))
                 .eut(RECIPE_IV)
-                .duration(1 * HOURS)
+                .duration(HOURS)
                 .addTo(compressorRecipes);
         }
     }
