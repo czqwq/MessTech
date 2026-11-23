@@ -46,6 +46,10 @@ public class Config {
     @Order(4)
     public static final Commands commands = new Commands();
 
+    @Comment("Options of the wireless ME network.")
+    @Order(5)
+    public static final Wireless wireless = new Wireless();
+
     public static class General {
 
         @Comment("Default Batch mode state of machine when placed. True is auto enable Batch mode.")
@@ -242,5 +246,15 @@ public class Config {
             "Off: /kill behaves exactly like vanilla 1.7.10 (permission level 0, kills only the sender)." })
         @DefaultBoolean(true)
         public boolean OVERRIDE_KILL = true;
+    }
+
+    public static class Wireless {
+
+        @Comment({
+            "Maximum number of wireless ME networks one player may create (-1 = no limit). Reaching the limit does",
+            "not stop the player from using networks that were shared with them: it only blocks the create button." })
+        @DefaultInt(5)
+        @RangeInt(min = -1, max = 1000)
+        public int NETWORK_LIMIT_PER_PLAYER = 5;
     }
 }

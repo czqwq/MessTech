@@ -927,26 +927,46 @@ MTMultiMachineBase<T>
   stabilizer) filter the *hologram* by MTE id, so a correctly placed wireless hatch is flagged by the "show errors"
   channel and autoplace can only pull the wired hatch; the structure still validates and the machine runs - place them
   by hand.
-- Pairing key = **only the hatch dye colour** (`getBaseMetaTileEntity().getColorization()`, `-1` = unpainted, never
-  links; re-read live, so repainting re-pairs immediately). `WirelessBeamlineUtil` keeps a dedicated registry because two
-  isolated hatches have no beamline pipe edge; pairing works across machines and dimensions **as long as both chunks are
-  loaded** - a chunk unload unregisters the hatch (`onUnload`), so an unloaded counterpart counts as "no counterpart"
-  and the beam is dropped instead of being pushed into an unloaded tile entity.
-- 1:1 is enforced at push time: the colour channel must hold **exactly one output and exactly one input**, else the
-  packet is dropped, never handed to an arbitrary hatch. `moveBeam()` replaces the wired hatch's pipe walk on the same
-  `MOVE_AT` hook (`tick % 20 == 4`), so the cadence matches a wired beamline.
+- Pairing is **data-stick address pairing**, the same contract and flow as the wireless vacuum conveyor
+  (`WirelessVacuumConveyorUtil`): left-click the output hatch (plain or filtered) with a GT data stick -> the stick
+  stores `{type, dim, x, y, z}` (`type = messtechWirelessBeamlineOutput`) plus a display name; right-click the input
+  hatch with that stick -> both hatches store each other's address (`wirelessBeamlineLink` NBT on each side, dimension
+  included). Rebinding detaches the old partners first; an unloaded or foreign old partner is left to self-heal
+  (`isDeadLink`). Binding loads the target chunk once (`GTUtil.getTileEntity(..., true)`) so a far-away output can be
+  paired from an input on the other side of the map; the move tick itself never loads chunks. Sneak + wire cutter
+  right-click on either hatch unbinds.
+- **No colour rule**, the one deliberate difference from the wireless vacuum conveyor: there the dye is the NAC module
+  routing channel, here the hatches have no such channel, so painting is ignored and unpainted hatches pair like any
+  other. `WirelessBeamlineUtil.LinkState` therefore has no `COLOR_MISMATCH`; the rest of the state set matches.
+- **Strict 1:1**: the output keeps one input address and the input keeps one output address, and the transfer is
+  push-only from the output - the single mover on GT5U's own beamline hook (`MTEHatchBeamlineConnector#onPostTick` calls
+  `moveAround`, i.e. `WirelessBeamlineUtil#moveBeam`, at `MOVE_AT` = `tick % 20 == 4`) - and only while both reverse
+  references match, so two outputs cannot merge into one input and two inputs cannot race for one output. Nothing is
+  transmitted while unpaired. A missing/wrong-type/re-pointed counterpart is dropped by the 20-tick check; an unloaded
+  counterpart keeps the address and only pauses the link, reporting `chunk_unloaded` / `dim_unloaded`.
+- `moveBeam()` replaces the wired hatch's pipe walk and never queues: the packet is offered once per move tick and
+  belongs to the tick it was published in, like the wired hatch with no pipe reaching an input.
 - `canConnect()` false on both sides, so beamline pipes neither connect to nor render a connection for them. The wired
   output hatch ignores `canConnect` when walking its line of sight, so the wireless input also overrides `setContents()`
   and only accepts the packet its own `WirelessBeamlineUtil.moveBeam()` is handing over: a wired hatch parked in front
-  cannot bypass the colour channel.
-- The input keeps GT's inherited expiry logic: a beam not refreshed within one move tick is dropped, so repainting a
+  cannot bypass the explicit pair.
+- The input keeps GT's inherited expiry logic: a beam not refreshed within one move tick is dropped, so re-pointing a
   hatch or breaking the pair stops the machine instead of caching a stale particle stream.
 - The filtered variant inherits the LHC/beam splitter particle blacklist: the machine writes `acceptedInputMap` and
-  `dataPacket`, GT5U's ModularUI edits the map - only the transport changed.
-- Scanner info (`getInfoData()`) gains two lines and stays inside the eight documented by `IGregTechDeviceInformation`:
-  the colour name (GT5U's `GT5U.infinite_spray_can.color.*` key with a `Dyes` name fallback) and the live link state
-  (unpainted / no counterpart / conflict / linked), emitted through `IGregTechDeviceInformation.encode(...)` /
-  `translatable(...)` - or as a bare lang key - so the client translates them; registry state stays server-side.
+  `dataPacket`, GT5U's ModularUI edits the map - only the transport changed. Its right-click still opens that GUI; the
+  address is saved with a left-click, like the plain output.
+- Scanner info (`getInfoData()`) mirrors the wireless vacuum conveyor and stays inside the eight lines documented by
+  `IGregTechDeviceInformation` (the parent reports at most six): one live link-state line (unpaired / linked with
+  dim+coords / dim or chunk unloaded / target missing / wrong hatch type / stale link) plus the expected counterpart
+  address when not cleanly linked, emitted through `IGregTechDeviceInformation.encode(...)` - or as a bare lang key - so
+  the client translates them; the state stays server-side.
+- **WAILA**: all three hatches override `getWailaNBTData` (server: `WirelessBeamlineUtil#writeWailaData` writes the live
+  `LinkState` and the peer address into the WAILA tag) and `getWailaBody` (client: `appendWailaBody` decodes and
+  translates it), with the wireless vacuum conveyor's AE2 wireless-connector wording:
+  `machine.wirelessbeamline.waila.linked` (connected + dim/coords, green), `waila.unbound` ("未连接", red), plus
+  `waila.unloaded` / `waila.invalid` for the unloaded and broken states.
+- Legacy: the first implementation paired by dye colour and stored nothing, so an old world's wireless beamline hatches
+  simply start unpaired after the update - nothing to migrate.
 - Lang in `machine.wirelessbeamline.*`. The hatches carry `@IMetaTileEntity.SkipGenerateDescription` because their
   description goes straight to the tooltip: without it GT5U dumps one instance's description into `GregTech.lang` at
   client setup. GT5U checks the **concrete** class (`ItemMachines#isSkipGenerateDescription`), so the annotation cannot
@@ -2312,3 +2332,98 @@ A GT5U tool item with an animated rainbow icon and three pinned numbers (耐久 
 - **文案**：中英 lang 都加了 `commands.kill.usage.targets`、`commands.kill.success.*` 和一组沿用 1.20.1 key
   名的 `argument.entity.*` / `argument.range.*` 解析错误。配置项在 `messtech.config.commands.override_kill`。
 - **验证**：`gradlew compileJava`。
+
+## 无线ME网络（无线连接仓室 / 无线ME网络核心 / 无线ME网络绑定工具）
+
+- 来源 GTLCore（1.20.1 GT Modern）`integration/ae2/wireless`；1.7.10 是重实现，**完整映射/契约见
+  `docs/wireless-me-network.md`**，本节只记落地结论与坑。
+- **v2（2026-11-24，用户要求）**：网络从「放核心时自动生成、拆核心即销毁」改成**存档级独立对象 + 手动创建/选择**，
+  GUI 重做成 **Flux Networks 1.20 风格**（背景/边框/网络色/页签/网络选择/创建新网络），工具选择界面与仓室无线页签
+  同风格。行为、API、NBT、lang、资源与 Flux 功能移植建议全部在 `docs/wireless-me-network.md` §9（含 §9.10 落地
+  记录与偏差）；实现要点：`MTWirelessSavedData` 存 color/access（PRIVATE/TEAM/PUBLIC）、每人网络数上限
+  `Config.wireless.NETWORK_LIMIT_PER_PLAYER`；`MTWirelessNetworkRuntime` 的 `selectNetworkForCore/detachCore/
+  onCoreReady` 管理每网络唯一的 `core` 槽；拆核心时网络记录/绑定保留、核心物品 NBT 记住网络并在重放时自动接回
+  （方块 `getDrops` + `PENDING_DROPS`，爆炸顺序见 §9.10）；未绑定核心按 TE NBT `placedBy` 限放置者配置；GUI 贴图
+  来自 Flux Networks（MIT，资产目录内有 LICENSE 副本）。**没有搬** Flux 的能量传输/成员权限/加密网络等功能，
+  只搬 GUI 与网络创建/选择模型。
+- 内容三件套：`MTWirelessNetworkCoreBlock`（普通 `BlockContainer`，meta = 朝向）+
+  `MTWirelessNetworkCoreItemBlock` + `MTWirelessNetworkCoreTile`（AE2 `AENetworkTile`：只为朝向面暴露 `SMART`
+  节点，`DENSE_CAPACITY`、`idlePowerUsage 0`、`validSides` = 朝向；GT 扳手旋转连接面）；`MTWirelessNetworkBindingTool`
+  （NBT 存网络、Shift+右键改绑、Shift+左击解绑、右键空气开网络选择 GUI）；核心 GUI（改名/状态/仓室数）。
+  **蹲下放置仓室自动绑定**（`MTWirelessToolEvents`，GTLCore `WirelessBindingToolPlacementHandler` 的移植）：
+  潜行 + 手持方块物品（正在放 ME 仓室）+ 绑定工具（带已保存网络）在背包里 → 放好后延迟 2 tick/最多 10 tick 重试，
+  `resolveTarget` 成功即 `bindTarget(replace=true)`。1.7.10 没有原版副手，工具在**主物品栏**里找；先记
+  `Block.getBlockFromItem(held)`，只有该坐标确实变成这个方块才绑（放置失败不会误绑已有方块），延迟期间只
+  `chunkExists`、不加载区块。
+- **无线连接机制**：`AEApi.instance().createGridConnection(coreNode, targetNode)` = AE2 自带无线连接器
+  （`TileWirelessBase.java:156`）用的同一 API；跨距离/跨维度都行，`ForgeDirection.UNKNOWN` 即不可见连接。
+  仓室识别（`MTWirelessNetworkRuntime#isBindableTile`）= ①`IGregTechTileEntity#getMetaTileEntity()` 为
+  `MTEHatch` 且 `IGridProxyable`（GT5U 全部 ME 仓室 + 本模组 `MTInventoryInput*ME`）；或 ②非 `AEBaseTile` 的
+  `IGridProxyable` 普通 TileEntity（本模组 ThE ME 源质输入/输出仓）。AE2 自家方块（drive/interface/线缆）因继承
+  `AEBaseTile` 被排除。
+- `MTWirelessSavedData`（overworld `MapStorage`）存 frequency → 核心坐标/owner/name/成员表；成员唯一归属，
+  重复按 frequency UUID 字典序确定性保留。`MTWirelessNetworkRuntime` 每 20 tick 维护：核心/成员区块未加载跳过
+  （只 `chunkExists`，不强制加载）、成员不再是 ME 仓室即解除绑定、同网格视为已连、否则 `createGridConnection`
+  （失败退避重试）。**坑**：节点区块卸载时 AE2 会自动 destroy 我们的连接（`GridNode.destroy()`），缓存里的
+  `IGridConnection` 可能已死，不能无脑二次 `destroy()`——先判断仍在 `node.getConnections()` 里，不在就只清缓存。
+- 权限 = 放置者 + ServerUtilities 同队（反射 `ServerUtilitiesAPI.arePlayersInSameTeam`，
+  `Mods.ServerUtilities.isModLoaded()` 守卫、非硬依赖；取不到退化为仅放置者）。
+- 仓室侧「无线网络页签」：mixin 注入 `MTETieredMachineBlockBaseGui#build`（GT5U 全部 ME 仓室 GUI 的公共基类），
+  用 MUI2 `syncManager.syncedPanel` 挂子面板 + 同步值/同步动作；**没有自定义网络包**（MUI2 的 buildUI 两侧都会
+  跑，sync value/action 自动 S2C/C2S）。MessTech 自己的 ThE ME 源质仓 GUI 不走该基类，单独在 `buildUI` 里
+  attach。
+- 来源标注：`MTRegistryMark`（GTLCore `gtlcore.registry.add` / `gtlcore.registry.modify` 的 1.7.10 对应）。
+  **文字照抄**「由GregTech Leisure添加 / Added by GregTech Leisure」「由GregTech Leisure修改 / Modified by
+  GregTech Leisure」；**颜色也照抄** GT Modern `TooltipHelper`——added 用 `RAINBOW_SLOW`（每 25 client tick 换一档）、
+  modified 用 `RAINBOW`（每 5 tick），整行单色、10 色循环 `RED→GOLD→YELLOW→GREEN→AQUA→DARK_AQUA→DARK_BLUE→BLUE→
+  DARK_PURPLE→LIGHT_PURPLE`。实现是 `MTTooltipFormattingCode`（首 tick 也前进一档，所以游戏里第一色是 GOLD，细节与
+  出处见 `docs/wireless-me-network.md` §8.7）。只给**新增物品**（核心/工具）挂 added；`markModified` 已移植但
+  **暂不挂**（ME 仓室物品不挂修改标注）。
+- 配方：`MTWirelessRecipes`（装配机，EV，照 GTLCore `MachineRecipe.java:918-936`）。两处 1.7.10 换算：
+  `wireGtHex` → `OrePrefixes.wireGt16`；GT Modern 的 `UraniumTriplatinum` 在 GT5U 不存在，用铂（Platinum）
+  同档替代；AE2 件用 `definitions().blocks().wirelessHub()/quantumLink()/quantumRing()` 与
+  `items().toolWirelessKit()`。
+- 注册入口：`MTWirelessContent.preInit()`（工具物品/GUI 工厂/运行时/事件，CommonProxy#preInit 调）+
+  `MTWirelessContent.registerBlocks()`（块/ItemBlock/TE，`MTBlocks.registerBlocks()` 调）；
+  `MTItemList.WirelessNetworkCore / WirelessNetworkBindingTool` 是配方用的 ItemStack 持有者。
+- **落地坑/限制**（详见 `docs/wireless-me-network.md` §8，实机反馈修复见 §8.4）：①核心方块物品栏图标固定 NORTH
+  正面、按 3D 方块渲染（**不要** `setBlockTextureName`，否则 ItemBlock 变 2D sprite）；机壳贴图要从 GT5U 复制成
+  自己的（`Textures.BlockIcons.MACHINE_EV_*` 对非 GT 方块可能为 null → 回退成半透明正面贴图）；正面 overlay 要
+  烘焙到机壳 side 上（1.7.10 一个面只能一个图标）。`MTWirelessNetworkCoreTile#canBeRotated()` 必须是 `false`，
+  否则 GT 扳手把 AE tile 当 `IOrientable` 旋转并吞掉右键。玩家放置朝向照 GT5U 仓室：
+  `BaseTileEntity.getSideForPlayerPlacing`（ItemBlock#placeBlockAt）；手持绑定工具点核心时方块**不打开 GUI**、
+  直接保存网络（避免 1.7.10 潜行状态同步竞态）。②`isWired` 只统计「非本 runtime 创建的连接」，否则页签会把
+  无线连接误判成有线锁。③AE2 Security Terminal（通电）下 GT 仓室节点无 owner → `createGridConnection` 抛安全
+  异常，绑定停在 pending 并退避重试但连不上（GTLCore 同款限制）。④绑定后再接有线不会主动断开无线连接
+  （无周期性有线复查）。⑤三套 GUI 全走 MUI2 同步值/动作、无自定义网络包；GUI 只过了 `spotlessApply build`，
+  实机只验证了第一轮反馈项，页签/网络列表视觉仍待复测，视觉常量集中在 `MTWirelessHatchTab`/`MTWirelessCoreGui`
+  文件顶部。
+- **Baubles 饰品栏**（GTLCore Curios 专用槽的 1.7.10 对应）：绑定工具可穿进 Baubles Expanded 的自定义槽
+  `wireless_connector`（GTLCore 的槽 id 与“无线连接器”名照抄）。`MTWirelessBaubles` 在 preInit 用
+  `BaubleExpandedSlots.tryRegisterType/tryAssignSlotOfType` 注册并分配（只在 PREINITIALIZATION 接受），物品
+  `MTWirelessNetworkBindingTool implements IBaubleExpanded` 只上报这一个类型；空槽材质必须提供在
+  `assets/baubles/textures/items/empty_bauble_slot_wireless_connector.png`（Baubles 自定义槽图标固定按
+  `baubles:` 命名空间 + 类型名注册，AE2 的 `empty_bauble_slot_Terminal.png` 同做法）。工具在槽里时没有右键
+  交互：靠键位 `key.messtech.wirelessNetworkPicker`（`MTWirelessKeyBindings` + `OpenWirelessPickerPacket`，
+  默认不绑键）打开网络选择界面；取用工具的路径统一走 `MTWirelessToolLocator`（饰品栏 → 主手 → 背包），NBT
+  改动经 `InventoryBaubles#syncSlotToClients` 回同步。**与 Baubles Expanded（`Baubles|Expanded`）是硬依赖**，
+  `dependencies.gradle` 显式 `implementation(gtnhDev("Baubles-Expanded"))`，`@Mod` 依赖加
+  `required-after:Baubles|Expanded`。
+## 超致密 AE2 内容（超致密ME控制器 / ME中子注入控制器 / 压缩线缆）
+
+- 需求：GT 压缩机 IV、1 小时；1000× 原版控制器 → 1 个超致密控制器；64× 原版线缆 → 1 个压缩线缆（17 个 AEColor 变体全做）。
+  设计/契约：docs/ultra-ae2.md；配方在 com/MessTech/common/ae2/MTUltraAeRecipes.java（itemInputsUnsafe +
+  GTUtility.copyAmountUnsafe(1000, ...)，1000 输入只有多方块压缩机供得起）。
+- 两个控制器方块直接 xtends BlockController / BlockCreativeEnergyController，**TE 复用 AE2 的**
+  TileController / TileCreativeEnergyController（pathing/校验/能量/颜色/动画全免费）；材质用
+  setBlockTextureName("appliedenergistics2:BlockController"/"appliedenergistics2:BlockCreativeEnergyController")
+  复用原版；AEBaseItemBlock + ppeng.core.CreativeTab.instance。
+- 频道上限两个 mixin：①MixinGridNode_ChannelCapacity 让 GridNode#getMaxChannels 对实现
+  IMTChannelCapacity 的节点返回自定义值（线缆 1024 / Integer.MAX_VALUE）；②
+  MixinPathingCalculation_UltraDense + MixinControllerFace_UltraDense 在包含超致密控制器的网络里把
+  ControllerFace.capacity 设成 Integer.MAX_VALUE（AE2 原生每面 32）。
+- 自定义 AE2 线缆 part：ItemMultiPart 是 final 且 PartCable 构造器会 cast 成 ItemMultiPart，所以 item 实现
+  IPartItem（setItemBusRenderer、getSpriteNumber()==0、onItemUse → partHelper().placeBus），
+  createPartFromItemStack 用 **AE2 原版线缆 stack** 作为 part 父类构造参数（材质/颜色/渲染一致），part 继承
+  PartDenseCable/PartCableGlass，覆写 getItemStack()/getItemStack(PartItemStack) 返回自己的物品 stack
+  （存档/掉落/WAILA 往返）。

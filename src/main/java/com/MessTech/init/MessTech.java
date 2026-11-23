@@ -24,7 +24,7 @@ import gregtech.api.enums.Mods;
     name = "MessTech",
     guiFactory = "com.MessTech.client.gui.config.MTGuiFactory",
     acceptedMinecraftVersions = "[1.7.10]",
-    dependencies = "required-after:gregtech; required-after:tectech; required-after:structurelib; required-after:AppleCore; required-after:Thaumcraft")
+    dependencies = "required-after:gregtech; required-after:tectech; required-after:structurelib; required-after:AppleCore; required-after:Thaumcraft; required-after:Baubles|Expanded")
 public class MessTech {
 
     public static final String MODID = "MessTech";

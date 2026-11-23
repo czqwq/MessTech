@@ -9,6 +9,8 @@ dependencies {
     }
     implementation(gtnhDev("GT5-Unofficial"))
     implementation(gtnhDev("Applied-Energistics-2-Unofficial"))
+    // Baubles Expanded (GTNH's 1.7.10 baubles fork) backs the wireless binding tool's dedicated accessory slot.
+    implementation(gtnhDev("Baubles-Expanded"))
     implementation(gtnhDev("NewHorizonsCoreMod"))
     implementation(gtnhDev("NotEnoughEnergistics"))
     implementation(gtnhDev("ForestryMC"))

@@ -31,6 +31,7 @@ import com.MessTech.common.render.highlight.HighlighterManager;
 import com.MessTech.common.util.MTAnimatedTooltipHandler;
 import com.MessTech.common.util.MTDynamicItemHelper;
 import com.MessTech.common.util.MTPigTech;
+import com.MessTech.common.util.MTTooltipFormattingCode;
 
 import appeng.api.parts.IPart;
 import appeng.util.Platform;
@@ -70,6 +71,9 @@ public class ClientProxy extends CommonProxy {
         // that
         // draws an animation (e.g. TRANSCENDENT_METAL) over the finished font.
         MTAnimatedTooltipHandler.init();
+        // The source markers' colour step (GTLCore's "Added by GregTech Leisure" uses GT Modern's RAINBOW_SLOW):
+        // GT's formatting code advances once per client tick, so the clock is a client tick listener.
+        MTTooltipFormattingCode.initClient();
         // The bow's magic circle: a textured quad in world space, drawn while the bow is charged
         // (MTMagicCircleRenderer; the
         // trail particles are MTVoidstarFx's).
@@ -89,6 +93,9 @@ public class ClientProxy extends CommonProxy {
         com.MessTech.client.thaumcraft.MTResearchTabIcon.init();
         // NEI-only recipe pools a remote client cannot get from the server: built once on the first client tick.
         MTClientRecipePools.init();
+        // The wireless binding tool's picker key bind: the tool can be worn in a Baubles accessory slot, where it never
+        // sees an item right click (MTWirelessKeyBindings sends the open-picker packet).
+        com.MessTech.client.MTWirelessKeyBindings.init();
     }
 
     @Override

@@ -177,8 +177,9 @@ public class MTMachineLoader {
                 translateToLocal("machine.wirelessvacuum.output.name")).getStackForm(1L));
         AuthorDynamic.registerOn(AuthorDynamic.author_czqwq(), MTItemList.MTWirelessVacuumConveyorOutput.get(1));
 
-        // Wireless particle beam hatches: dye colour = channel, 1:1 per colour, no beamline pipes; the filtered
-        // variant keeps GT5U's particle blacklist GUI.
+        // Wireless particle beam hatches: data-stick address pairing, the same flow as the wireless vacuum conveyor
+        // but with no colour rule, strictly 1:1 and no beamline pipes; the filtered variant keeps GT5U's particle
+        // blacklist GUI.
         MTItemList.MTWirelessBeamlineInput.set(
             new MTWirelessBeamlineInput(
                 MT_ID + 70,
