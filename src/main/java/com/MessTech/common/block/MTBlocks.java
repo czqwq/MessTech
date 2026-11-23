@@ -8,6 +8,7 @@ import com.MessTech.common.thaumcraft.MTEssentiaHatchBlock;
 import com.MessTech.common.thaumcraft.MTEssentiaHatchItemBlock;
 import com.MessTech.common.thaumcraft.MTEssentiaHatchTileEntity;
 import com.MessTech.common.thaumcraft.MTThaumcraftME;
+import com.MessTech.common.wireless.MTWirelessContent;
 
 import cpw.mods.fml.common.registry.GameRegistry;
 
@@ -44,5 +45,9 @@ public final class MTBlocks {
         GameRegistry.registerTileEntity(MTEssentiaHatchTileEntity.class, "messtech.essentiaHatch");
         MTItemList.MTEssentiaHatch.set(new ItemStack(essentiaHatchBlock, 1));
         MTThaumcraftME.register();
+        // The wireless ME network core: a standalone AE2-grid block, not a GT MetaTileEntity (see MTWirelessContent).
+        MTWirelessContent.registerBlocks();
+        // Ultra dense AE2 controllers (AE2 based, no GT MetaTileEntity): see docs/ultra-ae2.md.
+        com.MessTech.common.ae2.MTUltraAeContent.registerBlocks();
     }
 }

@@ -28,6 +28,7 @@ import com.MessTech.common.recipe.MTVendingMachineRecipes;
 import com.MessTech.common.recipe.RecipeMessFood;
 import com.MessTech.common.thaumcraft.MTThaumcraftResearch;
 import com.MessTech.common.util.MTKillBase;
+import com.MessTech.common.wireless.MTWirelessContent;
 import com.gtnewhorizon.gtnhlib.config.ConfigException;
 import com.gtnewhorizon.gtnhlib.config.ConfigurationManager;
 
@@ -84,6 +85,12 @@ public class CommonProxy implements IGuiHandler {
         MTNetwork.register();
         NetworkRegistry.INSTANCE.registerGuiHandler(MessTech.instance, this);
         MTItems.registerItems();
+        // Wireless ME network: the binding tool item, its GUI factory, the server-side link runtime and the
+        // left-click unbind listener. The core block/tile entity go in postInit with the other blocks (MTBlocks).
+        MTWirelessContent.preInit();
+        // Ultra dense AE2 cables (items only; the controller blocks are registered with the other blocks). See
+        // docs/ultra-ae2.md.
+        com.MessTech.common.ae2.MTUltraAeContent.preInit();
         // The thrown "A Piggy" (ids are per mod, so this mod's single entity is id 0).
         MTEntityPiggy.register();
         // The arrow of the Voidstar Piercer (id 1): straight flight, trail and the tunnel of an impact.

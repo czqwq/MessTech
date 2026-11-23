@@ -549,8 +549,8 @@ Reference for MessTech's wireless beamline hatches (`docs/knowledge.md`).
   `HATCH_ADVANCED_BEAMLINE_OUTPUT` in `MetaTileEntityIDs`; names from `gt.blockmachines.hatch.beamlineinput`
   (束流输入仓), `...beamlineoutput` (束流输出仓), `...hatch.advancedbeamlineoutput` (过滤式束流输出仓).
 * `MTEHatchBeamlineConnector.getDescription()` has a "Must be painted to work" line, but colour only modulates the
-  texture (`Dyes.getModulation`) - the wired pipe path ignores it → colour is free as an addon channel key (what
-  MessTech does).
+  texture (`Dyes.getModulation`) - the wired pipe path ignores it → an add-on hatch may use it as a channel key or
+  ignore it (the wireless beamline hatches pair with a data stick and ignore colour).
 * `IMetaTileEntity.SkipGenerateDescription` (not inherited by subclasses, `ItemMachines.addDescription` /
   `registerDescription`): without it `getDescription()` is dumped once into `GregTech.lang` at client setup and read
   back → per-instance text ends up frozen.

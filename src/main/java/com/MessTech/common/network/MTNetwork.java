@@ -26,6 +26,8 @@ public final class MTNetwork {
         initialized = true;
         nextPacketId = 0;
         registerServerbound(PatternImportHandler.class);
+        // Appended after PatternImportHandler so the ids of existing packets never shift (see the class javadoc).
+        registerServerbound(OpenWirelessPickerPacket.class);
     }
 
     public static <T extends ServerboundPacket> void registerServerbound(Class<T> packet) {

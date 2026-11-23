@@ -40,6 +40,9 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
   - MTLargeProcessingFactory (LPF, GT++ port) / MTLargeEssentiaGenerator (LEG, GoodGenerator port, incl. the ME
     essentia input hatch and the `essentia_cell` structure sub-channel)
   - Thaumcraft research tab (混乱科技 / MessTech): `MTThaumcraftResearch`, essentia hatch, LEG upgrade items
+  - 无线ME网络 (无线连接仓室 / 无线ME网络核心 / 无线ME网络绑定工具): `MTWirelessNetworkRuntime` /
+    `MTWirelessSavedData` / AE2 hatch wireless tab, ported from GTLCore; design doc `docs/wireless-me-network.md`
+    (v2 2026-11-24: 存档级网络 + 手动创建/选择 + Flux Networks 1.20 风格 GUI, see §9 of that doc)
   - Blocks
 - GT5U API knowledge
 - NEI collapsible item groups (物品折叠：速度/节能/并行模块仓与 NAC 部件, via `config/NEI/collapsibleitems.cfg`)
@@ -85,6 +88,20 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - 16. Reactor recipes (`GTRecipes.addReactorRecipes()`)
 - 17. Beamline / particle hatch API (GT5U 5.09.54.133)
 - 18. 2.9.0 迁移：GT5U 5.09.54.205 → 5.09.54.264（GTAuthors 移除等）
+
+### `docs/wireless-me-network.md` - 无线ME网络（GTLCore 移植设计/契约）
+- GTLCore → 1.7.10 功能映射表；AE2 rv3 / GT5U / MUI2 / ServerUtilities 技术结论
+- 文件所有权与共享契约：类签名、语言键、资源路径、SavedData NBT 格式
+- 无线连接机制（`createGridConnection` 逻辑连线）、绑定工具/GUI、仓室侧无线页签、来源标注、配方
+- 绑定工具的 Baubles Expanded 饰品槽（`wireless_connector`）与选择界面键位（§8.6）
+- **§9 v2（2026-11-24）**：存档级网络（独立创建/颜色/访问等级/删除）+ 手动选择绑定 + Flux Networks 1.20
+  风格 GUI（核心 5 页签 / 工具选择 / 仓室页签）+ 核心物品 NBT 持久化 + Flux 功能移植建议 + §9.10 落地记录
+
+### `docs/ultra-ae2.md` - 超致密 AE2 内容（超致密ME控制器 / ME中子注入控制器 / 压缩线缆）
+- 4 类物品的数值、配方（GT 压缩机 IV/1h）、材质复用方式
+- AE2 事实：控制器 TE 复用、`PathingCalculation.ControllerFace` 每面 32 频道、`GridNode.getMaxChannels`
+- 自定义 AE2 线缆 part/item 的写法（`IPartItem` + `createPartFromItemStack` + `getItemStack` 覆写）
+- 3 个 AE2 mixin 的分工与注册方式
 
 ### `docs/repo-readme.md` - the repo summary it started as
 - Machine base hierarchy

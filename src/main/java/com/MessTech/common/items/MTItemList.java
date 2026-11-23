@@ -115,6 +115,10 @@ public enum MTItemList {
     MTEssentiaOutputHatchME,
     /** 协议核心 (Protocol Core): the beacon-tower that turns the placer's wireless EU into wired power for the team. */
     MTProtocolCore,
+    /** 无线ME网络核心 (Wireless ME Network Core): the block that plugs an ME network into the air. */
+    WirelessNetworkCore,
+    /** 无线ME网络绑定工具 (Wireless ME Network Binding Tool): saves a network and binds ME hatches to it. */
+    WirelessNetworkBindingTool,
     /** LEG upgrade item (源质发电机升级), 10 metadata values. */
     MTEssentiaUpgrade;
 

@@ -8,6 +8,9 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import cpw.mods.fml.relauncher.FMLLaunchHandler;
+import cpw.mods.fml.relauncher.Side;
+
 /**
  * Registry of MessTech mixins: the late loader asks this enum which mixin classes to apply for the loaded mods
  * (the GTNH FMusic pattern).
@@ -45,7 +48,48 @@ public enum Mixins {
      */
     NEI_TEXT_EFFECTS(new MixinClass("MixinFormattedTextField_TextEffect").setClass("MixinFormattedTextField_TextEffect")
         .setPhase(Phase.LATE)
-        .addTargetMod(TargetMod.NOT_ENOUGH_ITEMS));
+        .addTargetMod(TargetMod.NOT_ENOUGH_ITEMS)),
+
+    /**
+     * The 「无线网络」 (wireless ME network) tab ported from GTLCore: every AE2 based GT hatch GUI gets a tab that lists
+     * the accessible wireless networks and connects/disconnects the hatch. The first mixin injects the tab attachment
+     * into the shared GT single block hatch GUI base class, the second one (client only) opens the always visible tab
+     * panel once the ModularUI2 screen was opened.
+     * <p>
+     * The screen mixin targets {@code ModularScreen}, which is {@code @SideOnly(Side.CLIENT)} and is stripped from the
+     * dedicated server jar by Forge, so it is only registered when the client side loads the late mixins. The GT mixin
+     * is unconditional: GT5U is a hard dependency of this mod.
+     */
+    WIRELESS_HATCH_TAB(
+        new MixinClass("MixinMTETieredMachineBlockBaseGui_WirelessTab")
+            .setClass("MixinMTETieredMachineBlockBaseGui_WirelessTab")
+            .setPhase(Phase.LATE),
+        new MixinClass("MixinModularScreen_WirelessTab").setClass("MixinModularScreen_WirelessTab")
+            .setPhase(Phase.LATE)
+            .addCondition(Side.CLIENT.equals(FMLLaunchHandler.side()))),
+
+    /**
+     * The ultra dense AE2 content (超致密ME控制器 / 超致密ME中子注入控制器 / 超致密压缩ME线缆 / 压缩ME玻璃线缆):
+     * AE2 natively caps a cable node at 8 or 32 channels and every controller face at 32 channels, so the requested
+     * 1024 / 2.1G values need these two facts changed. See {@code docs/ultra-ae2.md}.
+     * <ul>
+     * <li>{@code MixinGridNode_ChannelCapacity}: a node whose machine implements {@code IMTChannelCapacity} reports its
+     * own capacity from {@code GridNode#getMaxChannels}.</li>
+     * <li>{@code MixinPathingCalculation_UltraDense} / {@code MixinControllerFace_UltraDense}: a pathing run over a
+     * grid
+     * containing an ultra dense controller gives the controller faces {@code Integer.MAX_VALUE} channels.</li>
+     * </ul>
+     * AE2 is a hard dependency of this mod, but the target-mod condition keeps the mixins off if a pack ever drops it.
+     */
+    ULTRA_AE2(new MixinClass("MixinGridNode_ChannelCapacity").setClass("MixinGridNode_ChannelCapacity")
+        .setPhase(Phase.LATE)
+        .addTargetMod(TargetMod.APPLIED_ENERGISTICS2),
+        new MixinClass("MixinPathingCalculation_UltraDense").setClass("MixinPathingCalculation_UltraDense")
+            .setPhase(Phase.LATE)
+            .addTargetMod(TargetMod.APPLIED_ENERGISTICS2),
+        new MixinClass("MixinControllerFace_UltraDense").setClass("MixinControllerFace_UltraDense")
+            .setPhase(Phase.LATE)
+            .addTargetMod(TargetMod.APPLIED_ENERGISTICS2));
 
     private final MixinClass[] MIXIN_CLASS;
     private final Supplier<Boolean> shouldApplyThisMixinGroup;

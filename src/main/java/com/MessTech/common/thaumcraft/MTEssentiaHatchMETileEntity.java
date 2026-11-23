@@ -7,6 +7,7 @@ import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import com.MessTech.common.block.MTBlocks;
+import com.MessTech.common.wireless.gui.MTWirelessHatchTab;
 import com.MessTech.init.MessTech;
 import com.cleanroommc.modularui.api.IGuiHolder;
 import com.cleanroommc.modularui.api.drawable.IKey;
@@ -233,7 +234,7 @@ public class MTEssentiaHatchMETileEntity extends MTEssentiaHatchTileEntity
             .size(64, 14);
         maxInputField.syncHandler("max_input");
 
-        return new ModularPanel("me_essentia_hatch").size(176, 116)
+        ModularPanel panel = new ModularPanel("me_essentia_hatch").size(176, 116)
             .background(GuiTextures.MC_BACKGROUND)
             .child(ButtonWidget.panelCloseButton())
             .child(
@@ -274,6 +275,11 @@ public class MTEssentiaHatchMETileEntity extends MTEssentiaHatchTileEntity
                                 syncManager.callSyncedAction(CLEAR_ACTION);
                                 return true;
                             })));
+
+        // This GUI does not go through MTETieredMachineBlockBaseGui, so the wireless ME network tab has to be attached
+        // here directly.
+        MTWirelessHatchTab.attach(panel, syncManager, this);
+        return panel;
     }
 
     @SideOnly(Side.CLIENT)

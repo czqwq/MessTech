@@ -42,6 +42,10 @@ public class Config {
     @Order(3)
     public static final GameConsole gameconsole = new GameConsole();
 
+    @Comment("Options of the wireless ME network.")
+    @Order(4)
+    public static final Wireless wireless = new Wireless();
+
     public static class General {
 
         @Comment("Default Batch mode state of machine when placed. True is auto enable Batch mode.")
@@ -228,5 +232,15 @@ public class Config {
             "does not also stop every mob and machine around the player." })
         @DefaultBoolean(false)
         public boolean GAME_CONSOLE_PAUSES_WORLD = false;
+    }
+
+    public static class Wireless {
+
+        @Comment({
+            "Maximum number of wireless ME networks one player may create (-1 = no limit). Reaching the limit does",
+            "not stop the player from using networks that were shared with them: it only blocks the create button." })
+        @DefaultInt(5)
+        @RangeInt(min = -1, max = 1000)
+        public int NETWORK_LIMIT_PER_PLAYER = 5;
     }
 }
