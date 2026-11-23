@@ -42,8 +42,12 @@ public class Config {
     @Order(3)
     public static final GameConsole gameconsole = new GameConsole();
 
-    @Comment("Options of the wireless ME network.")
+    @Comment("Options of the commands the mod overrides.")
     @Order(4)
+    public static final Commands commands = new Commands();
+
+    @Comment("Options of the wireless ME network.")
+    @Order(5)
     public static final Wireless wireless = new Wireless();
 
     public static class General {
@@ -232,6 +236,16 @@ public class Config {
             "does not also stop every mob and machine around the player." })
         @DefaultBoolean(false)
         public boolean GAME_CONSOLE_PAUSES_WORLD = false;
+    }
+
+    public static class Commands {
+
+        @Comment({ "Replace vanilla's /kill with the entity-selector version ported from 1.20.1 (permission level 2):",
+            "@e / @p / @r / @a / @s, type=, distance=, limit=, sort=, x/y/z, dx/dy/dz, name=, team=, gamemode=,",
+            "level=, scores=, nbt=, x_rotation=/y_rotation= and the 1.7.10 spellings r=/rm=/c=/m=/l=/lm=.",
+            "Off: /kill behaves exactly like vanilla 1.7.10 (permission level 0, kills only the sender)." })
+        @DefaultBoolean(true)
+        public boolean OVERRIDE_KILL = true;
     }
 
     public static class Wireless {

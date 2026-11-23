@@ -58,6 +58,8 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - Galacticraft hook: 高速上升自动开星系 GUI (`MTGalacticraftSpaceHandler`)
 - Vanilla "moved too quickly" 上限 (`MixinNetHandlerPlayServer_MovedTooQuickly`)
 - `/messtech GoUp [秒数]` (`MTCommand` / `MTGoUpFlight`)
+- `/kill` entity selectors ported from 1.20.1 (`MTCommandKill` / `MTEntitySelector` / `MTEntitySelectorParser` /
+  `MixinCommandHandler`, `Config.commands.OVERRIDE_KILL`)
 
 ### `docs/GT5U-NOTES.md` - GT5U API notes for the version we build against
 - 0. Local reference source trees (offline lookup)
