@@ -7,6 +7,8 @@ package com.MessTech.common.mixin;
 public enum TargetMod {
 
     ANGELICA("Angelica", "angelica"),
+    /** Applied Energistics 2, the target of the ultra dense channel/controller mixins. */
+    APPLIED_ENERGISTICS2("Applied Energistics 2", "appliedenergistics2"),
     GTNH_INTERGALACTIC("GTNH Intergalactic", "gtnhintergalactic"),
     NOT_ENOUGH_ITEMS("Not Enough Items", "NotEnoughItems"),
     SPICE_OF_LIFE("The Spice of Life - Carrot Edition", "SpiceOfLife");

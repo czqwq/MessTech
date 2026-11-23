@@ -94,6 +94,10 @@ import thaumicenergistics.api.ThEApi;
 public class GTRecipes {
 
     public static void loadRecipes() {
+        // The ultra dense AE2 controllers/cables (compressor, IV, 1 hour). See docs/ultra-ae2.md.
+        com.MessTech.common.ae2.MTUltraAeRecipes.load();
+        // The wireless ME network core and binding tool (ported from GTLCore's MachineRecipe.java:918-936).
+        MTWirelessRecipes.load();
         GTValues.RA.stdBuilder()
             .metadata(RESEARCH_ITEM, getModItem(Mods.Minecraft.ID, "beacon", 1, 0))
             .metadata(SCANNING, new Scanning(10 * MINUTES, RECIPE_UHV))
