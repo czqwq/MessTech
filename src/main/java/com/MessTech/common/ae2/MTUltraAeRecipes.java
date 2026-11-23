@@ -67,14 +67,14 @@ public final class MTUltraAeRecipes {
     private static void addCableRecipes() {
         for (AEColor color : MTUltraDenseCables.colors()) {
             GTValues.RA.stdBuilder()
-                .itemInputsUnsafe(GTUtility.copyAmountUnsafe(512,MTUltraDenseCables.ae2DenseCable(color, 1)))
+                .itemInputsUnsafe(GTUtility.copyAmountUnsafe(512, MTUltraDenseCables.ae2DenseCable(color, 1)))
                 .itemOutputs(MTUltraDenseCables.ultraDenseStack(color))
                 .eut(RECIPE_IV)
                 .duration(HOURS)
                 .addTo(compressorRecipes);
 
             GTValues.RA.stdBuilder()
-                .itemInputsUnsafe(GTUtility.copyAmountUnsafe(512,MTUltraDenseCables.ae2GlassCable(color, 64)))
+                .itemInputsUnsafe(GTUtility.copyAmountUnsafe(512, MTUltraDenseCables.ae2GlassCable(color, 64)))
                 .itemOutputs(MTUltraDenseCables.compressedGlassStack(color))
                 .eut(RECIPE_IV)
                 .duration(HOURS)
