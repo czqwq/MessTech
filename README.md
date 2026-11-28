@@ -8,6 +8,9 @@ An Community mod for GTNH
 Download the Latest Mod Jar in Release then drop it to mods
 start the game
 
+> [!NOTE]
+> This is an unofficial mod. Please avoid discussing this mod in official GTNH forums.
+
 ### Before Download
 We're currently using Automatic Building System, the release version may not the newest version
 If any issue happened in AutoBuild release. Please Report Bugs in the issues
@@ -25,6 +28,11 @@ If any issue happened in AutoBuild release. Please Report Bugs in the issues
 | 2.9.0-beta3  |      1,3      |      2.5-beta2(3)      | [![1.7.0](https://img.shields.io/badge/release-v2.5-FFA500)](https://github.com/czqwq/MessTech/releases/tag/2.5-beta2(3)) |     ❌      |
 | 2.9.0-beta2  |      1.0      |          2.3           | [![1.7.0](https://img.shields.io/badge/release-v2.5-FFA500)](https://github.com/czqwq/MessTech/releases/tag/2.5-beta2(3)) |     ❌     |
 | 2.9.0-beta1  |    1.3-pre    |        1.6-pre         |   [![1.7.0](https://img.shields.io/badge/release-v1.6-FF0000)](https://github.com/czqwq/MessTech/releases/tag/1.6-pre)    |       ❌       |
+
+### Feature
+Included partial [ProfileCache](https://github.com/70CentsApple/ProfileCached) function
+
+Use /pfc command for more detail
 
 ### Why I write this mod
 I don't know. Maybe just for fun.Enjoy it

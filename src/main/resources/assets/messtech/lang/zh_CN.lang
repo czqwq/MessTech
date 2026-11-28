@@ -780,6 +780,16 @@ command.messtech.infiore.entry=§7综合采掘工厂 维度 §b%1$s§7（§b%2$s
 command.messtech.goup.start=§7已抛向空中: §b%s §7格/s, 持续 §b%s §7秒
 command.messtech.goup.threshold.low=§c警告: 配置 MOVED_TOO_QUICKLY_THRESHOLD=§b%s§c 低于本次速度的平方 §b%s§c, 原版 moved too quickly 检查会把玩家拉回来
 
+# --- /pfc 指令（ProfileCached 移植；见 MTProfileCachedCommand）。缓存按玩家名保存在线模式登录验证结果，
+# 子命令全部要求权限等级 3；reload 会重新读取 config/MessTech.cfg 并清空缓存。
+command.pfc.usage=§c用法: /pfc <reload|clean <玩家名>|cleanall|size>
+command.pfc.reloaded=§7会话缓存配置已重新读取，缓存已清空
+command.pfc.disabled=§c会话缓存未启用（配置 ENABLED=false）
+command.pfc.cleanall.done=§7已清空全部会话缓存（§b%s§7 条）
+command.pfc.clean.notcached=§c玩家 §b%s §c不在会话缓存中
+command.pfc.clean.done=§7已清除玩家 §b%s §7的缓存
+command.pfc.size=§7会话缓存条数: §b%s
+
 # 游戏机（MTR 风格的道具：右键打开一个跑 DOOM 的窗口）
 item.messtech.gameConsole.name=DOOM游戏机
 messtech.gameConsole.tooltip.open=§7· §6开机：§7右键打开一个约半屏大小的窗口，里面运行 §dDOOM§7
@@ -1100,6 +1110,15 @@ messtech.config.commands.override_kill.tooltip=把原版 /kill 替换为从 1.20
 messtech.config.wireless=无线ME网络
 messtech.config.wireless.network_limit_per_player=每人可创建网络数
 messtech.config.wireless.network_limit_per_player.tooltip=每个玩家最多能创建多少个无线ME网络；-1 表示不限制。达到上限后仍可使用别人分享给你的网络。
+messtech.config.profilecached=会话缓存（ProfileCached）
+messtech.config.profilecached.enabled=启用会话缓存
+messtech.config.profilecached.enabled.tooltip=按玩家名缓存在线模式登录验证结果：已经登录过的玩家在 Mojang 会话服务器不可用时仍能进服，登录请求也更少。只在开启 online-mode 的专用服务器上有意义；关闭后每次登录都由 Mojang 验证。
+messtech.config.profilecached.debug=调试日志
+messtech.config.profilecached.debug.tooltip=把每次缓存命中、IP 变化后的重新验证和写缓存都写进服务器日志。关闭则静默。
+messtech.config.profilecached.result_timeout=缓存有效期（分钟）
+messtech.config.profilecached.result_timeout.tooltip=一条缓存的验证结果保留多久，单位分钟（至少 10；参考模组默认 1440 = 24 小时）。每次登录成功都会刷新条目，所以活跃玩家大约每个有效期才需要 Mojang 验证一次。
+messtech.config.profilecached.verify_last_ip=校验登录 IP
+messtech.config.profilecached.verify_last_ip.tooltip=记住每条缓存验证对应的登录 IP；同名玩家从不同 IP 登录时丢弃缓存并让 Mojang 重新验证。1.7.10 的会话校验没有 IP 参数，因此登录 IP 由单独的 mixin 从登录处理器获取。关闭时缓存不绑定 IP（参考模组默认）。
 
 # --- LEG 假配方池（大型源质发电机：升级与要素） ---
 mt.recipe.leg=大型源质发电机：升级与要素

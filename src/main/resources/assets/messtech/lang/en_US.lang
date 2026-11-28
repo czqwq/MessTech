@@ -780,6 +780,17 @@ command.messtech.infiore.entry=§7Comprehensive Mining Plant, dimension §b%1$s�
 command.messtech.goup.start=§7Launched at §b%s §7blocks/s for §b%s §7seconds
 command.messtech.goup.threshold.low=§cWarning: MOVED_TOO_QUICKLY_THRESHOLD=§b%s§c is below this speed squared (§b%s§c), so the vanilla moved too quickly check will pull the player back
 
+# --- /pfc command (the ProfileCached port; see MTProfileCachedCommand). The cache holds online-mode login
+# validations by player name; every subcommand needs permission level 3, and "reload" re-reads config/MessTech.cfg
+# and empties the cache.
+command.pfc.usage=§cUsage: /pfc <reload|clean <player>|cleanall|size>
+command.pfc.reloaded=§7Session cache config reloaded; the cache has been emptied
+command.pfc.disabled=§cThe session cache is not enabled (ENABLED=false)
+command.pfc.cleanall.done=§7Emptied the session cache (§b%s§7 entries)
+command.pfc.clean.notcached=§cPlayer §b%s §cis not in the session cache
+command.pfc.clean.done=§7Removed the cached entry of §b%s
+command.pfc.size=§7Session cache size: §b%s
+
 # Game console: an item that opens a window running DOOM
 item.messtech.gameConsole.name=Game Console
 messtech.gameConsole.tooltip.open=§7· §6Power:§7 right click opens a window about half a screen across running §dDOOM§7
@@ -1101,6 +1112,15 @@ messtech.config.commands.override_kill.tooltip=Replace vanilla's /kill with the 
 messtech.config.wireless=Wireless ME Network
 messtech.config.wireless.network_limit_per_player=Networks per Player
 messtech.config.wireless.network_limit_per_player.tooltip=Maximum number of wireless ME networks one player may create; -1 means no limit. Reaching the limit does not block using networks shared with you.
+messtech.config.profilecached=Session Cache (ProfileCached)
+messtech.config.profilecached.enabled=Enable the Session Cache
+messtech.config.profilecached.enabled.tooltip=Cache online-mode login validations per player name: a player who already logged in once can still join while Mojang's session server is unreachable, and the login flow makes fewer requests. Only meaningful on a dedicated server with online-mode=true; off: every login is validated by Mojang.
+messtech.config.profilecached.debug=Debug Logging
+messtech.config.profilecached.debug.tooltip=Log every cache hit, the revalidation after an address change and every store to the server log. Off: silent.
+messtech.config.profilecached.result_timeout=Cache Lifetime (minutes)
+messtech.config.profilecached.result_timeout.tooltip=How long one cached validation stays valid, in minutes (at least 10; the reference default is 1440 = 24 hours). Every successful login refreshes the entry, so an active player only needs one Mojang validation per lifetime.
+messtech.config.profilecached.verify_last_ip=Verify the Login IP
+messtech.config.profilecached.verify_last_ip.tooltip=Remember the login IP each cached validation was requested from, and drop the entry when the same name logs in from another IP (Mojang then validates again). 1.7.10's session check has no address argument, so the IP is captured from the login handler by a separate mixin. Off: the cache is not bound to an IP (the reference default).
 
 # --- LEG fake recipe pool (Large Essentia Generator: upgrades and essentia) ---
 mt.recipe.leg=Large Essentia Generator: Upgrades & Essentia
