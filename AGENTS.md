@@ -60,6 +60,9 @@ end to end - `knowledge.md` alone is over a thousand lines. Find a section with 
 - `/messtech GoUp [秒数]` (`MTCommand` / `MTGoUpFlight`)
 - `/kill` entity selectors ported from 1.20.1 (`MTCommandKill` / `MTEntitySelector` / `MTEntitySelectorParser` /
   `MixinCommandHandler`, `Config.commands.OVERRIDE_KILL`)
+- Online-mode session cache (`/pfc`, ported from the standalone ProfileCached mod; `MTSessionService` /
+  `MTProfileCache` / `MTLoginAddresses`, `MixinMinecraftServer_ProfileCached` /
+  `MixinNetHandlerLoginServer_ProfileCached`, `Config.profilecached`)
 
 ### `docs/GT5U-NOTES.md` - GT5U API notes for the version we build against
 - 0. Local reference source trees (offline lookup)

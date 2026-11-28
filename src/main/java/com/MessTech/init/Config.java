@@ -1,5 +1,6 @@
 package com.MessTech.init;
 
+import com.MessTech.common.auth.MTProfileCache;
 import com.MessTech.common.explosion.MTExplosionDE;
 import com.gtnewhorizon.gtnhlib.config.Config.Comment;
 import com.gtnewhorizon.gtnhlib.config.Config.DefaultBoolean;
@@ -12,6 +13,7 @@ import com.gtnewhorizon.gtnhlib.config.Config.Order;
 import com.gtnewhorizon.gtnhlib.config.Config.RangeDouble;
 import com.gtnewhorizon.gtnhlib.config.Config.RangeFloat;
 import com.gtnewhorizon.gtnhlib.config.Config.RangeInt;
+import com.gtnewhorizon.gtnhlib.config.Config.Reloadable;
 
 /**
  * The mod's configuration: GTNHLib's annotation-driven config ({@code com.gtnewhorizon.gtnhlib.config}). Each nested
@@ -49,6 +51,10 @@ public class Config {
     @Comment("Options of the wireless ME network.")
     @Order(5)
     public static final Wireless wireless = new Wireless();
+
+    @Comment("Options of the online-mode session cache (ProfileCached port).")
+    @Order(6)
+    public static final Profilecached profilecached = new Profilecached();
 
     public static class General {
 
@@ -256,5 +262,46 @@ public class Config {
         @DefaultInt(5)
         @RangeInt(min = -1, max = 1000)
         public int NETWORK_LIMIT_PER_PLAYER = 5;
+    }
+
+    /**
+     * The online-mode session cache ported from the standalone ProfileCached mod (GPL-3), driven by
+     * {@code com.MessTech.common.auth}. Dedicated-server only: it changes what the server asks Mojang's session server
+     * at login, so the client half of the mod does nothing with it (the fields are still registered there because the
+     * config class is shared). Every field is reloadable through {@code /pfc reload}.
+     */
+    public static class Profilecached {
+
+        @Comment({
+            "Cache the result of the session server's hasJoinedServer check per player name: a player who already",
+            "logged in once can still join while Mojang's session server is unreachable, and the login flow makes",
+            "fewer requests (which also avoids temporary IP rejections on busy servers). Only meaningful on a",
+            "dedicated server with online-mode=true. Off: every login is validated by Mojang as usual." })
+        @DefaultBoolean(true)
+        @Reloadable(MTProfileCache.RELOAD_ID)
+        public boolean ENABLED = true;
+
+        @Comment({ "Log every cache hit, revalidation and store to the server log. Off: the cache is silent." })
+        @DefaultBoolean(false)
+        @Reloadable(MTProfileCache.RELOAD_ID)
+        public boolean DEBUG = false;
+
+        @Comment({
+            "How long one cached validation stays valid, in minutes (at least 10; the ported mod's default is 1440 =",
+            "24 hours). The entry is refreshed on every successful login, so an active player is validated by Mojang",
+            "once per entry lifetime." })
+        @DefaultInt(1440)
+        @RangeInt(min = 10, max = 525600)
+        @Reloadable(MTProfileCache.RELOAD_ID)
+        public int RESULT_TIMEOUT = 1440;
+
+        @Comment({
+            "Remember the remote address each cached validation was requested from, and drop the entry when the same",
+            "player name logs in from a different address (Mojang then validates it again). 1.7.10's session check",
+            "has no address argument, so the login handler's address is captured with a separate mixin. Off: the cache",
+            "is not bound to an address, like the ported mod's default." })
+        @DefaultBoolean(false)
+        @Reloadable(MTProfileCache.RELOAD_ID)
+        public boolean VERIFY_LAST_IP = false;
     }
 }

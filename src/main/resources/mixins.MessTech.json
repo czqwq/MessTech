@@ -15,5 +15,8 @@
     "MixinGuiNewChat_TextEffect",
     "MixinGuiTextField_TextEffect"
   ],
-  "server": []
+  "server": [
+    "MixinMinecraftServer_ProfileCached",
+    "MixinNetHandlerLoginServer_ProfileCached"
+  ]
 }

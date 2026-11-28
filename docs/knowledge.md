@@ -2034,6 +2034,50 @@ them, and that logger (`Gregtech.general.loggingOreDict`) is off by default.
   配置更低时额外发一条警告（`command.messtech.goup.threshold.low`），而不是让玩家莫名被拉回去。
 - 副作用：30 s 飞完在约 8400 格，掉下来要很久，落地/掉出世界按原版规则处理。
 
+## 在线模式会话缓存 (`/pfc`，从 ProfileCached 移植)
+- 来源：独立模组 **ProfileCached**（`one.tranic.pfc`，Forge 1.20.1，GPL-3；本仓库同为 GPL-3）。它把 player name ->
+  `hasJoinedServer` 的结果缓存起来：缓存命中的玩家**不再请求 Mojang 会话服务器**，所以会话服务器宕机时老玩家照样能进服，
+  日常登录请求也大幅减少（可避免繁忙服务器 IP 被临时拒绝）。移植后只保留这套行为，原模组的 YggdrasilProxy 反射兼容层
+  （`one.tranic.t.proxy`）不适用，未移植；原模组"仅在线模式 + 专用服务器"的适用范围照搬。
+- 文件：`common/auth/MTSessionService`（`YggdrasilMinecraftSessionService` 子类，重写 `hasJoinedServer`）、
+  `MTProfileCache`（Guava `Cache<String, MTCachedProfile>`，按配置的超时 `expireAfterWrite`）、`MTCachedProfile`
+  （profile + lastLoginIp）、`MTLoginAddresses`（登录 IP 的短期记录）与 `common/command/MTProfileCachedCommand`。
+  原模组用 Caffeine，1.7.10 的 Guava 就够，没加依赖。
+- 注入方式：**早期 mixin** `MixinMinecraftServer_ProfileCached` 把 `MinecraftServer` 构造器里的
+  `field_152364_T.createMinecraftSessionService()`（反编译/字节码可确认就是这个调用，`@Redirect` 的 target 逐字对应）
+  redirect 成 `new MTSessionService(...)`，`NetHandlerLoginServer` 于是走缓存服务；`@Mixin` 在
+  `mixins.MessTech.json` 的 **`"server"` 列表**里，客户端（含单人/LAN 的集成服务器）保持原版服务不变。
+- **为什么必须是早期 mixin**：专用服务器在 FML 加载模组**之前**就 `new DedicatedServer` → `MinecraftServer.<init>`
+  （会话服务在这里创建），晚期 mixin 注册时该类已经加载完。也正因为如此，`MinecraftServer` 构造时配置还没被 GTNHLib 读，
+  `MTSessionService`/`MTProfileCache` 只在**第一次登录**时才读 `Config.profilecached` 并懒建缓存（超时值变化会重建）。
+- 缓存语义（与 `PFCSessionService` 对齐）：`ENABLED=false` → 直接走真实会话服务器且不写缓存；缓存命中且
+  （`VERIFY_LAST_IP=false` 或没有可比对的地址）→ 直接返回缓存的 profile（UUID + 材质属性，1.7.10 的皮肤/披风属性也
+  在里面）；`VERIFY_LAST_IP=true` 且地址与缓存记录不同 → 丢条目、交回 Mojang 验证后重新缓存；未命中 → 真实验证，
+  `null` 不缓存，`AuthenticationUnavailableException` 照旧向上抛（缓存命中在前，所以宕机时老玩家能过）。
+- **IP 校验的 1.7.10 差异**：1.20.1 的 `hasJoinedServer(GameProfile, String, InetAddress)` 带地址，1.7.10 authlib
+  1.5.21 只有 `hasJoinedServer(GameProfile, String)`，而验证跑在 `User Authenticator #n` 线程里看不到登录处理器。
+  因此 `MixinNetHandlerLoginServer_ProfileCached` 在 `NetHandlerLoginServer#processEncryptionResponse` 的 HEAD（起线程
+  之前，profile 已从 Login Start 包读进 `field_147337_i`）把 `field_147333_a.getSocketAddress()` 记进
+  `MTLoginAddresses`（Guava 5 分钟过期，给流离的尝试兜底），`MTSessionService` 再做比对。`VERIFY_LAST_IP` 默认关
+  （原模组默认也关），关时缓存不绑定地址。
+- 配置：`Config.profilecached`（`ENABLED` / `DEBUG` / `RESULT_TIMEOUT` 分钟，≥10、默认 1440 / `VERIFY_LAST_IP`），
+  四个字段都带 `@Config.Reloadable("pfc")`，`/pfc reload` 用
+  `ConfigurationManager.reloadConfig(Config.class, MTProfileCache.RELOAD_ID)` 重读 `config/MessTech.cfg` 再清空缓存
+  （与原模组"reload 后缓存全空"一致）。`/pfc clean <name>` 按**名字**清条目（离线玩家也能清），`cleanall` 清全部，
+  `size` 打印 `cache.size()`；全部权限等级 3，命令只在专用服务器注册（`CommonProxy#serverStarting` 里判
+  `FMLCommonHandler#getSide`）。
+- 安全性是**原模组自带的取舍**：条目有效期（默认 24 h）内服务端不再向 Mojang 复核，改名易主的旧条目在这段时间里仍被
+  信任；`VERIFY_LAST_IP` 把信任范围收窄到上次登录 IP。文档/注释里都按这个口径写，不要写成"更安全"。
+- 语言键：`command.pfc.*` 与 `messtech.config.profilecached*` 进中英两份 lang。`/pfc` 的输出全部是
+  `ChatComponentTranslation`，跟随发送者语言。
+- 验证记录：`./gradlew compileJava` 通过，Mixin AP 的 refmap 把登录 mixin 映射到
+  `NetHandlerLoginServer.func_147315_a`（生产名）；`./gradlew runServer -PrunServerWorkingDirectory=run/probe-server`
+  起专用服务器通过，`-Dmixin.debug.verbose=true` 日志里有
+  `Mixing MixinMinecraftServer_ProfileCached from mixins.MessTech.json into net.minecraft.server.MinecraftServer`，
+  `Preparing mixins.MessTech.json (8)`（1 通用 + 5 客户端 + 2 服务端）。登录 mixin 只在首次有人登录时才随
+  `NetHandlerLoginServer` 加载，端到端缓存命中需要真实 online-mode 客户端，当前只做到 mixin/refmap/编译期校验；
+  `/pfc` 本身随服务器启动注册（`FMLServerStartingEvent`）。
+
 ## 混沌终焉·虚无贯星弓 (`MTItemVoidstarBow` / `MTEntityVoidstarArrow`)
 - `item.messtech.voidstarBow.name` = `混沌终焉·虚无贯星弓` / `Chaos Finale: Voidstar Piercer`; registry `VoidstarBow`,
   unlocalized `messtech.voidstarBow`, tab `tabCombat`, max stack 1, durability 1,024 (`MTItemVoidstarBow.MAX_DAMAGE`).

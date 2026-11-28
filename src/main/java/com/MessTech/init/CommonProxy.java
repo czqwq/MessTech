@@ -3,12 +3,14 @@ package com.MessTech.init;
 import static com.MessTech.init.MessTech.MT_LOG;
 
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import com.MessTech.common.block.MTBlocks;
 import com.MessTech.common.command.MTCommand;
 import com.MessTech.common.command.MTGoUpFlight;
+import com.MessTech.common.command.MTProfileCachedCommand;
 import com.MessTech.common.container.ContainerUltimatePatternTerminal;
 import com.MessTech.common.entity.MTEntityDEBlast;
 import com.MessTech.common.entity.MTEntityPiggy;
@@ -44,6 +46,8 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.event.FMLServerStoppedEvent;
 import cpw.mods.fml.common.network.IGuiHandler;
 import cpw.mods.fml.common.network.NetworkRegistry;
+import cpw.mods.fml.relauncher.FMLLaunchHandler;
+import cpw.mods.fml.relauncher.Side;
 import gregtech.api.enums.Mods;
 
 public class CommonProxy implements IGuiHandler {
@@ -146,6 +150,19 @@ public class CommonProxy implements IGuiHandler {
         MT_LOG.debug("Hello the mess world!");
         // /messtech - see MTCommand. Commands belong to this event, not to preInit.
         event.registerServerCommand(new MTCommand());
+        // /pfc - the online-mode session cache ported from ProfileCached. The cache only exists on the dedicated
+        // server (the session service is replaced there by MixinMinecraftServer_ProfileCached), so the command is not
+        // registered on a client's integrated server.
+        if (FMLLaunchHandler.side() == Side.SERVER) {
+            event.registerServerCommand(new MTProfileCachedCommand());
+            // The ported mod's startup notice: offline-mode logins never call hasJoinedServer, so an enabled cache
+            // simply stays empty there.
+            final MinecraftServer server = MinecraftServer.getServer();
+            if (server != null && !server.isServerInOnlineMode() && Config.profilecached.ENABLED) {
+                MT_LOG.warn(
+                    "ProfileCached session cache is enabled but online-mode is off: logins are not validated, so the cache stays empty.");
+            }
+        }
     }
 
     @Override
